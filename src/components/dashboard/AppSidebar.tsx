@@ -1,13 +1,25 @@
 import { useState } from "react";
 import {
   LayoutGrid,
-  Settings2,
+  Settings,
   LogOut,
   ChevronRight,
   ChevronDown,
   ChevronLeft,
   Sun,
   Moon,
+  Calendar,
+  MessageSquare,
+  BarChart3,
+  Activity,
+  Briefcase,
+  Video,
+  Megaphone,
+  Truck,
+  Hexagon,
+  Users,
+  Lightbulb,
+  FileBadge,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,7 +33,7 @@ interface MenuItem {
   hasArrow?: boolean;
   isDropdown?: boolean;
   isOpen?: boolean;
-  subItems?: string[];
+  subItems?: { label: string; icon?: LucideIcon }[];
 }
 
 const menuItems: MenuItem[] = [
@@ -29,20 +41,43 @@ const menuItems: MenuItem[] = [
     icon: LayoutGrid,
     label: "Dashboard",
     isDropdown: true,
-    subItems: ["Geral", "Analytics", "Performance", "Relatórios"],
+    subItems: [
+      { label: "Geral", icon: LayoutGrid },
+      { label: "Analytics", icon: BarChart3 },
+      { label: "Produtos", icon: Hexagon },
+    ],
   },
+  { icon: Calendar, label: "Calendário" },
+  { icon: MessageSquare, label: "Mensagens" },
+  { icon: BarChart3, label: "CRM" },
+  { icon: Activity, label: "Esteira" },
+  {
+    icon: Briefcase,
+    label: "Gestão",
+    isDropdown: true,
+    subItems: [
+      { label: "Campanhas", icon: Megaphone },
+      { label: "Entregas", icon: Truck },
+      { label: "Assinaturas", icon: Video },
+      { label: "Solicitações", icon: FileBadge },
+    ],
+  },
+  { icon: Users, label: "Usuários" },
+  { icon: Lightbulb, label: "Sugestões" },
 ];
 
 const settingsItems: MenuItem[] = [
-  { icon: Settings2, label: "Settings", hasArrow: true },
+  { icon: Settings, label: "Configurações", hasArrow: true },
 ];
 
 interface AppSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function AppSidebar({ isCollapsed, onToggle }: AppSidebarProps) {
+export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: AppSidebarProps) {
   const { theme, setTheme } = useTheme();
   const [openMenus, setOpenMenus] = useState<string[]>(["Dashboard"]);
   const [activeItem, setActiveItem] = useState<string>("Geral");
@@ -59,6 +94,8 @@ export function AppSidebar({ isCollapsed, onToggle }: AppSidebarProps) {
       className={cn(
         "fixed left-0 top-0 h-screen bg-card border-r border-border flex flex-col z-50 transition-all duration-500",
         isCollapsed ? "w-20" : "w-64",
+        "lg:translate-x-0",
+        isMobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
       )}
     >
       {/* Profile Section */}
@@ -126,6 +163,7 @@ export function AppSidebar({ isCollapsed, onToggle }: AppSidebarProps) {
                         toggleMenu(item.label);
                       } else {
                         setActiveItem(item.label);
+                        if (onMobileClose) onMobileClose();
                       }
                     }}
                     className={cn(
@@ -143,8 +181,7 @@ export function AppSidebar({ isCollapsed, onToggle }: AppSidebarProps) {
 
                     <item.icon
                       className="w-5 h-5 shrink-0 text-[#0053FC] transition-colors duration-300"
-                      strokeWidth={1.5}
-                      fill="currentColor"
+                      strokeWidth={1.8}
                     />
                     {!isCollapsed && (
                       <div
@@ -190,10 +227,13 @@ export function AppSidebar({ isCollapsed, onToggle }: AppSidebarProps) {
                         {item.subItems?.map((sub, i) => (
                           <div
                             key={i}
-                            onClick={() => setActiveItem(sub)}
+                            onClick={() => {
+                              setActiveItem(sub.label);
+                              if (onMobileClose) onMobileClose();
+                            }}
                             className={cn(
-                              "text-xs font-semibold py-2 px-3 rounded-md cursor-pointer transition-all border-l-2 relative overflow-hidden group/sub",
-                              activeItem === sub
+                              "text-xs font-semibold py-2 px-3 rounded-md cursor-pointer transition-all border-l-2 relative overflow-hidden group/sub flex items-center gap-2",
+                              activeItem === sub.label
                                 ? "bg-primary/5 text-primary border-primary font-bold shadow-sm"
                                 : "text-muted-foreground border-transparent hover:text-primary hover:bg-primary/5 hover:border-primary/30",
                             )}
@@ -201,10 +241,13 @@ export function AppSidebar({ isCollapsed, onToggle }: AppSidebarProps) {
                             <div
                               className={cn(
                                 "absolute inset-0 bg-primary/5 translate-x-[-100%] group-hover/sub:translate-x-0 transition-transform duration-500",
-                                activeItem === sub && "translate-x-0",
+                                activeItem === sub.label && "translate-x-0",
                               )}
                             />
-                            <span className="relative z-10">{sub}</span>
+                            {sub.icon && (
+                              <sub.icon className="w-3.5 h-3.5 relative z-10 opacity-70 group-hover/sub:opacity-100 transition-opacity" />
+                            )}
+                            <span className="relative z-10">{sub.label}</span>
                           </div>
                         ))}
                       </div>
@@ -275,7 +318,7 @@ export function AppSidebar({ isCollapsed, onToggle }: AppSidebarProps) {
             >
               {/* Brand Indicator Bar */}
               <div className="absolute left-0 top-2 bottom-2 w-1 bg-[#0053FC]" />
-              
+
               <div className="w-9 h-9 rounded-lg bg-background shadow-sm border border-border/50 flex items-center justify-center relative overflow-hidden shrink-0 ml-1">
                 <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-amber-500" />
                 <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-blue-400" />

@@ -10,8 +10,8 @@ export function DashboardHeader({ title }: { title: string }) {
       <div className="flex items-center gap-6">
         <div className="relative group hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors z-10" />
-          <Input 
-            placeholder="Pesquisar..." 
+          <Input
+            placeholder="Pesquisar..."
             className="pl-10 w-64 h-10 pr-12"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded border border-border bg-secondary text-[10px] text-muted-foreground font-mono">
