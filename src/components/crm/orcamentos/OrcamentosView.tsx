@@ -5,8 +5,6 @@ import {
   ChevronDown, 
   ChevronsUpDown, 
   ChevronUp, 
-  ChevronLeft, 
-  ChevronRight, 
   Package, 
   MessageSquare, 
   X, 
@@ -15,6 +13,7 @@ import {
   XCircle 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MiniCalendar } from "@/components/ui/MiniCalendar";
 
 export interface Orcamento {
   id: string;
@@ -65,14 +64,15 @@ export function OrcamentosView() {
   };
 
   // Date selection logic
-  const [startDate, setStartDate] = useState<number | null>(1);
-  const [endDate, setEndDate] = useState<number | null>(16);
-  const [isSelectingStart, setIsSelectingStart] = useState(true);
+  const [startDate, setStartDate] = useState<Date | null>(new Date(2026, 3, 1));
+  const [endDate, setEndDate] = useState<Date | null>(new Date(2026, 3, 16));
 
-  const handleOpenStatus = (item: Orcamento) => {
-    setSelectedItem(item);
-    setStatusStep('selection');
-    setIsStatusModalOpen(true);
+  const handleRangeSelect = (start: Date, end: Date | null) => {
+    setStartDate(start);
+    setEndDate(end);
+    if (start && end) {
+      setIsDateModalOpen(false);
+    }
   };
 
   const handleDateMask = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,21 +88,10 @@ export function OrcamentosView() {
     e.target.value = value;
   };
 
-  const handleDateClick = (day: number) => {
-    if (isSelectingStart) {
-      setStartDate(day);
-      setEndDate(null);
-      setIsSelectingStart(false);
-    } else {
-      if (day < (startDate || 0)) {
-        setStartDate(day);
-        setEndDate(null);
-      } else {
-        setEndDate(day);
-        setIsSelectingStart(true);
-        setIsDateModalOpen(false);
-      }
-    }
+  const handleOpenStatus = (item: Orcamento) => {
+    setSelectedItem(item);
+    setStatusStep('selection');
+    setIsStatusModalOpen(true);
   };
 
   const filteredAndSortedItems = useMemo(() => {
@@ -130,11 +119,12 @@ export function OrcamentosView() {
       }
     }
 
-    // Date Range Filter (Mock logic based on day of month)
+    // Date Range Filter
     if (startDate !== null && endDate !== null) {
       result = result.filter(item => {
-        const itemDay = parseInt(item.date.split('/')[0], 10);
-        return itemDay >= Math.min(startDate, endDate) && itemDay <= Math.max(startDate, endDate);
+        const [d, m, y] = item.date.split('/').map(Number);
+        const itemDate = new Date(y, m - 1, d);
+        return itemDate >= startDate && itemDate <= endDate;
       });
     }
 
@@ -181,8 +171,8 @@ export function OrcamentosView() {
   };
 
   const dateLabel = endDate !== null 
-    ? `${startDate?.toString().padStart(2, '0')}/04/2026 até ${endDate.toString().padStart(2, '0')}/04/2026`
-    : `Selecione a data final...`;
+    ? `${startDate?.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })} até ${endDate.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+    : startDate ? `${startDate.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })}...` : "Selecione o período...";
 
   return (
     <div className="h-full flex flex-col space-y-6">
@@ -204,51 +194,31 @@ export function OrcamentosView() {
           {/* 2. Date Filter Button */}
           <div className="relative w-full sm:w-auto">
             <button 
-              onClick={() => {
-                setIsDateModalOpen(!isDateModalOpen);
-                if (!isDateModalOpen) setIsSelectingStart(true);
-              }}
+              onClick={() => setIsDateModalOpen(!isDateModalOpen)}
               className={cn(
-                "w-full sm:w-auto flex items-center justify-center gap-3 border rounded-2xl px-6 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 shrink-0 outline-none",
+                "w-full sm:min-w-[280px] flex items-center justify-between gap-3 border rounded-2xl px-6 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 shrink-0 outline-none",
                 isDateModalOpen 
                   ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 ring-4 ring-primary/10" 
                   : "bg-secondary/20 border-border/40 text-foreground/80 hover:bg-secondary/40 hover:border-border/60"
               )}
             >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>{dateLabel}</span>
+              <div className="flex items-center gap-3">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{dateLabel}</span>
+              </div>
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", isDateModalOpen && "rotate-180")} />
             </button>
 
             {isDateModalOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsDateModalOpen(false)} />
-                <div className="absolute top-16 left-0 z-50 w-80 bg-card/95 backdrop-blur-xl border border-border/50 pb-6 rounded-[2.5rem] shadow-[0_25px_70px_-15px_rgba(0,0,0,0.6)] animate-in zoom-in-95 duration-200">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-8">
-                      <button className="p-2 hover:bg-secondary rounded-xl transition-all"><ChevronLeft className="w-4 h-4 text-muted-foreground" /></button>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-black uppercase tracking-tighter">Abril</span>
-                        <span className="text-sm font-black text-primary">2026</span>
-                      </div>
-                      <button className="p-2 hover:bg-secondary rounded-xl transition-all"><ChevronRight className="w-4 h-4 text-muted-foreground" /></button>
-                    </div>
-                    <div className="grid grid-cols-7 gap-1 text-center mb-4">
-                      {['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => (
-                        <span key={d} className="text-[9px] font-black text-muted-foreground/50 py-2">{d}</span>
-                      ))}
-                      {Array.from({ length: 30 }).map((_, i) => {
-                        const day = i + 1;
-                        const isStart = day === startDate;
-                        const isEnd = day === endDate;
-                        const isInRange = endDate !== null && day > (startDate || 0) && day < endDate;
-                        return (
-                          <button key={i} onClick={() => handleDateClick(day)} className={cn("aspect-square text-[11px] font-black rounded-xl transition-all flex items-center justify-center relative", (isStart || isEnd) ? "bg-primary text-white shadow-lg shadow-primary/30 z-10" : isInRange ? "bg-primary/10 text-primary rounded-none" : "hover:bg-secondary text-foreground/80")}>
-                            {day}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                <div className="absolute top-16 left-0 z-50 w-auto bg-card rounded-[2.5rem] shadow-[0_25px_70px_-15px_rgba(0,0,0,0.6)] animate-in zoom-in-95 duration-200">
+                  <MiniCalendar 
+                    mode="range"
+                    onSelectRange={handleRangeSelect}
+                    initialStartDate={startDate}
+                    initialEndDate={endDate}
+                  />
                 </div>
               </>
             )}

@@ -101,16 +101,16 @@ export function CampanhasView() {
 
   return (
     <div className="py-4 space-y-8 h-full overflow-y-auto scrollbar-hide pr-2">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
         {/* Nova Campanha Card */}
         <div 
           onClick={() => setIsNewCampaignModalOpen(true)}
-          className="aspect-square bg-white/[0.01] border-2 border-dashed border-border/60 rounded-[2.5rem] flex flex-col items-center justify-center group cursor-pointer hover:border-primary/50 transition-all hover:bg-primary/[0.02]"
+          className="aspect-[4/5] bg-white/[0.01] border-2 border-dashed border-border/60 rounded-[1.5rem] flex flex-col items-center justify-center group cursor-pointer hover:border-primary/50 transition-all hover:bg-primary/[0.02]"
         >
-          <div className="w-12 h-12 rounded-full bg-secondary/80 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
-            <Plus className="w-6 h-6 text-primary" />
+          <div className="w-10 h-10 rounded-full bg-secondary/80 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
+            <Plus className="w-5 h-5 text-primary" />
           </div>
-          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Nova Campanha</span>
+          <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Nova Campanha</span>
         </div>
 
         {campaigns.map((camp) => (
@@ -118,40 +118,40 @@ export function CampanhasView() {
             key={camp.id} 
             onClick={() => camp.type === 'brand' && setSelectedCampaign(camp)}
             className={cn(
-              "aspect-square rounded-[2.5rem] p-6 flex flex-col transition-all duration-500 cursor-pointer group relative overflow-hidden",
+              "aspect-[4/5] rounded-[1.5rem] p-5 flex flex-col transition-all duration-500 cursor-pointer group relative overflow-hidden",
               camp.type === 'highlight' 
                 ? "bg-gradient-to-br from-primary via-primary/90 to-blue-700 shadow-xl shadow-primary/10 border border-white/10" 
                 : "bg-card border border-border/60 hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/5"
             )}
           >
             {camp.type === 'highlight' ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center relative">
+              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center relative">
                   <div className="absolute inset-0 bg-white blur-xl opacity-20 animate-pulse" />
-                  <Target className="w-8 h-8 text-white relative z-10" />
+                  <Target className="w-6 h-6 text-white relative z-10" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-lg font-black text-white tracking-tight uppercase leading-none">{camp.name}</h3>
-                  <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{camp.description}</p>
+                  <h3 className="text-sm font-black text-white tracking-tight uppercase leading-tight">{camp.name}</h3>
+                  <p className="text-[9px] font-bold text-white/50 uppercase tracking-widest leading-tight">{camp.description}</p>
                 </div>
-                <div className="px-5 py-1.5 rounded-full bg-white/10 border border-white/20">
-                   <span className="text-[9px] font-black text-white tracking-[0.2em]">★ {camp.badge}</span>
+                <div className="px-4 py-1.5 rounded-full bg-white/10 border border-white/20">
+                   <span className="text-[8px] font-black text-white tracking-[0.2em]">★ {camp.badge}</span>
                 </div>
               </div>
             ) : (
               <>
-                <div className="flex-1 bg-secondary/50 dark:bg-black/40 rounded-3xl p-6 flex items-center justify-center border border-border/10 mb-4 transition-colors">
+                <div className="flex-1 bg-secondary/50 dark:bg-black/40 rounded-2xl p-4 flex items-center justify-center border border-border/10 mb-3 transition-colors">
                   <img 
                     src={camp.logo} 
-                    className="max-h-12 w-auto object-contain brightness-100 group-hover:scale-110 transition-transform duration-700 dark:contrast-125" 
+                    className="max-h-10 w-auto object-contain brightness-100 group-hover:scale-110 transition-transform duration-700 dark:contrast-125" 
                     alt={camp.name} 
                   />
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-xs font-black text-foreground/90 truncate uppercase tracking-tight">{camp.name}</h3>
-                  <p className="text-[9px] font-bold text-muted-foreground tracking-widest">{camp.date}</p>
-                  <div className="pt-1">
-                    <span className="inline-flex px-3 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[8px] font-black uppercase tracking-widest">
+                <div className="space-y-1.5">
+                  <h3 className="text-[10px] font-black text-foreground/90 truncate uppercase tracking-tight">{camp.name}</h3>
+                  <p className="text-[8px] font-bold text-muted-foreground tracking-widest leading-none">{camp.date}</p>
+                  <div className="pt-0.5">
+                    <span className="inline-flex px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[7px] font-black uppercase tracking-widest">
                        {camp.status}
                     </span>
                   </div>

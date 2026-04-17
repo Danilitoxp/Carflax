@@ -10,8 +10,6 @@ import {
   Moon,
   Calendar,
   BarChart3,
-  Briefcase,
-  Video,
   Megaphone,
   Truck,
   Hexagon,
@@ -23,6 +21,8 @@ import {
   Lightbulb,
   FileBadge,
   Plane,
+  FileText,
+  CheckCircle2,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -68,15 +68,13 @@ const menuItems: MenuItem[] = [
       { label: "Campanhas", icon: Megaphone },
     ],
   },
-
   {
-    icon: Briefcase,
-    label: "Gestão",
+    icon: Truck,
+    label: "Entregas",
     isDropdown: true,
     subItems: [
-      { label: "Entregas", icon: Truck },
-      { label: "Assinaturas", icon: Video },
-      { label: "Solicitações", icon: FileBadge },
+      { label: "Romaneios", icon: FileText },
+      { label: "Concluídas", icon: CheckCircle2 },
     ],
   },
   { icon: Users, label: "Usuários" },

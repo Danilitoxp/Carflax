@@ -13,6 +13,8 @@ import { LayoutGrid } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { SugestaoModal } from "@/components/sugestao";
+import { EntregasView } from "@/components/entregas";
+import { UsersView } from "@/components/users/UsersView";
 
 function DashboardContent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -90,6 +92,12 @@ function DashboardContent() {
             <SettingsSection externalTab={activeItem} />
           ) : isCrmView ? (
             <CrmSection activeTab={activeItem} />
+          ) : ["Entregas", "Romaneios", "Concluídas"].includes(activeItem) ? (
+            <EntregasView activeTab={activeItem} />
+          ) : activeItem === "Usuários" ? (
+            <div className="p-8 h-full overflow-y-auto scrollbar-hide">
+              <UsersView />
+            </div>
           ) : isDashboardView ? (
             <CommunicationSection />
           ) : (
