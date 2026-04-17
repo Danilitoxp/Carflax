@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { EventModal } from "./EventModal";
 import { EventsView } from "./Eventos/EventsView";
 import { VacationsView } from "./Ferias/VacationsView";
+import { VacationModal } from "./Ferias/VacationModal";
 
 interface CalendarEvent {
   id: number;
@@ -47,13 +48,14 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
     { id: 5, day: 23, month: 3, year: 2026, title: "Alan Henrique 1 ano d...", type: "star" },
   ]);
 
-  const [vacations, _setVacations] = useState<Vacation[]>([
+  const [vacations, setVacations] = useState<Vacation[]>([
     { id: 1, name: "Mateus Ronald", start: new Date(2026, 3, 5), end: new Date(2026, 3, 18), color: "bg-orange-500", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mateus" },
     { id: 2, name: "Guilherme Santana", start: new Date(2026, 3, 1), end: new Date(2026, 3, 4), color: "bg-blue-600", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Guilherme" },
     { id: 3, name: "Tatiane Maria", start: new Date(2026, 3, 20), end: new Date(2026, 3, 26), color: "bg-emerald-600", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Tatiane" },
   ]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [newEvent, setNewEvent] = useState({
@@ -61,6 +63,14 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
     description: "",
     type: "video" as const
   });
+
+  const handleSaveVacation = (newVacation: { name: string; start: Date; end: Date; color: string; avatar: string }) => {
+    const vacation: Vacation = {
+      id: Date.now(),
+      ...newVacation
+    };
+    setVacations([...vacations, vacation]);
+  };
 
   useEffect(() => {
     if (activeTab === "Férias") {
@@ -203,7 +213,10 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
         {/* Action Buttons */}
         <div className="flex items-center gap-3 w-full lg:w-auto">
           {viewMode === "vacations" && (
-              <button className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-8 py-4 bg-orange-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all border border-white/10">
+              <button 
+                onClick={() => setIsVacationModalOpen(true)}
+                className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-8 py-4 bg-orange-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all border border-white/10"
+              >
                 <Plus className="w-4 h-4" />
                 Lançar Férias
               </button>
@@ -211,18 +224,30 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
         </div>
       </div>
 
+      <VacationModal 
+        isOpen={isVacationModalOpen} 
+        onClose={() => setIsVacationModalOpen(false)}
+        onSave={handleSaveVacation}
+      />
+
       {/* Calendar Grid */}
       <div className="flex-1 bg-card border border-border/50 rounded-[2.5rem] overflow-hidden flex flex-col shadow-none min-h-0 relative">
         <div className="grid grid-cols-7 border-b border-border/10 bg-secondary/5">
           {daysOfWeek.map((day) => (
-            <div key={day} className="py-6 text-center border-r border-border/10 last:border-r-0">
+            <div key={day} className={cn(
+              "py-6 text-center last:border-r-0",
+              viewMode === "events" ? "border-r border-border/10" : "border-transparent"
+            )}>
               <span className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">{day}</span>
             </div>
           ))}
         </div>
 
         <div 
-          className="flex-1 grid grid-cols-7 transition-all duration-700 min-h-0 divide-x divide-y divide-border/5"
+          className={cn(
+            "flex-1 grid grid-cols-7 transition-all duration-700 min-h-0",
+            viewMode === "events" ? "divide-x divide-y divide-border/5" : "divide-transparent"
+          )}
           style={{ 
             gridTemplateRows: `repeat(${Math.ceil(allSlots.length / 7)}, 1fr)` 
           }}

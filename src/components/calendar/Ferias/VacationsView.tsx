@@ -26,18 +26,22 @@ export function VacationsView({ dayDate, vacations }: VacationsViewProps) {
       {activeVacations.map((v, i) => {
         const isStart = dayDate.toDateString() === v.start.toDateString();
         const isEnd = dayDate.toDateString() === v.end.toDateString();
+        
+        // Show indicator if it's the actual start OR if it's the first day of the current visible month
+        const showIndicator = isStart || (dayDate.getDate() === 1 && dayDate > v.start);
+
         return (
           <div 
             key={v.id}
             className={cn(
               "flex-1 relative flex items-center px-4 transition-all animate-in slide-in-from-right-4 duration-500 shadow-none",
               v.color,
-              isStart ? "rounded-l-2xl ml-3 border-l-2 border-white/30" : "",
-              isEnd ? "rounded-r-2xl mr-3 border-r-2 border-white/30" : "",
+              isStart ? "border-l-2 border-white/30" : "",
+              isEnd ? "border-r-2 border-white/30" : "",
               !isStart && !isEnd ? "opacity-95" : ""
             )}
           >
-            {isStart && (
+            {showIndicator && (
               <div className="flex items-center gap-2 overflow-hidden shrink-0">
                 <div className="w-7 h-7 rounded-full border-2 border-white/50 overflow-hidden bg-white/20">
                   <img src={v.avatar} className="w-full h-full object-cover" />
