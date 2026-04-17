@@ -7,7 +7,9 @@ import {
   Edit3,
   Trash2,
   X,
-  ChevronDown
+  ChevronDown,
+  Camera,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +30,7 @@ export function UsersView() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(true);
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   
   // User State
   const [newUser, setNewUser] = useState({
@@ -299,7 +302,61 @@ export function UsersView() {
 
               {/* Modal Body */}
               <div className="flex flex-col max-h-[80vh]">
-                <div className="p-6 pt-2 space-y-4 overflow-y-auto scrollbar-hide">
+                <div className="p-6 pt-2 space-y-6 overflow-y-auto scrollbar-hide">
+                  {/* Avatar Selection with Upload */}
+                  <div className="flex flex-col items-center justify-center py-6 bg-secondary/10 rounded-3xl border border-dashed border-border/50 relative overflow-hidden group/avatar">
+                    <input 
+                      type="file" 
+                      id="avatar-upload"
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setNewUser({...newUser, avatar: reader.result as string});
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                    
+                    <div className="relative">
+                      <div 
+                        onClick={() => document.getElementById('avatar-upload')?.click()}
+                        className="w-28 h-28 rounded-[2.5rem] overflow-hidden bg-card border-2 border-primary/20 shadow-xl cursor-pointer hover:border-primary/50 transition-all relative group"
+                      >
+                        <img 
+                          src={newUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUser.name || 'default'}`} 
+                          className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                          alt="Preview" 
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <Camera className="w-8 h-8 text-white" />
+                        </div>
+                      </div>
+                      
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const seeds = ["Felix", "Ane", "Jack", "Luna", "Oliver", "Maya"];
+                          const randomSeed = seeds[Math.floor(Math.random() * seeds.length)] + Math.floor(Math.random() * 1000);
+                          setNewUser({...newUser, avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${randomSeed}`});
+                        }}
+                        className="absolute -bottom-2 -right-2 p-2.5 bg-primary text-white rounded-xl shadow-lg hover:scale-110 active:scale-95 transition-all z-10"
+                        title="Gerar Aleatório"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="mt-4 text-center">
+                      <p className="text-[10px] font-black text-foreground uppercase tracking-widest">Clique para fazer upload</p>
+                      <p className="text-[8px] font-bold text-muted-foreground mt-1 uppercase opacity-60">PNG, JPG ou SVG (Máx. 2MB)</p>
+                    </div>
+                  </div>
+
                   <div className="space-y-4">
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Nome Completo</label>
@@ -327,18 +384,49 @@ export function UsersView() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 relative">
                         <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Cargo</label>
-                        <select
-                          value={newUser.role}
-                          onChange={(e) => setNewUser({...newUser, role: e.target.value as User["role"]})}
-                          className="w-full bg-secondary/20 border border-border/40 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-primary/50 transition-all appearance-none cursor-pointer"
+                        <button
+                          type="button"
+                          onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+                          className="w-full bg-secondary/20 border border-border/40 rounded-xl px-4 py-3 text-sm font-bold flex items-center justify-between hover:bg-secondary/30 transition-all"
                         >
-                          <option value="admin">Administrador</option>
-                          <option value="vendedor">Vendedor</option>
-                          <option value="logistica">Logística</option>
-                          <option value="coletor">Coletor</option>
-                        </select>
+                          <span className="capitalize">{newUser.role}</span>
+                          <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", isRoleDropdownOpen && "rotate-180")} />
+                        </button>
+
+                        {isRoleDropdownOpen && (
+                          <>
+                            <div 
+                              className="fixed inset-0 z-[110]" 
+                              onClick={() => setIsRoleDropdownOpen(false)} 
+                            />
+                            <div className="absolute top-full left-0 w-full mt-2 bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden z-[120] animate-in fade-in zoom-in-95 duration-200">
+                              {[
+                                { id: "admin", label: "Administrador" },
+                                { id: "vendedor", label: "Vendedor" },
+                                { id: "logistica", label: "Logística" },
+                                { id: "coletor", label: "Coletor" }
+                              ].map((role) => (
+                                <button
+                                  key={role.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setNewUser({...newUser, role: role.id as User["role"]});
+                                    setIsRoleDropdownOpen(false);
+                                  }}
+                                  className={cn(
+                                    "w-full px-4 py-3 text-sm font-bold text-left hover:bg-primary/10 transition-colors flex items-center justify-between",
+                                    newUser.role === role.id ? "text-primary bg-primary/5" : "text-foreground"
+                                  )}
+                                >
+                                  {role.label}
+                                  {newUser.role === role.id && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Cód. Operador</label>

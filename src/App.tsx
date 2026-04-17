@@ -119,15 +119,15 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
         </div>
 
         {showRightPanel && (
-          <div className="hidden xl:block w-80 fixed right-0 top-0 h-screen bg-transparent py-6 pr-6 pl-0 space-y-2 overflow-y-auto scrollbar-hide">
+          <div className="hidden xl:flex flex-col w-80 fixed right-0 top-0 h-screen bg-transparent py-6 pr-6 pl-0 overflow-hidden z-40">
             <button
               onClick={() => setIsVendedor(!isVendedor)}
-              className="absolute top-2 right-8 text-[8px] font-bold opacity-0 hover:opacity-100 transition-opacity text-primary uppercase"
+              className="absolute top-2 right-8 text-[8px] font-bold opacity-0 hover:opacity-100 transition-opacity text-primary uppercase z-50"
             >
               Simular {isVendedor ? 'Interno' : 'Vendedor'}
             </button>
-            <div className="flex flex-col gap-2 px-0 h-full">
-              {isVendedor ? <SalesMetricsCard /> : <HighlightCard />}
+            <div className="flex-1 flex flex-col gap-3 pb-0">
+              {isVendedor ? <SalesMetricsCard isCompact={isVendedor} /> : <HighlightCard />}
               <BirthdayList isCompact={isVendedor} />
             </div>
           </div>
