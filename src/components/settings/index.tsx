@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
   User,
   ShieldCheck,
-  Palette,
   Smartphone,
   Mail,
   Camera,
@@ -22,7 +21,6 @@ import {
   Megaphone,
   Calendar,
   MessageSquare,
-  Type,
   FileText,
   Briefcase,
 } from "lucide-react";
@@ -488,7 +486,6 @@ function SecurityTab() {
                   <div className="flex items-center gap-3 min-w-0">
                     <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-xs font-bold text-foreground truncate">{s.device}</p>
                         {s.current && (
                           <span className="text-[9px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0">Esta</span>
@@ -496,7 +493,6 @@ function SecurityTab() {
                       </div>
                       <p className="text-[10px] text-muted-foreground font-medium uppercase">{s.location} · {s.time}</p>
                     </div>
-                  </div>
                   {!s.current && !revoked && (
                     <button
                       onClick={() => setRevokedSessions([...revokedSessions, s.id])}
@@ -529,24 +525,9 @@ const accentColors = [
   { key: "amber", label: "Âmbar", value: "#D97706" },
 ];
 
-const densities = [
-  { key: "compact", label: "Compacto", desc: "Mais itens visíveis" },
-  { key: "default", label: "Padrão", desc: "Equilíbrio confortável" },
-  { key: "relaxed", label: "Relaxado", desc: "Mais espaço entre elementos" },
-];
-
-const languages = [
-  { key: "pt-BR", label: "Português (Brasil)", flag: "🇧🇷" },
-  { key: "en-US", label: "English (US)", flag: "🇺🇸" },
-  { key: "es-ES", label: "Español", flag: "🇪🇸" },
-];
-
 function AppearanceTab() {
   const { theme, setTheme } = useTheme();
   const [accent, setAccent] = useState("blue");
-  const [fontSize, setFontSize] = useState("medium");
-  const [language, setLanguage] = useState("pt-BR");
-  const [density, setDensity] = useState("default");
   const [saved, setSaved] = useState(false);
 
   function handleSave() {
@@ -569,8 +550,8 @@ function AppearanceTab() {
         </div>
         <div className="grid grid-cols-3 gap-4">
           {[
-            { key: "light", label: "Claro", icon: Sun },
             { key: "dark", label: "Escuro", icon: Moon },
+            { key: "light", label: "Claro", icon: Sun },
             { key: "system", label: "Sistema", icon: Monitor },
           ].map(({ key, label, icon: Icon }) => (
             <button
@@ -599,136 +580,38 @@ function AppearanceTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Accent Color */}
-        <div className="p-8 rounded-[2rem] bg-secondary/5 border border-border/50 space-y-5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-              <div className="w-6 h-6 rounded-full bg-primary" />
-            </div>
-            <div>
-              <h4 className="text-lg font-black text-foreground uppercase tracking-tight">Cor de Destaque</h4>
-              <p className="text-muted-foreground text-sm font-medium">Cor de botões e seleções</p>
-            </div>
+      {/* Accent Color */}
+      <div className="p-8 rounded-[2rem] bg-secondary/5 border border-border/50 space-y-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
+            <div className="w-6 h-6 rounded-full bg-primary" />
           </div>
-          <div className="flex flex-wrap gap-3">
-            {accentColors.map(({ key, label, value }) => (
-              <button
-                key={key}
-                onClick={() => setAccent(key)}
-                title={label}
-                className={cn(
-                  "relative w-10 h-10 rounded-2xl transition-all border-2",
-                  accent === key ? "border-foreground scale-110 shadow-lg" : "border-transparent hover:scale-105"
-                )}
-                style={{ backgroundColor: value }}
-              >
-                {accent === key && (
-                  <Check className="absolute inset-0 m-auto w-4 h-4 text-white" strokeWidth={3} />
-                )}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-            {accentColors.find((c) => c.key === accent)?.label}
-          </p>
-        </div>
-
-        {/* Font Size */}
-        <div className="p-8 rounded-[2rem] bg-secondary/5 border border-border/50 space-y-5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-              <Type className="text-primary w-6 h-6" />
-            </div>
-            <div>
-              <h4 className="text-lg font-black text-foreground uppercase tracking-tight">Tamanho da Fonte</h4>
-              <p className="text-muted-foreground text-sm font-medium">Tamanho do texto na interface</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { key: "small", label: "Pequeno", size: "text-sm" },
-              { key: "medium", label: "Médio", size: "text-base" },
-              { key: "large", label: "Grande", size: "text-lg" },
-            ].map(({ key, label, size }) => (
-              <button
-                key={key}
-                onClick={() => setFontSize(key)}
-                className={cn(
-                  "flex flex-col items-center gap-2 p-4 rounded-[1.5rem] border-2 transition-all",
-                  fontSize === key ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/30"
-                )}
-              >
-                <span className={cn(size, "font-black", fontSize === key ? "text-primary" : "text-muted-foreground")}>Aa</span>
-                <span className={cn("text-[10px] font-black uppercase tracking-tight", fontSize === key ? "text-primary" : "text-muted-foreground")}>{label}</span>
-              </button>
-            ))}
+          <div>
+            <h4 className="text-lg font-black text-foreground uppercase tracking-tight">Cor de Destaque</h4>
+            <p className="text-muted-foreground text-sm font-medium">Cor de botões e seleções</p>
           </div>
         </div>
-
-        {/* Density */}
-        <div className="p-8 rounded-[2rem] bg-secondary/5 border border-border/50 space-y-5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-              <Monitor className="text-primary w-6 h-6" />
-            </div>
-            <div>
-              <h4 className="text-lg font-black text-foreground uppercase tracking-tight">Densidade</h4>
-              <p className="text-muted-foreground text-sm font-medium">Espaçamento da interface</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {densities.map(({ key, label, desc }) => (
-              <button
-                key={key}
-                onClick={() => setDensity(key)}
-                className={cn(
-                  "w-full flex items-center justify-between px-5 py-4 rounded-[1.5rem] border-2 transition-all text-left",
-                  density === key ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/30"
-                )}
-              >
-                <div>
-                  <p className={cn("text-sm font-black uppercase tracking-tight", density === key ? "text-primary" : "text-foreground")}>{label}</p>
-                  <p className="text-xs text-muted-foreground font-medium">{desc}</p>
-                </div>
-                <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all", density === key ? "border-primary" : "border-border")}>
-                  {density === key && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                </div>
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-3">
+          {accentColors.map(({ key, label, value }) => (
+            <button
+              key={key}
+              onClick={() => setAccent(key)}
+              title={label}
+              className={cn(
+                "relative w-10 h-10 rounded-2xl transition-all border-2",
+                accent === key ? "border-foreground scale-110 shadow-lg" : "border-transparent hover:scale-105"
+              )}
+              style={{ backgroundColor: value }}
+            >
+              {accent === key && (
+                <Check className="absolute inset-0 m-auto w-4 h-4 text-white" strokeWidth={3} />
+              )}
+            </button>
+          ))}
         </div>
-
-        {/* Language */}
-        <div className="p-8 rounded-[2rem] bg-secondary/5 border border-border/50 space-y-5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-              <Globe className="text-primary w-6 h-6" />
-            </div>
-            <div>
-              <h4 className="text-lg font-black text-foreground uppercase tracking-tight">Idioma</h4>
-              <p className="text-muted-foreground text-sm font-medium">Idioma da plataforma</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {languages.map(({ key, label, flag }) => (
-              <button
-                key={key}
-                onClick={() => setLanguage(key)}
-                className={cn(
-                  "w-full flex items-center justify-between px-5 py-4 rounded-[1.5rem] border-2 transition-all",
-                  language === key ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/30"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{flag}</span>
-                  <span className={cn("text-sm font-black uppercase tracking-tight", language === key ? "text-primary" : "text-foreground")}>{label}</span>
-                </div>
-                {language === key && <Check className="w-5 h-5 text-primary" strokeWidth={2.5} />}
-              </button>
-            ))}
-          </div>
-        </div>
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+          {accentColors.find((c) => c.key === accent)?.label}
+        </p>
       </div>
 
       {/* Save */}

@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/ui/AppSidebar";
 import { CommunicationSection } from "@/components/dashboard/CommunicationSection";
 import { CalendarSection } from "@/components/calendar";
 import { SettingsSection } from "@/components/settings";
+import { CrmSection } from "@/components/dashboard/CrmSection";
 import {
   HighlightCard,
   SalesMetricsCard,
@@ -18,8 +19,10 @@ function DashboardContent() {
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
   const [activeItem, setActiveItem] = useState("Geral");
 
-  const isDashboardView = ["Geral", "Analytics", "Performance", "Campanhas", "Dashboard"].includes(activeItem);
+  const isDashboardView = ["Geral", "Analytics", "Performance", "Campanhas", "Dashboard", "Orçamentos", "Produtos"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(activeItem);
+  const isCrmView = ["Analytics", "Orçamentos", "CRM"].includes(activeItem);
+  const showRightPanel = activeItem === "Geral";
 
   return (
     <div className="h-screen bg-background font-sans transition-colors duration-300 overflow-hidden flex relative">
@@ -43,7 +46,7 @@ function DashboardContent() {
         className={cn(
           "flex-1 flex flex-col h-screen transition-all duration-500 w-full",
           isSidebarCollapsed ? "lg:pl-20" : "lg:pl-64",
-          isDashboardView ? "xl:pr-80" : "pr-0",
+          showRightPanel ? "xl:pr-80" : "pr-0",
         )}
       >
         {/* Mobile Header */}
@@ -75,6 +78,8 @@ function DashboardContent() {
             <CalendarSection />
           ) : isSettingsView ? (
             <SettingsSection externalTab={activeItem} />
+          ) : isCrmView ? (
+            <CrmSection activeTab={activeItem} />
           ) : isDashboardView ? (
             <CommunicationSection />
           ) : (
@@ -93,7 +98,7 @@ function DashboardContent() {
         </div>
 
         {/* Right Fixed Sidebar Panel (Dashboard Only) */}
-        {isDashboardView && (
+        {showRightPanel && (
           <div className="hidden xl:block w-80 fixed right-0 top-0 h-screen bg-transparent py-6 pr-6 pl-0 space-y-2 overflow-y-auto scrollbar-hide">
             <button 
               onClick={() => setIsVendedor(!isVendedor)}

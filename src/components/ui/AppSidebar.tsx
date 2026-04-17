@@ -47,13 +47,20 @@ const menuItems: MenuItem[] = [
     isDropdown: true,
     subItems: [
       { label: "Geral", icon: LayoutGrid },
-      { label: "Analytics", icon: BarChart3 },
       { label: "Produtos", icon: Hexagon },
     ],
   },
   { icon: Calendar, label: "Calendário" },
   { icon: MessageSquare, label: "Mensagens" },
-  { icon: BarChart3, label: "CRM" },
+  {
+    icon: BarChart3,
+    label: "CRM",
+    isDropdown: true,
+    subItems: [
+      { label: "Analytics", icon: BarChart3 },
+      { label: "Orçamentos", icon: FileBadge },
+    ],
+  },
   { icon: Activity, label: "Esteira" },
   {
     icon: Briefcase,
