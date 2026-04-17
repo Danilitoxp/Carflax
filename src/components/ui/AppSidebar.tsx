@@ -111,7 +111,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose,
   const toggleMenu = (label: string) => {
     if (isCollapsed) return;
     setOpenMenus((prev) =>
-      prev.includes(label) ? prev.filter((m) => m !== label) : [...prev, label],
+      prev.includes(label) ? [] : [label]
     );
   };
 
