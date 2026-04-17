@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   ChevronLeft, 
   ChevronRight, 
-  Calendar as CalendarIcon, 
   Gift, 
   Star, 
   GraduationCap,
@@ -10,6 +9,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EventModal } from "./EventModal";
+import { EventsView } from "./Eventos/EventsView";
+import { VacationsView } from "./Ferias/VacationsView";
 
 interface CalendarEvent {
   id: number;
@@ -21,7 +22,21 @@ interface CalendarEvent {
   year?: number;
 }
 
-export function CalendarSection() {
+interface Vacation {
+  id: number;
+  name: string;
+  start: Date;
+  end: Date;
+  color: string;
+  avatar: string;
+}
+
+interface CalendarSectionProps {
+  activeTab?: string;
+}
+
+export function CalendarSection({ activeTab }: CalendarSectionProps) {
+  const [viewMode, setViewMode] = useState<"events" | "vacations">("events");
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)); // Abril 2026
   const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video"]);
   const [events, setEvents] = useState<CalendarEvent[]>([
@@ -32,6 +47,12 @@ export function CalendarSection() {
     { id: 5, day: 23, month: 3, year: 2026, title: "Alan Henrique 1 ano d...", type: "star" },
   ]);
 
+  const [vacations, _setVacations] = useState<Vacation[]>([
+    { id: 1, name: "Mateus Ronald", start: new Date(2026, 3, 5), end: new Date(2026, 3, 18), color: "bg-orange-500", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mateus" },
+    { id: 2, name: "Guilherme Santana", start: new Date(2026, 3, 1), end: new Date(2026, 3, 4), color: "bg-blue-600", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Guilherme" },
+    { id: 3, name: "Tatiane Maria", start: new Date(2026, 3, 20), end: new Date(2026, 3, 26), color: "bg-emerald-600", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Tatiane" },
+  ]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
@@ -40,6 +61,14 @@ export function CalendarSection() {
     description: "",
     type: "video" as const
   });
+
+  useEffect(() => {
+    if (activeTab === "Férias") {
+      setViewMode("vacations");
+    } else {
+      setViewMode("events");
+    }
+  }, [activeTab]);
 
   const monthNames = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -56,11 +85,9 @@ export function CalendarSection() {
 
   const toggleFilter = (filter: string) => {
     setActiveFilters(prev => {
-      // Se clicar no mesmo filtro que já é o único ativo, volta a mostrar todos
       if (prev.length === 1 && prev.includes(filter)) {
         return ["birthday", "star", "education", "video"];
       }
-      // Caso contrário, ativa apenas o filtro clicado (Exclusivo)
       return [filter];
     });
   };
@@ -76,7 +103,7 @@ export function CalendarSection() {
   const allSlots = [...paddingDays, ...days];
 
   const handleDayClick = (day: number | null) => {
-    if (!day) return;
+    if (!day || viewMode === "vacations") return;
     setEditingEventId(null);
     setSelectedDay(day);
     setNewEvent({ title: "", description: "", type: "video" });
@@ -122,33 +149,7 @@ export function CalendarSection() {
     setNewEvent({ title: "", description: "", type: "video" });
   };
 
-  const getEventStyles = (type: string) => {
-    switch (type) {
-      case "birthday": 
-        return "bg-gradient-to-r from-rose-500/80 to-pink-600/80 shadow-rose-500/10 text-white backdrop-blur-sm";
-      case "star": 
-        return "bg-gradient-to-r from-amber-400/80 to-orange-500/80 shadow-orange-500/10 text-white backdrop-blur-sm";
-      case "education": 
-        return "bg-gradient-to-r from-blue-600/80 to-indigo-700/80 shadow-blue-500/10 text-white backdrop-blur-sm";
-      case "video": 
-        return "bg-gradient-to-r from-[#032D9C]/80 to-[#0053FC]/80 shadow-primary/10 text-white backdrop-blur-sm";
-      default: 
-        return "bg-secondary/80 text-foreground shadow-sm backdrop-blur-sm";
-    }
-  };
-
-  const getEventIcon = (type: string) => {
-    switch (type) {
-      case "birthday": return <Gift className="w-2.5 h-2.5" />;
-      case "star": return <Star className="w-2.5 h-2.5" />;
-      case "education": return <GraduationCap className="w-2.5 h-2.5" />;
-      case "video": return <Plus className="w-2.5 h-2.5" />;
-      default: return null;
-    }
-  };
-
   const daysOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const shortDaysOfWeek = ["D", "S", "T", "Q", "Q", "S", "S"];
 
   return (
     <div className="flex flex-col h-full bg-background p-3 md:p-6 overflow-hidden">
@@ -163,84 +164,65 @@ export function CalendarSection() {
         setNewEvent={setNewEvent}
       />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-4 md:mb-6 gap-4">
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center bg-card border border-border rounded-2xl px-6 py-3 shadow-sm w-full sm:w-auto justify-center sm:justify-start min-h-[52px]">
-            <span className="text-base md:text-lg font-black text-foreground uppercase tracking-tighter whitespace-nowrap">
-                {monthNames[month]} {year}
+      {/* Header Area */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-6">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center bg-card border border-border/50 rounded-2xl px-6 py-3 shadow-none">
+            <span className="text-xl font-black text-foreground uppercase tracking-tighter">
+                {monthNames[month]} <span className="text-primary">{year}</span>
             </span>
+            <div className="flex items-center gap-1.5 ml-6 pl-6 border-l border-border/50">
+               <button onClick={handlePrevMonth} className="p-2 hover:bg-secondary rounded-xl transition-all text-muted-foreground/60 hover:text-foreground active:scale-90"><ChevronLeft className="w-5 h-5" /></button>
+               <button onClick={handleNextMonth} className="p-2 hover:bg-secondary rounded-xl transition-all text-muted-foreground/60 hover:text-foreground active:scale-90"><ChevronRight className="w-5 h-5" /></button>
+            </div>
           </div>
           
-          <div className="flex items-center gap-1.5 bg-card border border-border p-1 rounded-2xl shadow-sm">
-            <button 
-                onClick={handlePrevMonth}
-                className="p-2 md:p-2.5 hover:text-foreground text-muted-foreground hover:bg-secondary rounded-xl transition-all"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button 
-                onClick={handleNextMonth}
-                className="p-2 md:p-2.5 hover:text-foreground text-muted-foreground hover:bg-secondary rounded-xl transition-all"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          {viewMode === "events" && (
+            <div className="flex items-center gap-1.5 bg-card border border-border/50 p-1.5 rounded-2xl shadow-none">
+              {[
+                { id: "birthday", icon: Gift, color: "text-rose-500", bg: "bg-rose-500/10" },
+                { id: "star", icon: Star, color: "text-amber-500", bg: "bg-amber-500/10" },
+                { id: "education", icon: GraduationCap, color: "text-indigo-500", bg: "bg-indigo-500/10" },
+                { id: "video", icon: Plus, color: "text-primary", bg: "bg-primary/10" },
+              ].map(f => (
+                <button 
+                  key={f.id}
+                  onClick={() => toggleFilter(f.id)}
+                  className={cn(
+                      "p-2.5 rounded-xl transition-all",
+                      activeFilters.length === 1 && activeFilters.includes(f.id) ? cn(f.bg, f.color) : "text-muted-foreground/60 hover:bg-secondary hover:text-foreground"
+                  )}
+                >
+                  <f.icon className="w-4.5 h-4.5" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-          <div className="flex items-center gap-1 bg-card border border-border p-1 rounded-2xl shadow-sm">
-            <button 
-                onClick={() => toggleFilter("birthday")}
-                className={cn(
-                    "p-2 rounded-lg transition-all",
-                    activeFilters.length === 1 && activeFilters.includes("birthday") ? "bg-rose-500/20 text-rose-500" : "text-muted-foreground hover:bg-secondary"
-                )}
-            >
-                <Gift className="w-4 h-4" />
-            </button>
-            <button 
-                onClick={() => toggleFilter("star")}
-                className={cn(
-                    "p-2 rounded-lg transition-all",
-                    activeFilters.length === 1 && activeFilters.includes("star") ? "bg-amber-500/20 text-amber-500" : "text-muted-foreground hover:bg-secondary"
-                )}
-            >
-                <Star className="w-4 h-4" />
-            </button>
-            <button 
-                onClick={() => toggleFilter("education")}
-                className={cn(
-                    "p-2 rounded-lg transition-all",
-                    activeFilters.length === 1 && activeFilters.includes("education") ? "bg-indigo-500/20 text-indigo-500" : "text-muted-foreground hover:bg-secondary"
-                )}
-            >
-                <GraduationCap className="w-4 h-4" />
-            </button>
-            <button 
-                onClick={() => toggleFilter("video")}
-                className={cn(
-                    "p-2 rounded-lg transition-all",
-                    activeFilters.length === 1 && activeFilters.includes("video") ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-secondary"
-                )}
-            >
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3 w-full lg:w-auto">
+          {viewMode === "vacations" && (
+              <button className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-8 py-4 bg-orange-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all border border-white/10">
                 <Plus className="w-4 h-4" />
-            </button>
-          </div>
+                Lançar Férias
+              </button>
+          )}
         </div>
       </div>
 
-      {/* Calendar Grid Container */}
-      <div className="flex-1 bg-card border border-border rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden flex flex-col shadow-xl min-h-0">
-        <div className="grid grid-cols-7 bg-[#0053FC]">
-          {daysOfWeek.map((day, i) => (
-            <div key={day} className="py-2 md:py-4 text-center">
-              <span className="hidden sm:inline text-[10px] md:text-[11px] font-black text-white uppercase tracking-[0.2em]">{day}</span>
-              <span className="sm:hidden text-[10px] font-black text-white uppercase">{shortDaysOfWeek[i]}</span>
+      {/* Calendar Grid */}
+      <div className="flex-1 bg-card border border-border/50 rounded-[2.5rem] overflow-hidden flex flex-col shadow-none min-h-0 relative">
+        <div className="grid grid-cols-7 border-b border-border/10 bg-secondary/5">
+          {daysOfWeek.map((day) => (
+            <div key={day} className="py-6 text-center border-r border-border/10 last:border-r-0">
+              <span className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">{day}</span>
             </div>
           ))}
         </div>
 
         <div 
-          className="flex-1 grid grid-cols-7 transition-all duration-500 min-h-0"
+          className="flex-1 grid grid-cols-7 transition-all duration-700 min-h-0 divide-x divide-y divide-border/5"
           style={{ 
             gridTemplateRows: `repeat(${Math.ceil(allSlots.length / 7)}, 1fr)` 
           }}
@@ -250,47 +232,46 @@ export function CalendarSection() {
                             month === new Date().getMonth() && 
                             year === new Date().getFullYear();
             
-            const dayEvents = events.filter(e => 
-                e.day === day && 
-                e.month === month && 
-                e.year === year &&
-                activeFilters.includes(e.type)
-            );
+            const dayDate = day ? new Date(year, month, day) : null;
             
             return (
               <div 
                 key={idx} 
                 onClick={() => handleDayClick(day)}
                 className={cn(
-                  "p-1.5 md:p-3 relative group transition-all duration-300 cursor-pointer flex flex-col items-start gap-1 border-r border-b border-border/10 last:border-r-0 overflow-hidden",
-                  "hover:bg-secondary/10",
-                  isToday ? "bg-primary/5 dark:bg-primary/10" : "bg-transparent"
+                  "relative group transition-all duration-500 cursor-pointer flex flex-col p-4 overflow-hidden",
+                  viewMode === "events" && "hover:bg-primary/[0.02]",
+                  viewMode === "events" && isToday && "bg-primary/[0.04]",
+                  !day && "bg-secondary/[0.03] opacity-40 shadow-inner"
                 )}
               >
                 {day && (
                   <>
-                    <span className={cn(
-                      "text-[10px] md:text-sm font-black transition-colors leading-none",
-                      isToday ? "text-[#0053FC]" : "text-muted-foreground/30 dark:text-muted-foreground/50"
-                    )}>
-                      {day < 10 ? `0${day}` : day}
-                    </span>
-                    
-                    <div className="w-full space-y-0.5 md:space-y-1 overflow-hidden">
-                      {dayEvents.map(event => (
-                        <div 
-                          key={event.id}
-                          onClick={(e) => handleEventClick(e, event)}
-                          className={cn(
-                            "py-0.5 md:py-1 px-1 md:px-2 rounded-sm md:rounded-md flex items-center gap-1 shadow-sm transform group-hover:translate-x-0.5 transition-all text-left w-full",
-                            getEventStyles(event.type)
-                          )}
-                        >
-                          <div className="shrink-0 opacity-90 scale-75 md:scale-100">{getEventIcon(event.type)}</div>
-                          <span className="text-[7px] md:text-[10px] font-bold truncate tracking-tight">{event.title}</span>
-                        </div>
-                      ))}
+                    <div className="flex justify-between items-start mb-3 relative z-20">
+                      <span className={cn(
+                        "text-xs md:text-base font-black transition-all duration-500 leading-none",
+                        isToday ? "text-[#0053FC] scale-125 origin-left" : "text-muted-foreground/30 group-hover:text-muted-foreground/60"
+                      )}>
+                        {day < 10 ? `0${day}` : day}
+                      </span>
+                      {isToday && <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
                     </div>
+                    
+                    {viewMode === "events" ? (
+                      <EventsView 
+                        day={day}
+                        month={month}
+                        year={year}
+                        events={events}
+                        activeFilters={activeFilters}
+                        onEventClick={handleEventClick}
+                      />
+                    ) : (
+                      <VacationsView 
+                        dayDate={dayDate}
+                        vacations={vacations}
+                      />
+                    )}
                   </>
                 )}
               </div>

@@ -24,6 +24,7 @@ import {
   Palette,
   Lightbulb,
   FileBadge,
+  Plane,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -50,7 +51,15 @@ const menuItems: MenuItem[] = [
       { label: "Produtos", icon: Hexagon },
     ],
   },
-  { icon: Calendar, label: "Calendário" },
+  { 
+    icon: Calendar, 
+    label: "Calendário",
+    isDropdown: true,
+    subItems: [
+      { label: "Eventos", icon: Calendar },
+      { label: "Férias", icon: Plane },
+    ]
+  },
   { icon: MessageSquare, label: "Mensagens" },
   {
     icon: BarChart3,

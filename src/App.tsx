@@ -84,8 +84,8 @@ function DashboardContent() {
 
         {/* Content Area */}
         <div className="flex flex-col h-full w-full mx-auto overflow-hidden">
-          {activeItem === "Calendário" ? (
-            <CalendarSection />
+          {["Calendário", "Eventos", "Férias"].includes(activeItem) ? (
+            <CalendarSection activeTab={activeItem} />
           ) : isSettingsView ? (
             <SettingsSection externalTab={activeItem} />
           ) : isCrmView ? (

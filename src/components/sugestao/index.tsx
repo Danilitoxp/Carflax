@@ -37,7 +37,7 @@ export function SugestaoModal({ isOpen, onClose }: SugestaoModalProps) {
       />
 
       {/* Modal Card */}
-      <div className="relative w-full max-w-lg bg-card border border-border/50 rounded-[2.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.4)] p-8 md:p-10 animate-in zoom-in-95 duration-300 overflow-hidden">
+      <div className="relative w-full max-w-lg bg-card border border-border/50 rounded-[2.5rem] p-8 md:p-10 animate-in zoom-in-95 duration-300 overflow-hidden">
         
         {/* Close Button Cross */}
         <button 
@@ -102,7 +102,7 @@ export function SugestaoModal({ isOpen, onClose }: SugestaoModalProps) {
             <Button 
               onClick={handleSubmit}
               disabled={!suggestion.trim()}
-              className="flex-1 py-7 bg-[#0081FF] hover:bg-[#0070E0] text-white rounded-2xl font-black text-xs uppercase tracking-widest gap-2 shadow-[0_10px_25px_-5px_rgba(0,129,255,0.4)] transition-all active:scale-[0.98] disabled:opacity-50"
+              className="flex-1 py-7 bg-[#0081FF] hover:bg-[#0070E0] text-white rounded-2xl font-black text-xs uppercase tracking-widest gap-2 transition-all disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
               Enviar Sugestão
