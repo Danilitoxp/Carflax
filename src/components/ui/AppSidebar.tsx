@@ -102,9 +102,10 @@ interface AppSidebarProps {
   onMobileClose?: () => void;
   activeItem: string;
   onActiveItemChange: (item: string) => void;
+  onLogout: () => void;
 }
 
-export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange }: AppSidebarProps) {
+export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout }: AppSidebarProps) {
   const { theme, setTheme } = useTheme();
   const [openMenus, setOpenMenus] = useState<string[]>(["Dashboard"]);
 
@@ -409,7 +410,10 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose,
           {isCollapsed ? (
             <div className="flex flex-col items-center gap-4">
               <ThemeToggle />
-              <button className="p-2 rounded-xl text-[#0053FC] hover:bg-[#0053FC]/10 transition-colors">
+              <button 
+                onClick={onLogout}
+                className="p-2 rounded-xl text-[#0053FC] hover:bg-[#0053FC]/10 transition-colors"
+              >
                 <LogOut className="w-5 h-5" strokeWidth={1.5} />
               </button>
             </div>
@@ -439,7 +443,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose,
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    console.log("Logout");
+                    onLogout();
                   }}
                   className="p-1.5 rounded-lg text-[#0053FC]/60 hover:text-[#0053FC] transition-colors hover:bg-[#0053FC]/5"
                 >

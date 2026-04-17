@@ -15,8 +15,10 @@ import { cn } from "@/lib/utils";
 import { SugestaoModal } from "@/components/sugestao";
 import { EntregasView } from "@/components/entregas";
 import { UsersView } from "@/components/users/UsersView";
+import { LoginView } from "@/components/auth/LoginView";
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
 
-function DashboardContent() {
+function DashboardContent({ onLogout }: { onLogout: () => void }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
@@ -45,6 +47,7 @@ function DashboardContent() {
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isMobileOpen={isMobileMenuOpen}
         onMobileClose={() => setIsMobileMenuOpen(false)}
+        onLogout={onLogout}
       />
 
       {isMobileMenuOpen && (
@@ -140,9 +143,27 @@ function DashboardContent() {
 }
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogin = () => {
+    setIsLoading(true);
+    // Simulate data loading
+    setTimeout(() => {
+      setIsAuthenticated(true);
+      setIsLoading(false);
+    }, 2000);
+  };
+
   return (
     <ThemeProvider defaultTheme="light" storageKey="carflax-theme">
-      <DashboardContent />
+      {isLoading && <LoadingScreen />}
+      
+      {isAuthenticated ? (
+        <DashboardContent onLogout={() => setIsAuthenticated(false)} />
+      ) : (
+        <LoginView onLogin={handleLogin} />
+      )}
     </ThemeProvider>
   );
 }
