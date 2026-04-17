@@ -15,45 +15,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { HeroBanner } from "./HeroBanner";
 
-interface KpiCardProps {
-  title: string;
-  value: string;
-  subtitle?: string;
-  trend?: {
-    value: string;
-    isUp: boolean;
-  };
-  icon: any;
-}
 
-function KpiCard({ title, value, subtitle, trend, icon: Icon }: KpiCardProps) {
-  return (
-    <div className="bg-card border border-border p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-      <div className="grid grid-cols-[1fr_auto] items-start gap-4">
-        <div className="space-y-1">
-          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{title}</p>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-2xl font-extrabold text-foreground tracking-tight">{value}</h3>
-            {trend && (
-              <span className={cn(
-                "text-[10px] font-bold flex items-center gap-0.5",
-                trend.isUp ? "text-emerald-600" : "text-rose-600"
-              )}>
-                {trend.isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingUp className="w-3 h-3 rotate-180" />}
-                {trend.value}
-              </span>
-            )}
-          </div>
-          {subtitle && <p className="text-[10px] text-muted-foreground font-medium">{subtitle}</p>}
-        </div>
-        <div className="w-10 h-10 rounded-lg bg-secondary/50 flex items-center justify-center text-primary">
-          <Icon className="w-5 h-5" />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function AlertItem({ type, title, description, time }: { type: 'danger' | 'warning' | 'info' | 'success', title: string, description: string, time: string }) {
   const colors = {
@@ -126,46 +90,8 @@ export function GeralView() {
           </div>
         </div>
 
-        {/* KPI Grid */}
-        {/* KPI Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          <KpiCard 
-            title="Faturamento Dia" 
-            value="R$ 12.480" 
-            trend={{ value: "12%", isUp: true }} 
-            icon={DollarSign} 
-          />
-          <KpiCard 
-            title="Pedidos em Aberto" 
-            value="24" 
-            subtitle="8 urgentes" 
-            icon={ShoppingCart} 
-          />
-          <KpiCard 
-            title="Estoque Crítico" 
-            value="12" 
-            subtitle="Itens abaixo do mínimo" 
-            icon={Package} 
-          />
-          <KpiCard 
-            title="Contas a Pagar" 
-            value="R$ 4.200" 
-            subtitle="Vencendo hoje" 
-            icon={ArrowDownRight} 
-          />
-          <KpiCard 
-            title="Contas a Receber" 
-            value="R$ 18.900" 
-            subtitle="Previsão para hoje" 
-            icon={ArrowUpRight} 
-          />
-          <KpiCard 
-            title="Novos Clientes" 
-            value="15" 
-            trend={{ value: "8%", isUp: true }} 
-            icon={Users} 
-          />
-        </div>
+        {/* Hero Banner instead of KPI Grid */}
+        <HeroBanner />
 
         {/* Charts and Alerts Row */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
