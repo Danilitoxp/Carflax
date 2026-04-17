@@ -50,18 +50,18 @@ export function EventsView({ day, month, year, events, activeFilters, onEventCli
   };
 
   return (
-    <div className="w-full space-y-1.5 overflow-hidden relative z-10">
+    <div className="w-full space-y-1.5 relative z-10">
       {dayEvents.map(event => (
         <div 
           key={event.id}
           onClick={(e) => onEventClick(e, event)}
           className={cn(
-            "py-2 px-3 rounded-xl flex items-center gap-2 transform transition-all hover:scale-[1.03] hover:translate-x-1 active:scale-95 text-left w-full h-9 shadow-sm",
+            "py-2 px-3 rounded-xl flex items-center gap-2 transform transition-all hover:scale-[1.03] hover:translate-x-1 active:scale-95 text-left w-full min-h-[36px] shadow-sm",
             getEventStyles(event.type)
           )}
         >
           <div className="shrink-0 opacity-90">{getEventIcon(event.type)}</div>
-          <span className="text-[10px] font-black truncate uppercase tracking-tighter">{event.title}</span>
+          <span className="text-[10px] font-black uppercase tracking-tighter leading-tight break-words line-clamp-2">{event.title}</span>
         </div>
       ))}
     </div>

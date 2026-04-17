@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -58,27 +58,30 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
-  const [newEvent, setNewEvent] = useState({
+  const [newEvent, setNewEvent] = useState<{
+    title: string;
+    description: string;
+    type: "birthday" | "star" | "education" | "video";
+  }>({
     title: "",
     description: "",
-    type: "video" as const
+    type: "video"
   });
 
   const handleSaveVacation = (newVacation: { name: string; start: Date; end: Date; color: string; avatar: string }) => {
     const vacation: Vacation = {
-      id: Date.now(),
+      id: events.length > 0 ? Math.max(...events.map(e => e.id)) + 1 : 1,
       ...newVacation
     };
     setVacations([...vacations, vacation]);
   };
 
-  useEffect(() => {
-    if (activeTab === "Férias") {
-      setViewMode("vacations");
-    } else {
-      setViewMode("events");
-    }
-  }, [activeTab]);
+  const [prevActiveTab, setPrevActiveTab] = useState(activeTab);
+
+  if (activeTab !== prevActiveTab) {
+    setPrevActiveTab(activeTab);
+    setViewMode(activeTab === "Férias" ? "vacations" : "events");
+  }
 
   const monthNames = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -127,7 +130,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
     setNewEvent({
       title: event.title,
       description: event.description || "",
-      type: event.type as any
+      type: event.type
     });
     setIsModalOpen(true);
   };
@@ -143,13 +146,13 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
       ));
     } else {
       const event: CalendarEvent = {
-          id: Date.now(),
+          id: events.length > 0 ? Math.max(...events.map(e => e.id)) + 1 : 1,
           day: selectedDay,
           month: month,
           year: year,
           title: newEvent.title,
           description: newEvent.description,
-          type: newEvent.type as any
+          type: newEvent.type
       };
       setEvents([...events, event]);
     }
@@ -246,15 +249,16 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
           ))}
         </div>
 
-        <div 
-          className={cn(
-            "flex-1 grid grid-cols-7 min-h-0",
-            viewMode === "events" ? "divide-x divide-y divide-border/5 transition-all duration-700" : "divide-none"
-          )}
-          style={{ 
-            gridTemplateRows: `repeat(${Math.ceil(allSlots.length / 7)}, 1fr)` 
-          }}
-        >
+        <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0">
+          <div 
+            className={cn(
+              "grid grid-cols-7 min-h-full",
+              viewMode === "events" ? "divide-x divide-y divide-border/5 transition-all duration-700" : "divide-none"
+            )}
+            style={{ 
+              gridTemplateRows: `repeat(${Math.ceil(allSlots.length / 7)}, minmax(130px, max-content))` 
+            }}
+          >
           {allSlots.map((day, idx) => {
             const isToday = day === new Date().getDate() && 
                             month === new Date().getMonth() && 
@@ -267,7 +271,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
                 key={idx} 
                 onClick={() => handleDayClick(day)}
                 className={cn(
-                  "relative group transition-all duration-500 cursor-pointer flex flex-col p-4 overflow-hidden",
+                  "relative group transition-all duration-500 cursor-pointer flex flex-col p-4",
                   viewMode === "events" && "hover:bg-primary/[0.02]",
                   viewMode === "events" && isToday && "bg-primary/[0.04]",
                   !day && "bg-secondary/[0.03] opacity-40 shadow-inner"
@@ -305,6 +309,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
               </div>
             );
           })}
+          </div>
         </div>
       </div>
     </div>

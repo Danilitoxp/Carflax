@@ -220,8 +220,21 @@ function AnalyticsView() {
 /* ─────────────────────────────────────────────
    ORÇAMENTOS VIEW (TABLE)
 ───────────────────────────────────────────── */
+export interface Orcamento {
+  id: string;
+  seller: string;
+  client: string;
+  date: string;
+  time: string;
+  total: string;
+  markup: string;
+  status: string;
+  totalValue: number;
+  markupValue: number;
+}
+
 function OrçamentosView() {
-  const [orçamentosData, setOrçamentosData] = useState([
+  const [orçamentosData, setOrçamentosData] = useState<Orcamento[]>([
     { id: "000001026785-OR", seller: "TATIANE MARIA", client: "CLEITO BARROS", date: "16/04/2026", time: "16:56", total: "R$ 48,05", markup: "71.18%", status: "VENDA", totalValue: 48.05, markupValue: 71.18 },
     { id: "000001026784-OR", seller: "GUSTAVO ALVES", client: "CREAM COLOR", date: "16/04/2026", time: "16:50", total: "R$ 139,90", markup: "125.28%", status: "VENDA", totalValue: 139.90, markupValue: 125.28 },
     { id: "000001026783-OR", seller: "GUILHERME SANTANA", client: "TRANS KOTHE", date: "16/04/2026", time: "16:47", total: "R$ 380,00", markup: "85.00%", status: "EMITIDO", totalValue: 380.00, markupValue: 85.00 },
@@ -245,7 +258,7 @@ function OrçamentosView() {
   const [isItemsModalOpen, setIsItemsModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusStep, setStatusStep] = useState<'selection' | 'enviado' | 'negociacao' | 'perdido'>('selection');
-  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Orcamento | null>(null);
 
   const handleUpdateStatus = (newStatus: string) => {
     if (!selectedItem) return;
@@ -260,7 +273,7 @@ function OrçamentosView() {
   const [endDate, setEndDate] = useState<number | null>(16);
   const [isSelectingStart, setIsSelectingStart] = useState(true);
 
-  const handleOpenStatus = (item: any) => {
+  const handleOpenStatus = (item: Orcamento) => {
     setSelectedItem(item);
     setStatusStep('selection');
     setIsStatusModalOpen(true);
@@ -331,9 +344,9 @@ function OrçamentosView() {
 
     // Sort
     if (sortConfig.key !== null && sortConfig.direction !== null) {
-      result.sort((a: any, b: any) => {
-        let aValue = a[sortConfig.key];
-        let bValue = b[sortConfig.key];
+      result.sort((a, b) => {
+        let aValue: string | number = a[sortConfig.key as keyof Orcamento] as string | number;
+        let bValue: string | number = b[sortConfig.key as keyof Orcamento] as string | number;
         if (sortConfig.key === 'total') { aValue = a.totalValue; bValue = b.totalValue; }
         if (sortConfig.key === 'markup') { aValue = a.markupValue; bValue = b.markupValue; }
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -463,7 +476,7 @@ function OrçamentosView() {
 
       <div className="flex-1 bg-card border border-border/50 rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col mb-4">
         <div className="flex-1 overflow-x-auto overflow-y-auto scrollbar-hide py-1">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
+          <table className="w-full text-left border-collapse min-w-[900px]">
             <thead className="sticky top-0 z-10">
               <tr className="bg-card border-b border-border/50 backdrop-blur-md">
                 {[
@@ -475,26 +488,26 @@ function OrçamentosView() {
                   { id: 'markup', label: 'Markup' },
                   { id: 'status', label: 'Status' },
                 ].map((col) => (
-                  <th key={col.id} onClick={() => requestSort(col.id)} className={cn("px-8 py-4 text-[9px] font-black uppercase tracking-[0.25em] cursor-pointer hover:bg-secondary/10 transition-colors group/th", col.id === 'status' && "text-center")}>
+                  <th key={col.id} onClick={() => requestSort(col.id)} className={cn("px-4 md:px-6 py-4 text-[9px] font-black uppercase tracking-[0.25em] cursor-pointer hover:bg-secondary/10 transition-colors group/th", col.id === 'status' && "text-center")}>
                     <div className={cn("flex items-center gap-2", col.id === 'status' && "justify-center")}>
                       <span className={cn(sortConfig.key === col.id ? "text-primary" : "text-muted-foreground/60")}>{col.label}</span>
                       {getSortIcon(col.id)}
                     </div>
                   </th>
                 ))}
-                <th className="px-8 py-4 text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.25em] text-right">Ações</th>
+                <th className="px-4 md:px-6 py-4 text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.25em] text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/10">
               {filteredAndSortedItems.map((item, idx) => (
                 <tr key={idx} className="hover:bg-primary/[0.01] transition-colors group">
-                  <td className="px-8 py-3.5"><span className="text-[11px] font-black text-[#0053FC] hover:underline cursor-pointer">{item.id}</span></td>
-                  <td className="px-8 py-3.5"><span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{item.seller}</span></td>
-                  <td className="px-8 py-3.5"><span className="text-[11px] font-black text-foreground/90 uppercase tracking-tighter transition-colors group-hover:text-foreground">{item.client}</span></td>
-                  <td className="px-8 py-3.5"><div className="flex items-baseline gap-2"><span className="text-[10px] font-black text-foreground whitespace-nowrap">{item.date}</span><span className="text-[9px] font-black text-muted-foreground/40">{item.time}</span></div></td>
-                  <td className="px-8 py-3.5"><span className="text-[11px] font-black text-emerald-500 whitespace-nowrap">{item.total}</span></td>
-                  <td className="px-8 py-3.5"><span className="text-[11px] font-black text-amber-500">{item.markup}</span></td>
-                  <td className="px-8 py-3.5 text-center">
+                  <td className="px-4 md:px-6 py-3.5"><span className="text-[11px] font-black text-[#0053FC] hover:underline cursor-pointer">{item.id}</span></td>
+                  <td className="px-4 md:px-6 py-3.5"><span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{item.seller}</span></td>
+                  <td className="px-4 md:px-6 py-3.5"><span className="text-[11px] font-black text-foreground/90 uppercase tracking-tighter transition-colors group-hover:text-foreground">{item.client}</span></td>
+                  <td className="px-4 md:px-6 py-3.5"><div className="flex items-baseline gap-2"><span className="text-[10px] font-black text-foreground whitespace-nowrap">{item.date}</span><span className="text-[9px] font-black text-muted-foreground/40">{item.time}</span></div></td>
+                  <td className="px-4 md:px-6 py-3.5"><span className="text-[11px] font-black text-emerald-500 whitespace-nowrap">{item.total}</span></td>
+                  <td className="px-4 md:px-6 py-3.5"><span className="text-[11px] font-black text-amber-500">{item.markup}</span></td>
+                  <td className="px-4 md:px-6 py-3.5 text-center">
                     <div 
                       onClick={() => (item.status !== "VENDA" && item.status !== "PERDIDO") && handleOpenStatus(item)}
                       className={cn(
@@ -506,7 +519,7 @@ function OrçamentosView() {
                       {item.status}
                     </div>
                   </td>
-                  <td className="px-8 py-3.5 text-right">
+                  <td className="px-4 md:px-6 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1.5 transition-all duration-300">
                       <button 
                          onClick={() => {
@@ -597,7 +610,7 @@ function OrçamentosView() {
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsStatusModalOpen(false)} />
-          <div className="relative w-full max-lg bg-card/95 backdrop-blur-2xl border border-white/10 rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.7)] p-10 animate-in zoom-in-95 duration-300 overflow-hidden">
+          <div className="relative w-full max-w-2xl bg-card/95 backdrop-blur-2xl border border-white/10 rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.7)] p-10 animate-in zoom-in-95 duration-300 overflow-hidden">
             <button 
               onClick={() => setIsStatusModalOpen(false)}
               className="absolute top-8 right-8 p-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-2xl transition-all duration-300"
@@ -627,7 +640,7 @@ function OrçamentosView() {
                     ].map((btn, i) => (
                       <button 
                         key={i}
-                        onClick={() => btn.next ? setStatusStep(btn.next as any) : handleUpdateStatus(btn.label)}
+                        onClick={() => btn.next ? setStatusStep(btn.next as 'enviado' | 'negociacao' | 'perdido') : handleUpdateStatus(btn.label)}
                         className={cn("py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-tighter transition-all hover:-translate-y-1 active:scale-[0.97] text-white shadow-lg", btn.bg)}
                       >
                         {btn.label}

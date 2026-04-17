@@ -47,7 +47,20 @@ const initialCommunications = [
   }
 ];
 
-export function CommunicationCard({ data, onEdit }: { data: any; onEdit: (d: any) => void }) {
+export interface CommunicationPost {
+  id: number;
+  title: string;
+  content: string;
+  category: string;
+  author: string;
+  authorAvatar: string;
+  date: string;
+  image: string;
+  likes: number;
+  dislikes: number;
+}
+
+export function CommunicationCard({ data, onEdit }: { data: CommunicationPost; onEdit: (d: CommunicationPost) => void }) {
   const [interaction, setInteraction] = useState<"like" | "dislike" | null>(null);
 
   const handleLike = () => {
@@ -67,11 +80,11 @@ export function CommunicationCard({ data, onEdit }: { data: any; onEdit: (d: any
   };
 
   return (
-    <div className="bg-card border border-border/50 rounded-3xl overflow-hidden flex flex-col group transition-all duration-500 hover:border-primary/30 shadow-lg dark:shadow-2xl dark:shadow-black/20 mb-4 mx-1 sm:mx-0">
-      <div className="flex flex-col md:flex-row md:min-h-[320px]">
+    <div className="bg-card border border-border/50 rounded-3xl overflow-hidden flex flex-col group transition-all duration-500 hover:border-primary/30 shadow-lg dark:shadow-2xl dark:shadow-black/20 flex-1">
+      <div className="flex flex-col md:flex-row md:min-h-[320px] h-full">
         {/* Visual Side (Image) */}
-        <div className="w-full md:w-[30%] bg-gradient-to-br from-[#032D9C] to-[#0053FC] flex items-center justify-center p-6 md:p-8 relative overflow-hidden shrink-0 h-48 md:h-auto">
-          <div className="w-28 h-28 md:w-44 md:h-44 rounded-full border-4 border-white/20 p-1.5 relative z-10 transition-transform duration-700 group-hover:scale-110 shadow-2xl shadow-black/20">
+        <div className="w-full md:w-[30%] md:min-w-[30%] md:max-w-[30%] bg-gradient-to-br from-[#032D9C] to-[#0053FC] flex items-center justify-center p-6 md:p-8 relative overflow-hidden shrink-0 h-48 md:h-auto">
+          <div className="w-32 h-32 md:w-full md:max-w-[160px] aspect-square rounded-full border-4 border-white/20 p-1.5 relative z-10 transition-transform duration-700 group-hover:scale-110 shadow-2xl shadow-black/20">
             <img
               src={data.image}
               alt={data.title}
@@ -157,19 +170,9 @@ export function CommunicationCard({ data, onEdit }: { data: any; onEdit: (d: any
               </div>
             </div>
 
-            <div className="flex items-center gap-3 md:gap-4 shrink-0 overflow-x-auto scrollbar-hide py-1">
-              <div className="flex items-center gap-1.5 sm:gap-2 bg-secondary/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-border/50">
-                <img
-                  src={data.authorAvatar}
-                  className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 rounded-full bg-primary/10 border border-border/50 shadow-sm"
-                  alt={data.author}
-                />
-                <span className="text-[9px] sm:text-[10px] md:text-xs font-bold text-primary uppercase tracking-[0.1em]">{data.author}</span>
-              </div>
-              <div className="flex items-center gap-1.5 sm:gap-2 text-muted-foreground/50 font-medium whitespace-nowrap">
-                <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
-                <span className="text-[8px] sm:text-[9px] md:text-[11px] font-bold uppercase tracking-widest">{data.date}</span>
-              </div>
+            <div className="flex items-center gap-2 text-muted-foreground/40 font-medium whitespace-nowrap py-1">
+              <Clock className="w-3 h-3" />
+              <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest">{data.date}</span>
             </div>
           </div>
         </div>
@@ -187,12 +190,12 @@ export function CommunicationSection() {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   // Form states
-  const [newPost, setNewPost] = useState({
+  const [newPost, setNewPost] = useState(() => ({
     title: "",
     content: "",
     category: "Empresa",
     image: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}`
-  });
+  }));
 
   const handleAddPost = () => {
     if (!newPost.title || !newPost.content) return;
@@ -228,7 +231,7 @@ export function CommunicationSection() {
     });
   };
 
-  const handleEdit = (data: any) => {
+  const handleEdit = (data: CommunicationPost) => {
     setNewPost({
       title: data.title,
       content: data.content,
@@ -417,8 +420,8 @@ export function CommunicationSection() {
       </div>
 
       {/* SCROLLABLE BOTTOM PART: Cards */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-12 scrollbar-hide">
-        <div className="flex flex-col gap-2 max-h-min pt-0">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-6 scrollbar-hide">
+        <div className="flex flex-col gap-4 min-h-full pt-0">
           {filtered.map((item) => (
             <CommunicationCard key={item.id} data={item} onEdit={handleEdit} />
           ))}

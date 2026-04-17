@@ -21,7 +21,6 @@ import {
   Megaphone,
   Calendar,
   MessageSquare,
-  FileText,
   Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -131,7 +130,6 @@ function ProfileTab() {
     email: "danilo@carflax.com.br",
     telefone: "+55 (11) 99999-9999",
     cargo: "Administrator",
-    bio: "Responsável pela gestão de produtos e estratégia de crescimento da Carflax.",
   });
   const [isSaved, setIsSaved] = useState(false);
 
@@ -191,21 +189,6 @@ function ProfileTab() {
             </div>
           </div>
         ))}
-
-        {/* Bio — full width */}
-        <div className="space-y-3 md:col-span-2">
-          <label className="text-[11px] font-black text-primary uppercase tracking-[0.2em] ml-1">Sobre mim</label>
-          <div className="relative group">
-            <FileText className="absolute left-5 top-5 w-5 h-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
-            <textarea
-              value={form.bio}
-              onChange={(e) => setForm({ ...form, bio: e.target.value })}
-              rows={3}
-              className="w-full pl-14 pr-6 py-5 rounded-[1.5rem] bg-secondary/10 border border-border/50 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-base font-bold text-foreground resize-none"
-            />
-          </div>
-          <p className="text-[10px] text-muted-foreground text-right pr-1">{form.bio.length}/200 caracteres</p>
-        </div>
       </div>
 
       {/* Footer */}
@@ -637,18 +620,23 @@ function AppearanceTab() {
 ───────────────────────────────────────────── */
 export function SettingsSection({ externalTab }: SettingsSectionProps) {
   const [activeTab, setActiveTab] = useState("profile");
+  const [prevExternalTab, setPrevExternalTab] = useState(externalTab);
 
-  useEffect(() => {
-    if (!externalTab) return;
-    const tabMap: Record<string, string> = {
-      "Meu Perfil": "profile",
-      "Notificações": "notifications",
-      "Segurança": "security",
-      "Aparência": "appearance",
-      "Configurações": "profile",
-    };
-    if (tabMap[externalTab]) setActiveTab(tabMap[externalTab]);
-  }, [externalTab]);
+  if (externalTab !== prevExternalTab) {
+    setPrevExternalTab(externalTab);
+    if (externalTab) {
+      const tabMap: Record<string, string> = {
+        "Meu Perfil": "profile",
+        "Notificações": "notifications",
+        "Segurança": "security",
+        "Aparência": "appearance",
+        "Configurações": "profile",
+      };
+      if (tabMap[externalTab]) {
+        setActiveTab(tabMap[externalTab]);
+      }
+    }
+  }
 
   const tabLabel: Record<string, string> = {
     profile: "Meu Perfil",
