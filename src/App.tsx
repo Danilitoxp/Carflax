@@ -12,12 +12,22 @@ import {
 import { LayoutGrid } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { SugestaoModal } from "@/components/sugestao";
 
 function DashboardContent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
   const [activeItem, setActiveItem] = useState("Geral");
+  const [isSugestaoModalOpen, setIsSugestaoModalOpen] = useState(false);
+
+  const handleActiveItemChange = (item: string) => {
+    if (item === "Sugestões") {
+      setIsSugestaoModalOpen(true);
+    } else {
+      setActiveItem(item);
+    }
+  };
 
   const isDashboardView = ["Geral", "Analytics", "Performance", "Campanhas", "Dashboard", "Orçamentos"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(activeItem);
@@ -28,7 +38,7 @@ function DashboardContent() {
     <div className="h-screen bg-background font-sans transition-colors duration-300 overflow-hidden flex relative">
       <AppSidebar
         activeItem={activeItem}
-        onActiveItemChange={setActiveItem}
+        onActiveItemChange={handleActiveItemChange}
         isCollapsed={isSidebarCollapsed}
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isMobileOpen={isMobileMenuOpen}
@@ -97,7 +107,6 @@ function DashboardContent() {
           )}
         </div>
 
-        {/* Right Fixed Sidebar Panel (Dashboard Only) */}
         {showRightPanel && (
           <div className="hidden xl:block w-80 fixed right-0 top-0 h-screen bg-transparent py-6 pr-6 pl-0 space-y-2 overflow-y-auto scrollbar-hide">
             <button
@@ -113,6 +122,11 @@ function DashboardContent() {
           </div>
         )}
       </main>
+
+      <SugestaoModal 
+        isOpen={isSugestaoModalOpen} 
+        onClose={() => setIsSugestaoModalOpen(false)} 
+      />
     </div>
   );
 }
