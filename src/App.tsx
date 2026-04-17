@@ -31,7 +31,7 @@ function DashboardContent() {
 
   const isDashboardView = ["Geral", "Analytics", "Performance", "Campanhas", "Dashboard", "Orçamentos"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(activeItem);
-  const isCrmView = ["Analytics", "Orçamentos", "CRM", "Produtos"].includes(activeItem);
+  const isCrmView = ["Analytics", "Orçamentos", "CRM", "Produtos", "Campanhas"].includes(activeItem);
   const showRightPanel = activeItem === "Geral";
 
   return (

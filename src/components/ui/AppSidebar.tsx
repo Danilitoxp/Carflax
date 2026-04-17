@@ -9,9 +9,7 @@ import {
   Sun,
   Moon,
   Calendar,
-  MessageSquare,
   BarChart3,
-  Activity,
   Briefcase,
   Video,
   Megaphone,
@@ -67,16 +65,15 @@ const menuItems: MenuItem[] = [
     subItems: [
       { label: "Analytics", icon: BarChart3 },
       { label: "Orçamentos", icon: FileBadge },
+      { label: "Campanhas", icon: Megaphone },
     ],
   },
-  { icon: MessageSquare, label: "Mensagens" },
-  { icon: Activity, label: "Esteira" },
+
   {
     icon: Briefcase,
     label: "Gestão",
     isDropdown: true,
     subItems: [
-      { label: "Campanhas", icon: Megaphone },
       { label: "Entregas", icon: Truck },
       { label: "Assinaturas", icon: Video },
       { label: "Solicitações", icon: FileBadge },
