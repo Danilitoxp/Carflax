@@ -1,6 +1,8 @@
 import { ThemeProvider } from "@/context/theme-provider";
-import { AppSidebar } from "@/components/dashboard/AppSidebar";
+import { AppSidebar } from "@/components/ui/AppSidebar";
 import { CommunicationSection } from "@/components/dashboard/CommunicationSection";
+import { CalendarSection } from "@/components/calendar";
+import { SettingsSection } from "@/components/settings";
 import {
   HighlightCard,
   SalesMetricsCard,
@@ -14,10 +16,16 @@ function DashboardContent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
+  const [activeItem, setActiveItem] = useState("Geral");
+
+  const isDashboardView = ["Geral", "Analytics", "Performance", "Campanhas", "Dashboard"].includes(activeItem);
+  const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(activeItem);
 
   return (
     <div className="h-screen bg-background font-sans transition-colors duration-300 overflow-hidden flex relative">
       <AppSidebar
+        activeItem={activeItem}
+        onActiveItemChange={setActiveItem}
         isCollapsed={isSidebarCollapsed}
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isMobileOpen={isMobileMenuOpen}
@@ -35,7 +43,7 @@ function DashboardContent() {
         className={cn(
           "flex-1 flex flex-col h-screen transition-all duration-500 w-full",
           isSidebarCollapsed ? "lg:pl-20" : "lg:pl-64",
-          "xl:pr-80",
+          isDashboardView ? "xl:pr-80" : "pr-0",
         )}
       >
         {/* Mobile Header */}
@@ -63,22 +71,42 @@ function DashboardContent() {
 
         {/* Content Area */}
         <div className="flex flex-col h-full w-full mx-auto overflow-hidden">
-          <CommunicationSection />
+          {activeItem === "Calendário" ? (
+            <CalendarSection />
+          ) : isSettingsView ? (
+            <SettingsSection externalTab={activeItem} />
+          ) : isDashboardView ? (
+            <CommunicationSection />
+          ) : (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                  <LayoutGrid className="w-10 h-10 text-primary" />
+                </div>
+                <h2 className="text-4xl font-black text-foreground mb-4 uppercase tracking-tighter">Seção: {activeItem}</h2>
+                <p className="text-muted-foreground text-lg font-medium max-w-md mx-auto">
+                  Esta página está em desenvolvimento e logo ocupará toda a largura da sua tela de forma dinâmica.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Right Fixed Sidebar Panel */}
-        <div className="hidden xl:block w-80 fixed right-0 top-0 h-screen bg-transparent py-6 pr-6 pl-0 space-y-2 overflow-y-auto scrollbar-hide">
-          <button 
-            onClick={() => setIsVendedor(!isVendedor)}
-            className="absolute top-2 right-8 text-[8px] font-bold opacity-0 hover:opacity-100 transition-opacity text-primary uppercase"
-          >
-            Simular {isVendedor ? 'Interno' : 'Vendedor'}
-          </button>
-          <div className="flex flex-col gap-2 px-0 h-full">
-            {isVendedor ? <SalesMetricsCard /> : <HighlightCard />}
-            <BirthdayList isCompact={isVendedor} />
+        {/* Right Fixed Sidebar Panel (Dashboard Only) */}
+        {isDashboardView && (
+          <div className="hidden xl:block w-80 fixed right-0 top-0 h-screen bg-transparent py-6 pr-6 pl-0 space-y-2 overflow-y-auto scrollbar-hide">
+            <button 
+              onClick={() => setIsVendedor(!isVendedor)}
+              className="absolute top-2 right-8 text-[8px] font-bold opacity-0 hover:opacity-100 transition-opacity text-primary uppercase"
+            >
+              Simular {isVendedor ? 'Interno' : 'Vendedor'}
+            </button>
+            <div className="flex flex-col gap-2 px-0 h-full">
+              {isVendedor ? <SalesMetricsCard /> : <HighlightCard />}
+              <BirthdayList isCompact={isVendedor} />
+            </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );

@@ -18,12 +18,16 @@ import {
   Truck,
   Hexagon,
   Users,
+  User,
+  Bell,
+  ShieldCheck,
+  Palette,
   Lightbulb,
   FileBadge,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "./ThemeToggle";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useTheme } from "@/context/theme-provider";
 
 interface MenuItem {
@@ -67,7 +71,17 @@ const menuItems: MenuItem[] = [
 ];
 
 const settingsItems: MenuItem[] = [
-  { icon: Settings, label: "Configurações", hasArrow: true },
+  { 
+    icon: Settings, 
+    label: "Configurações", 
+    isDropdown: true,
+    subItems: [
+      { label: "Meu Perfil", icon: User },
+      { label: "Notificações", icon: Bell },
+      { label: "Segurança", icon: ShieldCheck },
+      { label: "Aparência", icon: Palette },
+    ]
+  },
 ];
 
 interface AppSidebarProps {
@@ -75,12 +89,13 @@ interface AppSidebarProps {
   onToggle: () => void;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
+  activeItem: string;
+  onActiveItemChange: (item: string) => void;
 }
 
-export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: AppSidebarProps) {
+export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange }: AppSidebarProps) {
   const { theme, setTheme } = useTheme();
   const [openMenus, setOpenMenus] = useState<string[]>(["Dashboard"]);
-  const [activeItem, setActiveItem] = useState<string>("Geral");
 
   const toggleMenu = (label: string) => {
     if (isCollapsed) return;
@@ -112,7 +127,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose 
           )}
         >
           {!isCollapsed && (
-            <div className="flex items-center gap-3 overflow-hidden animate-in fade-in slide-in-from-left-2 duration-300 flex-1">
+            <div className="flex items-center gap-3 overflow-hidden duration-300 flex-1">
               <div className="w-12 h-12 rounded-full border-2 border-[#0053FC]/30 p-0.5 shrink-0">
                 <img
                   src="https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo&backgroundColor=0053FC"
@@ -162,7 +177,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose 
                       if (item.isDropdown) {
                         toggleMenu(item.label);
                       } else {
-                        setActiveItem(item.label);
+                        onActiveItemChange(item.label);
                         if (onMobileClose) onMobileClose();
                       }
                     }}
@@ -186,7 +201,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose 
                     {!isCollapsed && (
                       <div
                         className={cn(
-                          "flex items-center flex-1 animate-in fade-in slide-in-from-left-1 duration-300 overflow-hidden",
+                          "flex items-center flex-1 duration-300 overflow-hidden",
                           isActive && !item.isDropdown && "text-[#0053FC]",
                         )}
                       >
@@ -228,7 +243,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose 
                           <div
                             key={i}
                             onClick={() => {
-                              setActiveItem(sub.label);
+                              onActiveItemChange(sub.label);
                               if (onMobileClose) onMobileClose();
                             }}
                             className={cn(
@@ -265,33 +280,109 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose 
         {/* Settings Section */}
         <div>
           <div className="space-y-1">
-            {settingsItems.map((item, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  "flex items-center rounded-xl transition-all duration-300 group cursor-pointer hover:bg-secondary/50 text-muted-foreground hover:text-foreground",
-                  isCollapsed
-                    ? "justify-center h-12 px-0"
-                    : "gap-3 px-3 py-2.5",
-                )}
-              >
-                <item.icon
-                  className="w-5 h-5 text-[#0053FC] shrink-0"
-                  strokeWidth={1.5}
-                />
-                {!isCollapsed && (
-                  <div className="flex items-center flex-1 animate-in fade-in slide-in-from-left-1 duration-300 overflow-hidden">
-                    <span className="text-sm font-semibold flex-1 tracking-tight truncate">
-                      {item.label}
-                    </span>
-                    <ChevronRight
-                      className="w-4 h-4 opacity-40"
+            {settingsItems.map((item, idx) => {
+              const isOpen = openMenus.includes(item.label);
+              const isSubActive = item.subItems?.some(sub => activeItem === sub.label);
+              const isActive = activeItem === item.label || isSubActive;
+
+              return (
+                <div key={idx} className="space-y-1">
+                  <div
+                    onClick={() => {
+                      if (item.isDropdown) {
+                        toggleMenu(item.label);
+                      } else {
+                        onActiveItemChange(item.label);
+                        if (onMobileClose) onMobileClose();
+                      }
+                    }}
+                    className={cn(
+                      "flex items-center rounded-xl transition-all duration-300 group cursor-pointer relative",
+                      isActive && !item.isDropdown 
+                        ? "bg-primary/[0.03] text-primary" 
+                        : "hover:bg-secondary/50 text-muted-foreground hover:text-foreground",
+                      isCollapsed
+                        ? "justify-center h-12 px-0"
+                        : "gap-3 px-3 py-2.5",
+                    )}
+                  >
+                    {isActive && !item.isDropdown && (
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#0053FC]" />
+                    )}
+
+                    <item.icon
+                      className={cn(
+                          "w-5 h-5 shrink-0 transition-colors",
+                          isActive ? "text-[#0053FC]" : "text-[#0053FC]/70 group-hover:text-[#0053FC]"
+                      )}
                       strokeWidth={1.5}
                     />
+                    {!isCollapsed && (
+                      <div className="flex items-center flex-1 duration-300 overflow-hidden">
+                        <span className={cn(
+                          "text-sm font-semibold flex-1 tracking-tight truncate",
+                          isActive && "font-bold"
+                        )}>
+                          {item.label}
+                        </span>
+                        {item.isDropdown ? (
+                          <ChevronDown
+                            className={cn(
+                              "w-4 h-4 opacity-40 transition-transform duration-500",
+                              isOpen ? "rotate-180 text-[#0053FC]" : "rotate-0 text-muted-foreground",
+                            )}
+                            strokeWidth={1.5}
+                          />
+                        ) : (
+                          <ChevronRight
+                            className={cn(
+                                "w-4 h-4 transition-all",
+                                isActive ? "opacity-100 translate-x-1" : "opacity-40"
+                            )}
+                            strokeWidth={1.5}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* Dropdown for Settings Subitems */}
+                  <div
+                    className={cn(
+                      "grid transition-all duration-300 ease-in-out",
+                      isOpen && !isCollapsed
+                        ? "grid-rows-[1fr] opacity-100"
+                        : "grid-rows-[0fr] opacity-0 overflow-hidden",
+                    )}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="pl-8 space-y-1 py-1">
+                        {item.subItems?.map((sub, i) => (
+                          <div
+                            key={i}
+                            onClick={() => {
+                              onActiveItemChange(sub.label);
+                              if (onMobileClose) onMobileClose();
+                            }}
+                            className={cn(
+                              "text-xs font-semibold py-2 px-3 rounded-md cursor-pointer transition-all border-l-2 relative overflow-hidden group/sub flex items-center gap-2",
+                              activeItem === sub.label
+                                ? "bg-primary/5 text-primary border-primary font-bold"
+                                : "text-muted-foreground border-transparent hover:text-primary hover:bg-primary/5 hover:border-primary/30",
+                            )}
+                          >
+                            {sub.icon && (
+                              <sub.icon className="w-3.5 h-3.5 relative z-10 opacity-70" />
+                            )}
+                            <span className="relative z-10">{sub.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

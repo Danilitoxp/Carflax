@@ -1,5 +1,5 @@
 import { Search, Bell } from "lucide-react"
-import { ThemeToggle } from "./ThemeToggle"
+import { ThemeToggle } from "@/components/ui/ThemeToggle"
 import { Input } from "@/components/ui/input"
 
 export function DashboardHeader({ title }: { title: string }) {
