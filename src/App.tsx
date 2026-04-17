@@ -1,14 +1,14 @@
 import { ThemeProvider } from "@/context/theme-provider";
 import { AppSidebar } from "@/components/ui/AppSidebar";
-import { CommunicationSection } from "@/components/dashboard/CommunicationSection";
+import { CommunicationSection } from "@/components/dashboard/Geral/CommunicationSection";
 import { CalendarSection } from "@/components/calendar";
 import { SettingsSection } from "@/components/settings";
-import { CrmSection } from "@/components/dashboard/CrmSection";
+import { CrmSection } from "@/components/crm";
 import {
   HighlightCard,
   SalesMetricsCard,
   BirthdayList,
-} from "@/components/dashboard/RightPanelComponents";
+} from "@/components/dashboard/Geral/RightPanelComponents";
 import { LayoutGrid } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -19,9 +19,9 @@ function DashboardContent() {
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
   const [activeItem, setActiveItem] = useState("Geral");
 
-  const isDashboardView = ["Geral", "Analytics", "Performance", "Campanhas", "Dashboard", "Orçamentos", "Produtos"].includes(activeItem);
+  const isDashboardView = ["Geral", "Analytics", "Performance", "Campanhas", "Dashboard", "Orçamentos"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(activeItem);
-  const isCrmView = ["Analytics", "Orçamentos", "CRM"].includes(activeItem);
+  const isCrmView = ["Analytics", "Orçamentos", "CRM", "Produtos"].includes(activeItem);
   const showRightPanel = activeItem === "Geral";
 
   return (
@@ -36,7 +36,7 @@ function DashboardContent() {
       />
 
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity duration-300"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -51,7 +51,7 @@ function DashboardContent() {
       >
         {/* Mobile Header */}
         <div className="lg:hidden flex items-center justify-between p-4 border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-30">
-          <button 
+          <button
             onClick={() => setIsMobileMenuOpen(true)}
             className="p-2 hover:bg-secondary rounded-xl text-primary transition-colors"
           >
@@ -60,14 +60,14 @@ function DashboardContent() {
           <div className="flex items-center gap-2">
             <span className="text-xl font-black text-primary tracking-tighter">CARFLAX</span>
           </div>
-          <button 
+          <button
             onClick={() => setIsVendedor(!isVendedor)}
             className="w-10 h-10 rounded-full border border-border overflow-hidden"
           >
-            <img 
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo" 
-              className="w-full h-full rounded-full" 
-              alt="User" 
+            <img
+              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo"
+              className="w-full h-full rounded-full"
+              alt="User"
             />
           </button>
         </div>
@@ -100,7 +100,7 @@ function DashboardContent() {
         {/* Right Fixed Sidebar Panel (Dashboard Only) */}
         {showRightPanel && (
           <div className="hidden xl:block w-80 fixed right-0 top-0 h-screen bg-transparent py-6 pr-6 pl-0 space-y-2 overflow-y-auto scrollbar-hide">
-            <button 
+            <button
               onClick={() => setIsVendedor(!isVendedor)}
               className="absolute top-2 right-8 text-[8px] font-bold opacity-0 hover:opacity-100 transition-opacity text-primary uppercase"
             >

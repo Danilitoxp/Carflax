@@ -17,7 +17,7 @@ import {
   Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
+import { ProdutosView } from "@/components/dashboard/products/ProdutosView";
 
 /* ─────────────────────────────────────────────
    ANALYTICS VIEW (INSIGHTS)
@@ -509,7 +509,7 @@ function OrçamentosView() {
                   <td className="px-8 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1.5 transition-all duration-300">
                       <button 
-                        onClick={() => {
+                         onClick={() => {
                           setSelectedItem(item);
                           setIsItemsModalOpen(true);
                         }}
@@ -532,9 +532,6 @@ function OrçamentosView() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsItemsModalOpen(false)} />
           <div className="relative w-full max-w-4xl bg-card border border-border/50 rounded-[3.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-300">
-            {/* Top Light Highlight */}
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-
             {/* Modal Header */}
             <div className="p-10 pb-6 flex items-center gap-5">
               <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(245,158,11,0.2)] border border-amber-400/20">
@@ -600,10 +597,7 @@ function OrçamentosView() {
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsStatusModalOpen(false)} />
-          <div className="relative w-full max-w-lg bg-card/95 backdrop-blur-2xl border border-white/10 rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.7)] p-10 animate-in zoom-in-95 duration-300 overflow-hidden">
-            {/* Top Light Highlight */}
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-            
+          <div className="relative w-full max-lg bg-card/95 backdrop-blur-2xl border border-white/10 rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.7)] p-10 animate-in zoom-in-95 duration-300 overflow-hidden">
             <button 
               onClick={() => setIsStatusModalOpen(false)}
               className="absolute top-8 right-8 p-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-2xl transition-all duration-300"
@@ -615,202 +609,70 @@ function OrçamentosView() {
               {statusStep === 'selection' ? (
                 <>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-black text-foreground tracking-tight leading-tight">Alterar Status do Orçamento</h3>
+                    <h3 className="text-2xl font-black text-foreground tracking-tight leading-tight">Alterar Status</h3>
                     {selectedItem && (
                       <div className="p-4 rounded-2xl bg-secondary/30 border border-border/50">
-                        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1 opacity-60">Orçamento selecionado</p>
-                        <p className="text-xs font-black text-foreground uppercase tracking-tighter truncate">
-                          <span className="text-primary">#{selectedItem.id}</span> — {selectedItem.client}
-                        </p>
+                        <p className="text-xs font-black text-foreground uppercase tracking-tighter">#{selectedItem.id} — {selectedItem.client}</p>
                       </div>
                     )}
                   </div>
-
-                  <div className="space-y-5 pt-2">
-                    <div className="flex items-center gap-4">
-                      <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] whitespace-nowrap">Mudar para etapa</h4>
-                      <div className="h-px w-full bg-border/40" />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { label: "Emitido", bg: "bg-[#343A40]", glow: "shadow-[#343A40]/10", next: null },
-                        { label: "Enviado", bg: "bg-[#9C6ADE]", glow: "shadow-[#9C6ADE]/20", next: 'enviado' },
-                        { label: "Negociação", bg: "bg-[#F5C71A]", glow: "shadow-[#F5C71A]/20", next: 'negociacao' },
-                        { label: "Lib. Crédito", bg: "bg-[#E68A2E]", glow: "shadow-[#E68A2E]/20", next: null },
-                        { label: "Aguard. Pedido", bg: "bg-[#D35400]", glow: "shadow-[#D35400]/20", next: null },
-                        { label: "Perdido", bg: "bg-[#C0392B]", glow: "shadow-[#C0392B]/20", next: 'perdido' },
-                      ].map((btn, i) => (
-                        <button 
-                          key={i}
-                          onClick={() => btn.next ? setStatusStep(btn.next as any) : handleUpdateStatus(btn.label)}
-                          className={cn(
-                            "group relative py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-tighter transition-all duration-300 hover:-translate-y-1 hover:brightness-110 active:scale-[0.97] shadow-lg text-white border border-white/5 overflow-hidden",
-                            btn.bg, btn.glow
-                          )}
-                        >
-                          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-white/10 group-hover:bg-white/20 transition-colors" />
-                          <span className="relative z-10">{btn.label}</span>
-                        </button>
-                      ))}
-                    </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Emitido", bg: "bg-[#343A40]", next: null },
+                      { label: "Enviado", bg: "bg-[#9C6ADE]", next: 'enviado' },
+                      { label: "Negociação", bg: "bg-[#F5C71A]", next: 'negociacao' },
+                      { label: "Lib. Crédito", bg: "bg-[#E68A2E]", next: null },
+                      { label: "Aguard. Pedido", bg: "bg-[#D35400]", next: null },
+                      { label: "Perdido", bg: "bg-[#C0392B]", next: 'perdido' },
+                    ].map((btn, i) => (
+                      <button 
+                        key={i}
+                        onClick={() => btn.next ? setStatusStep(btn.next as any) : handleUpdateStatus(btn.label)}
+                        className={cn("py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-tighter transition-all hover:-translate-y-1 active:scale-[0.97] text-white shadow-lg", btn.bg)}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
                   </div>
                 </>
               ) : statusStep === 'enviado' ? (
-                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#0081FF]/10 rounded-xl flex items-center justify-center">
-                      <Send className="w-5 h-5 text-[#0081FF]" />
-                    </div>
-                    <h3 className="text-xl font-black text-[#0081FF] uppercase tracking-tighter">Status: Enviado</h3>
-                  </div>
-
-                  <p className="text-xs font-bold text-muted-foreground/80 leading-relaxed pl-1">
-                    Para mudar o status para Enviado, você precisa informar a data agendada para o seu próximo contato.
-                  </p>
-
-                  <div className="space-y-5 pt-2">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1">Data de próximo contato *</label>
-                      <div className="relative group">
-                        <input 
-                          type="text" 
-                          placeholder="dd/mm/aaaa" 
-                          onChange={handleDateMask}
-                          className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#0081FF]/50 transition-all"
-                        />
-                        <Calendar className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-[#0081FF]" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1">Observação</label>
-                      <textarea 
-                        placeholder="Algum detalhe importante sobre o orçamento enviado..." 
-                        rows={4}
-                        className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#0081FF]/50 transition-all resize-none"
-                      />
-                    </div>
-
-                    <button 
-                      onClick={() => handleUpdateStatus('ENVIADO')}
-                      className="w-full py-5 bg-[#59ACFF] hover:bg-[#0081FF] text-white rounded-[1.5rem] font-black text-base uppercase tracking-widest transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-3"
-                    >
-                      <Calendar className="w-5 h-5" />
-                      Avançar Status
-                    </button>
+                <div className="space-y-6">
+                  <h3 className="text-xl font-black text-[#0081FF] uppercase tracking-tighter flex items-center gap-4">
+                    <Send className="w-5 h-5" /> Status: Enviado
+                  </h3>
+                  <div className="space-y-5">
+                    <input type="text" placeholder="Data de contato (dd/mm/aaaa)" onChange={handleDateMask} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#0081FF]/50" />
+                    <textarea placeholder="Observação..." rows={4} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none resize-none" />
+                    <button onClick={() => handleUpdateStatus('ENVIADO')} className="w-full py-5 bg-[#0081FF] text-white rounded-[1.5rem] font-black uppercase tracking-widest">Confirmar</button>
                   </div>
                 </div>
               ) : statusStep === 'negociacao' ? (
-                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#F5C71A]/10 rounded-xl flex items-center justify-center">
-                      <Handshake className="w-6 h-6 text-[#F5C71A]" />
-                    </div>
-                    <h3 className="text-xl font-black text-[#0081FF] uppercase tracking-tighter">Informações de Negociação</h3>
-                  </div>
-
+                <div className="space-y-6">
+                  <h3 className="text-xl font-black text-[#F5C71A] uppercase tracking-tighter flex items-center gap-4">
+                    <Handshake className="w-6 h-6" /> Negociação
+                  </h3>
                   <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1">Endereço da obra *</label>
-                      <input 
-                        type="text" 
-                        placeholder="Ex.: Rua das Flores, 123" 
-                        className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#F5C71A]/50 transition-all"
-                      />
+                    <input type="text" placeholder="Endereço da obra *" className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none" />
+                    <div className="grid grid-cols-2 gap-4">
+                      <input type="text" placeholder="Fechamento *" onChange={handleDateMask} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4" />
+                      <input type="text" placeholder="Entrega *" onChange={handleDateMask} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4" />
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1">Previsão de fechamento *</label>
-                        <div className="relative group">
-                          <input type="text" placeholder="dd/mm/aaaa" onChange={handleDateMask} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#F5C71A]/50 transition-all" />
-                          <Calendar className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-[#F5C71A]" />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1">Previsão de entrega *</label>
-                        <div className="relative group">
-                          <input type="text" placeholder="dd/mm/aaaa" onChange={handleDateMask} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#F5C71A]/50 transition-all" />
-                          <Calendar className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-[#F5C71A]" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1">Data de próximo contato *</label>
-                      <div className="relative group">
-                        <input type="text" placeholder="dd/mm/aaaa" onChange={handleDateMask} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#F5C71A]/50 transition-all" />
-                        <Calendar className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-[#F5C71A]" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1">Observação</label>
-                      <textarea 
-                        placeholder="Detalhes da negociação, condições especiais, etc..." 
-                        rows={3}
-                        className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#F5C71A]/50 transition-all resize-none"
-                      />
-                    </div>
+                    <textarea placeholder="Observação..." rows={3} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none resize-none" />
+                    <button onClick={() => handleUpdateStatus('NEGOCIAÇÃO')} className="w-full py-5 bg-[#F5C71A] text-black rounded-[1.5rem] font-black uppercase tracking-widest">Salvar</button>
                   </div>
-
-                  <button 
-                    onClick={() => handleUpdateStatus('NEGOCIAÇÃO')}
-                    className="w-full py-5 bg-[#F5C71A] hover:bg-[#D4A017] text-black rounded-[1.5rem] font-black text-sm uppercase tracking-widest transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-3"
-                  >
-                    <Send className="w-5 h-5" />
-                    Salvar e Enviar ao Gerente
-                  </button>
                 </div>
               ) : (
-                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#C0392B]/10 rounded-xl flex items-center justify-center">
-                      <XCircle className="w-6 h-6 text-[#C0392B]" />
-                    </div>
-                    <h3 className="text-xl font-black text-[#0081FF] uppercase tracking-tighter">Status: Perdido</h3>
-                  </div>
-
+                <div className="space-y-6">
+                  <h3 className="text-xl font-black text-[#C0392B] uppercase tracking-tighter flex items-center gap-4">
+                    <XCircle className="w-6 h-6" /> Status: Perdido
+                  </h3>
                   <div className="space-y-5">
-                    <div className="flex items-center gap-2">
-                      <XCircle className="w-4 h-4 text-[#C0392B]" />
-                      <h4 className="text-[10px] font-black text-[#C0392B] uppercase tracking-widest">Motivo da perda</h4>
-                    </div>
-
-                    <div className="relative group">
-                      <select 
-                        className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#C0392B]/50 appearance-none cursor-pointer transition-all"
-                      >
-                        <option value="" className="bg-[#111214]">Selecione o motivo...</option>
-                        <option value="Preço Alto" className="bg-[#111214]">Preço Alto</option>
-                        <option value="Falta de Estoque" className="bg-[#111214]">Falta de Estoque</option>
-                        <option value="Prazo de Entrega" className="bg-[#111214]">Prazo de Entrega</option>
-                        <option value="Cliente Desistiu" className="bg-[#111214]">Cliente Desistiu</option>
-                        <option value="Postergou" className="bg-[#111214]">Postergou</option>
-                        <option value="Liberação Financeira" className="bg-[#111214]">Liberação Financeira</option>
-                        <option value="Comparativo de Linhas" className="bg-[#111214]">Comparativo de Linhas</option>
-                        <option value="Tomada de Preço" className="bg-[#111214]">Tomada de Preço</option>
-                        <option value="Erro do Vendedor" className="bg-[#111214]">Erro do Vendedor</option>
-                      </select>
-                      <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none group-hover:text-[#C0392B] transition-colors" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <textarea 
-                        placeholder="Observação adicional (opcional)..." 
-                        rows={4}
-                        className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#C0392B]/50 transition-all resize-none"
-                      />
-                    </div>
-
-                    <button 
-                      onClick={() => handleUpdateStatus('PERDIDO')}
-                      className="w-full py-5 bg-[#E74C3C] hover:bg-[#C0392B] text-white rounded-[1.5rem] font-black text-sm uppercase tracking-widest transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-3 mt-4"
-                    >
-                      <Send className="w-5 h-5" />
-                      Confirmar Perda e Notificar Gerente
-                    </button>
+                    <select className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none appearance-none">
+                      <option value="">Selecione o motivo...</option>
+                      {["Preço Alto", "Estoque", "Prazo", "Desistiu"].map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <textarea placeholder="Observação adicional..." rows={4} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none resize-none" />
+                    <button onClick={() => handleUpdateStatus('PERDIDO')} className="w-full py-5 bg-[#C0392B] text-white rounded-[1.5rem] font-black uppercase tracking-widest">Confirmar Perda</button>
                   </div>
                 </div>
               )}
@@ -830,6 +692,8 @@ export function CrmSection({ activeTab }: CrmSectionProps) {
         <div className="flex-1 min-h-0">
           {activeTab === "Analytics" ? (
             <div className="h-full overflow-y-auto scrollbar-hide py-4"><AnalyticsView /></div>
+          ) : activeTab === "Produtos" ? (
+            <ProdutosView />
           ) : (
             <OrçamentosView />
           )}

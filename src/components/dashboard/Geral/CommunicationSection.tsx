@@ -71,107 +71,107 @@ export function CommunicationCard({ data, onEdit }: { data: any; onEdit: (d: any
       <div className="flex flex-col md:flex-row md:min-h-[320px]">
         {/* Visual Side (Image) */}
         <div className="w-full md:w-[30%] bg-gradient-to-br from-[#032D9C] to-[#0053FC] flex items-center justify-center p-6 md:p-8 relative overflow-hidden shrink-0 h-48 md:h-auto">
-            <div className="w-28 h-28 md:w-44 md:h-44 rounded-full border-4 border-white/20 p-1.5 relative z-10 transition-transform duration-700 group-hover:scale-110 shadow-2xl shadow-black/20">
+          <div className="w-28 h-28 md:w-44 md:h-44 rounded-full border-4 border-white/20 p-1.5 relative z-10 transition-transform duration-700 group-hover:scale-110 shadow-2xl shadow-black/20">
             <img
-                src={data.image}
-                alt={data.title}
-                className="w-full h-full rounded-full object-cover bg-white/10"
+              src={data.image}
+              alt={data.title}
+              className="w-full h-full rounded-full object-cover bg-white/10"
             />
-            </div>
-            {/* Decorative pattern */}
-            <div className="absolute inset-0 opacity-10 pointer-events-none">
+          </div>
+          {/* Decorative pattern */}
+          <div className="absolute inset-0 opacity-10 pointer-events-none">
             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
-            </div>
+          </div>
         </div>
 
         {/* Content Side */}
         <div className="flex-1 p-4 sm:p-6 md:p-8 flex flex-col relative bg-card transition-colors duration-300 min-w-0">
-            <div className="flex justify-between items-start mb-3 md:mb-4 gap-3 md:gap-4">
-              <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground flex-1 tracking-tight line-clamp-2">
-                  {data.title}
-              </h3>
-              <div className="flex items-center gap-1 shrink-0 bg-secondary/30 rounded-xl p-1">
-                <button 
-                    onClick={handleShare}
-                    className="text-muted-foreground/60 hover:text-primary transition-all p-1.5 md:p-2 hover:bg-card rounded-lg hover:scale-105 active:scale-95"
-                    title="Compartilhar no WhatsApp"
+          <div className="flex justify-between items-start mb-3 md:mb-4 gap-3 md:gap-4">
+            <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground flex-1 tracking-tight line-clamp-2">
+              {data.title}
+            </h3>
+            <div className="flex items-center gap-1 shrink-0 bg-secondary/30 rounded-xl p-1">
+              <button
+                onClick={handleShare}
+                className="text-muted-foreground/60 hover:text-primary transition-all p-1.5 md:p-2 hover:bg-card rounded-lg hover:scale-105 active:scale-95"
+                title="Compartilhar no WhatsApp"
+              >
+                <Share2 className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+              <button
+                onClick={() => onEdit(data)}
+                className="text-muted-foreground/60 hover:text-primary transition-all p-1.5 md:p-2 hover:bg-card rounded-lg hover:scale-105 active:scale-95"
+              >
+                <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-6 md:mb-8 flex-1">
+            <p className="text-sm md:text-base text-muted-foreground leading-relaxed font-medium line-clamp-4 md:line-clamp-none">
+              {data.content}
+            </p>
+          </div>
+
+          {/* Footer info */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between mt-auto gap-5 pt-5 border-t border-border/10">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 md:gap-6">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <button
+                  onClick={handleLike}
+                  className={cn(
+                    "flex items-center gap-2 md:gap-3 px-3 sm:px-4 md:px-6 py-1.5 md:py-2.5 rounded-full group/like cursor-pointer transition-all shadow-sm hover:scale-105 active:scale-95",
+                    interaction === "like"
+                      ? "bg-[#0053FC] text-white border-transparent"
+                      : "bg-secondary/50 dark:bg-secondary/20 border border-border/50 text-muted-foreground hover:bg-[#0053FC] hover:text-white"
+                  )}
                 >
-                    <Share2 className="w-4 h-4 md:w-5 md:h-5" />
+                  <ThumbsUp
+                    className={cn(
+                      "w-3.5 h-3.5 md:w-5 md:h-5 transition-all group-hover/like:-rotate-12",
+                      interaction === "like" ? "fill-white text-white" : "text-muted-foreground/70"
+                    )}
+                  />
+                  <span className="text-[10px] sm:text-xs md:text-sm font-bold transition-colors">{currentLikes}</span>
                 </button>
-                <button 
-                  onClick={() => onEdit(data)}
-                  className="text-muted-foreground/60 hover:text-primary transition-all p-1.5 md:p-2 hover:bg-card rounded-lg hover:scale-105 active:scale-95"
+                <button
+                  onClick={handleDislike}
+                  className={cn(
+                    "flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 border border-border/50 rounded-full group/dislike cursor-pointer transition-all shadow-sm hover:scale-105 active:scale-95",
+                    interaction === "dislike"
+                      ? "bg-destructive text-white border-transparent"
+                      : "bg-secondary/50 dark:bg-secondary/20 text-muted-foreground hover:bg-destructive hover:text-white"
+                  )}
                 >
-                    <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
+                  <ThumbsDown
+                    className={cn(
+                      "w-3.5 h-3.5 md:w-5 md:h-5 transition-all group-hover/dislike:rotate-12",
+                      interaction === "dislike" ? "fill-white text-white" : "text-muted-foreground/70"
+                    )}
+                  />
                 </button>
               </div>
-            </div>
 
-            <div className="mb-6 md:mb-8 flex-1">
-              <p className="text-sm md:text-base text-muted-foreground leading-relaxed font-medium line-clamp-4 md:line-clamp-none">
-                  {data.content}
-              </p>
-            </div>
-
-            {/* Footer info */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between mt-auto gap-5 pt-5 border-t border-border/10">
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4 md:gap-6">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <button 
-                      onClick={handleLike}
-                      className={cn(
-                        "flex items-center gap-2 md:gap-3 px-3 sm:px-4 md:px-6 py-1.5 md:py-2.5 rounded-full group/like cursor-pointer transition-all shadow-sm hover:scale-105 active:scale-95",
-                        interaction === "like" 
-                          ? "bg-[#0053FC] text-white border-transparent" 
-                          : "bg-secondary/50 dark:bg-secondary/20 border border-border/50 text-muted-foreground hover:bg-[#0053FC] hover:text-white"
-                      )}
-                    >
-                      <ThumbsUp 
-                        className={cn(
-                          "w-3.5 h-3.5 md:w-5 md:h-5 transition-all group-hover/like:-rotate-12",
-                          interaction === "like" ? "fill-white text-white" : "text-muted-foreground/70"
-                        )} 
-                      />
-                      <span className="text-[10px] sm:text-xs md:text-sm font-bold transition-colors">{currentLikes}</span>
-                    </button>
-                    <button 
-                      onClick={handleDislike}
-                      className={cn(
-                        "flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 border border-border/50 rounded-full group/dislike cursor-pointer transition-all shadow-sm hover:scale-105 active:scale-95",
-                        interaction === "dislike"
-                          ? "bg-destructive text-white border-transparent"
-                          : "bg-secondary/50 dark:bg-secondary/20 text-muted-foreground hover:bg-destructive hover:text-white"
-                      )}
-                    >
-                      <ThumbsDown 
-                        className={cn(
-                          "w-3.5 h-3.5 md:w-5 md:h-5 transition-all group-hover/dislike:rotate-12",
-                          interaction === "dislike" ? "fill-white text-white" : "text-muted-foreground/70"
-                        )} 
-                      />
-                    </button>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1 overflow-hidden shrink-0">
-                      <AvatarStack count={data.likes} />
-                  </div>
-              </div>
-
-              <div className="flex items-center gap-3 md:gap-4 shrink-0 overflow-x-auto scrollbar-hide py-1">
-                  <div className="flex items-center gap-1.5 sm:gap-2 bg-secondary/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-border/50">
-                      <img 
-                          src={data.authorAvatar} 
-                          className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 rounded-full bg-primary/10 border border-border/50 shadow-sm" 
-                          alt={data.author} 
-                      />
-                      <span className="text-[9px] sm:text-[10px] md:text-xs font-bold text-primary uppercase tracking-[0.1em]">{data.author}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 sm:gap-2 text-muted-foreground/50 font-medium whitespace-nowrap">
-                      <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
-                      <span className="text-[8px] sm:text-[9px] md:text-[11px] font-bold uppercase tracking-widest">{data.date}</span>
-                  </div>
+              <div className="flex flex-col gap-1 overflow-hidden shrink-0">
+                <AvatarStack count={data.likes} />
               </div>
             </div>
+
+            <div className="flex items-center gap-3 md:gap-4 shrink-0 overflow-x-auto scrollbar-hide py-1">
+              <div className="flex items-center gap-1.5 sm:gap-2 bg-secondary/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-border/50">
+                <img
+                  src={data.authorAvatar}
+                  className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 rounded-full bg-primary/10 border border-border/50 shadow-sm"
+                  alt={data.author}
+                />
+                <span className="text-[9px] sm:text-[10px] md:text-xs font-bold text-primary uppercase tracking-[0.1em]">{data.author}</span>
+              </div>
+              <div className="flex items-center gap-1.5 sm:gap-2 text-muted-foreground/50 font-medium whitespace-nowrap">
+                <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
+                <span className="text-[8px] sm:text-[9px] md:text-[11px] font-bold uppercase tracking-widest">{data.date}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -199,9 +199,9 @@ export function CommunicationSection() {
 
     if (editingId) {
       // Edit existing
-      setComms(comms.map(c => 
-        c.id === editingId 
-          ? { ...c, ...newPost, date: "editado agora" } 
+      setComms(comms.map(c =>
+        c.id === editingId
+          ? { ...c, ...newPost, date: "editado agora" }
           : c
       ));
     } else {
@@ -259,7 +259,7 @@ export function CommunicationSection() {
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -270,7 +270,7 @@ export function CommunicationSection() {
               }}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -278,31 +278,31 @@ export function CommunicationSection() {
             >
               {/* Modal Sidebar (Preview) */}
               <div className="w-full md:w-[42%] bg-gradient-to-br from-[#032D9C] to-[#0053FC] p-8 md:p-12 flex flex-col items-center justify-center text-white relative">
-                 <div className="relative z-10 text-center w-full">
-                    <div className="w-40 h-40 md:w-60 md:h-60 rounded-full border-8 border-white/20 p-2 mx-auto mb-8 bg-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative group">
-                      <img src={newPost.image} className="w-full h-full rounded-full object-cover shadow-inner" alt="Preview" />
-                      <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 rounded-full cursor-pointer transition-all duration-300 backdrop-blur-[2px]">
-                        <div className="flex flex-col items-center gap-2">
-                          <ImageIcon className="w-10 h-10 text-white" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Trocar</span>
-                        </div>
-                        <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-                      </label>
-                    </div>
-                    <h4 className="font-black text-3xl uppercase tracking-tighter mb-2">{editingId ? 'EDITANDO' : 'PREVIEW'}</h4>
-                    <p className="text-white/50 text-xs font-bold uppercase tracking-[0.3em] mb-10">Imagem do Comunicado</p>
-                    
-                    <button 
-                      onClick={() => document.getElementById('modal-file-upload')?.click()}
-                      className="px-10 py-4 bg-white/10 hover:bg-white text-white hover:text-primary rounded-2xl text-xs font-black uppercase tracking-widest transition-all border border-white/20 shadow-xl"
-                    >
-                      ALTERAR FOTO
-                    </button>
-                    <input id="modal-file-upload" type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-                 </div>
-                 {/* Abstract Shapes */}
-                 <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-                 <div className="absolute bottom-[-10%] left-[-10%] w-48 h-48 bg-white/5 rounded-full blur-3xl opacity-50" />
+                <div className="relative z-10 text-center w-full">
+                  <div className="w-40 h-40 md:w-60 md:h-60 rounded-full border-8 border-white/20 p-2 mx-auto mb-8 bg-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative group">
+                    <img src={newPost.image} className="w-full h-full rounded-full object-cover shadow-inner" alt="Preview" />
+                    <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 rounded-full cursor-pointer transition-all duration-300 backdrop-blur-[2px]">
+                      <div className="flex flex-col items-center gap-2">
+                        <ImageIcon className="w-10 h-10 text-white" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Trocar</span>
+                      </div>
+                      <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                    </label>
+                  </div>
+                  <h4 className="font-black text-3xl uppercase tracking-tighter mb-2">{editingId ? 'EDITANDO' : 'PREVIEW'}</h4>
+                  <p className="text-white/50 text-xs font-bold uppercase tracking-[0.3em] mb-10">Imagem do Comunicado</p>
+
+                  <button
+                    onClick={() => document.getElementById('modal-file-upload')?.click()}
+                    className="px-10 py-4 bg-white/10 hover:bg-white text-white hover:text-primary rounded-2xl text-xs font-black uppercase tracking-widest transition-all border border-white/20 shadow-xl"
+                  >
+                    ALTERAR FOTO
+                  </button>
+                  <input id="modal-file-upload" type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                </div>
+                {/* Abstract Shapes */}
+                <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-white/5 rounded-full blur-3xl" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-48 h-48 bg-white/5 rounded-full blur-3xl opacity-50" />
               </div>
 
               {/* Form Side */}
@@ -322,11 +322,11 @@ export function CommunicationSection() {
                     <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] ml-1">Assunto</label>
                     <div className="relative">
                       <Type className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="Título do comunicado..."
                         value={newPost.title}
-                        onChange={(e) => setNewPost({...newPost, title: e.target.value})}
+                        onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
                         className="w-full pl-12 pr-4 py-4 rounded-2xl bg-secondary/30 border border-border/50 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none text-sm font-semibold"
                       />
                     </div>
@@ -336,9 +336,9 @@ export function CommunicationSection() {
                     <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] ml-1">Categoria</label>
                     <div className="relative">
                       <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-                      <select 
+                      <select
                         value={newPost.category}
-                        onChange={(e) => setNewPost({...newPost, category: e.target.value})}
+                        onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
                         className="w-full pl-12 pr-4 py-4 rounded-2xl bg-secondary/30 border border-border/50 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none text-sm font-semibold appearance-none cursor-pointer"
                       >
                         {categories.filter(c => c !== "Todos").map(cat => (
@@ -350,10 +350,10 @@ export function CommunicationSection() {
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] ml-1">Conteúdo</label>
-                    <textarea 
+                    <textarea
                       placeholder="Escreva sua mensagem aqui..."
                       value={newPost.content}
-                      onChange={(e) => setNewPost({...newPost, content: e.target.value})}
+                      onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
                       rows={4}
                       className="w-full p-4 rounded-2xl bg-secondary/30 border border-border/50 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none text-sm font-semibold resize-none"
                     />
@@ -385,24 +385,24 @@ export function CommunicationSection() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center p-1 bg-secondary/50 rounded-2xl border border-border w-full sm:w-fit overflow-x-auto scrollbar-hide">
             <div className="flex items-center min-w-max">
-                {categories.map((cat) => (
+              {categories.map((cat) => (
                 <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={cn(
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={cn(
                     "px-5 py-2 text-sm font-semibold rounded-xl transition-all duration-300",
                     activeCategory === cat
-                        ? "bg-card text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
                 >
-                    {cat}
+                  {cat}
                 </button>
-                ))}
+              ))}
             </div>
           </div>
 
-          <Button 
+          <Button
             onClick={() => {
               setEditingId(null);
               setNewPost({ title: "", content: "", category: "Empresa", image: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}` });
