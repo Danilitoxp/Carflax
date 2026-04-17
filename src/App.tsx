@@ -9,6 +9,7 @@ import {
   SalesMetricsCard,
   BirthdayList,
 } from "@/components/dashboard/Geral/RightPanelComponents";
+import { GeralView } from "@/components/dashboard/Geral/GeralView";
 import { LayoutGrid } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -36,7 +37,7 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
   const isDashboardView = ["Geral", "Analytics", "Performance", "Campanhas", "Dashboard", "Orçamentos"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(activeItem);
   const isCrmView = ["Analytics", "Orçamentos", "CRM", "Produtos", "Campanhas"].includes(activeItem);
-  const showRightPanel = activeItem === "Geral";
+  const showRightPanel = false; // Reduzindo distrações como solicitado
 
   return (
     <div className="h-screen bg-background font-sans transition-colors duration-300 overflow-hidden flex relative">
@@ -101,6 +102,8 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
             <div className="p-8 h-full overflow-y-auto scrollbar-hide">
               <UsersView />
             </div>
+          ) : activeItem === "Geral" ? (
+            <GeralView />
           ) : isDashboardView ? (
             <CommunicationSection />
           ) : (

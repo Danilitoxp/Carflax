@@ -2,14 +2,20 @@ import { ProdutosView } from "@/components/dashboard/products/ProdutosView";
 import { AnalyticsView } from "./analytics/AnalyticsView";
 import { CampanhasView } from "./campanhas/CampanhasView";
 import { OrcamentosView } from "./orcamentos/OrcamentosView";
+import { cn } from "@/lib/utils";
 
 interface CrmSectionProps {
   activeTab: string;
 }
 
 export function CrmSection({ activeTab }: CrmSectionProps) {
+  const isProdutosTab = activeTab === "Produtos";
+
   return (
-    <div className="flex flex-col h-full bg-background p-4 md:p-8 overflow-hidden">
+    <div className={cn(
+      "flex flex-col h-full bg-background overflow-hidden",
+      !isProdutosTab ? "p-4 md:p-8" : "p-0"
+    )}>
       <div className="w-full h-full flex flex-col">
         <div className="flex-1 min-h-0">
           {activeTab === "Analytics" ? (

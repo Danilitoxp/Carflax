@@ -371,10 +371,8 @@ export function CommunicationSection() {
           </div>
         )}
 
-      {/* FIXED TOP PART: Banner + Filters */}
+      {/* FIXED TOP PART: Filters */}
       <div className="p-4 md:px-6 md:pt-6 md:pb-2 space-y-4 shrink-0 bg-background/50 backdrop-blur-md z-20">
-        <HeroBanner />
-
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center p-1 bg-secondary/50 rounded-2xl border border-border w-full sm:w-fit overflow-x-auto scrollbar-hide">
             <div className="flex items-center min-w-max">
