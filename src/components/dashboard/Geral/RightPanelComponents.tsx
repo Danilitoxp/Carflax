@@ -206,72 +206,56 @@ export function BirthdayList({ isCompact }: { isCompact?: boolean }) {
       </div>
       
       <div className="relative flex-1 overflow-hidden">
-        <AnimatePresence mode="wait">
-          {activeTab === 0 ? (
-            <motion.div 
-              key="birthdays"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="flex flex-col gap-2 h-full"
-            >
-              {birthdays.map((person, i) => (
+        {activeTab === 0 ? (
+          <div className="flex flex-col gap-2 h-full">
+            {birthdays.map((person, i) => (
+              <div key={i} className="bg-secondary/30 border border-border/50 p-2.5 rounded-2xl flex items-center gap-3 transition-all hover:bg-secondary/50 cursor-pointer group">
+                <div className="relative shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-primary overflow-hidden border border-border/10 group-hover:scale-105 transition-transform">
+                    <img src={person.img} alt={person.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-4.5 h-4.5 bg-pink-500 rounded-lg flex items-center justify-center border-2 border-background shadow-sm">
+                    <Gift className="w-2.5 h-2.5 text-white" />
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1 flex items-center justify-between">
+                  <p className="text-[10px] font-black text-foreground truncate">{person.name}</p>
+                  <div className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                    <span className="text-[9px] font-bold text-primary">{person.date}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 h-full">
+            {events.map((event, i) => {
+              const [day, month] = event.date.split("/");
+              const monthMap: Record<string, string> = { "04": "ABR", "05": "MAI", "06": "JUN" };
+              return (
                 <div key={i} className="bg-secondary/30 border border-border/50 p-2.5 rounded-2xl flex items-center gap-3 transition-all hover:bg-secondary/50 cursor-pointer group">
-                  <div className="relative shrink-0">
-                    <div className="w-10 h-10 rounded-xl bg-primary overflow-hidden border border-border/10 group-hover:scale-105 transition-transform">
-                      <img src={person.img} alt={person.name} className="w-full h-full object-cover" />
+                  <div className="w-10 h-10 rounded-xl bg-card border border-border/50 overflow-hidden flex flex-col shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                    <div className="bg-primary h-3.5 w-full flex items-center justify-center">
+                      <span className="text-[7px] font-black text-white">{monthMap[month] || "EVENT"}</span>
                     </div>
-                    <div className="absolute -bottom-1 -right-1 w-4.5 h-4.5 bg-pill bg-pink-500 rounded-lg flex items-center justify-center border-2 border-background shadow-sm">
-                      <Gift className="w-2.5 h-2.5 text-white" />
+                    <div className="flex-1 flex items-center justify-center">
+                      <span className="text-sm font-black text-foreground">{day}</span>
                     </div>
                   </div>
                   <div className="min-w-0 flex-1 flex items-center justify-between">
-                    <p className="text-[10px] font-black text-foreground truncate">{person.name}</p>
+                    <div>
+                        <p className="text-[10px] font-black text-foreground truncate">{event.name}</p>
+                        <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">{event.type}</p>
+                    </div>
                     <div className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
-                      <span className="text-[9px] font-bold text-primary">{person.date}</span>
+                      <span className="text-[9px] font-bold text-primary">{event.date}</span>
                     </div>
                   </div>
                 </div>
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div 
-              key="events"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="flex flex-col gap-2 h-full"
-            >
-              {events.map((event, i) => {
-                const [day, month] = event.date.split("/");
-                const monthMap: Record<string, string> = { "04": "ABR", "05": "MAI", "06": "JUN" };
-                return (
-                  <div key={i} className="bg-secondary/30 border border-border/50 p-2.5 rounded-2xl flex items-center gap-3 transition-all hover:bg-secondary/50 cursor-pointer group">
-                    <div className="w-10 h-10 rounded-xl bg-card border border-border/50 overflow-hidden flex flex-col shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-                      <div className="bg-primary h-3.5 w-full flex items-center justify-center">
-                        <span className="text-[7px] font-black text-white">{monthMap[month] || "EVENT"}</span>
-                      </div>
-                      <div className="flex-1 flex items-center justify-center">
-                        <span className="text-sm font-black text-foreground">{day}</span>
-                      </div>
-                    </div>
-                    <div className="min-w-0 flex-1 flex items-center justify-between">
-                      <div>
-                          <p className="text-[10px] font-black text-foreground truncate">{event.name}</p>
-                          <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">{event.type}</p>
-                      </div>
-                      <div className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
-                        <span className="text-[9px] font-bold text-primary">{event.date}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -37,7 +37,7 @@ export function SugestaoModal({ isOpen, onClose }: SugestaoModalProps) {
       />
 
       {/* Modal Card */}
-      <div className="relative w-full max-w-lg bg-card border border-border/50 rounded-[2.5rem] p-8 md:p-10 animate-in zoom-in-95 duration-300 overflow-hidden">
+      <div className="relative w-full max-w-lg bg-card border border-border/50 rounded-[2.5rem] p-8 md:p-10 overflow-hidden">
         
         {/* Close Button Cross */}
         <button 

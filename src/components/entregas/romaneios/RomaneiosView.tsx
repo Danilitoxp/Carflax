@@ -10,7 +10,6 @@ import {
   ChevronRight,
   User as UserIcon
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export interface Delivery {
@@ -145,13 +144,9 @@ export function RomaneiosView() {
 
           <div className="px-10 pb-10">
             <div className="grid grid-cols-1 gap-4">
-              <AnimatePresence>
                 {deliveries.map((delivery, i) => (
-                  <motion.div 
+                  <div 
                     key={delivery.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 + (i * 0.1) }}
                     className="relative group/card"
                   >
                     {/* Vertical Timeline Link */}
@@ -220,9 +215,8 @@ export function RomaneiosView() {
                         </div>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
-              </AnimatePresence>
             </div>
           </div>
         </div>

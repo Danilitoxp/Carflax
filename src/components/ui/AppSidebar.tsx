@@ -202,7 +202,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose,
                   >
                     {/* Active Indicator Bar */}
                     {isActive && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#0053FC] fade-in duration-300" />
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#0053FC]" />
                     )}
 
                     <item.icon

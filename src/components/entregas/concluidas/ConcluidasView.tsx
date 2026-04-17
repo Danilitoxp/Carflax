@@ -10,7 +10,6 @@ import {
   FileText,
   ChevronDown
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
 import type { Delivery } from "../romaneios/RomaneiosView";
@@ -97,23 +96,16 @@ export function ConcluidasView() {
                   <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", isDateMenuOpen && "rotate-180")} />
                 </button>
 
-               <AnimatePresence>
                  {isDateMenuOpen && (
-                   <motion.div 
-                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                     className="absolute top-full right-0 mt-3 w-auto bg-card border border-border/50 rounded-2xl shadow-2xl z-[100] backdrop-blur-xl"
-                   >
+                   <div className="absolute top-full right-0 mt-3 w-auto bg-card border border-border/50 rounded-2xl shadow-2xl z-[100] backdrop-blur-xl">
                      <MiniCalendar 
                        mode="range" 
                        onSelectRange={handleRangeSelect} 
                        initialStartDate={startDate}
                        initialEndDate={endDate}
                      />
-                   </motion.div>
+                   </div>
                  )}
-               </AnimatePresence>
              </div>
 
              <div className="h-10 w-px bg-border/20 hidden lg:block" />
@@ -142,17 +134,12 @@ export function ConcluidasView() {
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          <AnimatePresence mode="popLayout">
+          <div>
             {filteredHistory.length > 0 ? (
-              filteredHistory.map((delivery, i) => (
-                <motion.div 
+              filteredHistory.map((delivery) => (
+                <div 
                   key={delivery.id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="bg-card border border-border/40 rounded-[2.5rem] p-6 hover:shadow-xl hover:shadow-primary/[0.03] hover:border-primary/30 transition-all group"
+                  className="bg-card border border-border/40 rounded-[2.5rem] p-6 hover:shadow-xl hover:shadow-primary/[0.03] hover:border-primary/30 transition-all group mb-4"
                 >
                   <div className="flex flex-col lg:flex-row items-center gap-8">
                     {/* NF Identity */}
@@ -191,12 +178,10 @@ export function ConcluidasView() {
                        </button>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               ))
             ) : (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+              <div 
                 className="flex flex-col items-center justify-center py-20 bg-secondary/10 rounded-[3rem] border border-dashed border-border"
               >
                 <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mb-4">
@@ -210,9 +195,9 @@ export function ConcluidasView() {
                 >
                   Limpar todos os filtros
                 </button>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
+          </div>
         </div>
 
         {/* Dynamic Pagination/Load More */}

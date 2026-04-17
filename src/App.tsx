@@ -49,14 +49,14 @@ function DashboardContent() {
 
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity duration-300"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       <main
         className={cn(
-          "flex-1 flex flex-col h-screen transition-all duration-500 w-full",
+          "flex-1 flex flex-col h-screen w-full",
           isSidebarCollapsed ? "lg:pl-20" : "lg:pl-64",
           showRightPanel ? "xl:pr-80" : "pr-0",
         )}

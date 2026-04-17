@@ -61,7 +61,7 @@ export function VacationModal({ isOpen, onClose, onSave }: VacationModalProps) {
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-lg bg-card border border-border/50 rounded-[2.5rem] p-8 md:p-10 animate-in zoom-in-95 duration-300">
+      <div className="relative w-full max-w-lg bg-card border border-border/50 rounded-[2.5rem] p-8 md:p-10 overflow-hidden">
         <button 
           onClick={onClose}
           className="absolute top-8 right-8 p-3 text-muted-foreground/60 hover:text-foreground hover:bg-secondary rounded-2xl transition-all"

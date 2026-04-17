@@ -4,8 +4,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { HeroBanner } from "./HeroBanner";
 import { AvatarStack } from "@/components/ui/AvatarStack";
-import { motion, AnimatePresence } from "framer-motion";
-
 const categories = ["Todos", "Empresa", "Social", "Eventos", "Avisos"];
 
 const initialCommunications = [
@@ -259,13 +257,9 @@ export function CommunicationSection() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden relative">
-      <AnimatePresence>
-        {isModalOpen && (
+      {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div
               onClick={() => {
                 setIsModalOpen(false);
                 setEditingId(null);
@@ -273,10 +267,7 @@ export function CommunicationSection() {
               }}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            <div
               className="relative w-full max-w-4xl bg-card border border-border shadow-2xl rounded-[2.5rem] overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-auto"
             >
               {/* Modal Sidebar (Preview) */}
@@ -376,10 +367,9 @@ export function CommunicationSection() {
                   </Button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
 
       {/* FIXED TOP PART: Banner + Filters */}
       <div className="p-4 md:px-6 md:pt-6 md:pb-2 space-y-4 shrink-0 bg-background/50 backdrop-blur-md z-20">

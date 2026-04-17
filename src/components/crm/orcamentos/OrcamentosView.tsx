@@ -153,8 +153,8 @@ export function OrcamentosView() {
   const getSortIcon = (key: string) => {
     if (sortConfig.key !== key) return <ChevronsUpDown className="w-3 h-3 opacity-20" />;
     return sortConfig.direction === 'asc'
-      ? <ChevronUp className="w-3 h-3 text-primary animate-in zoom-in-50 duration-300" />
-      : <ChevronDown className="w-3 h-3 text-primary animate-in zoom-in-50 duration-300" />;
+      ? <ChevronUp className="w-3 h-3 text-primary" />
+      : <ChevronDown className="w-3 h-3 text-primary" />;
   };
 
   const getStatusStyle = (status: string) => {
@@ -212,7 +212,7 @@ export function OrcamentosView() {
             {isDateModalOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsDateModalOpen(false)} />
-                <div className="absolute top-16 left-0 z-50 w-auto bg-card rounded-[2.5rem] shadow-[0_25px_70px_-15px_rgba(0,0,0,0.6)] animate-in zoom-in-95 duration-200">
+                <div className="absolute top-16 left-0 z-50 w-auto bg-card rounded-[2.5rem] shadow-[0_25px_70px_-15px_rgba(0,0,0,0.6)]">
                   <MiniCalendar 
                     mode="range"
                     onSelectRange={handleRangeSelect}
@@ -310,7 +310,7 @@ export function OrcamentosView() {
       {isItemsModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsItemsModalOpen(false)} />
-          <div className="relative w-full max-w-4xl bg-card border border-border/50 rounded-[3.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="relative w-full max-w-4xl bg-card border border-border/50 rounded-[3.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
             {/* Modal Header */}
             <div className="p-10 pb-6 flex items-center gap-5">
               <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(245,158,11,0.2)] border border-amber-400/20">
@@ -376,7 +376,7 @@ export function OrcamentosView() {
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsStatusModalOpen(false)} />
-          <div className="relative w-full max-w-2xl bg-card/95 backdrop-blur-2xl border border-white/10 rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.7)] p-10 animate-in zoom-in-95 duration-300 overflow-hidden">
+          <div className="relative w-full max-w-2xl bg-card/95 backdrop-blur-2xl border border-white/10 rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.7)] p-10 overflow-hidden">
             <button 
               onClick={() => setIsStatusModalOpen(false)}
               className="absolute top-8 right-8 p-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-2xl transition-all duration-300"

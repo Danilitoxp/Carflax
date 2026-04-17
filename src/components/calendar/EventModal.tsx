@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from "framer-motion";
 import { X, Calendar as CalendarIcon, ChevronDown } from "lucide-react";
 import { Button } from "../ui/button";
 
@@ -13,7 +12,7 @@ interface EventModalProps {
     description: string;
     type: "birthday" | "star" | "education" | "video";
   };
-  setNewEvent: (event: any) => void;
+  setNewEvent: (event: EventModalProps["newEvent"]) => void;
 }
 
 export function EventModal({
@@ -26,20 +25,14 @@ export function EventModal({
   setNewEvent
 }: EventModalProps) {
   return (
-    <AnimatePresence>
+    <>
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <div 
             onClick={onClose}
             className="absolute inset-0 bg-black/40 backdrop-blur-md"
           />
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          <div 
             className="relative w-full max-w-lg bg-card/90 backdrop-blur-2xl rounded-[3rem] p-10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] border border-white/10 overflow-hidden"
           >
             {/* Abstract Background Decoration */}
@@ -93,7 +86,7 @@ export function EventModal({
                   <div className="relative">
                       <select 
                           value={newEvent.type}
-                          onChange={(e) => setNewEvent({...newEvent, type: e.target.value as any})}
+                          onChange={(e) => setNewEvent({...newEvent, type: e.target.value as EventModalProps["newEvent"]["type"]})}
                           className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-6 py-4 text-sm font-semibold outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer transition-all"
                       >
                           <option value="video">📹 Gravar Vídeo</option>
@@ -113,9 +106,9 @@ export function EventModal({
                   </Button>
               </div>
             </div>
-          </motion.div>
+            </div>
         </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }

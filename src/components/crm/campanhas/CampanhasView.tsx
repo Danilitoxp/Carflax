@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Target, Plus, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export interface Campaign {
@@ -165,171 +164,155 @@ export function CampanhasView() {
       </div>
 
       {/* RANKING MODAL */}
-      <AnimatePresence>
-        {selectedCampaign && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-background/60 backdrop-blur-md" 
-              onClick={() => setSelectedCampaign(null)} 
-            />
-            
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-6xl bg-card border border-border/50 rounded-[3rem] shadow-[0_50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col max-h-[90vh]"
-            >
-              {/* Modal Header */}
-              <div className="px-10 py-8 flex items-center justify-between border-b border-border/50 bg-secondary/5">
-                <h2 className="text-2xl font-black text-foreground tracking-tighter uppercase">Ranking — {selectedCampaign.name}</h2>
-                <button 
-                  onClick={() => setSelectedCampaign(null)}
-                  className="px-6 py-2 bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                >
-                  Fechar
-                </button>
+      {selectedCampaign && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 bg-background/60 backdrop-blur-md" 
+            onClick={() => setSelectedCampaign(null)} 
+          />
+          
+          <div 
+            className="relative w-full max-w-6xl bg-card border border-border/50 rounded-[3rem] shadow-[0_50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            {/* Modal Header */}
+            <div className="px-10 py-8 flex items-center justify-between border-b border-border/50 bg-secondary/5">
+              <h2 className="text-2xl font-black text-foreground tracking-tighter uppercase">Ranking — {selectedCampaign.name}</h2>
+              <button 
+                onClick={() => setSelectedCampaign(null)}
+                className="px-6 py-2 bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+              >
+                Fechar
+              </button>
+            </div>
+
+            {/* Ranking List */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 scrollbar-hide space-y-3">
+              <div className="grid grid-cols-12 px-6 mb-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                <div className="col-span-1">#</div>
+                <div className="col-span-8">Vendedor</div>
+                <div className="col-span-3 text-right">Faturamento</div>
               </div>
 
-              {/* Ranking List */}
-              <div className="flex-1 overflow-y-auto p-6 md:p-10 scrollbar-hide space-y-3">
-                <div className="grid grid-cols-12 px-6 mb-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                  <div className="col-span-1">#</div>
-                  <div className="col-span-8">Vendedor</div>
-                  <div className="col-span-3 text-right">Faturamento</div>
-                </div>
-
-                {ranking.map((v) => (
-                  <div key={v.pos} className="grid grid-cols-12 items-center bg-secondary/10 hover:bg-secondary/20 p-5 rounded-2xl border border-border/30 transition-all group">
-                    <div className="col-span-1">
-                      <div className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shadow-lg",
-                        v.pos <= 3 ? v.color + " text-black" : "bg-card/50 text-muted-foreground"
-                      )}>
-                        {v.pos}
-                      </div>
-                    </div>
-                    <div className="col-span-8 pl-4">
-                      <span className="text-[11px] font-black text-foreground/70 group-hover:text-foreground transition-colors uppercase tracking-tight">
-                        {v.name}
-                      </span>
-                    </div>
-                    <div className="col-span-3 text-right">
-                      <span className="text-sm font-black text-emerald-500 tracking-tighter">
-                        {v.value}
-                      </span>
+              {ranking.map((v) => (
+                <div key={v.pos} className="grid grid-cols-12 items-center bg-secondary/10 hover:bg-secondary/20 p-5 rounded-2xl border border-border/30 transition-all group">
+                  <div className="col-span-1">
+                    <div className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shadow-lg",
+                      v.pos <= 3 ? v.color + " text-black" : "bg-card/50 text-muted-foreground"
+                    )}>
+                      {v.pos}
                     </div>
                   </div>
-                ))}
-              </div>
-            </motion.div>
+                  <div className="col-span-8 pl-4">
+                    <span className="text-[11px] font-black text-foreground/70 group-hover:text-foreground transition-colors uppercase tracking-tight">
+                      {v.name}
+                    </span>
+                  </div>
+                  <div className="col-span-3 text-right">
+                    <span className="text-sm font-black text-emerald-500 tracking-tighter">
+                      {v.value}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
       {/* NEW CAMPAIGN MODAL */}
-      <AnimatePresence>
-        {isNewCampaignModalOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-background/60 backdrop-blur-md" 
-              onClick={() => setIsNewCampaignModalOpen(false)} 
-            />
-            
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.98, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: 10 }}
-              className="relative w-full max-w-[500px] bg-card border border-border/50 rounded-[2.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden"
-            >
-              {/* Modal Header */}
-              <div className="px-10 pt-10 pb-4 flex items-center justify-between">
-                <h2 className="text-2xl font-black text-foreground tracking-tighter uppercase">Nova Campanha</h2>
-                <button 
-                  onClick={() => setIsNewCampaignModalOpen(false)}
-                  className="p-3 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-2xl transition-all"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      {isNewCampaignModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 bg-background/60 backdrop-blur-md" 
+            onClick={() => setIsNewCampaignModalOpen(false)} 
+          />
+          
+          <div 
+            className="relative w-full max-w-[500px] bg-card border border-border/50 rounded-[2.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden"
+          >
+            {/* Modal Header */}
+            <div className="px-10 pt-10 pb-4 flex items-center justify-between">
+              <h2 className="text-2xl font-black text-foreground tracking-tighter uppercase">Nova Campanha</h2>
+              <button 
+                onClick={() => setIsNewCampaignModalOpen(false)}
+                className="p-3 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-2xl transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              <div className="px-10 pb-10 pt-4 space-y-6">
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Nome da Campanha</label>
+            <div className="px-10 pb-10 pt-4 space-y-6">
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Nome da Campanha</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ex: Ofertas de Verão"
+                    className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-4 text-sm text-foreground outline-none focus:border-primary/50 focus:bg-background transition-all placeholder:text-muted-foreground/30"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Imagem Principal</label>
+                  <div className="relative group/file">
                     <input 
-                      type="text" 
-                      placeholder="Ex: Ofertas de Verão"
-                      className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-4 text-sm text-foreground outline-none focus:border-primary/50 focus:bg-background transition-all placeholder:text-muted-foreground/30"
+                      type="file" 
+                      className="w-full h-14 opacity-0 absolute inset-0 z-10 cursor-pointer"
+                    />
+                    <div className="w-full h-14 bg-secondary/30 border border-border/40 border-dashed rounded-2xl flex items-center px-5 gap-3 group-hover/file:border-primary/50 transition-all">
+                      <Plus className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-semibold text-muted-foreground">Clique para selecionar imagem</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Início</label>
+                    <input 
+                      type="date" 
+                      className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-3.5 text-sm text-foreground outline-none focus:border-primary/50 transition-all"
                     />
                   </div>
-
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Imagem Principal</label>
-                    <div className="relative group/file">
-                      <input 
-                        type="file" 
-                        className="w-full h-14 opacity-0 absolute inset-0 z-10 cursor-pointer"
-                      />
-                      <div className="w-full h-14 bg-secondary/30 border border-border/40 border-dashed rounded-2xl flex items-center px-5 gap-3 group-hover/file:border-primary/50 transition-all">
-                        <Plus className="w-4 h-4 text-primary" />
-                        <span className="text-xs font-semibold text-muted-foreground">Clique para selecionar imagem</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Início</label>
-                      <input 
-                        type="date" 
-                        className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-3.5 text-sm text-foreground outline-none focus:border-primary/50 transition-all"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Término</label>
-                      <input 
-                        type="date" 
-                        className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-3.5 text-sm text-foreground outline-none focus:border-primary/50 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Fornecedor Responsável</label>
-                    <select className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-4 text-sm text-foreground/70 outline-none focus:border-primary/50 transition-all appearance-none cursor-pointer">
-                      <option value="">Selecione o fornecedor</option>
-                      <option value="amanco">Amanco</option>
-                      <option value="italy">Italy Válvulas</option>
-                      <option value="sansil">Sansil Led</option>
-                    </select>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Término</label>
+                    <input 
+                      type="date" 
+                      className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-3.5 text-sm text-foreground outline-none focus:border-primary/50 transition-all"
+                    />
                   </div>
                 </div>
 
-                <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                  <button 
-                    onClick={() => setIsNewCampaignModalOpen(false)}
-                    className="flex-1 py-4.5 bg-primary text-white rounded-[1.5rem] font-bold text-sm uppercase tracking-widest shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all"
-                  >
-                    Salvar Campanha
-                  </button>
-                  <button 
-                    onClick={() => setIsNewCampaignModalOpen(false)}
-                    className="py-4.5 px-8 bg-secondary text-foreground rounded-[1.5rem] font-bold text-sm uppercase tracking-widest hover:bg-secondary/80 transition-all"
-                  >
-                    Cancelar
-                  </button>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Fornecedor Responsável</label>
+                  <select className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-4 text-sm text-foreground/70 outline-none focus:border-primary/50 transition-all appearance-none cursor-pointer">
+                    <option value="">Selecione o fornecedor</option>
+                    <option value="amanco">Amanco</option>
+                    <option value="italy">Italy Válvulas</option>
+                    <option value="sansil">Sansil Led</option>
+                  </select>
                 </div>
               </div>
-            </motion.div>
+
+              <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={() => setIsNewCampaignModalOpen(false)}
+                  className="flex-1 py-4.5 bg-primary text-white rounded-[1.5rem] font-bold text-sm uppercase tracking-widest shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all"
+                >
+                  Salvar Campanha
+                </button>
+                <button 
+                  onClick={() => setIsNewCampaignModalOpen(false)}
+                  className="py-4.5 px-8 bg-secondary text-foreground rounded-[1.5rem] font-bold text-sm uppercase tracking-widest hover:bg-secondary/80 transition-all"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
