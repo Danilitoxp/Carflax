@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   User,
   ShieldCheck,
@@ -650,7 +650,7 @@ export function SettingsSection({ externalTab }: SettingsSectionProps) {
       <div className="max-w-5xl mx-auto w-full h-full flex flex-col">
 
         {/* Header */}
-        <div className="mb-8 animate-in fade-in slide-in-from-top-2 duration-500">
+        <div className="mb-8">
           <h2 className="text-4xl font-black text-foreground uppercase tracking-tighter">
             {tabLabel[activeTab] ?? externalTab}
           </h2>
@@ -660,7 +660,7 @@ export function SettingsSection({ externalTab }: SettingsSectionProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 bg-card border border-border/50 rounded-[2.5rem] shadow-2xl overflow-y-auto scrollbar-hide p-8 md:p-12 relative animate-in fade-in zoom-in-95 duration-500">
+        <div className="flex-1 bg-card border border-border/50 rounded-[2.5rem] shadow-2xl overflow-y-auto scrollbar-hide p-8 md:p-12 relative">
           {activeTab === "profile" && <ProfileTab />}
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "security" && <SecurityTab />}

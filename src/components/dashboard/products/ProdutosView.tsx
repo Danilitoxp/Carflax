@@ -28,7 +28,7 @@ export function ProdutosView() {
   );
 
   return (
-    <div className="h-full flex flex-col space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="h-full flex flex-col space-y-6">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-2xl font-black text-foreground tracking-tighter uppercase">Produtos</h2>
         <div className="flex items-center gap-4">

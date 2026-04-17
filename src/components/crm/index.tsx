@@ -40,7 +40,7 @@ function AnalyticsView() {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
+    <div className="space-y-6 pb-12">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Status Distribution */}
         <div className="lg:col-span-5 bg-card border border-border/50 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden group">
@@ -389,7 +389,7 @@ function OrçamentosView() {
     : `Selecione a data final...`;
 
   return (
-    <div className="h-full flex flex-col space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="h-full flex flex-col space-y-6">
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between shrink-0 mb-2">
         <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto flex-1">

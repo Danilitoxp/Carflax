@@ -23,7 +23,7 @@ export function VacationsView({ dayDate, vacations }: VacationsViewProps) {
 
   return (
     <div className="absolute inset-x-0 inset-y-0 flex flex-col pt-10 pb-2 px-0 z-10 pointer-events-none">
-      {activeVacations.map((v, i) => {
+      {activeVacations.map((v) => {
         const isStart = dayDate.toDateString() === v.start.toDateString();
         const isEnd = dayDate.toDateString() === v.end.toDateString();
         
@@ -34,7 +34,7 @@ export function VacationsView({ dayDate, vacations }: VacationsViewProps) {
           <div 
             key={v.id}
             className={cn(
-              "flex-1 relative flex items-center px-4 transition-all animate-in slide-in-from-right-4 duration-500 shadow-none",
+              "flex-1 relative flex items-center px-4 transition-all shadow-none",
               v.color,
               isStart ? "border-l-2 border-white/30" : "",
               isEnd ? "border-r-2 border-white/30" : "",
