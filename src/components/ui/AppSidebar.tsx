@@ -60,7 +60,6 @@ const menuItems: MenuItem[] = [
       { label: "Férias", icon: Plane },
     ]
   },
-  { icon: MessageSquare, label: "Mensagens" },
   {
     icon: BarChart3,
     label: "CRM",
@@ -70,6 +69,7 @@ const menuItems: MenuItem[] = [
       { label: "Orçamentos", icon: FileBadge },
     ],
   },
+  { icon: MessageSquare, label: "Mensagens" },
   { icon: Activity, label: "Esteira" },
   {
     icon: Briefcase,

@@ -232,11 +232,14 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
 
       {/* Calendar Grid */}
       <div className="flex-1 bg-card border border-border/50 rounded-[2.5rem] overflow-hidden flex flex-col shadow-none min-h-0 relative">
-        <div className="grid grid-cols-7 border-b border-border/10 bg-secondary/5">
+        <div className={cn(
+          "grid grid-cols-7 bg-secondary/5",
+          viewMode === "events" ? "border-b border-border/10" : ""
+        )}>
           {daysOfWeek.map((day) => (
             <div key={day} className={cn(
               "py-6 text-center last:border-r-0",
-              viewMode === "events" ? "border-r border-border/10" : "border-transparent"
+              viewMode === "events" ? "border-r border-border/10" : ""
             )}>
               <span className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">{day}</span>
             </div>
@@ -245,8 +248,8 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
 
         <div 
           className={cn(
-            "flex-1 grid grid-cols-7 transition-all duration-700 min-h-0",
-            viewMode === "events" ? "divide-x divide-y divide-border/5" : "divide-transparent"
+            "flex-1 grid grid-cols-7 min-h-0",
+            viewMode === "events" ? "divide-x divide-y divide-border/5 transition-all duration-700" : "divide-none"
           )}
           style={{ 
             gridTemplateRows: `repeat(${Math.ceil(allSlots.length / 7)}, 1fr)` 
