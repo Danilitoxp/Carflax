@@ -1,42 +1,83 @@
-import { TrendingUp, Wallet, Eye, CheckSquare, Download } from "lucide-react"
+import { TrendingUp, Wallet, ArrowUpRight, ShoppingBag, Tag } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useState, useEffect } from "react";
+import { apiVendedores, type VendedorResumo } from "@/lib/api";
 
-const stats = [
-  {
-    title: "Ganhos Totais",
-    value: "—",
-    change: "—",
-    icon: Wallet,
-    color: "blue",
-  },
-  {
-    title: "Visualizações",
-    value: "—",
-    change: "—",
-    icon: Eye,
-    color: "amber",
-  },
-  {
-    title: "Tarefas Totais",
-    value: "—",
-    change: "—",
-    icon: CheckSquare,
-    color: "emerald",
-  },
-  {
-    title: "Downloads",
-    value: "—",
-    change: "—",
-    icon: Download,
-    color: "rose",
-  },
-]
+export function StatCards({ userProfile }: { userProfile?: any }) {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<VendedorResumo | null>(null);
 
-export function StatCards() {
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const now = new Date();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const yyyy = now.getFullYear();
+        const mesano = `${mm}${yyyy}`;
+        const codVendedor = userProfile?.operator_code || userProfile?.operatorCode || "049";
+        const response = await apiVendedores(mesano, codVendedor);
+        if (response && response.resumo) {
+          const myData = response.resumo.find(r => r.COD_VENDEDOR === codVendedor) || response.resumo[0];
+          setData(myData);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar StatCards:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [userProfile]);
+
+  const formatBRL = (val: number) => 
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
+
+  const stats = data ? [
+    {
+      title: "Total Vendido",
+      value: formatBRL(data.TOTAL),
+      change: `${data.ATINGIMENTO_PCT?.toFixed(1)}% da meta`,
+      icon: Wallet,
+      color: "blue",
+    },
+    {
+      title: "Taxa de Conversão",
+      value: `${data.TAXA_CONVERSAO?.toFixed(1)}%`,
+      change: "Mensal",
+      icon: ArrowUpRight,
+      color: "emerald",
+    },
+    {
+      title: "Qtd. Vendas",
+      value: String(data.QTD_VENDAS),
+      change: "Este mês",
+      icon: ShoppingBag,
+      color: "amber",
+    },
+    {
+      title: "Ticket Médio",
+      value: formatBRL(data.TICKET_MEDIO),
+      change: "Por venda",
+      icon: Tag,
+      color: "rose",
+    },
+  ] : [];
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1,2,3,4].map(i => (
+          <div key={i} className="h-32 bg-white border border-border rounded-2xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {stats.map((stat, i) => (
-        <div key={i} className="bg-card border border-border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all group">
+        <div key={i} className="bg-white border border-border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all group">
           <div className="flex items-center justify-between mb-4">
             <div className={cn(
               "p-2.5 rounded-xl",
@@ -47,34 +88,33 @@ export function StatCards() {
             )}>
               <stat.icon className="w-5 h-5" />
             </div>
-            <button className="text-muted-foreground hover:text-foreground">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
-            </button>
           </div>
           
           <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-            <div className="flex items-end justify-between">
-              <h4 className="text-2xl font-bold text-foreground">{stat.value}</h4>
-              <div className="flex items-center gap-1 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-lg">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.title}</p>
+            <div className="flex flex-col">
+              <h4 className="text-xl font-black text-slate-900 tracking-tight">{stat.value}</h4>
+              
+              {stat.title === "Total Vendido" && data && (
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] font-bold">
+                    <span className="text-blue-500">Meta</span>
+                    <span className="text-slate-900">{data.ATINGIMENTO_PCT?.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                      style={{ width: `${Math.min(data.ATINGIMENTO_PCT || 0, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 mt-1">
                 <TrendingUp className="w-3 h-3" />
                 {stat.change}
               </div>
             </div>
-          </div>
-
-          {/* Sparkline placeholder animation */}
-          <div className="mt-4 h-1 w-full bg-secondary rounded-full overflow-hidden">
-            <div 
-              className={cn(
-                "h-full rounded-full transition-all duration-1000",
-                stat.color === "blue" ? "bg-blue-500" :
-                stat.color === "amber" ? "bg-amber-500" :
-                stat.color === "emerald" ? "bg-emerald-500" :
-                "bg-rose-500"
-              )} 
-              style={{ width: `${60 + (i * 10) % 30}%` }}
-            ></div>
           </div>
         </div>
       ))}

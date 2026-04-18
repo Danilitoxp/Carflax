@@ -42,16 +42,23 @@ export interface VendedorResumo {
   MARGEM_PCT: number;
   PRAZO_MEDIO_DIAS: number;
   TOTAL_VENDIDO_HOJE: number;
+  dias_trabalhados?: number;
 }
 
 export interface VendedoresResponse {
   mesano: string;
   dias_trabalhados: number;
   resumo: VendedorResumo[];
+  detalhe?: any[];
+  vendas_diarias?: any[];
+  vendas_mensais?: any[];
 }
 
-export const apiVendedores = (mesano: string) =>
-  get<VendedoresResponse>("/api/vendedores", { mesano });
+export const apiVendedores = (mesano: string, vendedor?: string) =>
+  get<VendedoresResponse>("/api/vendedores", { 
+    mesano, 
+    ...(vendedor ? { vendedor } : {}) 
+  });
 
 // ── Metas de Campanha (Elegíveis para Sorteio) ────────────────────────────────
 

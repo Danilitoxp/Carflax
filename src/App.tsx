@@ -18,7 +18,15 @@ import { LoginView } from "@/components/auth/LoginView";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { OrgChartView } from "@/components/ui/OrgChartModal";
 
-function DashboardContent({ userProfile, onLogout }: { userProfile: any, onLogout: () => void }) {
+function DashboardContent({ 
+  userProfile, 
+  vendedorMetrics, 
+  onLogout 
+}: { 
+  userProfile: any, 
+  vendedorMetrics: any, 
+  onLogout: () => void 
+}) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
@@ -133,7 +141,7 @@ function DashboardContent({ userProfile, onLogout }: { userProfile: any, onLogou
               Simular {isVendedor ? 'Interno' : 'Vendedor'}
             </button>
             <div className="flex-1 flex flex-col gap-4 pb-0 overflow-y-auto scrollbar-hide">
-              <SalesMetricsCard />
+              <SalesMetricsCard userProfile={userProfile} data={vendedorMetrics} />
               <BirthdayList />
             </div>
           </div>
@@ -156,25 +164,50 @@ function App() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
+  const [vendedorMetrics, setVendedorMetrics] = useState<any>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchProfile(session.user.id);
-      else setLoading(false);
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchProfile(session.user.id);
-      else {
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
         setProfile(null);
+        setVendedorMetrics(null);
         setLoading(false);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const fetchVendedorMetrics = async (codVendedor: string) => {
+    try {
+      const now = new Date();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = now.getFullYear();
+      const mesano = `${mm}${yyyy}`;
+      
+      const { apiVendedores } = await import("@/lib/api");
+      const response = await apiVendedores(mesano, codVendedor);
+      
+      if (response && response.resumo) {
+        const myData = response.resumo.find((r: any) => r.COD_VENDEDOR === codVendedor) || response.resumo[0];
+        setVendedorMetrics({ ...myData, dias_trabalhados: response.dias_trabalhados });
+      }
+    } catch (error) {
+      console.error("Erro ao buscar métricas:", error);
+    }
+  };
 
   const fetchProfile = async (uid: string) => {
     try {
@@ -207,15 +240,18 @@ function App() {
 
       if (data) {
         setProfile(data);
+        const codVendedor = data.operator_code || data.operatorCode || "049";
+        fetchVendedorMetrics(codVendedor);
       } else {
         // Fallback total para não travar a UI se o usuário for novo no banco
         const { data: { user } } = await supabase.auth.getUser();
-        setProfile({
+        const fallbackProfile = {
           name: user?.email?.split('@')[0].toUpperCase() || "Usuário",
           email: user?.email || "",
           role: "Membro",
           avatar: ""
-        });
+        };
+        setProfile(fallbackProfile);
       }
     } catch (err) {
       console.error("Erro perfil:", err);
@@ -232,6 +268,7 @@ function App() {
         {session ? (
           <DashboardContent 
             userProfile={profile} 
+            vendedorMetrics={vendedorMetrics}
             onLogout={() => supabase.auth.signOut()} 
           />
         ) : (

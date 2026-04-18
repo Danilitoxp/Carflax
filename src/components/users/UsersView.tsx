@@ -12,8 +12,7 @@ import {
   UserCog,
   Building2,
   Briefcase,
-  Camera,
-  User as UserIcon
+  Camera
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
