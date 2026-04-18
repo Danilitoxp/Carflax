@@ -105,9 +105,9 @@ export function CampanhasView() {
         setLoadingCampaigns(false);
       }
 
-      // Fornecedores em background, não bloqueia o carregamento
-      fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/fornecedores")
-        .then(r => r.json()).then(d => { if (d?.fornecedores) setFornecedores(d.fornecedores); })
+      // Fornecedores/marcas em background para o autocomplete
+      fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/fornecedores?type=marca")
+        .then(r => r.json()).then(d => { if (d?.fornecedores?.length) setFornecedores(d.fornecedores); })
         .catch(() => {});
     }
     fetchData();
