@@ -4,6 +4,8 @@ const API_BASE =
     : import.meta.env.VITE_API_URL ||
       "https://marketing-gestao-de-tempo.velbav.easypanel.host";
 
+console.log("[API] BASE:", API_BASE);
+
 async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(`${API_BASE}${path}`);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));

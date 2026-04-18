@@ -149,7 +149,8 @@ export function CampanhasView() {
     try {
       const elig = await apiElegiveisParaSorteio(mesano);
       setElegiveis(elig);
-    } catch {
+    } catch (err) {
+      console.error("[Campanhas] Erro ao buscar elegíveis:", err);
       setErroApi(true);
       setElegiveis([]);
     }
@@ -181,7 +182,8 @@ export function CampanhasView() {
         data_fim: camp.data_fim,
       });
       setRankingCampanha(ranking);
-    } catch {
+    } catch (err) {
+      console.error("[Campanhas] Erro ao buscar ranking:", err);
       setRankingCampanha([]);
     }
     setLoadingRanking(false);
