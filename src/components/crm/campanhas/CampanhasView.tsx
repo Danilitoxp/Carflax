@@ -360,7 +360,7 @@ export function CampanhasView() {
                 ) : elegiveis && elegiveis.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {elegiveis.map((v) => {
-                      const pct = v.PERC_META_BATIDA;
+                      const pct = parseFloat(v.PERC_META_BATIDA);
                       const borderColor = pct >= 100 ? "border-emerald-400" : "border-amber-400";
                       const pctColor = pct >= 100 ? "text-emerald-600" : "text-amber-600";
                       return (
@@ -469,7 +469,7 @@ export function CampanhasView() {
                       </div>
                       <div className="col-span-2 text-right">
                         <span className="text-[11px] font-black text-emerald-600">
-                          {Number(v.FATURADO).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}
+                          {parseFloat(v.FATURADO).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}
                         </span>
                       </div>
                     </div>

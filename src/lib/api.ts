@@ -2,9 +2,7 @@ const API_BASE =
   typeof window !== "undefined" && (window as any).__API_ORIGIN__
     ? (window as any).__API_ORIGIN__
     : import.meta.env.VITE_API_URL ||
-      (typeof window !== "undefined" && window.location.hostname === "localhost"
-        ? "http://localhost:3001"
-        : "https://api.carflax.com.br");
+      "https://marketing-gestao-de-tempo.velbav.easypanel.host";
 
 async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(`${API_BASE}${path}`);
@@ -56,12 +54,12 @@ export const apiVendedores = (mesano: string) =>
 // ── Metas de Campanha (Elegíveis para Sorteio) ────────────────────────────────
 
 export interface MetaVendedor {
-  MET_MESANO: string;
+  MES: string;
   COD_VENDEDOR: string;
   NOME_VENDEDOR: string;
-  META_VENDEDOR: number;
-  FATURAMENTO: number;
-  PERC_META_BATIDA: number;
+  META_VENDEDOR: string;
+  FATURAMENTO: string;
+  PERC_META_BATIDA: string;
 }
 
 export interface CampanhaMetasResponse {
@@ -75,7 +73,7 @@ export const apiCampanhaMetas = (mesano: string) =>
 /** Retorna apenas vendedores com ≥ 97% da meta (regra do gestao-de-tempo) */
 export const apiElegiveisParaSorteio = async (mesano: string): Promise<MetaVendedor[]> => {
   const data = await apiCampanhaMetas(mesano);
-  return data.resumo.filter((v) => v.PERC_META_BATIDA >= 97);
+  return data.resumo.filter((v) => parseFloat(v.PERC_META_BATIDA) >= 97);
 };
 
 // ── Bônus Trimestral ──────────────────────────────────────────────────────────
@@ -108,16 +106,22 @@ export const apiCampanhaMetasTrimestral = (mesano: string) =>
 export interface RankingVendedor {
   COD_VENDEDOR: string;
   NOME_VENDEDOR: string;
-  FATURADO: number;
+  FATURADO: string;
   QTD_VENDAS: number;
 }
 
-export const apiCampaignRanking = (params: {
+export const apiCampaignRanking = async (params: {
   fornecedor?: string;
   produto?: string;
   data_ini?: string;
   data_fim?: string;
-}) => get<RankingVendedor[]>("/api/campaign-ranking", params as Record<string, string>);
+}): Promise<RankingVendedor[]> => {
+  const data = await get<{ rows: RankingVendedor[] } | RankingVendedor[]>(
+    "/api/campaign-ranking",
+    params as Record<string, string>
+  );
+  return Array.isArray(data) ? data : (data as any).rows ?? [];
+};
 
 // ── Entregas ──────────────────────────────────────────────────────────────────
 
