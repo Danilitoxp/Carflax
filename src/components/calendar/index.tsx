@@ -47,24 +47,65 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [vacations, setVacations] = useState<Vacation[]>([]);
 
   useEffect(() => {
-    async function fetchEvents() {
-      const { data, error } = await supabase
+    async function fetchAllData() {
+      // 1. Buscar Eventos Manuais
+      const { data: evData } = await supabase
         .from("eventos_calendario")
         .select("*");
-      if (!error && data) {
-        setEvents(data.map((e, i) => ({
-          id: i + 1,
-          day: e.day,
-          month: e.month - 1, // DB stores 1-indexed, JS uses 0-indexed
-          year: e.year,
-          title: e.title,
-          type: e.type as CalendarEvent["type"],
-          description: e.description || "",
-        })));
-      }
+      
+      const manualEvents = (evData || []).map((e, i) => ({
+        id: i + 1,
+        day: e.day,
+        month: e.month - 1,
+        year: e.year,
+        title: e.title,
+        type: e.type as CalendarEvent["type"],
+        description: e.description || "",
+      }));
+
+      // 2. Buscar Aniversários e Admissões dos Usuários
+      const { data: userData } = await supabase
+        .from("usuarios")
+        .select("name, birth_date, admission_date")
+        .or("birth_date.not.is.null,admission_date.not.is.null");
+
+      const birthdayEvents = (userData || [])
+        .filter(u => u.birth_date)
+        .map((u, i) => {
+          const [_, m, d] = u.birth_date.split("-");
+          return {
+            id: 1000 + i,
+            day: parseInt(d),
+            month: parseInt(m) - 1,
+            year: currentDate.getFullYear(),
+            title: `${u.name} 🎂`,
+            type: "birthday" as const,
+            description: `Aniversário de ${u.name}`,
+          };
+        });
+
+      const admissionEvents = (userData || [])
+        .filter(u => u.admission_date)
+        .map((u, i) => {
+          const [y, m, d] = u.admission_date.split("-");
+          const years = currentDate.getFullYear() - parseInt(y);
+          if (years <= 0) return null; // Não mostra "0 anos" no ano de entrada
+
+          return {
+            id: 2000 + i,
+            day: parseInt(d),
+            month: parseInt(m) - 1,
+            year: currentDate.getFullYear(),
+            title: `${u.name} - ${years} ${years === 1 ? 'ANO' : 'ANOS'} 🏢`,
+            type: "star" as const, // Usa o estilo de 'estrela/destaque'
+            description: `Aniversário de Empresa: ${years} anos de Carflax!`,
+          };
+        }).filter(Boolean) as CalendarEvent[];
+
+      setEvents([...manualEvents, ...birthdayEvents, ...admissionEvents]);
     }
-    fetchEvents();
-  }, []);
+    fetchAllData();
+  }, [currentDate.getFullYear()]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);

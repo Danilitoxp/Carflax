@@ -203,7 +203,7 @@ export function UsersView() {
       ?? editingUser?.avatar
       ?? "";
 
-    const payload = {
+    const finalPayload = {
       name: newUser.name,
       email: newUser.email,
       role: newUser.role,
@@ -216,29 +216,34 @@ export function UsersView() {
       admission_date: maskedToISO((newUser as any).admissionDate || "") || null,
     };
 
+    console.log("[Users] Salvando usuário. Payload final:", finalPayload);
+
     try {
       if (editingUser) {
-        const { error } = await supabase.from("usuarios").update(payload).eq("id", editingUser.id);
+        const { error } = await supabase.from("usuarios").update(finalPayload).eq("id", editingUser.id);
         if (error) { console.error("[Users] Erro ao editar:", error); return; }
         
-        // Update local state immediately with the same payload data
+        // Update local state immediately
         setUsers(prev => prev.map(u => u.id === editingUser.id ? {
           ...u,
           ...newUser,
           avatar: finalAvatar,
           operatorCode: (newUser as any).operatorCode,
+          birthDate: (newUser as any).birthDate,
+          admissionDate: (newUser as any).admissionDate,
         } : u));
       } else {
-        const { error } = await supabase.from("usuarios").insert({ ...payload, status: "ativo" });
+        const { error } = await supabase.from("usuarios").insert({ ...finalPayload, status: "ativo" });
         if (error) { console.error("[Users] Erro ao criar:", error); return; }
         
-        // Refresh full list to get the new DB-generated ID and data
         const { data: all } = await supabase.from("usuarios").select("*").order("name");
         if (all) setUsers(all.map(u => ({
           id: u.id, name: u.name, email: u.email, role: u.role,
           status: u.status, avatar: u.avatar || "", lastLogin: u.last_login ? new Date(u.last_login).toLocaleString("pt-BR") : "Nunca",
           permissions: u.permissions || [], operatorCode: u.operator_code || "",
           company: u.company, department: u.department,
+          birthDate: isoToMasked(u.birth_date || ""),
+          admissionDate: isoToMasked(u.admission_date || ""),
         })));
       }
       setIsAddModalOpen(false);
