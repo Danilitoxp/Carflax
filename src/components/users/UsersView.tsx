@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import {
   UserPlus,
   Search,
@@ -74,6 +75,34 @@ export function UsersView() {
   const departments = ["Comercial", "Logística", "Administrativo", "Produção", "TI"];
 
   const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchUsers() {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("*")
+        .order("name");
+
+      if (!error && data) {
+        setUsers(data.map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          status: u.status,
+          avatar: u.avatar || "",
+          lastLogin: u.last_login ? new Date(u.last_login).toLocaleString("pt-BR") : "Nunca",
+          permissions: u.permissions || ["Geral"],
+          operatorCode: u.operator_code || "",
+          company: u.company,
+          department: u.department,
+        })));
+      }
+      setLoading(false);
+    }
+    fetchUsers();
+  }, []);
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -234,6 +263,12 @@ export function UsersView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
+              {loading && (
+                <tr><td colSpan={5} className="py-12 text-center text-slate-400 text-sm">Carregando usuários...</td></tr>
+              )}
+              {!loading && filteredUsers.length === 0 && (
+                <tr><td colSpan={5} className="py-12 text-center text-slate-400 text-sm">Nenhum usuário encontrado.</td></tr>
+              )}
               {filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="py-3 px-6">
