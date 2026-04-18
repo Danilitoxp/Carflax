@@ -1,31 +1,44 @@
 import { useState } from "react";
 import { 
   Search, 
-  ShoppingCart, 
-  Plus, 
-  Filter, 
-  Package,
   ArrowUpDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 export function ProdutosView() {
   const [searchTerm, setSearchTerm] = useState("");
   
   const products = [
-    { cod: "00001", desc: "TUBO ROSCAVEL PVC 3/4\" (10464) AMANCO", stock: 20.130, pending: 0, debit: 92.99, credit: 97.32, category: "Hidráulica" },
-    { cod: "00002", desc: "TUBO ROSCAVEL PVC 1/2\" (10463) AMANCO", stock: 144.720, pending: 0, debit: 68.99, credit: 72.20, category: "Hidráulica" },
-    { cod: "00003", desc: "ADAP ROSCAVEL PVC FLANGE P/ CX D'AGUA 3/4 (11477) AMANCO", stock: 1.000, pending: 20, debit: 22.99, credit: 24.05, category: "Hidráulica" },
-    { cod: "00004", desc: "TUBO ROSCAVEL PVC 1\" (10465) AMANCO", stock: 11.760, pending: 0, debit: 183.99, credit: 192.56, category: "Hidráulica" },
-    { cod: "00005", desc: "TUBO ROSCAVEL PVC 1.1/4\" (10466) AMANCO", stock: 3.620, pending: 0, debit: 218.99, credit: 229.19, category: "Hidráulica" },
-    { cod: "00006", desc: "TUBO ROSCAVEL PVC 1.1/2\" (10467) AMANCO", stock: 4.620, pending: 0, debit: 286.99, credit: 300.36, category: "Hidráulica" },
-    { cod: "00007", desc: "ADAP ROSCAVEL PVC FLANGE P/ CX D'AGUA 1/2\" (11474) AMANCO", stock: 4.000, pending: 20, debit: 17.99, credit: 18.83, category: "Hidráulica" },
-    { cod: "00008", desc: "TUBO ROSCAVEL PVC 2\" (10468) AMANCO", stock: 5.000, pending: 0, debit: 427.99, credit: 447.93, category: "Hidráulica" },
-    { cod: "00009", desc: "TUBO ROSCAVEL PVC 2 1/2\"", stock: 0.000, pending: 0, debit: 133.76, credit: 139.99, category: "Hidráulica" },
-    { cod: "00010", desc: "TUBO ROSCAVEL PVC 3\"", stock: 0.000, pending: 0, debit: 231.75, credit: 242.55, category: "Hidráulica" },
-    { cod: "00011", desc: "TUBO ROSCAVEL PVC 4\"", stock: 0.000, pending: 0, debit: 260.92, credit: 273.08, category: "Hidráulica" },
-    { cod: "00012", desc: "ADAP ROSCAVEL PVC FLANGE P/ CX D'AGUA 1\" (11475) AMANCO", stock: 3.000, pending: 20, debit: 30.99, credit: 32.43, category: "Hidráulica" },
+    { cod: "00001", desc: "TUBO ROSCAVEL PVC 3/4\" (10464) AMANCO", stock: 20.130, debit: 92.99, credit: 97.32, brand: "AMANCO" },
+    { cod: "00002", desc: "TUBO ROSCAVEL PVC 1/2\" (10463) AMANCO", stock: 144.720, debit: 68.99, credit: 72.20, brand: "AMANCO" },
+    { cod: "00003", desc: "ADAP ROSCAVEL PVC FLANGE P/ CX D'AGUA 3/4 (11477) AMANCO", stock: 1.000, debit: 22.99, credit: 24.05, brand: "AMANCO" },
+    { cod: "00004", desc: "TUBO ROSCAVEL PVC 1\" (10465) AMANCO", stock: 11.760, debit: 183.99, credit: 192.56, brand: "AMANCO" },
+    { cod: "00005", desc: "TUBO ROSCAVEL PVC 1.1/4\" (10466) AMANCO", stock: 3.620, debit: 218.99, credit: 229.19, brand: "AMANCO" },
+    { cod: "00006", desc: "TUBO ROSCAVEL PVC 1.1/2\" (10467) AMANCO", stock: 4.620, debit: 286.99, credit: 300.36, brand: "AMANCO" },
+    { cod: "00007", desc: "ADAP ROSCAVEL PVC FLANGE P/ CX D'AGUA 1/2\" (11474) AMANCO", stock: 4.000, debit: 17.99, credit: 18.83, brand: "AMANCO" },
+    { cod: "00008", desc: "TUBO ROSCAVEL PVC 2\" (10468) AMANCO", stock: 5.000, debit: 427.99, credit: 447.93, brand: "AMANCO" },
+    { cod: "00009", desc: "TUBO ROSCAVEL PVC 2 1/2\"", stock: 0.000, debit: 133.76, credit: 139.99, brand: "AMANCO" },
+    { cod: "00010", desc: "TUBO ROSCAVEL PVC 3\"", stock: 0.000, debit: 231.75, credit: 242.55, brand: "AMANCO" },
+    { cod: "00011", desc: "TUBO ROSCAVEL PVC 4\"", stock: 0.000, debit: 260.92, credit: 273.08, brand: "AMANCO" },
+    { cod: "00012", desc: "ADAP ROSCAVEL PVC FLANGE P/ CX D'AGUA 1\" (11475) AMANCO", stock: 3.000, debit: 30.99, credit: 32.43, brand: "AMANCO" },
+    { cod: "00013", desc: "JOELHO 90 PVC MARROM 25MM TIGRE", stock: 45.000, debit: 1.50, credit: 1.65, brand: "TIGRE" },
+    { cod: "00014", desc: "TE 90 PVC MARROM 25MM TIGRE", stock: 32.000, debit: 2.10, credit: 2.30, brand: "TIGRE" },
+    { cod: "00015", desc: "LUVA PVC MARROM 25MM TIGRE", stock: 120.000, debit: 0.95, credit: 1.10, brand: "TIGRE" },
+    { cod: "00016", desc: "ADAPTADOR PVC MARROM 25MM X 3/4 TIGRE", stock: 50.000, debit: 1.25, credit: 1.40, brand: "TIGRE" },
+    { cod: "00017", desc: "COLA PVC FRASCO 175G TIGRE", stock: 15.000, debit: 18.90, credit: 20.50, brand: "TIGRE" },
+    { cod: "00018", desc: "FITA VEDA ROSCA 18MM X 25M TIGRE", stock: 25.000, debit: 6.50, credit: 7.20, brand: "TIGRE" },
+    { cod: "00019", desc: "REGISTRO ESFERA VS 25MM TIGRE", stock: 8.000, debit: 12.40, credit: 13.80, brand: "TIGRE" },
+    { cod: "00020", desc: "TUBO ESGOTO SN 100MM TIGRE (METRO)", stock: 60.000, debit: 15.30, credit: 17.10, brand: "TIGRE" },
+    { cod: "00021", desc: "JOELHO 90 ESGOTO 100MM TIGRE", stock: 22.000, debit: 5.80, credit: 6.40, brand: "TIGRE" },
+    { cod: "00022", desc: "TE ESGOTO 100MM TIGRE", stock: 14.000, debit: 9.20, credit: 10.20, brand: "TIGRE" },
+    { cod: "00023", desc: "CAIXA SIFONADA 150X150X50 TIGRE", stock: 5.000, debit: 34.50, credit: 38.00, brand: "TIGRE" },
+    { cod: "00024", desc: "RALO LINEAR 50CM TIGRE", stock: 3.000, debit: 89.90, credit: 98.00, brand: "TIGRE" },
+    { cod: "00025", desc: "TORNEIRA COZINHA PAREDE DECA", stock: 10.000, debit: 145.00, credit: 160.00, brand: "DECA" },
+    { cod: "00026", desc: "DUCHA HIGIENICA DECA", stock: 7.000, debit: 189.00, credit: 210.00, brand: "DECA" },
+    { cod: "00027", desc: "VALVULA DESCARGA HYDRA MAX DECA", stock: 4.000, debit: 245.00, credit: 275.00, brand: "DECA" },
+    { cod: "00028", desc: "ASSENTO SANITARIO LIFT DECA", stock: 12.000, debit: 78.00, credit: 86.00, brand: "DECA" },
+    { cod: "00029", desc: "MISTURADOR LAVATORIO DECA", stock: 2.000, debit: 450.00, credit: 500.00, brand: "DECA" },
+    { cod: "00030", desc: "PAPELEIRA DE PAREDE DECA", stock: 15.000, debit: 45.00, credit: 52.00, brand: "DECA" },
   ];
 
   const filteredProducts = products.filter(p => 
@@ -53,10 +66,6 @@ export function ProdutosView() {
               <button className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground hover:text-foreground rounded-md">COM ESTOQUE</button>
               <button className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground hover:text-foreground rounded-md">SEM ESTOQUE</button>
            </div>
-           <Button className="h-10 bg-primary hover:bg-primary/90 text-white gap-2 text-[10px] font-bold px-5 rounded-lg shadow-sm shrink-0">
-            <Plus className="w-4 h-4" />
-            NOVO PRODUTO
-          </Button>
         </div>
       </div>
 
@@ -65,16 +74,16 @@ export function ProdutosView() {
         <div className="bg-white border border-border rounded-lg shadow-sm h-full flex flex-col overflow-hidden">
           <div className="overflow-x-auto overflow-y-auto flex-1 scrollbar-hide">
             <table className="w-full text-left border-collapse min-w-[900px]">
-              <thead className="sticky top-0 z-10 bg-[#F9FAFB] border-b border-border">
+              <thead className="sticky top-0 z-10 bg-slate-50 border-b border-border">
                 <tr>
-                  <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     <div className="flex items-center gap-2">CÓDIGO <ArrowUpDown className="w-3 h-3" /></div>
                   </th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">DESCRIÇÃO</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">CATEGORIA</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-right">ESTOQUE</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-right">DÉBITO</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-right">CRÉDITO 3X</th>
+                  <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">DESCRIÇÃO</th>
+                  <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">MARCA</th>
+                  <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">ESTOQUE</th>
+                  <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">DÉBITO</th>
+                  <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">CRÉDITO 3X</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -84,12 +93,11 @@ export function ProdutosView() {
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="text-xs font-bold text-foreground line-clamp-1">{p.desc}</span>
-                        <span className="text-[10px] text-muted-foreground/60 font-medium">Marca: AMANCO</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-secondary text-muted-foreground uppercase tracking-wider">
-                        {p.category}
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-widest leading-none">
+                        {p.brand}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -100,21 +108,15 @@ export function ProdutosView() {
                         )}>
                           {p.stock.toLocaleString('pt-BR', { minimumFractionDigits: 3 })}
                         </span>
-                        {p.pending > 0 && (
-                          <div className="flex items-center gap-1 text-[9px] font-bold text-blue-500 uppercase">
-                            <ShoppingCart className="w-2.5 h-2.5" />
-                            {p.pending} PEND.
-                          </div>
-                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <span className="text-xs font-bold text-foreground">
+                      <span className="text-xs font-bold text-emerald-600">
                         R$ {p.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <span className="text-xs font-bold text-primary">
+                      <span className="text-xs font-bold text-amber-600">
                         R$ {p.credit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </td>
@@ -124,16 +126,6 @@ export function ProdutosView() {
             </table>
           </div>
           
-          {/* Footer / Pagination */}
-          <div className="px-6 py-3 border-t border-border bg-[#F9FAFB] flex items-center justify-between">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider" id="products-count-label">
-              Exibindo {filteredProducts.length} de {products.length} produtos
-            </span>
-            <div className="flex items-center gap-2">
-               <Button variant="outline" className="h-8 px-3 text-[10px] font-bold rounded-md" disabled>Anterior</Button>
-               <Button variant="outline" className="h-8 px-3 text-[10px] font-bold rounded-md">Próximo</Button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

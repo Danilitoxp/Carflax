@@ -5,7 +5,6 @@ import { CalendarSection } from "@/components/calendar";
 import { SettingsSection } from "@/components/settings";
 import { CrmSection } from "@/components/crm";
 import {
-  HighlightCard,
   SalesMetricsCard,
   BirthdayList,
 } from "@/components/dashboard/Geral/RightPanelComponents";
@@ -37,7 +36,7 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
   const isDashboardView = ["Geral", "Analytics", "Performance", "Campanhas", "Dashboard", "Orçamentos"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(activeItem);
   const isCrmView = ["Analytics", "Orçamentos", "CRM", "Produtos", "Campanhas"].includes(activeItem);
-  const showRightPanel = false; // Reduzindo distrações como solicitado
+  const showRightPanel = activeItem === "Geral"; // Mostrar apenas no dashboard principal
 
   return (
     <div className="h-screen bg-background font-sans transition-colors duration-300 overflow-hidden flex relative">
@@ -129,9 +128,9 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
             >
               Simular {isVendedor ? 'Interno' : 'Vendedor'}
             </button>
-            <div className="flex-1 flex flex-col gap-3 pb-0">
-              {isVendedor ? <SalesMetricsCard isCompact={isVendedor} /> : <HighlightCard />}
-              <BirthdayList isCompact={isVendedor} />
+            <div className="flex-1 flex flex-col gap-4 pb-0 overflow-y-auto scrollbar-hide">
+              <SalesMetricsCard />
+              <BirthdayList />
             </div>
           </div>
         )}
