@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Target, Plus, X } from "lucide-react";
+import { Target, Plus, X, Trophy, WashingMachine, Smartphone, Tv, Speaker, Fan, Refrigerator } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface Campaign {
@@ -98,217 +98,277 @@ export function CampanhasView() {
     { pos: 8, name: "JULIANA OLIVEIRA DA SILVA", value: "R$ 14.162,46", color: "bg-secondary" },
   ];
 
-  return (
-    <div className="py-4 space-y-8 h-full overflow-y-auto scrollbar-hide pr-2">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-        {/* Nova Campanha Card */}
-        <div 
-          onClick={() => setIsNewCampaignModalOpen(true)}
-          className="aspect-[4/5] bg-white/[0.01] border-2 border-dashed border-border/60 rounded-[1.5rem] flex flex-col items-center justify-center group cursor-pointer hover:border-primary/50 transition-all hover:bg-primary/[0.02]"
-        >
-          <div className="w-10 h-10 rounded-full bg-secondary/80 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
-            <Plus className="w-5 h-5 text-primary" />
-          </div>
-          <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Nova Campanha</span>
-        </div>
+  // Import Trophy from lucide-react (add to imports if not there)
+  // ...
 
-        {campaigns.map((camp) => (
-          <div 
-            key={camp.id} 
-            onClick={() => camp.type === 'brand' && setSelectedCampaign(camp)}
-            className={cn(
-              "aspect-[4/5] rounded-[1.5rem] p-5 flex flex-col transition-all duration-500 cursor-pointer group relative overflow-hidden",
-              camp.type === 'highlight' 
-                ? "bg-gradient-to-br from-primary via-primary/90 to-blue-700 shadow-xl shadow-primary/10 border border-white/10" 
-                : "bg-card border border-border/60 hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/5"
-            )}
-          >
-            {camp.type === 'highlight' ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center relative">
-                  <div className="absolute inset-0 bg-white blur-xl opacity-20 animate-pulse" />
-                  <Target className="w-6 h-6 text-white relative z-10" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-black text-white tracking-tight uppercase leading-tight">{camp.name}</h3>
-                  <p className="text-[9px] font-bold text-white/50 uppercase tracking-widest leading-tight">{camp.description}</p>
-                </div>
-                <div className="px-4 py-1.5 rounded-full bg-white/10 border border-white/20">
-                   <span className="text-[8px] font-black text-white tracking-[0.2em]">★ {camp.badge}</span>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex-1 bg-secondary/50 dark:bg-black/40 rounded-2xl p-4 flex items-center justify-center border border-border/10 mb-3 transition-colors">
-                  <img 
-                    src={camp.logo} 
-                    className="max-h-10 w-auto object-contain brightness-100 group-hover:scale-110 transition-transform duration-700 dark:contrast-125" 
-                    alt={camp.name} 
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <h3 className="text-[10px] font-black text-foreground/90 truncate uppercase tracking-tight">{camp.name}</h3>
-                  <p className="text-[8px] font-bold text-muted-foreground tracking-widest leading-none">{camp.date}</p>
-                  <div className="pt-0.5">
-                    <span className="inline-flex px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[7px] font-black uppercase tracking-widest">
-                       {camp.status}
-                    </span>
-                  </div>
-                </div>
-              </>
-            )}
-            
-            <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-          </div>
-        ))}
+  return (
+    <div className="h-full flex flex-col pt-3 px-6 pb-2 overflow-hidden bg-[#F8FAFC]">
+      {/* CSS for Border Trace and Float Animation */}
+      <style>{`
+        @keyframes border-trace {
+          0%, 100% { clip-path: inset(0 0 98% 0); }
+          25% { clip-path: inset(0 0 0 98%); }
+          50% { clip-path: inset(98% 0 0 0); }
+          75% { clip-path: inset(0 98% 0 0); }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
+        }
+        @keyframes float-diag {
+          0%, 100% { transform: translate(0, 0); }
+          50% { transform: translate(4px, -6px); }
+        }
+        @keyframes float-vert {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+        .animate-border-trace {
+          animation: border-trace 4s linear infinite;
+        }
+        .animate-float {
+          animation: float 4s ease-in-out infinite;
+        }
+        .animate-float-diag {
+          animation: float-diag 5s ease-in-out infinite;
+        }
+        .animate-float-vert {
+          animation: float-vert 6s ease-in-out infinite;
+        }
+      `}</style>
+
+      {/* Header Area */}
+      <div className="flex items-center justify-between mb-4 shrink-0">
+        <div>
+          <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Campanhas</h2>
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Programas de Incentivo e Vendas</p>
+        </div>
+        <button 
+          onClick={() => setIsNewCampaignModalOpen(true)}
+          className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 uppercase tracking-wider active:scale-[0.98]"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Nova Campanha
+        </button>
       </div>
 
-      {/* RANKING MODAL */}
-      {selectedCampaign && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div 
-            className="fixed inset-0 bg-background/60 backdrop-blur-md" 
-            onClick={() => setSelectedCampaign(null)} 
-          />
-          
-          <div 
-            className="relative w-full max-w-6xl bg-card border border-border/50 rounded-[3rem] shadow-[0_50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col max-h-[90vh]"
-          >
-            {/* Modal Header */}
-            <div className="px-10 py-8 flex items-center justify-between border-b border-border/50 bg-secondary/5">
-              <h2 className="text-2xl font-black text-foreground tracking-tighter uppercase">Ranking — {selectedCampaign.name}</h2>
-              <button 
-                onClick={() => setSelectedCampaign(null)}
-                className="px-6 py-2 bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-              >
-                Fechar
-              </button>
-            </div>
+      <div className="flex-1 overflow-y-auto scrollbar-hide pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 pb-6">
+          {campaigns.map((camp) => (
+            <div 
+              key={camp.id} 
+              onClick={() => camp.type === 'brand' && setSelectedCampaign(camp)}
+              className={cn(
+                "aspect-[4/5] rounded-xl p-4 flex flex-col border border-slate-200 transition-all duration-300 cursor-pointer group relative overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-300",
+                camp.type === 'highlight' && "border-blue-200/50 shadow-xl shadow-blue-600/5"
+              )}
+            >
+              {camp.type === 'highlight' ? (
+                <>
+                  {/* Border Trace Effect */}
+                  <div className="absolute inset-0 z-0 pointer-events-none">
+                    <div className="absolute inset-0 border-2 border-blue-600 rounded-xl animate-border-trace opacity-60" />
+                  </div>
 
-            {/* Ranking List */}
-            <div className="flex-1 overflow-y-auto p-6 md:p-10 scrollbar-hide space-y-3">
-              <div className="grid grid-cols-12 px-6 mb-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                <div className="col-span-1">#</div>
-                <div className="col-span-8">Vendedor</div>
-                <div className="col-span-3 text-right">Faturamento</div>
-              </div>
+                  {/* Floating Product Decorations */}
+                  <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-10">
+                    <Tv className="absolute top-4 left-4 w-5 h-5 text-blue-600 animate-float-diag opacity-80" style={{ animationDelay: '0s' }} />
+                    <WashingMachine className="absolute top-10 right-4 w-6 h-6 text-blue-600 animate-float-vert opacity-60" style={{ animationDelay: '1.5s' }} />
+                    <Smartphone className="absolute bottom-16 left-6 w-4 h-4 text-blue-600 animate-float opacity-90" style={{ animationDelay: '3s' }} />
+                    <Refrigerator className="absolute bottom-6 right-8 w-6 h-6 text-blue-600 animate-float-diag opacity-50" style={{ animationDelay: '0.8s' }} />
+                    <Speaker className="absolute top-1/2 left-2 w-4 h-4 text-blue-600 animate-float opacity-70" style={{ animationDelay: '2.2s' }} />
+                    <Fan className="absolute bottom-12 right-2 w-5 h-5 text-blue-600 animate-float-vert opacity-80" style={{ animationDelay: '1.2s' }} />
+                  </div>
+                  
+                  <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 relative z-10">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-blue-400 blur-2xl opacity-10 animate-pulse" />
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 flex items-center justify-center relative shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform duration-500">
+                        <Trophy className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <h3 className="text-[16px] font-black text-blue-600 tracking-tight uppercase leading-tight">Prêmio do Mês</h3>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">Bata a meta • Concorra ao sorteio</p>
+                    </div>
 
-              {ranking.map((v) => (
-                <div key={v.pos} className="grid grid-cols-12 items-center bg-secondary/10 hover:bg-secondary/20 p-5 rounded-2xl border border-border/30 transition-all group">
-                  <div className="col-span-1">
-                    <div className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shadow-lg",
-                      v.pos <= 3 ? v.color + " text-black" : "bg-card/50 text-muted-foreground"
-                    )}>
-                      {v.pos}
+                    <div className="px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
+                      <span className="text-[9px] font-black text-blue-600 tracking-[0.2em] uppercase flex items-center gap-1.5">
+                        <span className="text-[11px] leading-none mb-0.5">★</span> NOVIDADE
+                      </span>
                     </div>
                   </div>
-                  <div className="col-span-8 pl-4">
-                    <span className="text-[11px] font-black text-foreground/70 group-hover:text-foreground transition-colors uppercase tracking-tight">
-                      {v.name}
-                    </span>
+                </>
+              ) : (
+                <>
+                  <div className="flex-1 bg-slate-50 rounded-lg p-4 flex items-center justify-center border border-slate-100 mb-3 transition-colors group-hover:bg-blue-50/50">
+                    <img 
+                      src={camp.logo} 
+                      className="max-h-12 w-auto object-contain brightness-100 group-hover:scale-110 transition-transform duration-500" 
+                      alt={camp.name} 
+                    />
                   </div>
-                  <div className="col-span-3 text-right">
-                    <span className="text-sm font-black text-emerald-500 tracking-tighter">
-                      {v.value}
-                    </span>
+                  <div className="space-y-1.5">
+                    <h3 className="text-[10px] font-black text-slate-900 truncate uppercase tracking-tight">{camp.name}</h3>
+                    <p className="text-[8px] font-bold text-slate-400 tracking-widest leading-none">{camp.date}</p>
+                    <div className="pt-0.5">
+                      <span className="inline-flex px-2 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-100 text-[7px] font-black uppercase tracking-widest">
+                         {camp.status}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                </>
+              )}
             </div>
-          </div>
+          ))}
         </div>
-      )}
+      </div>
 
-      {/* NEW CAMPAIGN MODAL */}
-      {isNewCampaignModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div 
-            className="fixed inset-0 bg-background/60 backdrop-blur-md" 
-            onClick={() => setIsNewCampaignModalOpen(false)} 
-          />
-          
-          <div 
-            className="relative w-full max-w-[500px] bg-card border border-border/50 rounded-[2.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden"
-          >
+      {/* RANKING MODAL (Tiny Redesign) */}
+      {selectedCampaign && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-sm">
+          <div className="fixed inset-0" onClick={() => setSelectedCampaign(null)} />
+          <div className="relative w-full max-w-4xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}
-            <div className="px-10 pt-10 pb-4 flex items-center justify-between">
-              <h2 className="text-2xl font-black text-foreground tracking-tighter uppercase">Nova Campanha</h2>
+            <div className="px-8 py-6 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
+                  <Target className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Ranking Performance</h2>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">{selectedCampaign.name}</p>
+                </div>
+              </div>
               <button 
-                onClick={() => setIsNewCampaignModalOpen(false)}
-                className="p-3 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-2xl transition-all"
+                onClick={() => setSelectedCampaign(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="px-10 pb-10 pt-4 space-y-6">
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Nome da Campanha</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ex: Ofertas de Verão"
-                    className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-4 text-sm text-foreground outline-none focus:border-primary/50 focus:bg-background transition-all placeholder:text-muted-foreground/30"
-                  />
-                </div>
+            {/* Ranking List */}
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+              <div className="grid grid-cols-12 px-4 mb-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                <div className="col-span-1">Pos</div>
+                <div className="col-span-8">Vendedor</div>
+                <div className="col-span-3 text-right">Faturamento</div>
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Imagem Principal</label>
-                  <div className="relative group/file">
-                    <input 
-                      type="file" 
-                      className="w-full h-14 opacity-0 absolute inset-0 z-10 cursor-pointer"
-                    />
-                    <div className="w-full h-14 bg-secondary/30 border border-border/40 border-dashed rounded-2xl flex items-center px-5 gap-3 group-hover/file:border-primary/50 transition-all">
-                      <Plus className="w-4 h-4 text-primary" />
-                      <span className="text-xs font-semibold text-muted-foreground">Clique para selecionar imagem</span>
+              <div className="space-y-1">
+                {ranking.map((v) => (
+                  <div key={v.pos} className="grid grid-cols-12 items-center bg-white hover:bg-slate-50 px-4 py-2.5 rounded-lg border border-slate-100 transition-all group">
+                    <div className="col-span-1">
+                      <div className={cn(
+                        "w-6 h-6 rounded flex items-center justify-center text-[10px] font-black transition-all",
+                        v.pos === 1 ? "bg-amber-400 text-amber-900 shadow-sm shadow-amber-400/20" :
+                        v.pos === 2 ? "bg-slate-200 text-slate-600" :
+                        v.pos === 3 ? "bg-orange-100 text-orange-600" :
+                        "bg-slate-50 text-slate-400"
+                      )}>
+                        {v.pos}
+                      </div>
+                    </div>
+                    <div className="col-span-8 pl-2">
+                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">
+                        {v.name}
+                      </span>
+                    </div>
+                    <div className="col-span-3 text-right">
+                      <span className="text-[11px] font-black text-emerald-600 tracking-tighter">
+                        {v.value}
+                      </span>
                     </div>
                   </div>
-                </div>
+                ))}
+              </div>
+            </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Início</label>
-                    <input 
-                      type="date" 
-                      className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-3.5 text-sm text-foreground outline-none focus:border-primary/50 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Término</label>
-                    <input 
-                      type="date" 
-                      className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-3.5 text-sm text-foreground outline-none focus:border-primary/50 transition-all"
-                    />
-                  </div>
-                </div>
+            <div className="p-6 border-t border-slate-100 bg-white shrink-0">
+              <button 
+                onClick={() => setSelectedCampaign(null)}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/10"
+              >
+                Fechar Ranking
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Fornecedor Responsável</label>
-                  <select className="w-full bg-secondary/30 border border-border/40 rounded-2xl px-5 py-4 text-sm text-foreground/70 outline-none focus:border-primary/50 transition-all appearance-none cursor-pointer">
-                    <option value="">Selecione o fornecedor</option>
-                    <option value="amanco">Amanco</option>
-                    <option value="italy">Italy Válvulas</option>
-                    <option value="sansil">Sansil Led</option>
-                  </select>
+      {/* NEW CAMPAIGN MODAL (Tiny Redesign) */}
+      {isNewCampaignModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-sm">
+          <div className="fixed inset-0" onClick={() => setIsNewCampaignModalOpen(false)} />
+          <div className="relative w-full max-w-[480px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-8 py-6 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
+               <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
+                  <Plus className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Nova Campanha</h2>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Cadastro de Incentivo</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsNewCampaignModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 space-y-5 scrollbar-hide">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Nome da Campanha</label>
+                <input type="text" placeholder="Ex: Ofertas de Verão" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all" />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Imagem / Logo</label>
+                <div className="relative group/file">
+                  <input type="file" className="w-full h-12 opacity-0 absolute inset-0 z-10 cursor-pointer" />
+                  <div className="w-full h-12 bg-slate-50 border border-slate-200 border-dashed rounded-xl flex items-center px-4 gap-3 group-hover/file:border-blue-600/50 transition-all">
+                    <Plus className="w-4 h-4 text-blue-600" />
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">Selecionar imagem</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                <button 
-                  onClick={() => setIsNewCampaignModalOpen(false)}
-                  className="flex-1 py-4.5 bg-primary text-white rounded-[1.5rem] font-bold text-sm uppercase tracking-widest shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all"
-                >
-                  Salvar Campanha
-                </button>
-                <button 
-                  onClick={() => setIsNewCampaignModalOpen(false)}
-                  className="py-4.5 px-8 bg-secondary text-foreground rounded-[1.5rem] font-bold text-sm uppercase tracking-widest hover:bg-secondary/80 transition-all"
-                >
-                  Cancelar
-                </button>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Início</label>
+                  <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Término</label>
+                  <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50" />
+                </div>
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Fornecedor Responsável</label>
+                <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none appearance-none cursor-pointer">
+                  <option value="">Selecione o fornecedor...</option>
+                  <option value="amanco">Amanco</option>
+                  <option value="italy">Italy Válvulas</option>
+                  <option value="sansil">Sansil Led</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="p-8 border-t border-slate-100 bg-white shrink-0">
+               <button 
+                onClick={() => setIsNewCampaignModalOpen(false)}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/10"
+              >
+                Salvar Campanha
+              </button>
             </div>
           </div>
         </div>

@@ -9,12 +9,9 @@ interface CrmSectionProps {
 }
 
 export function CrmSection({ activeTab }: CrmSectionProps) {
-  const isProdutosTab = activeTab === "Produtos";
-
   return (
     <div className={cn(
-      "flex flex-col h-full bg-background overflow-hidden",
-      !isProdutosTab ? "p-4 md:p-8" : "p-0"
+      "flex flex-col h-full bg-[#F8FAFC] overflow-hidden p-0",
     )}>
       <div className="w-full h-full flex flex-col">
         <div className="flex-1 min-h-0">

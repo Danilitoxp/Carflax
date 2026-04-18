@@ -63,7 +63,6 @@ const menuItems: MenuItem[] = [
     label: "CRM",
     isDropdown: true,
     subItems: [
-      { label: "Analytics", icon: BarChart3 },
       { label: "Orçamentos", icon: FileBadge },
       { label: "Campanhas", icon: Megaphone },
     ],

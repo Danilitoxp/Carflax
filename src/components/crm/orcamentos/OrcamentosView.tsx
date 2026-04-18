@@ -10,8 +10,10 @@ import {
   X, 
   Send, 
   Handshake, 
-  XCircle 
+  XCircle,
+  Download
 } from "lucide-react";
+import { ChatModal } from "@/components/ui/ChatModal";
 import { cn } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
 
@@ -26,15 +28,16 @@ export interface Orcamento {
   status: string;
   totalValue: number;
   markupValue: number;
+  lossReason?: string;
 }
 
 export function OrcamentosView() {
   const [orçamentosData, setOrçamentosData] = useState<Orcamento[]>([
     { id: "000001026785-OR", seller: "TATIANE MARIA", client: "CLEITO BARROS", date: "16/04/2026", time: "16:56", total: "R$ 48,05", markup: "71.18%", status: "VENDA", totalValue: 48.05, markupValue: 71.18 },
     { id: "000001026784-OR", seller: "GUSTAVO ALVES", client: "CREAM COLOR", date: "16/04/2026", time: "16:50", total: "R$ 139,90", markup: "125.28%", status: "VENDA", totalValue: 139.90, markupValue: 125.28 },
-    { id: "000001026783-OR", seller: "GUILHERME SANTANA", client: "TRANS KOTHE", date: "16/04/2026", time: "16:47", total: "R$ 380,00", markup: "85.00%", status: "EMITIDO", totalValue: 380.00, markupValue: 85.00 },
+    { id: "000001026783-OR", seller: "GUILHERME SANTANA", client: "TRANS KOTHE", date: "16/04/2026", time: "16:47", total: "R$ 380,00", markup: "85.00%", status: "PERDIDO", lossReason: "Preço Alto", totalValue: 380.00, markupValue: 85.00 },
     { id: "000001026782-OR", seller: "GUILHERME SANTANA", client: "TRANS KOTHE", date: "16/04/2026", time: "18:45", total: "R$ 33.468,36", markup: "140.08%", status: "EMITIDO", totalValue: 33468.36, markupValue: 140.08 },
-    { id: "000001026781-OR", seller: "TATIANE MARIA", client: "ITM LATIN", date: "16/04/2026", time: "16:43", total: "R$ 2.847,30", markup: "73.41%", status: "EMITIDO", totalValue: 2847.30, markupValue: 73.41 },
+    { id: "000001026781-OR", seller: "TATIANE MARIA", client: "ITM LATIN", date: "16/04/2026", time: "16:43", total: "R$ 2.847,30", markup: "73.41%", status: "PERDIDO", lossReason: "Falta de Estoque", totalValue: 2847.30, markupValue: 73.41 },
     { id: "000001026780-OR", seller: "MATEUS RONALD", client: "RODRIGO SOARES", date: "16/04/2026", time: "16:43", total: "R$ 2.611,60", markup: "75.97%", status: "VENDA", totalValue: 2611.60, markupValue: 75.97 },
     { id: "000000000822-OR", seller: "GUILHERME SANTANA", client: "JMJ LOCACOES", date: "16/04/2026", time: "16:42", total: "R$ 599,74", markup: "77.78%", status: "VENDA", totalValue: 599.74, markupValue: 77.78 },
     { id: "000001026779-OR", seller: "TATIANE MARIA", client: "MEDIATRIZ ENGENHARIA", date: "16/04/2026", time: "16:23", total: "R$ 126,40", markup: "114.09%", status: "VENDA", totalValue: 126.40, markupValue: 114.09 },
@@ -46,9 +49,12 @@ export function OrcamentosView() {
 
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'id', direction: 'desc' });
   const [filterStatus, setFilterStatus] = useState("Todos os Status");
+  const [filterSeller, setFilterSeller] = useState("Todos os Vendedores");
+  const [filterReason, setFilterReason] = useState("Todos os Motivos");
   const [searchTerm, setSearchTerm] = useState("");
   
   // Modals state
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [isItemsModalOpen, setIsItemsModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
@@ -94,6 +100,21 @@ export function OrcamentosView() {
     setIsStatusModalOpen(true);
   };
 
+  const uniqueSellers = useMemo(() => {
+    const sellers = new Set(orçamentosData.map(item => item.seller));
+    return ["Todos os Vendedores", ...Array.from(sellers)];
+  }, [orçamentosData]);
+
+  const lossReasons = [
+    "Todos os Motivos",
+    "Preço Alto",
+    "Falta de Estoque",
+    "Desistiu",
+    "Prazo de Entrega",
+    "Mão de Obra e Material",
+    "Comparativo de Linhas"
+  ];
+
   const filteredAndSortedItems = useMemo(() => {
     let result = [...orçamentosData];
 
@@ -119,6 +140,16 @@ export function OrcamentosView() {
       }
     }
 
+    // Seller Filter
+    if (filterSeller !== "Todos os Vendedores") {
+      result = result.filter(item => item.seller === filterSeller);
+    }
+
+    // Reason Filter
+    if (filterReason !== "Todos os Motivos") {
+      result = result.filter(item => item.lossReason === filterReason);
+    }
+
     // Date Range Filter
     if (startDate !== null && endDate !== null) {
       result = result.filter(item => {
@@ -142,7 +173,7 @@ export function OrcamentosView() {
     }
 
     return result;
-  }, [orçamentosData, searchTerm, filterStatus, startDate, endDate, sortConfig]);
+  }, [orçamentosData, searchTerm, filterStatus, filterSeller, filterReason, startDate, endDate, sortConfig]);
 
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -157,17 +188,30 @@ export function OrcamentosView() {
       : <ChevronDown className="w-3 h-3 text-primary" />;
   };
 
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case "VENDA": return "bg-emerald-500 text-white border-transparent";
-      case "EMITIDO": return "bg-[#343A40] text-white border-transparent";
-      case "ENVIADO": return "bg-[#9C6ADE] text-white border-transparent";
-      case "NEGOCIAÇÃO": return "bg-[#F5C71A] text-black border-transparent";
-      case "LIB. CRÉDITO": return "bg-[#E68A2E] text-white border-transparent";
-      case "AGUARD. PEDIDO": return "bg-[#D35400] text-white border-transparent";
-      case "PERDIDO": return "bg-[#C0392B] text-white border-transparent";
-      default: return "bg-secondary text-muted-foreground";
-    }
+  const handleExportCSV = () => {
+    const headers = ["ID", "Vendedor", "Cliente", "Data", "Hora", "Total", "Markup", "Status", "Motivo"];
+    const rows = filteredAndSortedItems.map(item => [
+      item.id,
+      item.seller,
+      item.client,
+      item.date,
+      item.time,
+      item.total.replace('R$ ', ''),
+      item.markup,
+      item.status,
+      item.lossReason || ""
+    ]);
+
+    const csvContent = [headers, ...rows].map(e => e.join(";")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `orcamentos_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const dateLabel = endDate !== null 
@@ -175,19 +219,19 @@ export function OrcamentosView() {
     : startDate ? `${startDate.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })}...` : "Selecione o período...";
 
   return (
-    <div className="h-full flex flex-col space-y-6">
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between shrink-0 mb-2">
-        <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto flex-1">
-          {/* 1. Search Bar (Now first) */}
-          <div className="relative w-full sm:w-96 group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-all duration-300" />
+    <div className="h-full flex flex-col pt-3 px-6 pb-2 overflow-y-auto scrollbar-hide">
+      {/* Header & Filters (Tiny Style) */}
+      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between shrink-0 mb-4 px-1">
+        <div className="flex flex-col sm:flex-row gap-2 items-center w-full lg:w-auto flex-1 flex-wrap">
+          {/* 1. Search Bar */}
+          <div className="relative w-full sm:w-60 group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
             <input 
               type="text" 
-              placeholder="Buscar por cliente, vendedor ou ID..." 
+              placeholder="Pesquisar..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-secondary/20 border border-border/40 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-semibold outline-none focus:border-primary/50 focus:bg-background/50 focus:ring-4 focus:ring-primary/5 transition-all duration-300 placeholder:text-muted-foreground/40" 
+              className="w-full bg-slate-50 border border-slate-200 rounded-md pl-9 pr-3 py-2 text-xs font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all placeholder:text-slate-300" 
             />
           </div>
 
@@ -196,23 +240,23 @@ export function OrcamentosView() {
             <button 
               onClick={() => setIsDateModalOpen(!isDateModalOpen)}
               className={cn(
-                "w-full sm:min-w-[280px] flex items-center justify-between gap-3 border rounded-2xl px-6 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 shrink-0 outline-none",
+                "w-full sm:min-w-[200px] flex items-center justify-between gap-3 border rounded-md px-4 py-2 text-[10px] font-bold uppercase tracking-wider transition-all duration-300 outline-none",
                 isDateModalOpen 
-                  ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 ring-4 ring-primary/10" 
-                  : "bg-secondary/20 border-border/40 text-foreground/80 hover:bg-secondary/40 hover:border-border/60"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-sm" 
+                  : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
               )}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Calendar className="w-3.5 h-3.5" />
                 <span>{dateLabel}</span>
               </div>
-              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", isDateModalOpen && "rotate-180")} />
+              <ChevronDown className={cn("w-3 h-3 transition-transform", isDateModalOpen && "rotate-180")} />
             </button>
 
             {isDateModalOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsDateModalOpen(false)} />
-                <div className="absolute top-16 left-0 z-50 w-auto bg-card rounded-[2.5rem] shadow-[0_25px_70px_-15px_rgba(0,0,0,0.6)]">
+                <div className="absolute top-11 left-0 z-50">
                   <MiniCalendar 
                     mode="range"
                     onSelectRange={handleRangeSelect}
@@ -224,27 +268,140 @@ export function OrcamentosView() {
             )}
           </div>
           
-          {/* 3. Status Filter Dropdown */}
-          <div className="relative w-full sm:w-56 group shrink-0">
+          {/* 3. Status Filter */}
+          <div className="relative w-full sm:w-36 group shrink-0">
             <select 
               value={filterStatus} 
               onChange={(e) => setFilterStatus(e.target.value)} 
-              className="w-full bg-secondary/20 border border-border/40 rounded-2xl px-6 py-3.5 text-[10px] font-black uppercase tracking-widest outline-none appearance-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 cursor-pointer transition-all duration-300 text-foreground/80 hover:bg-secondary/40"
+              className="w-full bg-slate-50 border border-slate-200 rounded-md px-4 py-2 text-[10px] font-bold uppercase tracking-wider outline-none appearance-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 cursor-pointer transition-all text-slate-500 hover:bg-slate-100"
             >
               {["Todos os Status", "Em Aberto", "Emitido", "Enviado", "Negociação", "Lib. Crédito", "Aguard. Pedido", "Venda", "Perdido"].map(opt => (
-                <option key={opt} value={opt} className="bg-card text-foreground">{opt}</option>
+                <option key={opt} value={opt}>{opt}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 pointer-events-none group-hover:text-primary transition-colors" />
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none group-hover:text-blue-600 transition-colors" />
+          </div>
+
+          {/* 4. Seller Filter */}
+          <div className="relative w-full sm:w-36 group shrink-0">
+            <select 
+              value={filterSeller} 
+              onChange={(e) => setFilterSeller(e.target.value)} 
+              className="w-full bg-slate-50 border border-slate-200 rounded-md px-4 py-2 text-[10px] font-bold uppercase tracking-wider outline-none appearance-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 cursor-pointer transition-all text-slate-500 hover:bg-slate-100"
+            >
+              {uniqueSellers.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none group-hover:text-blue-600 transition-colors" />
+          </div>
+
+          {/* 5. Loss Reason Filter */}
+          <div className="relative w-full sm:w-36 group shrink-0">
+            <select 
+              value={filterReason} 
+              onChange={(e) => setFilterReason(e.target.value)} 
+              className="w-full bg-slate-50 border border-slate-200 rounded-md px-4 py-2 text-[10px] font-bold uppercase tracking-wider outline-none appearance-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 cursor-pointer transition-all text-slate-500 hover:bg-slate-100"
+            >
+              {lossReasons.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none group-hover:text-blue-600 transition-colors" />
+          </div>
+        </div>
+
+        <button 
+          onClick={handleExportCSV}
+          className="w-full lg:w-auto flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm shrink-0"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Exportar CSV
+        </button>
+      </div>
+
+      {/* INSIGHTS SECTION */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 shrink-0">
+        {/* Card 1: Distribuição por Status */}
+        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Distribuição por Status</h3>
+          <div className="space-y-3">
+            {[
+              { label: "Emitido", val: 51, total: 100, color: "bg-blue-400" },
+              { label: "Enviado", val: 32, total: 100, color: "bg-indigo-500" },
+              { label: "Negociação", val: 45, total: 100, color: "bg-amber-400" },
+              { label: "Aguard. Pedido", val: 12, total: 100, color: "bg-orange-500" },
+              { label: "Venda", val: 88, total: 100, color: "bg-emerald-500" },
+              { label: "Perdido", val: 24, total: 100, color: "bg-rose-500" },
+            ].map((s, i) => (
+              <div key={i} className="space-y-1">
+                <div className="flex justify-between items-center text-[9px] font-bold text-slate-500">
+                  <span className="uppercase tracking-tight truncate pr-2">{s.label}</span>
+                  <span className="text-slate-900">{s.val}</span>
+                </div>
+                <div className="h-1 bg-slate-50 rounded-full overflow-hidden">
+                  <div className={cn("h-full rounded-full", s.color)} style={{ width: `${s.val}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Card 2: Motivos de Perda */}
+        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Motivos de Perda</h3>
+          <div className="space-y-3.5">
+            {[
+              { label: "Mão de Obra e Material", val: 85, color: "bg-rose-500" },
+              { label: "Preço Alto", val: 65, color: "bg-orange-500" },
+              { label: "Falta de Estoque", val: 45, color: "bg-orange-500" },
+              { label: "Desistiu", val: 35, color: "bg-amber-500" },
+              { label: "Postergou", val: 25, color: "bg-amber-500" },
+            ].map((m, i) => (
+              <div key={i} className="space-y-1">
+                <div className="flex justify-between items-center text-[9px] font-bold text-slate-500">
+                  <span className="uppercase tracking-tight truncate pr-2">{m.label}</span>
+                  <span className="text-slate-900">{Math.floor(m.val/10)}</span>
+                </div>
+                <div className="h-2.5 bg-slate-50 rounded-sm overflow-hidden border border-slate-100/50">
+                  <div className={cn("h-full rounded-r-sm transition-all duration-700", m.color)} style={{ width: `${m.val}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Card 3: Resumo Geral */}
+        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Resumo Geral</h3>
+          <div className="space-y-4">
+            {[
+              { label: "Valor em Pipeline", value: "R$ 35.528,49", color: "text-emerald-600" },
+              { label: "Qtde. Orçamentos", value: "62", color: "text-slate-900" },
+              { label: "Vendas Fechadas", value: "32", color: "text-slate-900" },
+              { label: "Conv. por Qtde.", value: "76.2%", color: "text-emerald-600", trend: "up" },
+              { label: "Conv. por Valor", value: "61.5%", color: "text-blue-600", trend: "up" },
+            ].map((r, i) => (
+              <div key={i} className="flex flex-col border-b border-slate-50 pb-2 last:border-0 last:pb-0">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{r.label}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn("text-[12px] font-black", r.color)}>{r.value}</span>
+                    {r.trend === "up" && <span className="text-[10px] text-emerald-500 animate-pulse">↗</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 bg-card border border-border/50 rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col mb-4">
-        <div className="flex-1 overflow-x-auto overflow-y-auto scrollbar-hide py-1">
-          <table className="w-full text-left border-collapse min-w-[900px]">
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-card border-b border-border/50 backdrop-blur-md">
+      {/* Main Table Container */}
+      <div className="flex-1 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-0">
+        <div className="flex-1 overflow-x-auto overflow-y-auto scrollbar-hide">
+          <table className="w-full text-left border-collapse min-w-[1000px]">
+            <thead className="sticky top-0 z-20">
+              <tr className="bg-slate-50/50 border-b border-slate-100 backdrop-blur-md">
                 {[
                   { id: 'id', label: 'Orçamento' },
                   { id: 'seller', label: 'Vendedor' },
@@ -254,49 +411,103 @@ export function OrcamentosView() {
                   { id: 'markup', label: 'Markup' },
                   { id: 'status', label: 'Status' },
                 ].map((col) => (
-                  <th key={col.id} onClick={() => requestSort(col.id)} className={cn("px-4 md:px-6 py-4 text-[9px] font-black uppercase tracking-[0.25em] cursor-pointer hover:bg-secondary/10 transition-colors group/th", col.id === 'status' && "text-center")}>
+                  <th 
+                    key={col.id} 
+                    onClick={() => requestSort(col.id)} 
+                    className={cn(
+                      "px-6 py-3 text-[9px] font-black uppercase tracking-[0.1em] cursor-pointer hover:bg-slate-100/50 transition-colors text-slate-400 group/th", 
+                      col.id === 'status' && "text-center"
+                    )}
+                  >
                     <div className={cn("flex items-center gap-2", col.id === 'status' && "justify-center")}>
-                      <span className={cn(sortConfig.key === col.id ? "text-primary" : "text-muted-foreground/60")}>{col.label}</span>
+                      <span className={cn(sortConfig.key === col.id ? "text-blue-600" : "text-slate-400 group-hover/th:text-slate-600")}>{col.label}</span>
                       {getSortIcon(col.id)}
                     </div>
                   </th>
                 ))}
-                <th className="px-4 md:px-6 py-4 text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.25em] text-right">Ações</th>
+                <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.1em] text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/10">
+            <tbody className="divide-y divide-slate-100">
               {filteredAndSortedItems.map((item, idx) => (
-                <tr key={idx} className="hover:bg-primary/[0.01] transition-colors group">
-                  <td className="px-4 md:px-6 py-3.5"><span className="text-[11px] font-black text-[#0053FC] hover:underline cursor-pointer">{item.id}</span></td>
-                  <td className="px-4 md:px-6 py-3.5"><span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{item.seller}</span></td>
-                  <td className="px-4 md:px-6 py-3.5"><span className="text-[11px] font-black text-foreground/90 uppercase tracking-tighter transition-colors group-hover:text-foreground">{item.client}</span></td>
-                  <td className="px-4 md:px-6 py-3.5"><div className="flex items-baseline gap-2"><span className="text-[10px] font-black text-foreground whitespace-nowrap">{item.date}</span><span className="text-[9px] font-black text-muted-foreground/40">{item.time}</span></div></td>
-                  <td className="px-4 md:px-6 py-3.5"><span className="text-[11px] font-black text-emerald-500 whitespace-nowrap">{item.total}</span></td>
-                  <td className="px-4 md:px-6 py-3.5"><span className="text-[11px] font-black text-amber-500">{item.markup}</span></td>
-                  <td className="px-4 md:px-6 py-3.5 text-center">
-                    <div 
-                      onClick={() => (item.status !== "VENDA" && item.status !== "PERDIDO") && handleOpenStatus(item)}
-                      className={cn(
-                        "inline-flex items-center px-5 py-1.5 rounded-full text-[9px] font-black tracking-[0.1em] transition-all", 
-                        (item.status !== "VENDA" && item.status !== "PERDIDO") ? "cursor-pointer hover:brightness-110 active:scale-95" : "cursor-default opacity-80",
-                        getStatusStyle(item.status)
-                      )}
+                <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-6 py-4">
+                    <span 
+                      className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
                     >
-                      {item.status}
+                      {item.id.replace('-OR', '')}
+                      <span className="text-[9px] opacity-40 ml-0.5 font-medium">-OR</span>
+                    </span>
+                  </td>
+                  <td className="px-6 py-4"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{item.seller}</span></td>
+                  <td className="px-6 py-4"><span className="text-[11px] font-black text-slate-800 uppercase tracking-tighter transition-colors group-hover:text-blue-600">{item.client}</span></td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[10px] font-bold text-slate-600 whitespace-nowrap">{item.date}</span>
+                      <span className="text-[9px] font-medium text-slate-400">{item.time}</span>
                     </div>
                   </td>
-                  <td className="px-4 md:px-6 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1.5 transition-all duration-300">
+                  <td className="px-6 py-4"><span className="text-[11px] font-black text-emerald-600 whitespace-nowrap">{item.total}</span></td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span className="text-[11px] font-black text-slate-700">{item.markup}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col items-center gap-1">
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (item.status !== "VENDA" && item.status !== "PERDIDO") {
+                            handleOpenStatus(item);
+                          }
+                        }}
+                        className={cn(
+                          "inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold tracking-tight transition-all", 
+                          (item.status !== "VENDA" && item.status !== "PERDIDO") ? "cursor-pointer hover:brightness-110 active:scale-95" : "cursor-default opacity-80",
+                          item.status === "VENDA" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
+                          item.status === "EMITIDO" ? "bg-slate-50 text-slate-600 border border-slate-100" :
+                          item.status === "ENVIADO" ? "bg-blue-50 text-blue-600 border border-blue-100" :
+                          item.status === "NEGOCIAÇÃO" ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                          item.status === "LIB. CRÉDITO" ? "bg-orange-50 text-orange-600 border border-orange-100" :
+                          item.status === "AGUARD. PEDIDO" ? "bg-indigo-50 text-indigo-600 border border-indigo-100" :
+                          item.status === "PERDIDO" ? "bg-rose-50 text-rose-600 border border-rose-100" :
+                          "bg-slate-50 text-slate-500 border border-slate-100"
+                        )}
+                      >
+                        {item.status}
+                      </div>
+                      {item.status === 'PERDIDO' && (
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">
+                          {item.lossReason || "Não Informado"}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                       <button 
                          onClick={() => {
                           setSelectedItem(item);
                           setIsItemsModalOpen(true);
                         }}
-                        className="p-2.5 rounded-xl bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white transition-all shadow-sm border border-orange-500/20"
+                        className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
+                        title="Ver Itens"
                       >
                         <Package className="w-3.5 h-3.5" />
                       </button>
-                      <button className="p-2.5 rounded-xl bg-[#0053FC]/10 hover:bg-[#0053FC] text-[#0053FC] hover:text-white transition-all shadow-sm border border-[#0053FC]/20"><MessageSquare className="w-3.5 h-3.5" /></button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedItem(item);
+                          setIsChatModalOpen(true);
+                        }}
+                        className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
+                        title="Enviar Mensagem"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -306,64 +517,87 @@ export function OrcamentosView() {
         </div>
       </div>
 
-      {/* ITEMS MODAL */}
+      {/* CHAT MODAL (Reusable UI Component) */}
+      <ChatModal 
+        isOpen={isChatModalOpen && selectedItem !== null}
+        onClose={() => setIsChatModalOpen(false)}
+        id={selectedItem?.id.replace('-OR', '') || ""}
+        title={selectedItem?.seller || ""}
+        subtitle={selectedItem?.seller || ""}
+        avatarText={selectedItem?.seller.split(' ').map(n => n[0]).join('')}
+      />
+
+      {/* ITEMS MODAL (Tiny Redesign) */}
       {isItemsModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsItemsModalOpen(false)} />
-          <div className="relative w-full max-w-4xl bg-card border border-border/50 rounded-[3.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-sm">
+          <div className="fixed inset-0" onClick={() => setIsItemsModalOpen(false)} />
+          <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}
-            <div className="p-10 pb-6 flex items-center gap-5">
-              <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(245,158,11,0.2)] border border-amber-400/20">
-                <Package className="w-6 h-6 text-black" />
+            <div className="p-6 pb-4 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center border border-amber-100">
+                  <Package className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">Itens do Orçamento</h2>
+                  {selectedItem && (
+                    <div className="mt-1 flex items-center gap-2">
+                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                        #{selectedItem.id.replace('-OR', '')}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate max-w-[200px]">
+                        {selectedItem.client}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <h2 className="text-2xl font-black text-[#0081FF] uppercase tracking-tighter">Itens do Orçamento</h2>
-              {selectedItem && (
-                <span className="text-[10px] font-black text-muted-foreground/40 bg-secondary/50 px-4 py-1.5 rounded-xl border border-border/50">
-                  #{selectedItem.id}
-                </span>
-              )}
+              <button 
+                onClick={() => setIsItemsModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {/* Modal Content - Table */}
-            <div className="px-10 py-2">
-              <div className="overflow-x-auto scrollbar-hide">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-border/30">
-                      <th className="py-5 text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em]">Cód.</th>
-                      <th className="py-5 text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] pl-6">Descrição</th>
-                      <th className="py-5 text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] text-right">Qtd</th>
-                      <th className="py-5 text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] text-right">Un</th>
-                      <th className="py-5 text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] text-right">Val. Unit</th>
-                      <th className="py-5 text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] text-right">Custo</th>
-                      <th className="py-5 text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] text-right">Total</th>
+            <div className="flex-1 overflow-y-auto scrollbar-hide">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-100">
+                    <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-wider">Cód.</th>
+                    <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-wider">Descrição</th>
+                    <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-wider text-right">Qtd</th>
+                    <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-wider text-right">Un</th>
+                    <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-wider text-right">Val. Unit</th>
+                    <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-wider text-right">Custo</th>
+                    <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-wider text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {[
+                    { cod: "11400", desc: "DISJ TRIP 32A CURVA C (SDD63C32) STECK", qtd: "1.00", un: "02", unit: "R$ 70,03", custo: "R$ 50,05", total: "R$ 70,03" },
+                    { cod: "19614", desc: "CABO PP 1KV 3X4,00MM CORFIO (POR METRO)", qtd: "30.00", un: "03", unit: "R$ 13,04", custo: "R$ 298,80", total: "R$ 391,20" },
+                  ].map((row, i) => (
+                    <tr key={i} className="group hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3 px-6 text-[11px] font-bold text-slate-500 tracking-tight">{row.cod}</td>
+                      <td className="py-3 px-6 text-[11px] font-black text-slate-800 tracking-tight">{row.desc}</td>
+                      <td className="py-3 px-6 text-[11px] font-bold text-slate-600 text-right tracking-tight">{row.qtd}</td>
+                      <td className="py-3 px-6 text-[11px] font-bold text-slate-600 text-right tracking-tight">{row.un}</td>
+                      <td className="py-3 px-6 text-[11px] font-bold text-slate-600 text-right tracking-tight">{row.unit}</td>
+                      <td className="py-3 px-6 text-[11px] font-bold text-rose-500 text-right tracking-tight">{row.custo}</td>
+                      <td className="py-3 px-6 text-[11px] font-black text-emerald-600 text-right tracking-tight">{row.total}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/10">
-                    {[
-                      { cod: "11400", desc: "DISJ TRIP 32A CURVA C (SDD63C32) STECK", qtd: "1.00", un: "02", unit: "R$ 70,03", custo: "R$ 50,05", total: "R$ 70,03" },
-                      { cod: "19614", desc: "CABO PP 1KV 3X4,00MM CORFIO (POR METRO)", qtd: "30.00", un: "03", unit: "R$ 13,04", custo: "R$ 298,80", total: "R$ 391,20" },
-                    ].map((row, i) => (
-                      <tr key={i} className="group hover:bg-primary/[0.02] transition-colors">
-                        <td className="py-6 text-[12px] font-black text-foreground/80 tracking-tight">{row.cod}</td>
-                        <td className="py-6 text-[12px] font-black text-foreground/80 pl-6 tracking-tight">{row.desc}</td>
-                        <td className="py-6 text-[12px] font-black text-foreground/80 text-right tracking-tight">{row.qtd}</td>
-                        <td className="py-6 text-[12px] font-black text-foreground/80 text-right tracking-tight">{row.un}</td>
-                        <td className="py-6 text-[12px] font-black text-foreground/80 text-right tracking-tight">{row.unit}</td>
-                        <td className="py-6 text-[12px] font-black text-rose-500 text-right tracking-tight opacity-90">{row.custo}</td>
-                        <td className="py-6 text-[12px] font-black text-emerald-500 text-right tracking-tight">{row.total}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-10 pt-6">
+            <div className="p-6 border-t border-slate-100 bg-white shrink-0">
               <button 
                 onClick={() => setIsItemsModalOpen(false)}
-                className="w-full py-5 bg-[#0053FC] hover:bg-[#0042CC] text-white rounded-[1.5rem] font-black text-base uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-primary/20"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/10"
               >
                 Fechar
               </button>
@@ -371,87 +605,155 @@ export function OrcamentosView() {
           </div>
         </div>
       )}
-
-      {/* STATUS CHANGE MODAL */}
+        {/* STATUS CHANGE MODAL (Tiny Redesign) */}
       {isStatusModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsStatusModalOpen(false)} />
-          <div className="relative w-full max-w-2xl bg-card/95 backdrop-blur-2xl border border-white/10 rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.7)] p-10 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-sm">
+          <div className="fixed inset-0" onClick={() => setIsStatusModalOpen(false)} />
+          <div className="relative w-full max-w-lg bg-white rounded-2xl p-8 shadow-2xl border border-slate-200 overflow-hidden">
             <button 
               onClick={() => setIsStatusModalOpen(false)}
-              className="absolute top-8 right-8 p-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-2xl transition-all duration-300"
+              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="space-y-8">
+            <div className="space-y-6">
               {statusStep === 'selection' ? (
                 <>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-black text-foreground tracking-tight leading-tight">Alterar Status</h3>
-                    {selectedItem && (
-                      <div className="p-4 rounded-2xl bg-secondary/30 border border-border/50">
-                        <p className="text-xs font-black text-foreground uppercase tracking-tighter">#{selectedItem.id} — {selectedItem.client}</p>
-                      </div>
-                    )}
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
+                      <ChevronsUpDown className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Alterar Status</h3>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Fluxo de Vendas</p>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+
+                  {selectedItem && (
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Orçamento Selecionado</p>
+                      <p className="text-sm font-black text-slate-900 tracking-tighter">
+                        {selectedItem.id.replace('-OR', '')} — {selectedItem.client}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
                     {[
-                      { label: "Emitido", bg: "bg-[#343A40]", next: null },
-                      { label: "Enviado", bg: "bg-[#9C6ADE]", next: 'enviado' },
-                      { label: "Negociação", bg: "bg-[#F5C71A]", next: 'negociacao' },
-                      { label: "Lib. Crédito", bg: "bg-[#E68A2E]", next: null },
-                      { label: "Aguard. Pedido", bg: "bg-[#D35400]", next: null },
-                      { label: "Perdido", bg: "bg-[#C0392B]", next: 'perdido' },
+                      { label: "Emitido", color: "text-slate-600", dot: "bg-slate-600", next: null },
+                      { label: "Enviado", color: "text-blue-600", dot: "bg-blue-600", next: 'enviado' },
+                      { label: "Negociação", color: "text-amber-600", dot: "bg-amber-600", next: 'negociacao' },
+                      { label: "Lib. Crédito", color: "text-orange-600", dot: "bg-orange-600", next: null },
+                      { label: "Aguard. Pedido", color: "text-indigo-600", dot: "bg-indigo-600", next: null },
+                      { label: "Perdido", color: "text-rose-600", dot: "bg-rose-600", next: 'perdido' },
                     ].map((btn, i) => (
                       <button 
                         key={i}
                         onClick={() => btn.next ? setStatusStep(btn.next as 'enviado' | 'negociacao' | 'perdido') : handleUpdateStatus(btn.label)}
-                        className={cn("py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-tighter transition-all hover:-translate-y-1 active:scale-[0.97] text-white shadow-lg", btn.bg)}
+                        className="flex items-center gap-3 py-3 px-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/80 transition-all text-left group"
                       >
-                        {btn.label}
+                        <div className={cn("w-2 h-2 rounded-full", btn.dot)} />
+                        <span className={cn("text-[11px] font-bold uppercase tracking-tight", btn.color)}>{btn.label}</span>
                       </button>
                     ))}
                   </div>
                 </>
               ) : statusStep === 'enviado' ? (
                 <div className="space-y-6">
-                  <h3 className="text-xl font-black text-[#0081FF] uppercase tracking-tighter flex items-center gap-4">
-                    <Send className="w-5 h-5" /> Status: Enviado
-                  </h3>
-                  <div className="space-y-5">
-                    <input type="text" placeholder="Data de contato (dd/mm/aaaa)" onChange={handleDateMask} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:border-[#0081FF]/50" />
-                    <textarea placeholder="Observação..." rows={4} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none resize-none" />
-                    <button onClick={() => handleUpdateStatus('ENVIADO')} className="w-full py-5 bg-[#0081FF] text-white rounded-[1.5rem] font-black uppercase tracking-widest">Confirmar</button>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
+                      <Send className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Status: Enviado</h3>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Registro de Contato</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Data de Contato</label>
+                      <input type="text" placeholder="dd/mm/aaaa" onChange={handleDateMask} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Observação</label>
+                      <textarea placeholder="Ex: Cliente solicitou retorno na segunda..." rows={4} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all resize-none" />
+                    </div>
+                    <button 
+                      onClick={() => handleUpdateStatus('ENVIADO')} 
+                      className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/10 active:scale-[0.98] transition-all"
+                    >
+                      Confirmar Envio
+                    </button>
                   </div>
                 </div>
               ) : statusStep === 'negociacao' ? (
                 <div className="space-y-6">
-                  <h3 className="text-xl font-black text-[#F5C71A] uppercase tracking-tighter flex items-center gap-4">
-                    <Handshake className="w-6 h-6" /> Negociação
-                  </h3>
-                  <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
-                    <input type="text" placeholder="Endereço da obra *" className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none" />
-                    <div className="grid grid-cols-2 gap-4">
-                      <input type="text" placeholder="Fechamento *" onChange={handleDateMask} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4" />
-                      <input type="text" placeholder="Entrega *" onChange={handleDateMask} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4" />
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center border border-amber-100">
+                      <Handshake className="w-6 h-6 text-amber-600" />
                     </div>
-                    <textarea placeholder="Observação..." rows={3} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none resize-none" />
-                    <button onClick={() => handleUpdateStatus('NEGOCIAÇÃO')} className="w-full py-5 bg-[#F5C71A] text-black rounded-[1.5rem] font-black uppercase tracking-widest">Salvar</button>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Negociação</h3>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Dados da Proposta</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Endereço da Obra *</label>
+                      <input type="text" placeholder="Logradouro, número, bairro..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-amber-600/50 focus:ring-4 focus:ring-amber-600/5 transition-all" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Prev. Fechamento *</label>
+                        <input type="text" placeholder="dd/mm/aaaa" onChange={handleDateMask} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-amber-600/50" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Prev. Entrega *</label>
+                        <input type="text" placeholder="dd/mm/aaaa" onChange={handleDateMask} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-amber-600/50" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Observações</label>
+                      <textarea placeholder="Detalhes da negociação..." rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none resize-none" />
+                    </div>
+                    <button 
+                      onClick={() => handleUpdateStatus('NEGOCIAÇÃO')} 
+                      className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-500/10 active:scale-[0.98] transition-all"
+                    >
+                      Salvar Negociação
+                    </button>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  <h3 className="text-xl font-black text-[#C0392B] uppercase tracking-tighter flex items-center gap-4">
-                    <XCircle className="w-6 h-6" /> Status: Perdido
-                  </h3>
-                  <div className="space-y-5">
-                    <select className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none appearance-none">
-                      <option value="">Selecione o motivo...</option>
-                      {["Preço Alto", "Estoque", "Prazo", "Desistiu"].map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                    <textarea placeholder="Observação adicional..." rows={4} className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-5 py-4 text-sm font-semibold outline-none resize-none" />
-                    <button onClick={() => handleUpdateStatus('PERDIDO')} className="w-full py-5 bg-[#C0392B] text-white rounded-[1.5rem] font-black uppercase tracking-widest">Confirmar Perda</button>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center border border-rose-100">
+                      <XCircle className="w-6 h-6 text-rose-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Status: Perdido</h3>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Motivo da Perda</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Selecione o Motivo *</label>
+                      <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none appearance-none cursor-pointer">
+                        <option value="">Selecione o motivo...</option>
+                        {["Preço Alto", "Estoque", "Prazo", "Desistiu"].map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Observação Adicional</label>
+                      <textarea placeholder="Explique por que o negócio não avançou..." rows={4} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none resize-none" />
+                    </div>
+                    <button 
+                      onClick={() => handleUpdateStatus('PERDIDO')} 
+                      className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-600/10 active:scale-[0.98] transition-all"
+                    >
+                      Confirmar Perda
+                    </button>
                   </div>
                 </div>
               )}

@@ -72,7 +72,7 @@ export function MiniCalendar({
 
   const days = [];
   for (let i = 0; i < firstDayOfMonth; i++) {
-    days.push(<div key={`empty-${i}`} className="h-8 w-8" />);
+    days.push(<div key={`empty-${i}`} className="h-7 w-7" />);
   }
 
   for (let d = 1; d <= daysInMonth; d++) {
@@ -100,45 +100,45 @@ export function MiniCalendar({
         key={d}
         onClick={() => handleDateClick(d)}
         className={cn(
-          "h-8 w-8 text-[10px] font-black transition-all flex items-center justify-center relative z-10",
-          isSelected ? "bg-primary text-white shadow-lg shadow-primary/30 rounded-xl" : "hover:bg-secondary text-foreground/60 hover:text-foreground rounded-xl",
-          isInRange && "bg-primary/10 text-primary rounded-none",
+          "h-7 w-7 text-[10px] font-bold transition-all flex items-center justify-center relative z-10",
+          isSelected ? "bg-blue-600 text-white shadow-md shadow-blue-600/20 rounded-lg" : "hover:bg-slate-50 text-slate-500 hover:text-slate-900 rounded-lg",
+          isInRange && "bg-blue-50 text-blue-600 rounded-none",
           isStart && rangeEnd && "rounded-r-none",
           isEnd && "rounded-l-none",
-          isToday && !isSelected && !isInRange && "text-primary border border-primary/20"
+          isToday && !isSelected && !isInRange && "text-blue-600 border border-blue-600/20"
         )}
       >
         {d}
-        {isToday && !isSelected && !isInRange && <div className="absolute bottom-1 w-1 h-1 bg-primary rounded-full" />}
+        {isToday && !isSelected && !isInRange && <div className="absolute bottom-1 w-1 h-1 bg-blue-600 rounded-full" />}
       </button>
     );
   }
 
   return (
-    <div className="p-4 bg-card border border-border/50 rounded-3xl shadow-2xl w-full max-w-[280px]" onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-center justify-between mb-4 px-1">
-        <span className="text-[11px] font-black uppercase tracking-tighter text-foreground">
-          {months[month]} <span className="text-primary">{year}</span>
+    <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-[240px]" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between mb-3 px-1">
+        <span className="text-[10px] font-black uppercase tracking-tight text-slate-800">
+          {months[month]} <span className="text-blue-600">{year}</span>
         </span>
-        <div className="flex items-center gap-1">
-          <button onClick={handlePrevMonth} className="p-1.5 hover:bg-secondary rounded-lg transition-all active:scale-90">
-            <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
+        <div className="flex items-center gap-0.5">
+          <button onClick={handlePrevMonth} className="p-1 px-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-blue-600 active:scale-90">
+            <ChevronLeft className="w-3.5 h-3.5" />
           </button>
-          <button onClick={handleNextMonth} className="p-1.5 hover:bg-secondary rounded-lg transition-all active:scale-90">
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+          <button onClick={handleNextMonth} className="p-1 px-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-blue-600 active:scale-90">
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {daysOfWeek.map((day) => (
-          <div key={day} className="h-8 w-8 flex items-center justify-center text-[9px] font-black text-muted-foreground/40 uppercase">
+      <div className="grid grid-cols-7 gap-0.5 mb-1.5">
+        {daysOfWeek.map((day, i) => (
+          <div key={i} className="h-7 w-7 flex items-center justify-center text-[8px] font-black text-slate-300 uppercase tracking-widest">
             {day}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-0.5">
         {days}
       </div>
     </div>

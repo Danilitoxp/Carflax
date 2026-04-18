@@ -33,9 +33,9 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  const isDashboardView = ["Geral", "Analytics", "Performance", "Campanhas", "Dashboard", "Orçamentos"].includes(activeItem);
+  const isDashboardView = ["Geral", "Performance", "Campanhas", "Dashboard", "Orçamentos"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(activeItem);
-  const isCrmView = ["Analytics", "Orçamentos", "CRM", "Produtos", "Campanhas"].includes(activeItem);
+  const isCrmView = ["Orçamentos", "CRM", "Produtos", "Campanhas"].includes(activeItem);
   const showRightPanel = activeItem === "Geral"; // Mostrar apenas no dashboard principal
 
   return (

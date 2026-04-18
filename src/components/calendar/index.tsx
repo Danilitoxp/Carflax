@@ -307,7 +307,6 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
                       {isToday && (
                         <div className="flex flex-col items-center">
                            <div className="w-1.5 h-1.5 rounded-full bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)]" />
-                           <span className="text-[7px] font-black text-blue-600 uppercase tracking-tighter mt-1">Hoje</span>
                         </div>
                       )}
                     </div>
