@@ -217,7 +217,7 @@ export function CampanhasView() {
   const salvarNovaCampanha = async () => {
     if (!formData.name.trim()) return;
     setSavingCampaign(true);
-    const { data } = await supabase.from("campanhas").insert({
+    const { data, error } = await supabase.from("campanhas").insert({
       name: formData.name.trim(),
       fornecedor: formData.fornecedor || null,
       date: formData.data_ini || null,
@@ -227,6 +227,7 @@ export function CampanhasView() {
       status: "ativa",
     }).select().single();
     setSavingCampaign(false);
+    if (error) { console.error("[Campanhas] Erro ao criar:", error); alert(`Erro ao criar campanha: ${error.message}`); return; }
     setIsNewCampaignModalOpen(false);
     if (data) setCampaigns(prev => [mapCampaign(data), ...prev]);
   };
@@ -240,23 +241,25 @@ export function CampanhasView() {
   };
 
   const salvarEdicao = async () => {
-    if (!editingCampaign) return;
+    if (!editingCampaign || !formData.name.trim()) return;
     setSavingCampaign(true);
-    const { data } = await supabase.from("campanhas").update({
-      name: formData.name,
+    const { data, error } = await supabase.from("campanhas").update({
+      name: formData.name.trim(),
       fornecedor: formData.fornecedor || null,
       date: formData.data_ini || null,
       periodo_fim: formData.data_fim || null,
       logo: formData.logo || null,
     }).eq("id", editingCampaign.id).select().single();
     setSavingCampaign(false);
+    if (error) { console.error("[Campanhas] Erro ao editar:", error); alert(`Erro ao salvar: ${error.message}`); return; }
     setEditingCampaign(null);
     if (data) setCampaigns(prev => prev.map(c => c.id === editingCampaign.id ? mapCampaign(data) : c));
   };
 
   const confirmarExclusao = async () => {
     if (confirmDeleteId === null) return;
-    await supabase.from("campanhas").delete().eq("id", confirmDeleteId);
+    const { error } = await supabase.from("campanhas").delete().eq("id", confirmDeleteId);
+    if (error) { console.error("[Campanhas] Erro ao excluir:", error); alert(`Erro ao excluir: ${error.message}`); return; }
     setCampaigns((prev) => prev.filter((c) => c.id !== confirmDeleteId));
     setConfirmDeleteId(null);
   };
