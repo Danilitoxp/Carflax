@@ -29,8 +29,8 @@ export function SugestaoModal({ isOpen, onClose }: SugestaoModalProps) {
     if (!suggestion.trim()) return;
     setSending(true);
     const { error } = await supabase.from("sugestoes").insert({
-      categoria: category,
-      mensagem: suggestion.trim(),
+      category,
+      suggestion: suggestion.trim(),
     });
     setSending(false);
     if (error) { console.error("[Sugestão] Erro ao enviar:", error); return; }
