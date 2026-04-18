@@ -66,6 +66,25 @@ export function UsersView() {
 
   const companies = ["Carflax", "Zelex", "JCM"];
 
+  const applyDateMask = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
+
+  const maskedToISO = (masked: string) => {
+    const digits = masked.replace(/\D/g, "");
+    if (digits.length !== 8) return null;
+    return `${digits.slice(4)}-${digits.slice(2, 4)}-${digits.slice(0, 2)}`;
+  };
+
+  const isoToMasked = (iso: string) => {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    return y && m && d ? `${d}/${m}/${y}` : iso;
+  };
+
   const getAvatarSrc = (avatar: string, name: string) =>
     avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
 
@@ -156,8 +175,8 @@ export function UsersView() {
       avatar: user.avatar,
       permissions: user.permissions || [],
       operatorCode: user.operatorCode || "",
-      birthDate: (user as any).birthDate || "",
-      admissionDate: (user as any).admissionDate || "",
+      birthDate: isoToMasked((user as any).birthDate || ""),
+      admissionDate: isoToMasked((user as any).admissionDate || ""),
     });
     setAvatarLoading(false);
     setSaving(false);
@@ -193,8 +212,8 @@ export function UsersView() {
       avatar: finalAvatar,
       permissions: newUser.permissions,
       operator_code: (newUser as any).operatorCode || null,
-      birth_date: (newUser as any).birthDate || null,
-      admission_date: (newUser as any).admissionDate || null,
+      birth_date: maskedToISO((newUser as any).birthDate || "") || null,
+      admission_date: maskedToISO((newUser as any).admissionDate || "") || null,
     };
 
     console.log("[Users] Salvando payload:", payload);
@@ -500,12 +519,12 @@ export function UsersView() {
 
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data de Nascimento</label>
-                  <input type="date" value={(newUser as any).birthDate} onChange={(e) => setNewUser({ ...newUser, birthDate: e.target.value } as any)} className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all" />
+                  <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={(newUser as any).birthDate} onChange={(e) => setNewUser({ ...newUser, birthDate: applyDateMask(e.target.value) } as any)} className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all" />
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data de Admissão</label>
-                  <input type="date" value={(newUser as any).admissionDate} onChange={(e) => setNewUser({ ...newUser, admissionDate: e.target.value } as any)} className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all" />
+                  <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={(newUser as any).admissionDate} onChange={(e) => setNewUser({ ...newUser, admissionDate: applyDateMask(e.target.value) } as any)} className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all" />
                 </div>
               </div>
 
