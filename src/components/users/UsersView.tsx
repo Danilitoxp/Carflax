@@ -234,13 +234,13 @@ export function UsersView() {
       } else {
         const { error } = await supabase.from("usuarios").insert({ ...payload, status: "ativo" });
         if (error) { console.error("[Users] Erro ao criar:", error); return; }
-        setUsers(prev => [...prev, {
-          id: crypto.randomUUID(),
-          name: payload.name, email: payload.email, role: payload.role as User["role"],
-          status: "ativo", avatar: finalAvatar, lastLogin: "Recém criado",
-          permissions: payload.permissions, operatorCode: payload.operator_code || "",
-          company: payload.company as User["company"], department: payload.department,
-        }]);
+        const { data: all } = await supabase.from("usuarios").select("*").order("name");
+        if (all) setUsers(all.map(u => ({
+          id: u.id, name: u.name, email: u.email, role: u.role,
+          status: u.status, avatar: u.avatar || "", lastLogin: u.last_login ? new Date(u.last_login).toLocaleString("pt-BR") : "Nunca",
+          permissions: u.permissions || [], operatorCode: u.operator_code || "",
+          company: u.company, department: u.department,
+        })));
       }
       setIsAddModalOpen(false);
       setEditingUser(null);
