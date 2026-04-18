@@ -217,7 +217,7 @@ export function CampanhasView() {
   const salvarNovaCampanha = async () => {
     if (!formData.name.trim()) return;
     setSavingCampaign(true);
-    const { data, error } = await supabase.from("campanhas").insert({
+    const { error } = await supabase.from("campanhas").insert({
       name: formData.name.trim(),
       fornecedor: formData.fornecedor || null,
       date: formData.data_ini || null,
@@ -225,11 +225,13 @@ export function CampanhasView() {
       logo: formData.logo || null,
       type: "highlight",
       status: "ativa",
-    }).select().single();
+    });
     setSavingCampaign(false);
     if (error) { console.error("[Campanhas] Erro ao criar:", error); alert(`Erro ao criar campanha: ${error.message}`); return; }
     setIsNewCampaignModalOpen(false);
-    if (data) setCampaigns(prev => [mapCampaign(data), ...prev]);
+    // Recarrega lista para pegar o id gerado
+    const { data: lista } = await supabase.from("campanhas").select("*");
+    if (lista) setCampaigns(lista.map(mapCampaign));
   };
 
   const abrirEdicao = (camp: Campaign, e: React.MouseEvent) => {
@@ -243,17 +245,26 @@ export function CampanhasView() {
   const salvarEdicao = async () => {
     if (!editingCampaign || !formData.name.trim()) return;
     setSavingCampaign(true);
-    const { data, error } = await supabase.from("campanhas").update({
+    const { error } = await supabase.from("campanhas").update({
       name: formData.name.trim(),
       fornecedor: formData.fornecedor || null,
       date: formData.data_ini || null,
       periodo_fim: formData.data_fim || null,
       logo: formData.logo || null,
-    }).eq("id", editingCampaign.id).select().single();
+    }).eq("id", editingCampaign.id);
     setSavingCampaign(false);
     if (error) { console.error("[Campanhas] Erro ao editar:", error); alert(`Erro ao salvar: ${error.message}`); return; }
+    // Atualiza localmente com os dados do formData
+    const updated = mapCampaign({
+      id: editingCampaign.id,
+      name: formData.name.trim(),
+      fornecedor: formData.fornecedor || null,
+      date: formData.data_ini || null,
+      periodo_fim: formData.data_fim || null,
+      logo: formData.logo || editingCampaign.logo || null,
+    });
+    setCampaigns(prev => prev.map(c => c.id === editingCampaign.id ? updated : c));
     setEditingCampaign(null);
-    if (data) setCampaigns(prev => prev.map(c => c.id === editingCampaign.id ? mapCampaign(data) : c));
   };
 
   const confirmarExclusao = async () => {
