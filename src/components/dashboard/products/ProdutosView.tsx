@@ -15,6 +15,7 @@ interface Product {
   debit: number;
   credit: number;
   brand: string;
+  location: string;
 }
 
 export function ProdutosView() {
@@ -27,22 +28,19 @@ export function ProdutosView() {
   useEffect(() => {
     async function fetchProducts() {
       try {
-        const response = await fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/produtos");
+        const response = await fetch("https://marketing-banco-de-dados.velbav.easypanel.host/api/produtos");
         const json = await response.json();
         
         if (json.success && json.data) {
           const mapped = json.data.map((p: any) => {
-            const words = p.PRODUTO.split(' ');
-            const brandCandidate = words[words.length - 1];
-            const cleanBrand = brandCandidate.replace(/[()]/g, '');
-
             return {
-              cod: p.COD_PRODUTO,
-              desc: p.PRODUTO,
-              stock: parseFloat(p.SALDO) || 0,
-              debit: parseFloat(p.PRECO_VENDA) || 0,
-              credit: (parseFloat(p.PRECO_VENDA) || 0) * 1.0465,
-              brand: cleanBrand || "OUTROS"
+              cod: p.ITE_CODITE,
+              desc: p.ITE_DESITE,
+              stock: parseFloat(p.TOTAL_DISPONIVEL) || 0,
+              debit: parseFloat(p.PRECO_VENDA || 0) || 0,
+              credit: (parseFloat(p.PRECO_VENDA || 0) || 0) * 1.0465,
+              brand: p.MARCA || "OUTROS",
+              location: p.ITE_LOCFIS || "---"
             };
           });
           setProducts(mapped);
