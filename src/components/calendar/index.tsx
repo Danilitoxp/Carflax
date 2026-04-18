@@ -6,7 +6,8 @@ import {
   Gift,
   Star,
   GraduationCap,
-  Plus
+  Plus,
+  Flag
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EventModal } from "./EventModal";
@@ -19,7 +20,7 @@ interface CalendarEvent {
   id: number;
   day: number;
   title: string;
-  type: "birthday" | "star" | "education" | "video";
+  type: "birthday" | "star" | "education" | "video" | "holiday";
   description?: string;
   month?: number;
   year?: number;
@@ -41,7 +42,7 @@ interface CalendarSectionProps {
 export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [viewMode, setViewMode] = useState<"events" | "vacations">(activeTab === "Férias" ? "vacations" : "events");
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)); // Abril 2026
-  const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video"]);
+  const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video", "holiday"]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
 
   const [vacations, setVacations] = useState<Vacation[]>([]);
@@ -52,7 +53,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
       const { data: evData } = await supabase
         .from("eventos_calendario")
         .select("*");
-      
+
       const manualEvents = (evData || []).map((e, i) => ({
         id: i + 1,
         day: e.day,
@@ -102,7 +103,30 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
           };
         }).filter(Boolean) as CalendarEvent[];
 
-      setEvents([...manualEvents, ...birthdayEvents, ...admissionEvents]);
+      // 3. Buscar Feriados Nacionais (Brasil API)
+      let holidayEvents: CalendarEvent[] = [];
+      try {
+        const hResp = await fetch(`https://brasilapi.com.br/api/feriados/v1/${currentDate.getFullYear()}`);
+        if (hResp.ok) {
+          const holidays = await hResp.json();
+          holidayEvents = holidays.map((h: any, i: number) => {
+            const [y, m, d] = h.date.split("-");
+            return {
+              id: 3000 + i,
+              day: parseInt(d),
+              month: parseInt(m) - 1,
+              year: parseInt(y),
+              title: h.name.toUpperCase(),
+              type: "holiday" as const,
+              description: "Feriado Nacional",
+            };
+          });
+        }
+      } catch (e) {
+        console.error("[Calendar] Erro feriados:", e);
+      }
+
+      setEvents([...manualEvents, ...birthdayEvents, ...admissionEvents, ...holidayEvents]);
     }
     fetchAllData();
   }, [currentDate.getFullYear()]);
@@ -114,7 +138,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [newEvent, setNewEvent] = useState<{
     title: string;
     description: string;
-    type: "birthday" | "star" | "education" | "video";
+    type: "birthday" | "star" | "education" | "video" | "holiday";
   }>({
     title: "",
     description: "",
@@ -152,7 +176,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const toggleFilter = (filter: string) => {
     setActiveFilters(prev => {
       if (prev.length === 1 && prev.includes(filter)) {
-        return ["birthday", "star", "education", "video"];
+        return ["birthday", "star", "education", "video", "holiday"];
       }
       return [filter];
     });
@@ -253,12 +277,13 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
 
             {viewMode === "events" && (
               <div className="flex items-center gap-1">
-                {[
+                {([
+                  { id: "holiday", icon: Flag, label: "Feriados", color: "slate" },
                   { id: "birthday", icon: Gift, label: "Aniversários", color: "rose" },
                   { id: "star", icon: Star, label: "Destaques", color: "amber" },
                   { id: "education", icon: GraduationCap, label: "Treinamentos", color: "indigo" },
                   { id: "video", icon: Plus, label: "Outros", color: "blue" },
-                ].map(f => (
+                ] as const).map(f => (
                   <button
                     key={f.id}
                     onClick={() => toggleFilter(f.id)}
@@ -339,7 +364,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
                     onClick={() => handleDayClick(day)}
                     className={cn(
                       "relative group transition-all duration-300 cursor-pointer flex flex-col p-3",
-                      day ? "bg-white" : "bg-transparent",
+                      day ? (isToday ? "bg-blue-300 shadow-lg shadow-blue-500/20 z-10" : "bg-white") : "bg-transparent",
                       day && !isLastCol && "border-r border-slate-100",
                       day && !isLastRow && "border-b border-slate-100",
                       day && (isFirstCol || neighborLeftHasNoDay) && "border-l border-slate-100",
@@ -352,13 +377,13 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
                         <div className="flex justify-between items-start mb-2 relative z-20">
                           <span className={cn(
                             "text-sm font-black transition-all leading-none",
-                            isToday ? "text-blue-600" : "text-slate-300 group-hover:text-slate-500"
+                            isToday ? "text-white" : "text-slate-300 group-hover:text-slate-500"
                           )}>
                             {day}
                           </span>
                           {isToday && (
                             <div className="flex flex-col items-center">
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)]" />
+                              <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
                             </div>
                           )}
                         </div>

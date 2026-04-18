@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
-import { Gift, Star, GraduationCap, Plus } from "lucide-react";
+import { Gift, Star, GraduationCap, Plus, Flag } from "lucide-react";
 
 interface CalendarEvent {
   id: number;
   day: number;
   title: string;
-  type: "birthday" | "star" | "education" | "video";
+  type: "birthday" | "star" | "education" | "video" | "holiday";
   month?: number;
   year?: number;
 }
@@ -33,6 +33,7 @@ export function EventsView({ day, month, year, events, activeFilters, onEventCli
     switch (type) {
       case "birthday": return "bg-rose-50 text-rose-600 border-rose-100/50 hover:bg-rose-100";
       case "star": return "bg-amber-50 text-amber-600 border-amber-100/50 hover:bg-amber-100";
+      case "holiday": return "bg-slate-100 text-slate-700 border-slate-200/60 hover:bg-slate-200/50 shadow-sm";
       case "education": return "bg-indigo-50 text-indigo-600 border-indigo-100/50 hover:bg-indigo-100";
       case "video": return "bg-blue-50 text-blue-600 border-blue-100/50 hover:bg-blue-100";
       default: return "bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100";
@@ -43,6 +44,7 @@ export function EventsView({ day, month, year, events, activeFilters, onEventCli
     switch (type) {
       case "birthday": return <Gift className="w-3 h-3" />;
       case "star": return <Star className="w-2.5 h-2.5" />;
+      case "holiday": return <Flag className="w-2.5 h-2.5 fill-slate-400/20" />;
       case "education": return <GraduationCap className="w-3 h-3" />;
       case "video": return <Plus className="w-3 h-3" />;
       default: return null;

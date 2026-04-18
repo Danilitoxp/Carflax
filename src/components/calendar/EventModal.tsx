@@ -11,7 +11,7 @@ interface EventModalProps {
   newEvent: {
     title: string;
     description: string;
-    type: "birthday" | "star" | "education" | "video";
+    type: "birthday" | "star" | "education" | "video" | "holiday";
   };
   setNewEvent: (event: EventModalProps["newEvent"]) => void;
 }
@@ -89,7 +89,8 @@ export function EventModal({
                             { value: "video", label: "📹 Gravar Vídeo" },
                             { value: "birthday", label: "🎂 Aniversário" },
                             { value: "star", label: "⭐ Destaque Especial" },
-                            { value: "education", label: "🎓 Treinamento Técnico" }
+                            { value: "education", label: "🎓 Treinamento Técnico" },
+                            { value: "holiday", label: "🚩 Feriado Nacional/Local" }
                         ]}
                         onChange={(val) => setNewEvent({...newEvent, type: val as any})}
                         icon={Tag}
