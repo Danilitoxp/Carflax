@@ -17,8 +17,81 @@ import {
   MessageSquare,
   Briefcase,
   ShieldAlert,
-  Palette
+  Palette,
+  Image as ImageIcon,
+  Sparkles,
+  Plus
 } from "lucide-react";
+
+/* ─────────────────────────────────────────────
+   BANNERS
+   Gestão de imagens de topo e avisos
+   ───────────────────────────────────────────── */
+function BannersTab() {
+  const [transitionEnabled, setTransitionEnabled] = useState(true);
+  const [banners] = useState([
+    { id: 1, title: "Banner Promoção Abril", url: "https://images.unsplash.com/photo-1549416805-0e6d62635928?q=80&w=1200", dims: "1800 x 600px" },
+    { id: 2, title: "Aviso Nova Filial", url: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=1200", dims: "1800 x 600px" },
+  ]);
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 pb-6 border-b border-slate-50">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
+              <ImageIcon className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none mb-2">Banners da Home</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Altere as imagens e efeitos de transição</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-2">
+              <Sparkles className={cn("w-4 h-4", transitionEnabled ? "text-blue-600" : "text-slate-300")} />
+              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest leading-none">Efeito Transição</span>
+            </div>
+            <Toggle checked={transitionEnabled} onChange={setTransitionEnabled} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {banners.map((b) => (
+            <div key={b.id} className="group relative bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden hover:border-blue-300 transition-all duration-300">
+              <div className="aspect-[3/1] bg-slate-200 relative overflow-hidden">
+                <img src={b.url} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Button className="bg-white text-slate-900 hover:bg-slate-100 h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest">
+                    SUBSTITUIR IMAGEM
+                  </Button>
+                </div>
+              </div>
+              <div className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">{b.title}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Dimensões: {b.dims}</p>
+                </div>
+                <Button className="w-8 h-8 rounded-lg bg-white border border-slate-200 p-0 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all">
+                  <ImageIcon className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+
+          {/* ADD NEW CARD */}
+          <button className="aspect-[3/1] md:aspect-auto flex flex-col items-center justify-center gap-3 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-300 transition-all group">
+            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-slate-200 shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all">
+              <Plus className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
+            </div>
+            <span className="text-[10px] font-black text-slate-400 group-hover:text-blue-600 uppercase tracking-widest">Adicionar Banner</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/context/theme-provider";
@@ -562,6 +635,7 @@ export function SettingsSection({ externalTab }: SettingsSectionProps) {
         "Notificações": "notifications",
         "Segurança": "security",
         "Aparência": "appearance",
+        "Banners": "banners",
         "Configurações": "profile",
       };
       if (tabMap[externalTab]) {
@@ -579,6 +653,7 @@ export function SettingsSection({ externalTab }: SettingsSectionProps) {
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "security" && <SecurityTab />}
           {activeTab === "appearance" && <AppearanceTab />}
+          {activeTab === "banners" && <BannersTab />}
         </div>
       </div>
     </div>

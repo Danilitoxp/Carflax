@@ -23,6 +23,7 @@ import {
   Plane,
   FileText,
   CheckCircle2,
+  Image,
   type LucideIcon,
 } from "lucide-react";
 import organogramaIcon from "@/assets/organograma.svg";
@@ -90,6 +91,7 @@ const settingsItems: MenuItem[] = [
       { label: "Notificações", icon: Bell },
       { label: "Segurança", icon: ShieldCheck },
       { label: "Aparência", icon: Palette },
+      { label: "Banners", icon: Image },
     ]
   },
 ];

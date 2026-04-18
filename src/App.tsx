@@ -34,7 +34,7 @@ function DashboardContent({ userProfile, onLogout }: { userProfile: any, onLogou
   };
 
   const isDashboardView = ["Geral", "Performance", "Campanhas", "Dashboard", "Orçamentos"].includes(activeItem);
-  const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(activeItem);
+  const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência", "Banners"].includes(activeItem);
   const isCrmView = ["Orçamentos", "CRM", "Produtos", "Campanhas"].includes(activeItem);
   const showRightPanel = activeItem === "Geral"; // Mostrar apenas no dashboard principal
 

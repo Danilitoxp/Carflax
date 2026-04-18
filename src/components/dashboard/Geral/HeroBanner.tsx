@@ -1,18 +1,36 @@
-import { Info } from "lucide-react";
+import { Target, Zap, BarChart3, CheckCircle2, Clock, Rocket, Cpu, Globe, ShieldCheck, TrendingUp, Layers, MousePointer2 } from "lucide-react";
 
 export function HeroBanner() {
   return (
     <div className="relative overflow-hidden rounded-xl w-full bg-white border border-border shadow-sm p-8 flex flex-col md:flex-row items-center gap-8 group">
-      <div className="flex-1 space-y-3 text-center md:text-left">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100 mb-2">
-          <Info className="w-3.5 h-3.5" />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Informativo Carflax</span>
-        </div>
+      {/* Decorative Icons Background - Better Distribution */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Top Edge */}
+        <Target className="absolute top-4 left-[10%] w-12 h-12 text-blue-600/5 -rotate-12" />
+        <Rocket className="absolute top-6 right-[10%] w-9 h-9 text-blue-500/5 rotate-45" />
+        <Globe className="absolute top-20 right-[35%] w-12 h-12 text-blue-400/5 rotate-12" />
+        <MousePointer2 className="absolute top-10 left-[45%] w-8 h-8 text-slate-400/5 rotate-12" />
+
+        {/* Center/Middle Sides */}
+        <BarChart3 className="absolute top-1/2 left-[5%] w-14 h-14 text-indigo-600/5 -translate-y-1/2 -rotate-6" />
+        <TrendingUp className="absolute top-1/2 right-[5%] w-14 h-14 text-indigo-500/5 -translate-y-1/2 rotate-6" />
+        <Clock className="absolute top-10 right-[45%] w-10 h-10 text-slate-400/5 rotate-12" />
+
+        {/* Bottom Edge */}
+        <Zap className="absolute bottom-6 left-[15%] w-10 h-10 text-amber-500/5 rotate-12" />
+        <Cpu className="absolute bottom-10 right-[20%] w-16 h-16 text-slate-600/5 -rotate-12" />
+        <ShieldCheck className="absolute bottom-20 left-[40%] w-10 h-10 text-emerald-500/5 -rotate-6" />
+        <CheckCircle2 className="absolute bottom-4 right-[40%] w-8 h-8 text-emerald-600/5 rotate-12" />
+        <Layers className="absolute bottom-8 right-[5%] w-12 h-12 text-blue-600/5 -rotate-12" />
+      </div>
+
+      <div className="flex-1 space-y-3 text-center md:text-left relative z-10">
         <h1 className="text-3xl font-bold text-slate-900 tracking-tight leading-tight">
-          Painel de Gestão e <span className="text-blue-600">Comunicação</span>
+          Carflax <span className="text-blue-600">HUB</span>
         </h1>
         <p className="text-sm text-slate-500 max-w-xl leading-relaxed">
-          Acompanhe os principais indicadores da sua equipe em tempo real. Consulte metas, comunicados internos e atividades recentes em uma plataforma unificada e eficiente.
+          Sua produtividade em um só lugar. Tenha acesso ágil a metas e indicadores, comunique-se de forma direta com sua equipe e organize suas tarefas diárias com ferramentas integradas e inteligentes. 
+          Escalabilidade e eficiência para o seu dia a dia.
         </p>
       </div>
       

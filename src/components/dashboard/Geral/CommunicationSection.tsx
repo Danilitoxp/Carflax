@@ -45,14 +45,34 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
         setLikersAvatars([]);
         return;
       }
+      
+      // 1. Pegar os IDs mais recentes
+      const sortedIds = [...data.likedBy].reverse().slice(0, 3);
+      
       const { data: users } = await supabase
         .from('usuarios')
-        .select('avatar, name')
-        .in('id', data.likedBy.slice(0, 3));
+        .select('id, avatar, name')
+        .in('id', sortedIds);
       
+      let finalAvatars: string[] = [];
+
       if (users) {
-        setLikersAvatars(users.map(u => u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`));
+        finalAvatars = sortedIds
+          .map(id => users.find(u => String(u.id) === String(id)))
+          .filter(Boolean)
+          .map(u => u!.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u!.name}`);
       }
+
+      // 2. SEGURANÇA: Se eu curti e minha foto não apareceu na query por algum motivo (delay/cache)
+      // eu forço ela na primeira posição se eu estiver na lista de likes
+      if (currentUserId && data.likedBy.includes(currentUserId)) {
+        const alreadyIn = finalAvatars.includes(userAvatar);
+        if (!alreadyIn) {
+          finalAvatars = [userAvatar, ...finalAvatars].slice(0, 3);
+        }
+      }
+          
+      setLikersAvatars(finalAvatars);
     };
     fetchAvatars();
   }, [data.likedBy]);
@@ -63,20 +83,46 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
     const isLiking = interaction !== "like";
     const newLikesCount = isLiking ? likes + 1 : Math.max(0, likes - 1);
     
-    // UI OTIMISTA: Atualização Instantânea
+    // UI OTIMISTA: Atualização Instantânea na Tela
     setLikes(newLikesCount);
     setInteraction(isLiking ? "like" : null);
 
     if (isLiking) {
       setLikersAvatars(prev => [userAvatar, ...prev.filter(a => a !== userAvatar)].slice(0, 3));
-      await supabase.rpc('append_liked_by', { post_id: data.dbId, user_id: currentUserId });
     } else {
       setLikersAvatars(prev => prev.filter(a => a !== userAvatar));
-      await supabase.rpc('remove_liked_by', { post_id: data.dbId, user_id: currentUserId });
     }
-    
-    // Atualiza o contador absoluto no banco
-    await supabase.from("comunicados").update({ likes: newLikesCount }).eq("id", data.dbId);
+
+    // Processamento em Background no Supabase
+    try {
+      // 1. Buscar estado atual para sincronização de array
+      const { data: currentPost } = await supabase
+        .from("comunicados")
+        .select("liked_by")
+        .eq("id", data.dbId)
+        .single();
+
+      let newLikedBy = currentPost?.liked_by || [];
+      
+      if (isLiking) {
+        if (!newLikedBy.includes(currentUserId)) {
+          newLikedBy.push(currentUserId);
+        }
+      } else {
+        newLikedBy = newLikedBy.filter(id => id !== currentUserId);
+      }
+      
+      // 2. Persistir no banco
+      await supabase
+        .from("comunicados")
+        .update({ 
+          likes: newLikesCount, 
+          liked_by: newLikedBy 
+        })
+        .eq("id", data.dbId);
+    } catch (error) {
+      console.error("Erro ao sincronizar curtida:", error);
+    }
   };
 
   const handleShare = () => {
