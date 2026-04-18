@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   User,
-  ShieldCheck,
   Smartphone,
   Mail,
   Camera,
@@ -14,7 +13,6 @@ import {
   Monitor,
   Sun,
   Moon,
-  LogOut,
   Check,
   MessageSquare,
   Briefcase,
@@ -72,8 +70,8 @@ function SettingsInput({
   placeholder?: string;
 }) {
   return (
-    <div className="space-y-2">
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
+    <div className="space-y-1.5 px-0.5">
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 opacity-80">{label}</label>
       <div className="relative group">
         <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
         <input
@@ -81,7 +79,7 @@ function SettingsInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all placeholder:text-slate-300 shadow-sm"
+          className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all placeholder:text-slate-300 shadow-sm"
         />
       </div>
     </div>
@@ -159,6 +157,10 @@ function getStrength(pw: string): number {
 /* ─────────────────────────────────────────────
    MEU PERFIL
 ───────────────────────────────────────────── */
+/* ─────────────────────────────────────────────
+   MEU PERFIL - REDESIGN ESTRUTURADO
+   Foco em cards, hierarquia e organização
+───────────────────────────────────────────── */
 function ProfileTab() {
   const [form, setForm] = useState({
     nome: "Danilo Oliveira",
@@ -174,71 +176,126 @@ function ProfileTab() {
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-500 max-w-4xl">
-      {/* Profile Header - More Minimalist */}
-      <div className="flex flex-col sm:flex-row items-center gap-8 pb-8 border-b border-slate-100">
-        <div className="relative group shrink-0">
-          <div className="w-24 h-24 rounded-2xl border-2 border-slate-100 shadow-sm overflow-hidden relative bg-white transition-transform group-hover:scale-105">
-            <img
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo&backgroundColor=0053FC"
-              className="w-full h-full object-cover"
-              alt="Avatar"
+    <div className="max-w-[1000px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* SEÇÃO 1: PERFIL (HEADER) */}
+      <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 md:p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
+        <div className="flex flex-col md:flex-row items-center gap-8">
+          {/* Avatar e Ação de Foto */}
+          <div className="relative group shrink-0">
+            <div className="w-28 h-28 rounded-2xl border-2 border-slate-100 shadow-sm overflow-hidden bg-slate-50 flex items-center justify-center transition-all group-hover:shadow-md">
+              <img
+                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo&backgroundColor=0053FC"
+                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                alt="Avatar"
+              />
+            </div>
+            {/* Badge de Verificado */}
+            <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-1.5 rounded-lg shadow-lg border-2 border-white">
+              <CheckCircle2 className="w-4 h-4" strokeWidth={3} />
+            </div>
+          </div>
+
+          <div className="flex-1 text-center md:text-left space-y-3">
+            <div className="space-y-1">
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">
+                {form.nome}
+              </h3>
+              <div className="flex flex-wrap gap-2 justify-center md:justify-start items-center">
+                <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md uppercase tracking-wider">
+                  {form.cargo}
+                </span>
+                <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  SÃO PAULO - MATRIZ
+                </span>
+              </div>
+            </div>
+            <p className="text-xs font-medium text-slate-500 leading-relaxed max-w-xl">
+              Identificador interno verificado. Seu acesso de Administrador permite gerenciar todos os módulos do sistema Carflax com total autonomia.
+            </p>
+            
+            <div className="flex justify-center md:justify-start pt-1">
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 cursor-pointer hover:bg-slate-100 transition-all shadow-sm active:scale-95">
+                <Camera className="w-3.5 h-3.5" />
+                ALTERAR FOTO
+                <input type="file" className="hidden" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SEÇÃO 2: DADOS PESSOAIS */}
+      <div className="bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col">
+        {/* Card Header com Título */}
+        <div className="px-6 py-5 border-b border-slate-50 bg-slate-50/30 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
+            <User className="w-4 h-4" />
+          </div>
+          <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Informações pessoais</h4>
+        </div>
+
+        {/* Card Content (Grid de Inputs) */}
+        <div className="p-6 md:p-8 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+            <SettingsInput 
+              label="NOME COMPLETO" 
+              value={form.nome} 
+              onChange={(v) => setForm({ ...form, nome: v })} 
+              icon={User} 
             />
-            <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer backdrop-blur-[2px]">
-              <Camera className="text-white w-6 h-6" />
-              <input type="file" className="hidden" />
-            </label>
+            <SettingsInput 
+              label="E-MAIL CORPORATIVO" 
+              value={form.email} 
+              onChange={(v) => setForm({ ...form, email: v })} 
+              icon={Mail} 
+              type="email" 
+            />
+            <SettingsInput 
+              label="WHATSAPP / CELULAR" 
+              value={form.telefone} 
+              onChange={(v) => setForm({ ...form, telefone: v })} 
+              icon={Smartphone} 
+              type="tel" 
+            />
+            <SettingsInput 
+              label="CARGO / FUNÇÃO" 
+              value={form.cargo} 
+              onChange={(v) => setForm({ ...form, cargo: v })} 
+              icon={Briefcase} 
+            />
           </div>
-          <div className="absolute -bottom-1.5 -right-1.5 bg-blue-600 text-white p-1 rounded-md shadow-md">
-            <CheckCircle2 className="w-3 h-3" strokeWidth={3} />
+
+          {/* Action Footer dentro do card */}
+          <div className="pt-8 border-t border-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-[10px] font-bold text-slate-400 max-w-[300px] text-center md:text-left">
+              Mantenha seus dados atualizados para facilitar a comunicação interna.
+            </p>
+            <Button
+              onClick={handleSave}
+              className={cn(
+                "h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-95 w-full md:w-auto",
+                isSaved
+                  ? "bg-emerald-600 text-white shadow-emerald-500/20"
+                  : "bg-[#2563EB] hover:bg-blue-700 text-white shadow-blue-600/20"
+              )}
+            >
+              {isSaved ? (
+                <span className="flex items-center gap-2">
+                  <Check className="w-4 h-4" /> 
+                  ALTERAÇÕES SALVAS
+                </span>
+              ) : (
+                "SALVAR ALTERAÇÕES"
+              )}
+            </Button>
           </div>
         </div>
-
-        <div className="text-center sm:text-left space-y-1.5">
-          <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none group-hover:text-blue-600 transition-colors uppercase">{form.nome}</h3>
-          <div className="flex flex-wrap gap-2 justify-center sm:justify-start items-center">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">{form.cargo}</span>
-            <div className="w-1 h-1 rounded-full bg-slate-200" />
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">SÃO PAULO - MATRIZ</span>
-          </div>
-          <p className="text-[11px] font-medium text-slate-400 leading-tight max-w-md">
-            Identificador interno verificado. Seu acesso de Administrador permite gerenciar todos os módulos do sistema Carflax.
-          </p>
-        </div>
-      </div>
-
-      {/* Form Fields - High Density */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-        <SettingsInput label="NOME COMPLETO" value={form.nome} onChange={(v) => setForm({ ...form, nome: v })} icon={User} />
-        <SettingsInput label="E-MAIL CORPORATIVO" value={form.email} onChange={(v) => setForm({ ...form, email: v })} icon={Mail} type="email" />
-        <SettingsInput label="WHATSAPP / CELULAR" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} icon={Smartphone} type="tel" />
-        <SettingsInput label="CARGO / FUNÇÃO" value={form.cargo} onChange={(v) => setForm({ ...form, cargo: v })} icon={Briefcase} />
-      </div>
-
-      {/* Action Footer */}
-      <div className="pt-10 flex items-center justify-end">
-        <Button
-          onClick={handleSave}
-          className={cn(
-            "h-12 px-12 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] transition-all shadow-xl active:scale-95",
-            isSaved
-              ? "bg-emerald-600 text-white shadow-emerald-500/20"
-              : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/30"
-          )}
-        >
-          {isSaved ? (
-            <span className="flex items-center gap-2">
-              <Check className="w-4 h-4" /> 
-              DADOS ATUALIZADOS
-            </span>
-          ) : (
-            "SALVAR ALTERAÇÕES"
-          )}
-        </Button>
       </div>
     </div>
   );
 }
+
 
 /* ─────────────────────────────────────────────
    NOTIFICAÇÕES
@@ -333,16 +390,10 @@ function buildDefault(): StateMap {
 /* ─────────────────────────────────────────────
    SEGURANÇA
 ───────────────────────────────────────────── */
-const sessions = [
-  { id: 1, device: "Chrome — Windows 11", icon: Monitor, location: "São Paulo, BR", time: "Agora", current: true },
-  { id: 2, device: "Safari — iPhone 14", icon: Smartphone, location: "São Paulo, BR", time: "há 2 horas", current: false },
-];
 
 function SecurityTab() {
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
-  const [twoFactor, setTwoFactor] = useState(true);
   const [saved, setSaved] = useState(false);
-  const [revokedSessions, setRevokedSessions] = useState<number[]>([]);
 
   const strength = getStrength(pw.next);
   const match = pw.next === pw.confirm && pw.next.length > 0;
@@ -355,21 +406,23 @@ function SecurityTab() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Pass Change Card */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm flex flex-col h-full">
-          <div className="flex items-center gap-4 mb-8">
+    <div className="max-w-[1000px] mx-auto animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+        {/* Pass Change Card - Centralizado/Destaque */}
+        <div className="md:col-start-3 md:col-span-8 bg-white border border-[#E5E7EB] rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col">
+          <div className="flex items-center gap-4 mb-8 pb-4 border-b border-slate-50">
             <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
               <Lock className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight">Alterar Senha</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Sua segurança vem primeiro</p>
+              <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight">Segurança da Conta</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gerencie seu acesso e senha</p>
             </div>
           </div>
 
-          <div className="space-y-5 flex-1">
+          <div className="space-y-6 flex-1">
+            <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Alterar Senha de Acesso</h5>
+            
             <PasswordField label="Senha Atual" value={pw.current} onChange={(v) => setPw({ ...pw, current: v })} placeholder="••••••••" />
             <PasswordField label="Nova Senha" value={pw.next} onChange={(v) => setPw({ ...pw, next: v })} placeholder="Mínimo 8 caracteres" strength={strength} />
             <PasswordField label="Confirmar Nova Senha" value={pw.confirm} onChange={(v) => setPw({ ...pw, confirm: v })} placeholder="Repita a nova senha" />
@@ -382,93 +435,36 @@ function SecurityTab() {
             )}
           </div>
 
-          <div className="mt-8">
+          <div className="mt-10 pt-6 border-t border-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-[10px] font-bold text-slate-400 max-w-[300px] text-center md:text-left leading-relaxed">
+              Recomendamos o uso de senhas fortes com números e símbolos.
+            </p>
             <Button
               onClick={handleSave}
               disabled={!pw.current || !pw.next || !match}
               className={cn(
-                "w-full h-12 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95",
+                "h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-95 w-full md:w-auto",
                 saved
-                  ? "bg-emerald-600 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-30 disabled:shadow-none"
+                  ? "bg-emerald-600 text-white shadow-emerald-500/20"
+                  : "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-30 disabled:shadow-none shadow-blue-600/20"
               )}
             >
-              {saved ? <span className="flex items-center gap-2"><Check className="w-4 h-4" /> Senha Atualizada</span> : "Atualizar Senha"}
+              {saved ? (
+                <span className="flex items-center gap-2">
+                  <Check className="w-4 h-4" /> 
+                  SENHA ATUALIZADA
+                </span>
+              ) : (
+                "ATUALIZAR SENHA"
+              )}
             </Button>
-          </div>
-        </div>
-
-        {/* 2FA & Sessions Section */}
-        <div className="space-y-6">
-          {/* 2FA Card */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-colors">
-            <div className="flex items-center gap-5">
-              <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100">
-                <ShieldCheck className="w-6 h-6 text-emerald-600" />
-              </div>
-              <div>
-                <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-tight">Login em 2 Etapas</h4>
-                <p className="text-[10px] font-bold text-slate-400 uppercase leading-none mt-1">Proteção via Aplicativo</p>
-              </div>
-            </div>
-            <Toggle checked={twoFactor} onChange={setTwoFactor} />
-          </div>
-
-          {/* Active Sessions List */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100">
-                  <Monitor className="w-5 h-5 text-slate-400" />
-                </div>
-                <div>
-                  <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-tight">Sessões Ativas</h4>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">Dispositivos logados</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {sessions.map((s) => {
-                const Icon = s.icon;
-                const revoked = revokedSessions.includes(s.id);
-                return (
-                  <div key={s.id} className={cn(
-                    "flex items-center justify-between p-4 rounded-xl border transition-all",
-                    revoked ? "bg-slate-50 opacity-50 border-transparent" : "bg-white border-slate-100 hover:border-slate-200"
-                  )}>
-                    <div className="flex items-center gap-4">
-                      <div className="w-9 h-9 bg-slate-50 rounded-lg flex items-center justify-center shrink-0">
-                        <Icon className="w-4 h-4 text-slate-400" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">{s.device}</p>
-                          {s.current && (
-                            <span className="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md uppercase tracking-widest border border-blue-100">Atual</span>
-                          )}
-                        </div>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{s.location} · {s.time}</p>
-                      </div>
-                    </div>
-                    {!s.current && !revoked && (
-                      <button
-                        onClick={() => setRevokedSessions([...revokedSessions, s.id])}
-                        className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                      >
-                        <LogOut className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 
 /* ─────────────────────────────────────────────
    APARÊNCIA

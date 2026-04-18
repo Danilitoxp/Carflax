@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { 
-  Mail, 
-  Lock, 
-  Eye, 
-  EyeOff, 
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
   ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,30 +27,30 @@ export function LoginView({ onLogin }: LoginViewProps) {
   };
 
   return (
-    <div 
+    <div
       className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 md:p-8 transition-colors duration-500 relative overflow-hidden"
       style={{ backgroundColor: isDark ? '#020617' : '#F8FAFC' }}
     >
       {/* Background Ornaments - Dynamic based on state */}
-      <div 
-        className="absolute inset-0 bg-gradient-to-br from-[#E0E7FF] via-[#F8FAFC] to-[#C7D2FE] transition-opacity duration-500" 
+      <div
+        className="absolute inset-0 bg-gradient-to-br from-[#E0E7FF] via-[#F8FAFC] to-[#C7D2FE] transition-opacity duration-500"
         style={{ opacity: isDark ? 0 : 1 }}
       />
-      <div 
-        className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,_#0F172A_0%,_#020617_100%)] transition-opacity duration-500" 
+      <div
+        className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,_#0F172A_0%,_#020617_100%)] transition-opacity duration-500"
         style={{ opacity: isDark ? 1 : 0 }}
       />
-      
-      
+
+
       {/* Container Card */}
       <div className="relative z-10 w-full max-w-[1000px] h-full max-h-[650px] bg-card border border-border/50 rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.2)] overflow-hidden flex flex-col md:flex-row transition-all duration-500">
-        
+
         {/* Left Side: Branding & Features */}
         <div className="w-full md:w-[45%] bg-[#0053FC] p-8 md:p-12 text-white relative flex flex-col justify-center items-center text-center overflow-hidden md:rounded-r-[8rem] z-10 shrink-0">
           {/* Background Decorative Element */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/10 rounded-full blur-3xl -translate-x-1/2 translate-y-1/2" />
-          
+
           <div className="relative z-10 space-y-6">
             <h1 className="text-4xl md:text-5xl font-black leading-[1.1] tracking-tighter">
               Olá, <br />bem-vindo!
@@ -76,8 +76,8 @@ export function LoginView({ onLogin }: LoginViewProps) {
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">E-mail Corporativo</label>
                 <div className="relative group">
                   <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 transition-colors group-focus-within:text-[#0053FC]" />
-                  <input 
-                    type="email" 
+                  <input
+                    type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ex@carflax.com"
@@ -94,7 +94,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
                 </div>
                 <div className="relative group">
                   <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 transition-colors group-focus-within:text-[#0053FC]" />
-                  <input 
+                  <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -102,7 +102,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
                     className="w-full bg-secondary/50 dark:bg-white/[0.03] border border-border/50 dark:border-white/10 rounded-2xl pl-14 pr-14 py-4 text-sm font-bold outline-none focus:border-[#0053FC]/50 focus:ring-4 focus:ring-[#0053FC]/5 transition-all placeholder:text-muted-foreground/30 text-foreground"
                     required
                   />
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground transition-colors"
@@ -113,7 +113,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
               </div>
 
               <div className="pt-2">
-                <Button 
+                <Button
                   type="submit"
                   className="w-full bg-[#0053FC] hover:bg-[#0042CC] text-white rounded-2xl py-7 font-black text-sm uppercase tracking-[0.2em] transition-all active:scale-[0.98] flex items-center justify-center gap-3 border-none"
                 >
@@ -124,9 +124,9 @@ export function LoginView({ onLogin }: LoginViewProps) {
             </form>
 
             <div className="pt-8 text-center">
-                <p className="text-[11px] font-black text-muted-foreground/40 uppercase tracking-widest">
-                  &copy; {new Date().getFullYear()} Carflax Corporate
-                </p>
+              <p className="text-[11px] font-black text-muted-foreground/40 uppercase tracking-widest">
+                &copy; {new Date().getFullYear()} Carflax Corporate
+              </p>
             </div>
           </div>
         </div>
