@@ -24,7 +24,7 @@ import {
   FileCheck,
   AlertCircle,
 } from "lucide-react";
-import { apiCrm } from "@/lib/api";
+import { apiCrm, apiCrmItens, type CrmItem } from "@/lib/api";
 import {
   getCrmStatusMap,
   upsertCrmStatus,
@@ -44,6 +44,7 @@ export interface Orcamento {
   totalValue: number;
   markupValue: number;
   lossReason?: string;
+  lembreteData?: string;
   empresa?: string;
 }
 
@@ -69,10 +70,10 @@ function parseOrcamentos(raw: unknown[]): Orcamento[] {
       : "";
     const hora = String(r.HORA_ORCAMENTO || r.HORA_ENTRADA || "00:00:00").slice(0, 5);
 
-    // Status padrão: se ERP tem motivo de cancelamento → Perdido, se tem baixa → Venda
+    // Status: MOTIVO_CANCELAMENTO → PERDIDO; PEDIDO ou DATA_BAIXA → VENDA (mesma lógica do sistema antigo)
     let defaultStatus = "EMITIDO";
     if (r.MOTIVO_CANCELAMENTO) defaultStatus = "PERDIDO";
-    else if (r.DATA_BAIXA) defaultStatus = "VENDA";
+    else if (r.PEDIDO || r.DATA_BAIXA) defaultStatus = "VENDA";
 
     return {
       id,
@@ -91,7 +92,13 @@ function parseOrcamentos(raw: unknown[]): Orcamento[] {
   });
 }
 
-export function OrcamentosView() {
+function isGerente(role?: string) {
+  if (!role) return false;
+  const r = role.toLowerCase();
+  return r.includes("gerente") || r.includes("diretor") || r.includes("marketing") || r.includes("admin");
+}
+
+export function OrcamentosView({ userProfile }: { userProfile?: any }) {
   const [orçamentosData, setOrçamentosData] = useState<Orcamento[]>([]);
   const [loading, setLoading] = useState(false);
   const [migrando, setMigrando] = useState(false);
@@ -106,6 +113,8 @@ export function OrcamentosView() {
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [isItemsModalOpen, setIsItemsModalOpen] = useState(false);
+  const [itens, setItens] = useState<CrmItem[]>([]);
+  const [itensLoading, setItensLoading] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusStep, setStatusStep] = useState<"selection" | "enviado" | "negociacao" | "perdido">("selection");
   const [selectedItem, setSelectedItem] = useState<Orcamento | null>(null);
@@ -130,24 +139,32 @@ export function OrcamentosView() {
       if (endDate) params.fim = endDate.toISOString().slice(0, 10);
 
       const raw = (await apiCrm(params)) as unknown[];
-      const orcamentos = parseOrcamentos(raw);
+      let orcamentos = parseOrcamentos(raw);
 
-      // Overlay with Supabase CRM status (documento stored with -OR suffix)
+      // Vendedor só vê seus próprios orçamentos
+      if (userProfile && !isGerente(userProfile.role)) {
+        const nomeUser = (userProfile.name || "").toUpperCase();
+        const palavras = nomeUser.split(" ").filter((p: string) => p.length > 2);
+        orcamentos = orcamentos.filter((o) => {
+          const vend = o.seller.toUpperCase();
+          return palavras.some((p: string) => vend.includes(p));
+        });
+      }
+
+      // Overlay with Supabase CRM status
       const docs = orcamentos.map((o) => o.id);
       const statusMap = await getCrmStatusMap(docs);
 
-      console.log("[CRM] total orçamentos:", orcamentos.length);
-      console.log("[CRM] statusMap size:", statusMap.size);
-      console.log("[CRM] sample doc id:", docs[0]);
-      console.log("[CRM] sample map hit:", statusMap.get(docs[0]));
-
       const merged = orcamentos.map((o) => {
+        // ERP hard statuses não podem ser sobrescritos pelo CRM manual
+        if (o.status === "VENDA" || o.status === "PERDIDO") return o;
         const crm = statusMap.get(o.id);
         if (!crm) return o;
         return {
           ...o,
           status: crm.status_crm.toUpperCase(),
           lossReason: crm.motivo_perda ?? o.lossReason,
+          lembreteData: crm.lembrete_data ?? undefined,
         };
       });
 
@@ -625,12 +642,34 @@ export function OrcamentosView() {
                         {item.status === "PERDIDO" && (
                           <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{item.lossReason || "Não Informado"}</span>
                         )}
+                        {(item.status === "ENVIADO" || item.status === "NEGOCIAÇÃO") && item.lembreteData && (() => {
+                          const raw = item.lembreteData!;
+                          const display = /^\d{2}\/\d{2}\/\d{4}$/.test(raw)
+                            ? raw
+                            : /^\d{4}-\d{2}-\d{2}/.test(raw)
+                            ? raw.slice(8, 10) + "/" + raw.slice(5, 7) + "/" + raw.slice(0, 4)
+                            : (() => { const d = new Date(raw); return isNaN(d.getTime()) ? raw : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }); })();
+                          const color = item.status === "NEGOCIAÇÃO" ? "text-amber-400" : "text-blue-400";
+                          return (
+                            <div className={`flex items-center gap-0.5 text-[8px] font-bold ${color}`}>
+                              <Calendar className="w-2.5 h-2.5" />
+                              <span>{display}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={() => { setSelectedItem(item); setIsItemsModalOpen(true); }}
+                          onClick={async () => {
+                            setSelectedItem(item);
+                            setIsItemsModalOpen(true);
+                            setItens([]);
+                            setItensLoading(true);
+                            try { setItens(await apiCrmItens(item.id)); } catch { setItens([]); }
+                            finally { setItensLoading(false); }
+                          }}
                           className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
                           title="Ver Itens"
                         >
@@ -693,9 +732,54 @@ export function OrcamentosView() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-hide">
-              <div className="flex items-center justify-center py-12 text-[11px] text-slate-400 font-bold">
-                Em breve: itens do orçamento via API
-              </div>
+              {itensLoading ? (
+                <div className="flex items-center justify-center py-12 text-[11px] text-slate-400 font-bold">Carregando itens...</div>
+              ) : itens.length === 0 ? (
+                <div className="flex items-center justify-center py-12 text-[11px] text-slate-400 font-bold">Nenhum item encontrado</div>
+              ) : (
+                <table className="w-full text-[11px]">
+                  <thead className="sticky top-0 bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-black text-slate-400 uppercase tracking-wider w-16">Cód.</th>
+                      <th className="px-4 py-3 text-left font-black text-slate-400 uppercase tracking-wider">Descrição</th>
+                      <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-16">Qtd</th>
+                      <th className="px-4 py-3 text-center font-black text-slate-400 uppercase tracking-wider w-12">UN</th>
+                      <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-28">Val. Unit</th>
+                      <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-28">Custo</th>
+                      <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-28">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {itens.map((it, i) => {
+                      const qtd = parseFloat(it.QTDITE) || 0;
+                      const valuni = parseFloat(it.VALUNI) || 0;
+                      const custo = parseFloat(it.TOTCUS) || 0;
+                      const total = qtd * valuni;
+                      const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                      return (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 text-slate-400 font-mono">{it.COD_PRODUTO}</td>
+                          <td className="px-4 py-3 text-slate-700 font-semibold" title={it.PRODUTO}>{it.PRODUTO}</td>
+                          <td className="px-4 py-3 text-right text-slate-600 font-bold">{qtd.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-center text-slate-400 font-bold">{it.UN || "UN"}</td>
+                          <td className="px-4 py-3 text-right text-slate-600 font-bold">{fmt(valuni)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-rose-500">{custo > 0 ? fmt(custo) : "—"}</td>
+                          <td className="px-4 py-3 text-right font-black text-emerald-600">{fmt(total)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="border-t-2 border-slate-200 bg-slate-50">
+                    <tr>
+                      <td colSpan={6} className="px-4 py-3 text-right text-[10px] font-black text-slate-500 uppercase tracking-wider">Total do Orçamento</td>
+                      <td className="px-4 py-3 text-right font-black text-emerald-600">
+                        {itens.reduce((acc, it) => acc + (parseFloat(it.QTDITE) || 0) * (parseFloat(it.VALUNI) || 0), 0)
+                          .toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
             </div>
             <div className="p-6 border-t border-slate-100 bg-white shrink-0">
               <button onClick={() => setIsItemsModalOpen(false)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/10">
@@ -766,14 +850,22 @@ export function OrcamentosView() {
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Data de Contato</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Data de Retorno</label>
                       <input type="text" placeholder="dd/mm/aaaa" value={statusData} onChange={(e) => { handleDateMask(e); setStatusData(e.target.value); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Observação</label>
                       <textarea placeholder="Ex: Cliente solicitou retorno na segunda..." rows={4} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all resize-none" />
                     </div>
-                    <button onClick={() => handleUpdateStatus("ENVIADO", {})} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/10 active:scale-[0.98] transition-all">
+                    <button onClick={() => {
+                      // Converte dd/mm/aaaa → ISO para salvar no banco
+                      let iso: string | null = null;
+                      if (statusData && statusData.length === 10) {
+                        const [d, m, y] = statusData.split("/");
+                        iso = `${y}-${m}-${d}`;
+                      }
+                      handleUpdateStatus("ENVIADO", { lembrete_data: iso });
+                    }} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/10 active:scale-[0.98] transition-all">
                       Confirmar Envio
                     </button>
                   </div>

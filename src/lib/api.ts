@@ -156,6 +156,23 @@ export async function apiCrm(params?: Record<string, string>): Promise<unknown[]
 
 export const apiCrmStatus = (body: unknown) => post("/api/crm/status", body);
 
+const CRM_LEGADO = "https://marketing-gestao-de-tempo.velbav.easypanel.host";
+
+export interface CrmItem {
+  COD_PRODUTO: string;
+  PRODUTO: string;
+  QTDITE: string;
+  VALUNI: string;
+  UN: string;
+  TOTCUS: string;
+}
+
+export async function apiCrmItens(documento: string): Promise<CrmItem[]> {
+  const res = await fetch(`${CRM_LEGADO}/api/crm/itens/${encodeURIComponent(documento)}`);
+  if (!res.ok) throw new Error(`CRM Itens ${res.status}`);
+  return res.json();
+}
+
 // ── Outros ────────────────────────────────────────────────────────────────────
 
 export const apiFornecedores = () => get("/api/fornecedores");

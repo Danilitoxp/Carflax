@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils";
 
 interface CrmSectionProps {
   activeTab: string;
+  userProfile?: any;
 }
 
-export function CrmSection({ activeTab }: CrmSectionProps) {
+export function CrmSection({ activeTab, userProfile }: CrmSectionProps) {
   return (
     <div className={cn(
       "flex flex-col h-full bg-[#F8FAFC] overflow-hidden p-0",
@@ -26,7 +27,7 @@ export function CrmSection({ activeTab }: CrmSectionProps) {
               <CampanhasView />
             </div>
           ) : (
-            <OrcamentosView />
+            <OrcamentosView userProfile={userProfile} />
           )}
         </div>
       </div>

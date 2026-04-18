@@ -61,7 +61,7 @@ async function migrar() {
         status_crm: String(r.status_crm ?? "Emitido"),
         motivo_perda: r.motivo_perda ?? null,
         concorrente: r.concorrente ?? null,
-        lembrete_data: r.lembrete_data ?? null,
+        lembrete_data: r.lembrete_data ?? r.lembreteData ?? r.proximo_contato ?? null,
         vendedor: r.vendedor ?? null,
         vendedor_codigo: r.vendedor_codigo ?? null,
         endereco_obra: r.endereco_obra ?? null,

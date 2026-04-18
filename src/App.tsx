@@ -103,7 +103,7 @@ function DashboardContent({
           ) : isSettingsView ? (
             <SettingsSection externalTab={activeItem} />
           ) : isCrmView ? (
-            <CrmSection activeTab={activeItem} />
+            <CrmSection activeTab={activeItem} userProfile={userProfile} />
           ) : ["Entregas", "Romaneios", "Concluídas"].includes(activeItem) ? (
             <EntregasView activeTab={activeItem} />
           ) : activeItem === "Usuários" ? (

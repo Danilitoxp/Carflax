@@ -130,7 +130,7 @@ export async function migrarDoFirebase(): Promise<{ status: number; conversas: n
         status_crm: String(r.status_crm ?? "Emitido"),
         motivo_perda: r.motivo_perda ?? null,
         concorrente: r.concorrente ?? null,
-        lembrete_data: r.lembrete_data ?? null,
+        lembrete_data: r.lembrete_data ?? r.lembreteData ?? r.proximo_contato ?? null,
         vendedor: r.vendedor ?? null,
         vendedor_codigo: r.vendedor_codigo ?? null,
         endereco_obra: r.endereco_obra ?? null,
@@ -180,7 +180,6 @@ export async function getCrmStatusMap(
     .select("*")
     .in("documento", documentos);
   if (error) console.error("[CRM] getCrmStatusMap error:", error);
-  console.log("[CRM] getCrmStatusMap rows:", data?.length, "erro:", error?.message);
   const map = new Map<string, CrmStatus>();
   for (const row of data ?? []) map.set(row.documento, row);
   return map;
