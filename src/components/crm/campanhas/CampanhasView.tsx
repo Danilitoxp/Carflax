@@ -42,6 +42,7 @@ function offsetMes(mes: number, ano: number, delta: number): { mes: number; ano:
 
 export function CampanhasView() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [isNewCampaignModalOpen, setIsNewCampaignModalOpen] = useState(false);
 
@@ -69,6 +70,7 @@ export function CampanhasView() {
         supabase.from("campanhas").select("*").order("created_at", { ascending: false }),
         supabase.from("premio_mes").select("*").eq("mes", now.getMonth() + 1).eq("ano", now.getFullYear()).single(),
       ]);
+      setLoadingCampaigns(false);
       if (campanhasData) {
         const hoje = new Date(); hoje.setHours(0,0,0,0);
         setCampaigns(campanhasData.map((c) => {
@@ -235,8 +237,20 @@ export function CampanhasView() {
             </div>
           </div>
 
+          {/* Skeletons enquanto carrega */}
+          {loadingCampaigns && Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="aspect-[4/5] rounded-xl border border-slate-200 bg-white overflow-hidden animate-pulse">
+              <div className="h-3/5 bg-slate-100 m-3 rounded-lg" />
+              <div className="px-4 space-y-2">
+                <div className="h-2.5 bg-slate-100 rounded w-3/4" />
+                <div className="h-2 bg-slate-100 rounded w-1/2" />
+                <div className="h-4 bg-slate-100 rounded w-1/4 mt-1" />
+              </div>
+            </div>
+          ))}
+
           {/* Cards de Campanhas */}
-          {campaigns.map((camp) => (
+          {!loadingCampaigns && campaigns.map((camp) => (
             <div
               key={camp.id}
               onClick={() => abrirRankingCampanha(camp)}
