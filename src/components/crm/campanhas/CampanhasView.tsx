@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiElegiveisParaSorteio, apiCampaignRanking, type MetaVendedor, type RankingVendedor } from "@/lib/api";
-import { Target, Plus, X, Trophy, ChevronLeft, ChevronRight, Gift, Star, AlertCircle } from "lucide-react";
+import { Target, Plus, X, Trophy, ChevronLeft, ChevronRight, Gift, Star, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface Campaign {
@@ -45,6 +45,10 @@ export function CampanhasView() {
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [isNewCampaignModalOpen, setIsNewCampaignModalOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | number | null>(null);
+  const [savingCampaign, setSavingCampaign] = useState(false);
+  const [formData, setFormData] = useState({ name: "", fornecedor: "", data_ini: "", data_fim: "" });
 
   // Modal Prêmio do Mês
   const [isPremioModalOpen, setIsPremioModalOpen] = useState(false);
@@ -167,6 +171,54 @@ export function CampanhasView() {
     setLoadingRanking(false);
   };
 
+  const abrirEdicao = (camp: Campaign, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFormData({
+      name: camp.name,
+      fornecedor: camp.fornecedor || "",
+      data_ini: camp.data_ini || "",
+      data_fim: camp.data_fim || "",
+    });
+    setEditingCampaign(camp);
+  };
+
+  const salvarEdicao = async () => {
+    if (!editingCampaign) return;
+    setSavingCampaign(true);
+    await supabase.from("campanhas").update({
+      name: formData.name,
+      fornecedor: formData.fornecedor || null,
+      date: formData.data_ini || null,
+      periodo_fim: formData.data_fim || null,
+    }).eq("id", editingCampaign.id);
+    setSavingCampaign(false);
+    setEditingCampaign(null);
+    // recarregar lista
+    const { data } = await supabase.from("campanhas").select("*").order("created_at", { ascending: false });
+    if (data) {
+      const hoje = new Date(); hoje.setHours(0,0,0,0);
+      setCampaigns(data.map((c) => {
+        const fim = c.periodo_fim ? new Date(c.periodo_fim) : null;
+        const ini = c.date ? new Date(c.date) : null;
+        const status = fim && fim < hoje ? "encerrada" : ini && ini > hoje ? "futura" : "ativa";
+        const fmtDate = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+        const dateRange = ini && fim ? `${fmtDate(ini)} → ${fmtDate(fim)}` : ini ? fmtDate(ini) : fim ? `até ${fmtDate(fim)}` : "";
+        return {
+          id: c.id, type: "brand" as const, name: c.name, description: "",
+          date: dateRange, status, logo: c.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(c.name)}`,
+          fornecedor: c.fornecedor || c.name, data_ini: c.date || undefined, data_fim: c.periodo_fim || undefined,
+        };
+      }));
+    }
+  };
+
+  const confirmarExclusao = async () => {
+    if (confirmDeleteId === null) return;
+    await supabase.from("campanhas").delete().eq("id", confirmDeleteId);
+    setCampaigns((prev) => prev.filter((c) => c.id !== confirmDeleteId));
+    setConfirmDeleteId(null);
+  };
+
   const now = new Date();
   const mesAtual = now.getMonth() + 1;
   const anoAtual = now.getFullYear();
@@ -256,6 +308,22 @@ export function CampanhasView() {
               onClick={() => abrirRankingCampanha(camp)}
               className="aspect-[4/5] rounded-xl p-4 flex flex-col border border-slate-200 transition-all duration-300 cursor-pointer group relative overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-300"
             >
+              {/* Ações editar/excluir */}
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <button
+                  onClick={(e) => abrirEdicao(camp, e)}
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-400 hover:text-blue-600 hover:border-blue-300 transition-all"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(camp.id); }}
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-400 hover:text-red-500 hover:border-red-200 transition-all"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+
               <div className="flex-1 bg-slate-50 rounded-lg p-4 flex items-center justify-center border border-slate-100 mb-3 transition-colors group-hover:bg-blue-50/50">
                 <img src={camp.logo} className="max-h-12 w-auto object-contain group-hover:scale-110 transition-transform duration-500" alt={camp.name} />
               </div>
@@ -510,6 +578,78 @@ export function CampanhasView() {
             <div className="p-6 border-t border-slate-100 bg-white shrink-0">
               <button onClick={() => setSelectedCampaign(null)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98]">
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EDITAR CAMPANHA ── */}
+      {editingCampaign && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0" onClick={() => setEditingCampaign(null)} />
+          <div className="relative w-full max-w-[480px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+            <div className="px-8 py-6 flex items-center justify-between border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
+                  <Pencil className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Editar Campanha</h2>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">{editingCampaign.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setEditingCampaign(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-8 space-y-5 scrollbar-hide">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Nome da Campanha</label>
+                <input type="text" value={formData.name} onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Fornecedor</label>
+                <input type="text" value={formData.fornecedor} onChange={(e) => setFormData(f => ({ ...f, fornecedor: e.target.value }))} placeholder="Ex: IVM, Sansil, Amanco..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Início</label>
+                  <input type="date" value={formData.data_ini} onChange={(e) => setFormData(f => ({ ...f, data_ini: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Término</label>
+                  <input type="date" value={formData.data_fim} onChange={(e) => setFormData(f => ({ ...f, data_fim: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50" />
+                </div>
+              </div>
+            </div>
+            <div className="p-8 border-t border-slate-100 shrink-0">
+              <button onClick={salvarEdicao} disabled={savingCampaign} className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/10">
+                {savingCampaign ? "Salvando..." : "Salvar Alterações"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CONFIRMAÇÃO EXCLUIR ── */}
+      {confirmDeleteId !== null && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0" onClick={() => setConfirmDeleteId(null)} />
+          <div className="relative w-full max-w-sm bg-white border border-slate-200 rounded-2xl shadow-2xl p-8 flex flex-col items-center text-center gap-4">
+            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center border border-red-100">
+              <Trash2 className="w-5 h-5 text-red-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Excluir campanha?</h3>
+              <p className="text-[11px] text-slate-400 mt-1">Esta ação não pode ser desfeita.</p>
+            </div>
+            <div className="flex gap-3 w-full">
+              <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase tracking-widest transition-all">
+                Cancelar
+              </button>
+              <button onClick={confirmarExclusao} className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all">
+                Excluir
               </button>
             </div>
           </div>
