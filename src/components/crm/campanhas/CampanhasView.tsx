@@ -73,22 +73,21 @@ export function CampanhasView() {
     const now = new Date();
     async function fetchData() {
       try {
-      const [campanhasRes, premioRes, fornRes] = await Promise.all([
-        supabase.from("campanhas").select("*").order("id", { ascending: false }),
-        supabase.from("premio_mes").select("*").eq("mes", now.getMonth() + 1).eq("ano", now.getFullYear()).maybeSingle(),
-        fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/fornecedores").then(r => r.json()).catch(() => ({ fornecedores: [] })),
-      ]);
+        const [campanhasRes, premioRes, fornRes] = await Promise.all([
+          supabase.from("campanhas").select("*"),
+          supabase.from("premio_mes").select("*").eq("mes", now.getMonth() + 1).eq("ano", now.getFullYear()).maybeSingle(),
+          fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/fornecedores").then(r => r.json()).catch(() => ({ fornecedores: [] })),
+        ]);
 
-      if (campanhasRes.error) console.error("Campanhas erro:", campanhasRes.error);
-      if (premioRes.error) console.error("Premio erro:", premioRes.error);
+        if (campanhasRes.error) console.error("Campanhas erro:", campanhasRes.error);
+        if (premioRes.error) console.error("Premio erro:", premioRes.error);
 
-      const campanhasData = campanhasRes.data;
-      const premioData = premioRes.data;
+        const campanhasData = campanhasRes.data;
+        const premioData = premioRes.data;
 
-      if (fornRes?.fornecedores) setFornecedores(fornRes.fornecedores);
-      setLoadingCampaigns(false);
-      if (premioData) setPremioCard(premioData);
-      if (campanhasData) {
+        if (fornRes?.fornecedores) setFornecedores(fornRes.fornecedores);
+        if (premioData) setPremioCard(premioData);
+        if (campanhasData && campanhasData.length > 0) {
         const hoje = new Date(); hoje.setHours(0,0,0,0);
         setCampaigns(campanhasData.map((c) => {
           const fim = c.periodo_fim ? new Date(c.periodo_fim) : null;
@@ -111,7 +110,8 @@ export function CampanhasView() {
             data_fim: c.periodo_fim || undefined,
           };
         }));
-      }
+        }
+        setLoadingCampaigns(false);
       } catch (err) {
         console.error("fetchData erro:", err);
         setLoadingCampaigns(false);
