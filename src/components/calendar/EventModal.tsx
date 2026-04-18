@@ -6,6 +6,7 @@ interface EventModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: () => void;
+  onDelete: (id: number) => void;
   selectedDay: number | null;
   editingEventId: number | null;
   newEvent: {
@@ -20,6 +21,7 @@ export function EventModal({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   selectedDay,
   editingEventId,
   newEvent,
@@ -34,7 +36,7 @@ export function EventModal({
             className="absolute inset-0"
           />
           <div 
-            className="relative w-full max-w-lg bg-white rounded-2xl p-8 shadow-2xl border border-slate-200 overflow-hidden"
+            className="relative w-full max-w-lg bg-white rounded-2xl p-8 shadow-2xl border border-slate-200 overflow-visible"
           >
             <button 
               onClick={onClose}
@@ -104,10 +106,19 @@ export function EventModal({
                     />
                   </div>
 
-                  <div className="pt-2">
+                  <div className="pt-2 flex items-center gap-2">
+                    {editingEventId && (
+                      <Button 
+                        onClick={() => onDelete(editingEventId)}
+                        variant="ghost"
+                        className="h-12 px-6 border border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all"
+                      >
+                        Excluir
+                      </Button>
+                    )}
                     <Button 
                       onClick={onSave}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-blue-600/10 active:scale-[0.98]"
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-blue-600/10 active:scale-[0.98]"
                     >
                       {editingEventId ? "Salvar Alterações" : "Adicionar ao Calendário"}
                     </Button>
