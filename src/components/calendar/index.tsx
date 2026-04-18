@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import {
   ChevronLeft,
   ChevronRight,
@@ -44,6 +45,26 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
 
   const [vacations, setVacations] = useState<Vacation[]>([]);
+
+  useEffect(() => {
+    async function fetchEvents() {
+      const { data, error } = await supabase
+        .from("eventos_calendario")
+        .select("*");
+      if (!error && data) {
+        setEvents(data.map((e, i) => ({
+          id: i + 1,
+          day: e.day,
+          month: e.month - 1, // DB stores 1-indexed, JS uses 0-indexed
+          year: e.year,
+          title: e.title,
+          type: e.type as CalendarEvent["type"],
+          description: e.description || "",
+        })));
+      }
+    }
+    fetchEvents();
+  }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
