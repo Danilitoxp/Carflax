@@ -73,10 +73,9 @@ export function CampanhasView() {
     const now = new Date();
     async function fetchData() {
       try {
-        const [campanhasRes, premioRes, fornRes] = await Promise.all([
+        const [campanhasRes, premioRes] = await Promise.all([
           supabase.from("campanhas").select("*"),
           supabase.from("premio_mes").select("*").eq("mes", now.getMonth() + 1).eq("ano", now.getFullYear()).maybeSingle(),
-          fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/fornecedores").then(r => r.json()).catch(() => ({ fornecedores: [] })),
         ]);
 
         if (campanhasRes.error) console.error("Campanhas erro:", campanhasRes.error);
@@ -85,37 +84,31 @@ export function CampanhasView() {
         const campanhasData = campanhasRes.data;
         const premioData = premioRes.data;
 
-        if (fornRes?.fornecedores) setFornecedores(fornRes.fornecedores);
         if (premioData) setPremioCard(premioData);
-        if (campanhasData && campanhasData.length > 0) {
         const hoje = new Date(); hoje.setHours(0,0,0,0);
-        setCampaigns(campanhasData.map((c) => {
+        setCampaigns((campanhasData ?? []).map((c) => {
           const fim = c.periodo_fim ? new Date(c.periodo_fim) : null;
           const ini = c.date ? new Date(c.date) : null;
           const status = fim && fim < hoje ? "encerrada" : ini && ini > hoje ? "futura" : "ativa";
           const fmtDate = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-          const dateRange = ini && fim
-            ? `${fmtDate(ini)} → ${fmtDate(fim)}`
-            : ini ? fmtDate(ini) : fim ? `até ${fmtDate(fim)}` : "";
+          const dateRange = ini && fim ? `${fmtDate(ini)} → ${fmtDate(fim)}` : ini ? fmtDate(ini) : fim ? `até ${fmtDate(fim)}` : "";
           return {
-            id: c.id,
-            type: "brand" as const,
-            name: c.name,
-            description: "",
-            date: dateRange,
-            status,
+            id: c.id, type: "brand" as const, name: c.name, description: "",
+            date: dateRange, status,
             logo: c.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(c.name)}`,
-            fornecedor: c.fornecedor || c.name,
-            data_ini: c.date || undefined,
-            data_fim: c.periodo_fim || undefined,
+            fornecedor: c.fornecedor || c.name, data_ini: c.date || undefined, data_fim: c.periodo_fim || undefined,
           };
         }));
-        }
-        setLoadingCampaigns(false);
       } catch (err) {
         console.error("fetchData erro:", err);
+      } finally {
         setLoadingCampaigns(false);
       }
+
+      // Fornecedores em background, não bloqueia o carregamento
+      fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/fornecedores")
+        .then(r => r.json()).then(d => { if (d?.fornecedores) setFornecedores(d.fornecedores); })
+        .catch(() => {});
     }
     fetchData();
   }, []);
