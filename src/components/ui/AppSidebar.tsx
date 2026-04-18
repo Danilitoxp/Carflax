@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   type LucideIcon,
 } from "lucide-react";
+import organogramaIcon from "@/assets/organograma.svg";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/context/theme-provider";
 
@@ -94,6 +95,7 @@ const settingsItems: MenuItem[] = [
 ];
 
 interface AppSidebarProps {
+  userProfile?: any;
   isCollapsed: boolean;
   onToggle: () => void;
   isMobileOpen?: boolean;
@@ -103,9 +105,11 @@ interface AppSidebarProps {
   onLogout: () => void;
 }
 
-export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout }: AppSidebarProps) {
+export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout }: AppSidebarProps) {
   const { theme, setTheme } = useTheme();
   const [openMenus, setOpenMenus] = useState<string[]>(["Dashboard"]);
+
+  const userAvatar = userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}`;
 
   const toggleMenu = (label: string) => {
     if (isCollapsed) return;
@@ -140,17 +144,17 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose,
             <div className="flex items-center gap-3 overflow-hidden flex-1 px-1">
               <div className="w-10 h-10 rounded-lg border border-border flex items-center justify-center bg-secondary/50 shrink-0">
                 <img
-                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo"
+                  src={userAvatar}
                   alt="Profile"
-                  className="w-full h-full rounded-lg"
+                  className="w-full h-full rounded-lg object-cover"
                 />
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[10px] font-bold text-foreground truncate">
-                  Andrew Smith
+                  {userProfile?.name || "Carregando..."}
                 </span>
                 <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-widest leading-none mt-1">
-                  Administrador
+                  {userProfile?.role || "Membro"}
                 </span>
               </div>
             </div>
@@ -369,19 +373,32 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose,
 
       {/* Footer - Minimalist */}
       <div className="p-4 mt-auto border-t border-border/50">
-        {/* Organograma Card */}
+        {/* Organograma Card - Modernized */}
         <button
           onClick={() => onActiveItemChange("Organograma")}
           className={cn(
-            "w-full mb-3 flex items-center gap-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl px-3 py-2.5 transition-all shadow-md shadow-blue-600/20 active:scale-95",
+            "w-full mb-4 flex items-center gap-3 bg-gradient-to-br from-[#2563eb] via-[#1d4ed8] to-[#1e40af] hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 text-white rounded-xl p-3 transition-all duration-300 relative overflow-hidden group border border-white/10 active:scale-95",
             isCollapsed && "justify-center px-2"
           )}
         >
-          <Users className="w-4 h-4 shrink-0" />
+          {/* Subtle Shine Effect */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+          
+          <div className={cn(
+            "p-1.5 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 shrink-0",
+            isCollapsed && "mx-auto"
+          )}>
+            <img 
+              src={organogramaIcon} 
+              alt="Organograma" 
+              className="w-5 h-5 invert brightness-0" 
+            />
+          </div>
+          
           {!isCollapsed && (
             <div className="text-left">
-              <p className="text-[9px] font-black uppercase tracking-widest leading-none">Organograma</p>
-              <p className="text-[7px] font-bold text-blue-200 mt-0.5">Estrutura Corporativa</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.1em] text-white/90 leading-none mb-0.5">Organograma</p>
+              <p className="text-[8px] font-medium text-blue-200/80 leading-tight">Estrutura Corporativa</p>
             </div>
           )}
         </button>

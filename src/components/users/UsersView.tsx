@@ -220,20 +220,19 @@ export function UsersView() {
       if (editingUser) {
         const { error } = await supabase.from("usuarios").update(payload).eq("id", editingUser.id);
         if (error) { console.error("[Users] Erro ao editar:", error); return; }
-        const { data: updated } = await supabase.from("usuarios").select("*").eq("id", editingUser.id).single();
-        if (updated) {
-          setUsers(prev => prev.map(u => u.id === editingUser.id ? {
-            id: updated.id, name: updated.name, email: updated.email, role: updated.role,
-            status: updated.status, avatar: updated.avatar || "", lastLogin: updated.last_login ? new Date(updated.last_login).toLocaleString("pt-BR") : "Nunca",
-            permissions: updated.permissions || [], operatorCode: updated.operator_code || "",
-            company: updated.company, department: updated.department,
-          } : u));
-        } else {
-          setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...newUser, avatar: finalAvatar } : u));
-        }
+        
+        // Update local state immediately with the same payload data
+        setUsers(prev => prev.map(u => u.id === editingUser.id ? {
+          ...u,
+          ...newUser,
+          avatar: finalAvatar,
+          operatorCode: (newUser as any).operatorCode,
+        } : u));
       } else {
         const { error } = await supabase.from("usuarios").insert({ ...payload, status: "ativo" });
         if (error) { console.error("[Users] Erro ao criar:", error); return; }
+        
+        // Refresh full list to get the new DB-generated ID and data
         const { data: all } = await supabase.from("usuarios").select("*").order("name");
         if (all) setUsers(all.map(u => ({
           id: u.id, name: u.name, email: u.email, role: u.role,
@@ -375,18 +374,17 @@ export function UsersView() {
                 <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="py-3 px-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 relative shrink-0">
-                        <div className="img-skeleton absolute inset-0 bg-slate-200 animate-pulse" />
+                      <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 relative shrink-0 flex items-center justify-center">
                         <img
                           src={getAvatarSrc(user.avatar, user.name)}
                           alt={user.name}
+                          className="w-full h-full object-cover transition-opacity duration-300"
                           onLoad={(e) => {
                             e.currentTarget.style.opacity = "1";
-                            const sk = e.currentTarget.parentElement?.querySelector(".img-skeleton") as HTMLElement;
-                            if (sk) sk.style.display = "none";
                           }}
-                          style={{ opacity: 0, transition: "opacity 0.3s", position: "relative", zIndex: 1 }}
-                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name)}`;
+                          }}
                         />
                       </div>
                       <div className="flex flex-col min-w-0">

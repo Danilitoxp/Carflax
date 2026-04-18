@@ -10,15 +10,15 @@ import {
 } from "@/components/dashboard/Geral/RightPanelComponents";
 import { GeralView } from "@/components/dashboard/Geral/GeralView";
 import { LayoutGrid } from "lucide-react";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { SugestaoModal } from "@/components/sugestao";
 import { EntregasView } from "@/components/entregas";
 import { UsersView } from "@/components/users/UsersView";
 import { LoginView } from "@/components/auth/LoginView";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import { OrgChartView } from "@/components/ui/OrgChartModal";
 
-function DashboardContent({ onLogout }: { onLogout: () => void }) {
+function DashboardContent({ userProfile, onLogout }: { userProfile: any, onLogout: () => void }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
@@ -41,6 +41,7 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="h-screen bg-background font-sans transition-colors duration-300 overflow-hidden flex relative">
       <AppSidebar
+        userProfile={userProfile}
         activeItem={activeItem}
         onActiveItemChange={handleActiveItemChange}
         isCollapsed={isSidebarCollapsed}
@@ -80,7 +81,7 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
             className="w-10 h-10 rounded-full border border-border overflow-hidden"
           >
             <img
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo"
+              src={userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'Danilo'}`}
               className="w-full h-full rounded-full"
               alt="User"
             />
@@ -102,7 +103,10 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
               <UsersView />
             </div>
           ) : activeItem === "Geral" ? (
-            <GeralView />
+            <GeralView userProfile={userProfile} />
+          ) : activeItem === "Organograma" ? (
+
+            <OrgChartView />
           ) : isDashboardView ? (
             <CommunicationSection />
           ) : (
@@ -144,30 +148,99 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+import { NotificationProvider } from "@/components/ui/NotificationProvider";
+import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
 
-  const handleLogin = () => {
-    setIsLoading(true);
-    // Simulate data loading
-    setTimeout(() => {
-      setIsAuthenticated(true);
-      setIsLoading(false);
-    }, 2000);
+function App() {
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) fetchProfile(session.user.id);
+      else setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) fetchProfile(session.user.id);
+      else {
+        setProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (uid: string) => {
+    try {
+      // 1. Tentar buscar pelo ID (vínculo direto)
+      let { data, error } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("id", uid)
+        .single();
+
+      // 2. AUTO-CURA: Se não achou pelo ID, tenta pelo e-mail da sessão
+      if (error || !data) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) {
+          console.log("[App] Perfil não achou ID, tentando por e-mail:", user.email);
+          const { data: byEmail } = await supabase
+            .from("usuarios")
+            .select("*")
+            .eq("email", user.email)
+            .single();
+
+          if (byEmail) {
+            console.log("[App] Usuário achado por e-mail! Atualizando ID no banco...");
+            // Atualiza o registro antigo com o novo ID do Auth
+            await supabase.from("usuarios").update({ id: uid }).eq("email", user.email);
+            data = { ...byEmail, id: uid };
+          }
+        }
+      }
+
+      if (data) {
+        setProfile(data);
+      } else {
+        // Fallback total para não travar a UI se o usuário for novo no banco
+        const { data: { user } } = await supabase.auth.getUser();
+        setProfile({
+          name: user?.email?.split('@')[0].toUpperCase() || "Usuário",
+          email: user?.email || "",
+          role: "Membro",
+          avatar: ""
+        });
+      }
+    } catch (err) {
+      console.error("Erro perfil:", err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (loading) return <LoadingScreen />;
 
   return (
     <ThemeProvider defaultTheme="light" storageKey="carflax-theme">
-      {isLoading && <LoadingScreen />}
-
-      {isAuthenticated ? (
-        <DashboardContent onLogout={() => setIsAuthenticated(false)} />
-      ) : (
-        <LoginView onLogin={handleLogin} />
-      )}
+      <NotificationProvider>
+        {session ? (
+          <DashboardContent 
+            userProfile={profile} 
+            onLogout={() => supabase.auth.signOut()} 
+          />
+        ) : (
+          <LoginView onLogin={() => {}} />
+        )}
+      </NotificationProvider>
     </ThemeProvider>
   );
 }
 
 export default App;
+

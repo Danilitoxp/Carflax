@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/context/theme-provider";
+import { supabase } from "@/lib/supabase";
+import { useNotification } from "@/components/ui/NotificationProvider";
 
 interface LoginViewProps {
   onLogin: () => void;
@@ -15,15 +17,36 @@ interface LoginViewProps {
 
 export function LoginView({ onLogin }: LoginViewProps) {
   const { theme } = useTheme();
+  const { showNotification } = useNotification();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const isDark = theme === "dark" || (theme === "system" && typeof window !== 'undefined' && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin();
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        showNotification("error", "Erro de Acesso", "E-mail ou senha incorretos. Verifique suas credenciais.");
+      } else {
+        showNotification("success", "Bem-vindo!", "Login realizado com sucesso. Carregando seu painel...");
+        onLogin();
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification("error", "Erro no Sistema", "Ocorreu um problema inesperado ao tentar logar.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -115,9 +138,10 @@ export function LoginView({ onLogin }: LoginViewProps) {
               <div className="pt-2">
                 <Button
                   type="submit"
-                  className="w-full bg-[#0053FC] hover:bg-[#0042CC] text-white rounded-2xl py-7 font-black text-sm uppercase tracking-[0.2em] transition-all active:scale-[0.98] flex items-center justify-center gap-3 border-none"
+                  disabled={loading}
+                  className="w-full bg-[#0053FC] hover:bg-[#0042CC] text-white rounded-2xl py-7 font-black text-sm uppercase tracking-[0.2em] transition-all active:scale-[0.98] flex items-center justify-center gap-3 border-none disabled:opacity-70"
                 >
-                  Entrar no Painel
+                  {loading ? "ENTRANDO NO PAINEL..." : "Entrar no Painel"}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </div>
