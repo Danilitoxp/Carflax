@@ -72,14 +72,16 @@ export function CampanhasView() {
           const fim = c.periodo_fim ? new Date(c.periodo_fim) : null;
           const ini = c.date ? new Date(c.date) : null;
           const status = fim && fim < hoje ? "encerrada" : ini && ini > hoje ? "futura" : "ativa";
-          const fornecedor = c.fornecedor || "";
-          const showDesc = fornecedor && fornecedor.toLowerCase() !== c.name.toLowerCase();
+          const fmtDate = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+          const dateRange = ini && fim
+            ? `${fmtDate(ini)} → ${fmtDate(fim)}`
+            : ini ? fmtDate(ini) : fim ? `até ${fmtDate(fim)}` : "";
           return {
             id: c.id,
             type: "brand" as const,
             name: c.name,
-            description: showDesc ? fornecedor : "",
-            date: fim ? `até ${fim.toLocaleDateString("pt-BR")}` : ini ? ini.toLocaleDateString("pt-BR") : "",
+            description: "",
+            date: dateRange,
             status,
             logo: c.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(c.name)}`,
           };
@@ -241,9 +243,6 @@ export function CampanhasView() {
               <div className="space-y-1.5">
                 <h3 className="text-[10px] font-black text-slate-900 truncate uppercase tracking-tight">{camp.name}</h3>
                 <p className="text-[8px] font-bold text-slate-400 tracking-widest leading-none">{camp.date}</p>
-                {camp.description && (
-                  <p className="text-[8px] font-semibold text-slate-500 truncate">{camp.description}</p>
-                )}
                 <div className="pt-0.5">
                   <span className={cn(
                     "inline-flex px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest border",
