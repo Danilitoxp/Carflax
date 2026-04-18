@@ -49,6 +49,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video", "holiday", "meeting", "celebration", "finance", "important", "launch"]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [vacations, setVacations] = useState<Vacation[]>([]);
+  const [employees, setEmployees] = useState<{ name: string; avatar?: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Sincronizar aba ativa vinda do componente pai
@@ -61,6 +62,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [editingVacation, setEditingVacation] = useState<any>(null);
   const [newEvent, setNewEvent] = useState<{
     title: string;
     description: string;
@@ -75,13 +77,12 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const month = currentDate.getMonth();
 
   const fetchAllData = async () => {
-    // Carregamento sutil: não bloqueia a UI totalmente se for rápido
     setLoading(true);
     try {
       const [evResp, vacResp, userResp, holidayResp] = await Promise.all([
         supabase.from("eventos_calendario").select("*").eq("month", month + 1).eq("year", year),
         supabase.from("ferias").select("*"),
-        supabase.from("usuarios").select("name, birth_date, admission_date").or("birth_date.not.is.null,admission_date.not.is.null"),
+        supabase.from("usuarios").select("name, avatar, birth_date, admission_date"),
         fetch(`https://brasilapi.com.br/api/feriados/v1/${year}`).then(r => r.ok ? r.json() : [])
       ]);
 
@@ -97,17 +98,24 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
       }));
 
       // Processar Férias
-      const loadedVacations = (vacResp.data || []).map(v => ({
-        id: v.id,
-        name: v.name,
-        start: new Date(v.start_date),
-        end: new Date(v.end_date),
-        color: v.color || "blue",
-        avatar: v.avatar || ""
-      }));
+      const loadedVacations = (vacResp.data || []).map(v => {
+        const [yrS, moS, dyS] = v.start_date.split('-').map(Number);
+        const [yrE, moE, dyE] = v.end_date.split('-').map(Number);
+        return {
+          id: v.id,
+          name: v.name,
+          start: new Date(yrS, moS - 1, dyS),
+          end: new Date(yrE, moE - 1, dyE),
+          color: v.color || "blue",
+          avatar: v.avatar || ""
+        };
+      });
       setVacations(loadedVacations);
 
       // Processar Usuários
+      const emps = (userResp.data || []).map(u => ({ name: u.name, avatar: u.avatar }));
+      setEmployees(emps);
+
       const birthdayEvents = (userResp.data || [])
         .filter(u => u.birth_date)
         .map((u, i) => {
@@ -166,7 +174,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
     fetchAllData();
   }, [year, month]);
 
-  const handleSaveVacation = async (vData: { name: string; start: Date; end: Date; color: string; avatar: string }) => {
+  const handleSaveVacation = async (vData: { name: string; start: Date; end: Date; color: string; avatar: string; id?: number }) => {
     try {
       const payload = {
         name: vData.name,
@@ -175,11 +183,27 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
         color: vData.color,
         avatar: vData.avatar
       };
-      await supabase.from("ferias").insert([payload]);
+      
+      if (vData.id) {
+        await supabase.from("ferias").update(payload).eq("id", vData.id);
+      } else {
+        await supabase.from("ferias").insert([payload]);
+      }
+      
       fetchAllData();
       setIsVacationModalOpen(false);
+      setEditingVacation(null);
     } catch (err) {
       console.error("[Calendar] Erro férias:", err);
+    }
+  };
+
+  const handleDeleteVacation = async (id: number) => {
+    try {
+      await supabase.from("ferias").delete().eq("id", id);
+      fetchAllData();
+    } catch (err) {
+      console.error("[Calendar] Erro deletar férias:", err);
     }
   };
 
@@ -251,6 +275,11 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
     setIsModalOpen(true);
   };
 
+  const handleVacationClick = (vac: Vacation) => {
+    setEditingVacation(vac);
+    setIsVacationModalOpen(true);
+  };
+
   const daysOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   return (
@@ -294,13 +323,20 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
           </div>
           <div className="flex items-center gap-3">
             {viewMode === "vacations" && (
-              <Button onClick={() => setIsVacationModalOpen(true)} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 uppercase tracking-wider group">
+              <Button onClick={() => { setEditingVacation(null); setIsVacationModalOpen(true); }} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 uppercase tracking-wider group">
                 <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" /> LANÇAR FÉRIAS
               </Button>
             )}
           </div>
         </div>
-        <VacationModal isOpen={isVacationModalOpen} onClose={() => setIsVacationModalOpen(false)} onSave={handleSaveVacation} />
+        <VacationModal 
+          isOpen={isVacationModalOpen} 
+          onClose={() => { setIsVacationModalOpen(false); setEditingVacation(null); }} 
+          onSave={handleSaveVacation} 
+          onDelete={handleDeleteVacation}
+          editingVacation={editingVacation}
+          employees={employees}
+        />
         <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-0 relative mt-3">
           {loading && (
             <div className="absolute inset-0 z-[30] bg-white/40 backdrop-blur-[1px] flex items-center justify-center">
@@ -328,7 +364,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
                     {day && (
                       <>
                         <div className="flex justify-between items-start mb-2 relative z-20"><span className={cn("text-sm font-black transition-all leading-none", isToday ? "text-white" : "text-slate-300 group-hover:text-slate-500")}>{day}</span>{isToday && <div className="flex flex-col items-center"><div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" /></div>}</div>
-                        <div className="flex-1 mt-1">{viewMode === "events" ? <EventsView day={day} month={month} year={year} events={events} activeFilters={activeFilters} onEventClick={handleEventClick} /> : <VacationsView dayDate={dayDate} vacations={vacations} />}</div>
+                        <div className="flex-1 mt-1">{viewMode === "events" ? <EventsView day={day} month={month} year={year} events={events} activeFilters={activeFilters} onEventClick={handleEventClick} /> : <VacationsView dayDate={dayDate} vacations={vacations} onVacationClick={handleVacationClick} />}</div>
                       </>
                     )}
                   </div>

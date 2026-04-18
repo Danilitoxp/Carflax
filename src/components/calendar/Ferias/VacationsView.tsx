@@ -12,9 +12,10 @@ interface Vacation {
 interface VacationsViewProps {
   dayDate: Date | null;
   vacations: Vacation[];
+  onVacationClick: (v: Vacation) => void;
 }
 
-export function VacationsView({ dayDate, vacations }: VacationsViewProps) {
+export function VacationsView({ dayDate, vacations, onVacationClick }: VacationsViewProps) {
   if (!dayDate) return null;
 
   const activeVacations = vacations.filter(v => dayDate >= v.start && dayDate <= v.end);
@@ -24,7 +25,7 @@ export function VacationsView({ dayDate, vacations }: VacationsViewProps) {
 
   return (
     <div className={cn(
-      "absolute inset-x-0 bottom-0 flex flex-col gap-0.5 z-10 pointer-events-none justify-start pt-1",
+      "absolute inset-x-0 bottom-0 flex flex-col gap-0.5 z-10 justify-start pt-1",
       isSingle ? "top-[1.5rem]" : "top-[2.2rem]"
     )}>
       {activeVacations.map((v) => {
@@ -36,8 +37,9 @@ export function VacationsView({ dayDate, vacations }: VacationsViewProps) {
         return (
           <div 
             key={v.id}
+            onClick={(e) => { e.stopPropagation(); onVacationClick(v); }}
             className={cn(
-              "relative flex items-center px-3 transition-all",
+              "relative flex items-center px-3 transition-all cursor-pointer hover:brightness-110 active:scale-[0.99]",
               isSingle ? "h-10" : "h-7",
               v.color === 'bg-blue-600' ? (isSingle ? 'bg-blue-600/70' : 'bg-blue-600/90') : 
               v.color === 'bg-orange-500' ? (isSingle ? 'bg-amber-500/70' : 'bg-amber-500/90') : 
