@@ -29,7 +29,7 @@ export function SugestaoModal({ isOpen, onClose }: SugestaoModalProps) {
     if (!suggestion.trim()) return;
     setSending(true);
     const { error } = await supabase.from("sugestoes").insert({
-      category,
+      category: categoryEnum[category] ?? category,
       suggestion: suggestion.trim(),
     });
     setSending(false);
@@ -40,6 +40,9 @@ export function SugestaoModal({ isOpen, onClose }: SugestaoModalProps) {
   };
 
   const categories = ["Sugestão", "Crítica", "Elogio", "Dúvida", "Outros"];
+  const categoryEnum: Record<string, string> = {
+    "Sugestão": "Sugestao", "Crítica": "Critica", "Elogio": "Elogio", "Dúvida": "Duvida", "Outros": "Outros"
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm bg-slate-900/10">
