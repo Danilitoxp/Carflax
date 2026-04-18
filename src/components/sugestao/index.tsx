@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { 
-  X, 
-  MessageSquare, 
-  Lock, 
-  Send, 
+import {
+  X,
+  MessageSquare,
+  Lock,
+  Send,
   Hash
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
+import { supabase } from "@/lib/supabase";
 
 interface SugestaoModalProps {
   isOpen: boolean;
@@ -18,16 +19,24 @@ interface SugestaoModalProps {
 export function SugestaoModal({ isOpen, onClose }: SugestaoModalProps) {
   const [suggestion, setSuggestion] = useState("");
   const [category, setCategory] = useState("Sugestão");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
   const maxLength = 1000;
 
   if (!isOpen) return null;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!suggestion.trim()) return;
-    // Aqui viria a lógica de envio
-    console.log("Sugestão enviada:", { category, suggestion });
+    setSending(true);
+    const { error } = await supabase.from("sugestoes").insert({
+      categoria: category,
+      mensagem: suggestion.trim(),
+    });
+    setSending(false);
+    if (error) { console.error("[Sugestão] Erro ao enviar:", error); return; }
+    setSent(true);
     setSuggestion("");
-    onClose();
+    setTimeout(() => { setSent(false); onClose(); }, 1500);
   };
 
   const categories = ["Sugestão", "Crítica", "Elogio", "Dúvida", "Outros"];
@@ -118,18 +127,23 @@ export function SugestaoModal({ isOpen, onClose }: SugestaoModalProps) {
           >
             CANCELAR
           </Button>
-          <Button 
+          <Button
             onClick={handleSubmit}
-            disabled={!suggestion.trim()}
+            disabled={!suggestion.trim() || sending || sent}
             className={cn(
               "h-11 px-8 rounded-xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg",
-              suggestion.trim() 
-                ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20 active:scale-95" 
-                : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+              sent
+                ? "bg-emerald-500 text-white shadow-emerald-500/20"
+                : suggestion.trim() && !sending
+                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20 active:scale-95"
+                  : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
             )}
           >
-            <Send className="w-3.5 h-3.5" />
-            ENVIAR AGORA
+            {sending
+              ? <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/></svg>
+              : <Send className="w-3.5 h-3.5" />
+            }
+            {sent ? "ENVIADO!" : sending ? "ENVIANDO..." : "ENVIAR AGORA"}
           </Button>
         </div>
       </div>
