@@ -76,8 +76,34 @@ export function UsersView() {
     setNewUser(u => ({ ...u, avatar: URL.createObjectURL(file), _avatarFile: file } as any));
   };
 
-  const roles = ["vendedor", "logistica", "financeiro", "admin", "comercial"];
-  const departments = ["Comercial", "Logística", "Administrativo", "Produção", "TI"];
+  const roles = [
+    // Diretoria
+    "Diretor",
+    // Gerências
+    "Gerente de Estoque", "Gerente de Manutenção", "Gerente de Segurança",
+    "Gerente de Vendas", "Gerente de Compras", "Gerente de Marketing",
+    "Gerente de RH", "Gerente Contábil", "Gerente Administrativo",
+    "Gerente de TI", "Gerente de Limpeza",
+    // Vendas
+    "Vendedor B2B", "Vendedor B2C", "Auxiliar de Vendas",
+    // Estoque / Expedição
+    "Conferente", "Conferente de Estoque", "Conferente Balcão",
+    "Motorista", "Ajudante",
+    "Auxiliar de Conferência", "Auxiliar de Expedição",
+    "Auxiliar de Expedição Vendedor Separador",
+    // Auxiliares gerais
+    "Auxiliar de Manutenção", "Auxiliar de Segurança", "Auxiliar de Compras",
+    "Auxiliar de Marketing", "Auxiliar de RH", "Auxiliar Contábil",
+    "Assistente Administrativo", "Auxiliar de TI", "Auxiliar de Limpeza",
+    // Administrativo / Financeiro
+    "Faturista", "Caixa",
+    // TI / Admin sistema
+    "admin",
+  ];
+  const departments = [
+    "Estoque", "Manutenção", "Segurança", "Vendas", "Compras",
+    "Marketing", "RH", "Contabilidade", "Administrativo", "TI", "Limpeza",
+  ];
 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
