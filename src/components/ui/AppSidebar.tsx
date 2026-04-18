@@ -26,7 +26,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useTheme } from "@/context/theme-provider";
 
 interface MenuItem {
