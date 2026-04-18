@@ -163,10 +163,10 @@ function getStrength(pw: string): number {
 ───────────────────────────────────────────── */
 function ProfileTab() {
   const [form, setForm] = useState({
-    nome: "Danilo Oliveira",
-    email: "danilo@carflax.com.br",
-    telefone: "+55 (11) 99999-9999",
-    cargo: "Administrator",
+    nome: "",
+    email: "",
+    telefone: "",
+    cargo: "",
   });
   const [isSaved, setIsSaved] = useState(false);
 

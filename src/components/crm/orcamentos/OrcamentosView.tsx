@@ -38,20 +38,7 @@ export interface Orcamento {
 }
 
 export function OrcamentosView() {
-  const [orçamentosData, setOrçamentosData] = useState<Orcamento[]>([
-    { id: "000001026785-OR", seller: "TATIANE MARIA", client: "CLEITO BARROS", date: "16/04/2026", time: "16:56", total: "R$ 48,05", markup: "71.18%", status: "VENDA", totalValue: 48.05, markupValue: 71.18 },
-    { id: "000001026784-OR", seller: "GUSTAVO ALVES", client: "CREAM COLOR", date: "16/04/2026", time: "16:50", total: "R$ 139,90", markup: "125.28%", status: "VENDA", totalValue: 139.90, markupValue: 125.28 },
-    { id: "000001026783-OR", seller: "GUILHERME SANTANA", client: "TRANS KOTHE", date: "16/04/2026", time: "16:47", total: "R$ 380,00", markup: "85.00%", status: "PERDIDO", lossReason: "Preço Alto", totalValue: 380.00, markupValue: 85.00 },
-    { id: "000001026782-OR", seller: "GUILHERME SANTANA", client: "TRANS KOTHE", date: "16/04/2026", time: "18:45", total: "R$ 33.468,36", markup: "140.08%", status: "EMITIDO", totalValue: 33468.36, markupValue: 140.08 },
-    { id: "000001026781-OR", seller: "TATIANE MARIA", client: "ITM LATIN", date: "16/04/2026", time: "16:43", total: "R$ 2.847,30", markup: "73.41%", status: "PERDIDO", lossReason: "Falta de Estoque", totalValue: 2847.30, markupValue: 73.41 },
-    { id: "000001026780-OR", seller: "MATEUS RONALD", client: "RODRIGO SOARES", date: "16/04/2026", time: "16:43", total: "R$ 2.611,60", markup: "75.97%", status: "VENDA", totalValue: 2611.60, markupValue: 75.97 },
-    { id: "000000000822-OR", seller: "GUILHERME SANTANA", client: "JMJ LOCACOES", date: "16/04/2026", time: "16:42", total: "R$ 599,74", markup: "77.78%", status: "VENDA", totalValue: 599.74, markupValue: 77.78 },
-    { id: "000001026779-OR", seller: "TATIANE MARIA", client: "MEDIATRIZ ENGENHARIA", date: "16/04/2026", time: "16:23", total: "R$ 126,40", markup: "114.09%", status: "VENDA", totalValue: 126.40, markupValue: 114.09 },
-    { id: "000001026778-OR", seller: "GUSTAVO ALVES", client: "LOGISTICA EXPRESS", date: "16/04/2026", time: "15:10", total: "R$ 1.540,00", markup: "92.50%", status: "EMITIDO", totalValue: 1540.00, markupValue: 92.50 },
-    { id: "000001026777-OR", seller: "MATEUS RONALD", client: "AUTO PECAS SUL", date: "16/04/2026", time: "14:45", total: "R$ 890,25", markup: "65.20%", status: "VENDA", totalValue: 890.25, markupValue: 65.20 },
-    { id: "000001026776-OR", seller: "TATIANE MARIA", client: "CONSTRUTORA ALPHA", date: "16/04/2026", time: "14:20", total: "R$ 12.850,00", markup: "105.15%", status: "EMITIDO", totalValue: 12850.00, markupValue: 105.15 },
-    { id: "000001026775-OR", seller: "GUILHERME SANTANA", client: "METALURGICA REAL", date: "16/04/2026", time: "13:55", total: "R$ 4.320,00", markup: "88.40%", status: "VENDA", totalValue: 4320.00, markupValue: 88.40 },
-  ]);
+  const [orçamentosData, setOrçamentosData] = useState<Orcamento[]>([]);
 
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'id', direction: 'desc' });
   const [filterStatus, setFilterStatus] = useState("Todos os Status");

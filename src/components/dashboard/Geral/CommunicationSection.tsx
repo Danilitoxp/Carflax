@@ -6,44 +6,7 @@ import { TinyDropdown } from "@/components/ui/TinyDropdown";
 
 const categories = ["Todos", "Empresa", "Social", "Eventos", "Avisos"];
 
-const initialCommunications = [
-  {
-    id: 1,
-    title: "🎉 Feliz Aniversário, Mateus Ronald! 🎂",
-    content: "Hoje celebramos a vida do(a) nosso(a) colega Mateus Ronald! A família Carflax se alegra em compartilhar esse momento especial ao seu lado, reconhecendo toda a dedicação, profissionalismo e energia que você contribui no dia a dia. Desejamos que este novo ciclo venha acompanhado de muita saúde, conquistas e momentos inesquecíveis.",
-    category: "Social",
-    author: "RH Corporate",
-    authorAvatar: "https://api.dicebear.com/7.x/identicon/svg?seed=RH",
-    date: "há 7 dias",
-    image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mateus",
-    likes: 7,
-    dislikes: 0
-  },
-  {
-    id: 2,
-    title: "Atualização da Política de Home Office 2026",
-    content: "Estamos atualizando nossas diretrizes para permitir maior flexibilidade aos colaboradores. Confira os novos modelos de trabalho híbrido disponíveis a partir do próximo mês no portal do RH.",
-    category: "Empresa",
-    author: "Diretoria",
-    authorAvatar: "https://api.dicebear.com/7.x/identicon/svg?seed=Diretoria",
-    date: "há 2 horas",
-    image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Office",
-    likes: 12,
-    dislikes: 0
-  },
-  {
-    id: 3,
-    title: "Novos Benefícios: Plano de Saúde Ampliado",
-    content: "A partir do próximo trimestre, todos os colaboradores terão acesso ao novo plano de saúde Platinum. Fiquem atentos aos seus e-mails para o formulário de atualização de dependentes.",
-    category: "Avisos",
-    author: "Benefícios",
-    authorAvatar: "https://api.dicebear.com/7.x/identicon/svg?seed=Saude",
-    date: "há 1 dia",
-    image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Health",
-    likes: 24,
-    dislikes: 0
-  }
-];
+const initialCommunications: CommunicationPost[] = [];
 
 export interface CommunicationPost {
   id: number;

@@ -19,84 +19,9 @@ export function CampanhasView() {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [isNewCampaignModalOpen, setIsNewCampaignModalOpen] = useState(false);
 
-  const campaigns: Campaign[] = [
-    {
-      id: "premium",
-      type: "highlight",
-      name: "Prêmio do Mês",
-      description: "Bata a meta • Concorra ao sorteio",
-      badge: "NOVIDADE",
-      color: "from-[#1A1A2E] to-[#16213E]",
-      icon: Target
-    },
-    {
-      id: 1,
-      type: "brand",
-      name: "Amanco",
-      date: "01/11/2025 - 30/11/2025",
-      status: "Encerrado",
-      logo: "https://logodownload.org/wp-content/uploads/2019/07/amanco-logo.png",
-    },
-    {
-      id: 2,
-      type: "brand",
-      name: "Italy valvulas - Dezembro",
-      date: "01/12/2025 - 31/12/2025",
-      status: "Encerrado",
-      logo: "https://italyvalvulas.com.br/wp-content/uploads/2022/08/logo-italy-valvulas.png",
-    },
-    {
-      id: 3,
-      type: "brand",
-      name: "Italy valvulas - Fevereiro",
-      date: "01/02/2026 - 28/02/2026",
-      status: "Encerrado",
-      logo: "https://italyvalvulas.com.br/wp-content/uploads/2022/08/logo-italy-valvulas.png",
-    },
-    {
-      id: 4,
-      type: "brand",
-      name: "Italy valvulas - Janeiro",
-      date: "01/01/2026 - 31/01/2026",
-      status: "Encerrado",
-      logo: "https://italyvalvulas.com.br/wp-content/uploads/2022/08/logo-italy-valvulas.png",
-    },
-    {
-      id: 5,
-      type: "brand",
-      name: "Italy valvulas - Novembro",
-      date: "01/11/2025 - 30/11/2025",
-      status: "Encerrado",
-      logo: "https://italyvalvulas.com.br/wp-content/uploads/2022/08/logo-italy-valvulas.png",
-    },
-    {
-      id: 6,
-      type: "brand",
-      name: "Italy Válvulas e Metais | GERAL",
-      date: "01/11/2025 - 28/02/2026",
-      status: "Encerrado",
-      logo: "https://italyvalvulas.com.br/wp-content/uploads/2022/08/logo-italy-valvulas.png",
-    },
-    {
-      id: 7,
-      type: "brand",
-      name: "Sansil Led",
-      date: "01/11/2025 - 15/12/2025",
-      status: "Encerrado",
-      logo: "https://sansilled.com.br/wp-content/uploads/2021/04/logo-sansil-led.png",
-    }
-  ];
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
 
-  const ranking = [
-    { pos: 1, name: "GUSTAVO ALVES CORDEIRO NETO", value: "R$ 42.807,72", color: "bg-yellow-400" },
-    { pos: 2, name: "TATIANE MARIA NICEA DA SILVA S", value: "R$ 38.504,53", color: "bg-slate-300" },
-    { pos: 3, name: "MATEUS RONALD DE SOUSA", value: "R$ 29.651,30", color: "bg-orange-400" },
-    { pos: 4, name: "MURILO HENRIQUE DOS SANTOS", value: "R$ 23.264,53", color: "bg-secondary" },
-    { pos: 5, name: "CAROLINE VENCESLAU", value: "R$ 17.203,73", color: "bg-secondary" },
-    { pos: 6, name: "VALERIA VIEIRA DOS SANTOS", value: "R$ 17.069,33", color: "bg-secondary" },
-    { pos: 7, name: "GUILHERME SANTANA", value: "R$ 16.658,57", color: "bg-secondary" },
-    { pos: 8, name: "JULIANA OLIVEIRA DA SILVA", value: "R$ 14.162,46", color: "bg-secondary" },
-  ];
+  const [ranking, setRanking] = useState<{ pos: number; name: string; value: string; color: string }[]>([]);
 
   // Import Trophy from lucide-react (add to imports if not there)
   // ...

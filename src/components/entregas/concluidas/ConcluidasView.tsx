@@ -29,55 +29,7 @@ export function ConcluidasView() {
   const [startDate, setStartDate] = useState<Date | null>(new Date());
   const [endDate, setEndDate] = useState<Date | null>(null);
 
-  const romaneiosHistory: RomaneioConcluido[] = [
-    {
-      id: "ROM-250410",
-      driver: "NICHOLAS GALBIERI",
-      date: "10/04/2026",
-      deliveredCount: 2,
-      totalValue: "R$ 15.650,50",
-      deliveries: [
-        {
-          id: "h1",
-          nf: "121400",
-          client: "LOJAS CEM S/A",
-          address: "AVENIDA NOVE DE JULHO, 1200 - Jundiaí - SP",
-          status: "completed",
-          time: "10:15",
-          value: "R$ 12.450,00",
-          image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310f?q=80&w=200&h=120&auto=format&fit=crop"
-        },
-        {
-          id: "h2",
-          nf: "121398",
-          client: "MERCADO LIVRE LTDA",
-          address: "ESTRADA MUNICIPAL, 500 - Cajamar - SP",
-          status: "completed",
-          time: "09:30",
-          value: "R$ 3.200,50",
-          image: "https://images.unsplash.com/photo-1553413077-190dd306264c?q=80&w=200&h=120&auto=format&fit=crop"
-        }
-      ]
-    },
-    {
-      id: "ROM-250409",
-      driver: "DANILO VIEIRA",
-      date: "09/04/2026",
-      deliveredCount: 1,
-      totalValue: "R$ 8.940,00",
-      deliveries: [
-        {
-          id: "h3",
-          nf: "121390",
-          client: "MAGAZINE LUIZA",
-          address: "RODOVIA DOS BANDEIRANTES, KM 65 - Jundiaí - SP",
-          status: "completed",
-          time: "14:20",
-          value: "R$ 8.940,00"
-        }
-      ]
-    }
-  ];
+  const [romaneiosHistory, setRomaneiosHistory] = useState<RomaneioConcluido[]>([]);
 
   const filteredRomaneios = romaneiosHistory.filter(rom =>
     rom.id.toLowerCase().includes(searchTerm.toLowerCase()) ||

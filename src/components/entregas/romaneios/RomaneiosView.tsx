@@ -26,40 +26,7 @@ export interface Delivery {
 }
 
 export function RomaneiosView() {
-  const [deliveries] = useState<Delivery[]>([
-    {
-      id: "1",
-      nf: "121495",
-      client: "ANA MARIA DE JESUS PIERRONI",
-      address: "RUA UM, ESTRADA DA SERVIDÃO, NUMERO 37 - Várzea Paulista - SP",
-      status: "completed",
-      time: "16:20",
-      value: "R$ 4.544,01",
-      image: "https://images.unsplash.com/photo-1566576721346-d4a3b4eaad5b?q=80&w=200&h=120&auto=format&fit=crop",
-      priority: "high"
-    },
-    {
-      id: "2",
-      nf: "121412",
-      client: "BARBI DO BRASIL LTDA",
-      address: "RUADORIVAL SPONCHIADO, 530 - PQ EMPRESARIAL - Várzea Paulista - SP",
-      status: "completed",
-      time: "16:22",
-      value: "R$ 821,70",
-      image: "https://images.unsplash.com/photo-1553413077-190dd306264c?q=80&w=200&h=120&auto=format&fit=crop",
-      priority: "medium"
-    },
-    {
-      id: "3",
-      nf: "121496",
-      client: "JAQUELINE PAZELI",
-      address: "RUA INAJÁ, 155 - COND CHACUR - Jundiaí - SP",
-      status: "pending",
-      value: "R$ 1.000,00",
-      image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310f?q=80&w=200&h=120&auto=format&fit=crop",
-      priority: "low"
-    }
-  ]);
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
 
   return (
     <div className="flex-1 flex flex-col gap-4 pb-6 px-0 overflow-hidden bg-[#F8FAFC]">

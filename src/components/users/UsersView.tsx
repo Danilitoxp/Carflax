@@ -73,56 +73,7 @@ export function UsersView() {
   const roles = ["vendedor", "logistica", "financeiro", "admin", "comercial"];
   const departments = ["Comercial", "Logística", "Administrativo", "Produção", "TI"];
 
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: "1",
-      name: "Andrew Smith",
-      email: "andrew@carflax.com",
-      role: "admin",
-      status: "ativo",
-      company: "Carflax",
-      department: "TI",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Andrew",
-      lastLogin: "Há 5 min",
-      permissions: ["Geral", "Produtos", "Calendário", "CRM", "Entregas", "Usuários", "Sugestões"]
-    },
-    {
-      id: "2",
-      name: "Tatiane Maria",
-      email: "tati@carflax.com",
-      role: "vendedor",
-      status: "ativo",
-      company: "Zelex",
-      department: "Comercial",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Tatiane",
-      lastLogin: "Ontem às 16:45",
-      permissions: ["Geral", "CRM"]
-    },
-    {
-      id: "3",
-      name: "Mateus Ronald",
-      email: "mateus@carflax.com",
-      role: "logistica",
-      status: "ativo",
-      company: "JCM",
-      department: "Logística",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mateus",
-      lastLogin: "Hoje às 08:30",
-      permissions: ["Geral", "Entregas"]
-    },
-    {
-      id: "4",
-      name: "Guilherme Santana",
-      email: "guilherme@carflax.com",
-      role: "vendedor",
-      status: "suspenso",
-      company: "Carflax",
-      department: "Comercial",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Guilherme",
-      lastLogin: "Há 3 dias",
-      permissions: ["Geral"]
-    }
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

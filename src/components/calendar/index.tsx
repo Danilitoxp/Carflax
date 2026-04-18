@@ -41,19 +41,9 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [viewMode, setViewMode] = useState<"events" | "vacations">(activeTab === "Férias" ? "vacations" : "events");
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)); // Abril 2026
   const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video"]);
-  const [events, setEvents] = useState<CalendarEvent[]>([
-    { id: 1, day: 1, month: 3, year: 2026, title: "Daniel Duarte 2 anos...", type: "star" },
-    { id: 2, day: 7, month: 3, year: 2026, title: "João Pedro", type: "birthday" },
-    { id: 3, day: 10, month: 3, year: 2026, title: "Mateus Ronald", type: "birthday" },
-    { id: 4, day: 22, month: 3, year: 2026, title: "BLUKIT", type: "education" },
-    { id: 5, day: 23, month: 3, year: 2026, title: "Alan Henrique 1 ano d...", type: "star" },
-  ]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
 
-  const [vacations, setVacations] = useState<Vacation[]>([
-    { id: 1, name: "Mateus Ronald", start: new Date(2026, 3, 5), end: new Date(2026, 3, 18), color: "bg-orange-500", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mateus" },
-    { id: 2, name: "Guilherme Santana", start: new Date(2026, 3, 1), end: new Date(2026, 3, 4), color: "bg-blue-600", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Guilherme" },
-    { id: 3, name: "Tatiane Maria", start: new Date(2026, 3, 20), end: new Date(2026, 3, 26), color: "bg-emerald-600", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Tatiane" },
-  ]);
+  const [vacations, setVacations] = useState<Vacation[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
