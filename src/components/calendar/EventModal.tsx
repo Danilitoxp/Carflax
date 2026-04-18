@@ -1,5 +1,6 @@
-import { X, Calendar as CalendarIcon, ChevronDown } from "lucide-react";
+import { X, Calendar as CalendarIcon, Tag } from "lucide-react";
 import { Button } from "../ui/button";
+import { TinyDropdown } from "../ui/TinyDropdown";
 
 interface EventModalProps {
   isOpen: boolean;
@@ -82,19 +83,19 @@ export function EventModal({
 
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Categoria</label>
-                    <div className="relative">
-                        <select 
-                            value={newEvent.type}
-                            onChange={(e) => setNewEvent({...newEvent, type: e.target.value as EventModalProps["newEvent"]["type"]})}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 appearance-none cursor-pointer transition-all"
-                        >
-                            <option value="video">📹 Gravar Vídeo</option>
-                            <option value="birthday">🎂 Aniversário</option>
-                            <option value="star">⭐ Destaque Especial</option>
-                            <option value="education">🎓 Treinamento Técnico</option>
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                    </div>
+                    <TinyDropdown 
+                        value={newEvent.type}
+                        options={[
+                            { value: "video", label: "📹 Gravar Vídeo" },
+                            { value: "birthday", label: "🎂 Aniversário" },
+                            { value: "star", label: "⭐ Destaque Especial" },
+                            { value: "education", label: "🎓 Treinamento Técnico" }
+                        ]}
+                        onChange={(val) => setNewEvent({...newEvent, type: val as any})}
+                        icon={Tag}
+                        variant="blue"
+                        className="w-full"
+                    />
                   </div>
 
                   <div className="pt-2">

@@ -2,6 +2,8 @@ import { Plus, ThumbsUp, Edit2, Share2, X, Send, Image as ImageIcon, Type, Tag }
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { TinyDropdown } from "@/components/ui/TinyDropdown";
+
 const categories = ["Todos", "Empresa", "Social", "Eventos", "Avisos"];
 
 const initialCommunications = [
@@ -307,16 +309,14 @@ export function CommunicationSection() {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoria</label>
                     <div className="relative">
-                      <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <select
-                        value={newPost.category}
-                        onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm outline-none appearance-none cursor-pointer"
-                      >
-                        {categories.filter(c => c !== "Todos").map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
+                      <TinyDropdown 
+                        value={newPost.category} 
+                        options={categories.filter(c => c !== "Todos")} 
+                        onChange={(val) => setNewPost({ ...newPost, category: val })} 
+                        icon={Tag} 
+                        variant="blue"
+                        className="w-full"
+                      />
                     </div>
                   </div>
                 </div>
@@ -397,4 +397,3 @@ export function CommunicationSection() {
     </div>
   );
 }
-

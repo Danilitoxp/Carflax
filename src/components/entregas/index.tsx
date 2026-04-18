@@ -19,7 +19,7 @@ export function EntregasView({ activeTab: externalTab }: EntregasViewProps) {
   }, [externalTab]);
 
   return (
-    <div className="flex flex-col h-full bg-background p-4 md:p-8 overflow-hidden">
+    <div className="flex flex-col h-full bg-background pt-4 px-4 md:px-6 overflow-hidden">
       <div className="flex-1 flex flex-col min-h-0">
         {internalTab === "romaneios" ? (
           <RomaneiosView />

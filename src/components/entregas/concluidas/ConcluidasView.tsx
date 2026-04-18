@@ -1,60 +1,97 @@
 import { useState } from "react";
-import { 
-  Search, 
-  MapPin, 
-  CheckCircle2, 
+import {
+  Search,
+  CheckCircle2,
   Calendar,
   Download,
-  Clock,
-  ArrowRight,
   FileText,
-  ChevronDown
+  ChevronDown,
+  Truck,
+  User as UserIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
 import type { Delivery } from "../romaneios/RomaneiosView";
 
+interface RomaneioConcluido {
+  id: string;
+  driver: string;
+  date: string;
+  deliveredCount: number;
+  totalValue: string;
+  deliveries: Delivery[];
+}
+
 export function ConcluidasView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState("Hoje: 17 de Abr, 2026");
+  const [startDate, setStartDate] = useState<Date | null>(new Date());
+  const [endDate, setEndDate] = useState<Date | null>(null);
 
-  const history: Delivery[] = [
+  const romaneiosHistory: RomaneioConcluido[] = [
     {
-      id: "h1",
-      nf: "121400",
-      client: "LOJAS CEM S/A",
-      address: "AVENIDA NOVE DE JULHO, 1200 - Jundiaí - SP",
-      status: "completed",
-      time: "10:15",
-      value: "R$ 12.450,00",
-      image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310f?q=80&w=200&h=120&auto=format&fit=crop"
+      id: "ROM-250410",
+      driver: "NICHOLAS GALBIERI",
+      date: "10/04/2026",
+      deliveredCount: 2,
+      totalValue: "R$ 15.650,50",
+      deliveries: [
+        {
+          id: "h1",
+          nf: "121400",
+          client: "LOJAS CEM S/A",
+          address: "AVENIDA NOVE DE JULHO, 1200 - Jundiaí - SP",
+          status: "completed",
+          time: "10:15",
+          value: "R$ 12.450,00",
+          image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310f?q=80&w=200&h=120&auto=format&fit=crop"
+        },
+        {
+          id: "h2",
+          nf: "121398",
+          client: "MERCADO LIVRE LTDA",
+          address: "ESTRADA MUNICIPAL, 500 - Cajamar - SP",
+          status: "completed",
+          time: "09:30",
+          value: "R$ 3.200,50",
+          image: "https://images.unsplash.com/photo-1553413077-190dd306264c?q=80&w=200&h=120&auto=format&fit=crop"
+        }
+      ]
     },
     {
-      id: "h2",
-      nf: "121398",
-      client: "MERCADO LIVRE LTDA",
-      address: "ESTRADA MUNICIPAL, 500 - Cajamar - SP",
-      status: "completed",
-      time: "09:30",
-      value: "R$ 3.200,50",
-      image: "https://images.unsplash.com/photo-1553413077-190dd306264c?q=80&w=200&h=120&auto=format&fit=crop"
+      id: "ROM-250409",
+      driver: "DANILO VIEIRA",
+      date: "09/04/2026",
+      deliveredCount: 1,
+      totalValue: "R$ 8.940,00",
+      deliveries: [
+        {
+          id: "h3",
+          nf: "121390",
+          client: "MAGAZINE LUIZA",
+          address: "RODOVIA DOS BANDEIRANTES, KM 65 - Jundiaí - SP",
+          status: "completed",
+          time: "14:20",
+          value: "R$ 8.940,00"
+        }
+      ]
     }
   ];
 
-  const filteredHistory = history.filter(delivery => 
-    delivery.nf.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    delivery.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    delivery.address.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredRomaneios = romaneiosHistory.filter(rom =>
+    rom.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    rom.driver.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    rom.deliveries.some(d =>
+      d.nf.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      d.client.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
-
-  const [startDate, setStartDate] = useState<Date | null>(new Date());
-  const [endDate, setEndDate] = useState<Date | null>(null);
 
   const handleRangeSelect = (start: Date, end: Date | null) => {
     setStartDate(start);
     setEndDate(end);
-    
+
     if (start && end) {
       const startStr = start.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
       const endStr = end.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
@@ -66,147 +103,162 @@ export function ConcluidasView() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-hide space-y-10 pb-10">
-      {/* Advanced Filter Architecture */}
-      <section className="bg-card border border-border/50 rounded-[3rem] p-6 shadow-2xl shadow-primary/[0.02]">
-        <div className="flex flex-col lg:flex-row items-center gap-6">
-          <div className="flex-1 w-full space-y-2">
-            <div className="relative">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input 
-                type="text" 
-                placeholder="Busque por NF, cliente ou motorista..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-secondary/30 border border-border/50 rounded-[2rem] pl-14 pr-6 py-4 text-sm font-semibold outline-none focus:border-primary/50 focus:bg-background transition-all"
-              />
-            </div>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-4 shrink-0">
-             <div className="relative">
-                <button 
-                  onClick={() => setIsDateMenuOpen(!isDateMenuOpen)}
-                  className="flex items-center justify-between gap-3 px-6 py-4 rounded-[1.5rem] bg-secondary/30 border border-border/50 text-sm font-bold text-foreground/70 cursor-pointer hover:bg-secondary/50 transition-all group min-w-[260px]"
-                >
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-primary" />
-                    <span>{selectedPeriod}</span>
-                  </div>
-                  <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", isDateMenuOpen && "rotate-180")} />
-                </button>
-
-                 {isDateMenuOpen && (
-                   <div className="absolute top-full right-0 mt-3 w-auto bg-card border border-border/50 rounded-2xl shadow-2xl z-[100] backdrop-blur-xl">
-                     <MiniCalendar 
-                       mode="range" 
-                       onSelectRange={handleRangeSelect} 
-                       initialStartDate={startDate}
-                       initialEndDate={endDate}
-                     />
-                   </div>
-                 )}
-             </div>
-
-             <div className="h-10 w-px bg-border/20 hidden lg:block" />
-
-
-             <button className="flex items-center gap-3 bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-[1.5rem] shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
-               <FileText className="w-4 h-4" />
-               <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Exportar Relatório</span>
-               <Download className="w-4 h-4" />
-             </button>
-          </div>
-        </div>
-      </section>
-
-      {/* History Feed */}
-      <div className="space-y-8">
-        <div className="flex items-center justify-between px-2">
-           <h4 className="text-[12px] font-black text-foreground uppercase tracking-[0.2em] flex items-center gap-4">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-              Histórico de Entregas
-           </h4>
-           <div className="h-px flex-1 bg-gradient-to-r from-border/50 to-transparent mx-8 hidden md:block" />
-           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-             {filteredHistory.length} registros encontrados
-           </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4">
+    <div className="flex-1 flex flex-col gap-4 pt-0 pb-6 px-0 overflow-hidden bg-[#F8FAFC]">
+      {/* COMPACT TOOLBAR */}
+      <div className="flex flex-col gap-3 shrink-0">
+        <div className="flex items-center justify-between">
           <div>
-            {filteredHistory.length > 0 ? (
-              filteredHistory.map((delivery) => (
-                <div 
-                  key={delivery.id}
-                  className="bg-card border border-border/40 rounded-[2.5rem] p-6 hover:shadow-xl hover:shadow-primary/[0.03] hover:border-primary/30 transition-all group mb-4"
-                >
-                  <div className="flex flex-col lg:flex-row items-center gap-8">
-                    {/* NF Identity */}
-                    <div className="flex flex-col items-center gap-2 shrink-0">
-                       <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex flex-col items-center justify-center relative shadow-inner">
-                          <span className="text-[8px] font-black text-emerald-600 uppercase">Status</span>
-                          <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-                       </div>
-                       <span className="text-xs font-black text-foreground tracking-tighter">NF {delivery.nf}</span>
-                    </div>
+            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none">Entregas Concluídas</h2>
+            <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center gap-2">
+              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+              Histórico Agrupado por Romaneios Finalizados
+            </p>
+          </div>
 
-                    {/* Main Content */}
-                    <div className="flex-1 space-y-2 text-center lg:text-left pt-2 lg:pt-0">
-                       <div className="flex items-center justify-center lg:justify-start gap-3">
-                          <h5 className="text-[13px] font-black text-foreground uppercase tracking-tight">{delivery.client}</h5>
-                          <span className="px-3 py-1 rounded-lg bg-secondary text-muted-foreground text-[8px] font-black tracking-widest uppercase">CONCLUÍDA</span>
-                       </div>
-                       <div className="flex items-center justify-center lg:justify-start gap-2">
-                          <MapPin className="w-3.5 h-3.5 text-primary/60" />
-                          <p className="text-[11px] font-bold text-muted-foreground uppercase leading-relaxed max-w-2xl">{delivery.address}</p>
-                       </div>
-                    </div>
+          <button className="h-8 px-3 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm shadow-blue-600/10 active:scale-95">
+            <FileText className="w-3.5 h-3.5" />
+            Exportar Geral
+          </button>
+        </div>
 
-                    {/* Outcome & Details */}
-                    <div className="flex items-center gap-8 shrink-0">
-                       <div className="flex flex-col items-end gap-1">
-                          <span className="text-xl font-black text-foreground tracking-tighter">{delivery.value}</span>
-                          <div className="flex items-center gap-1.5">
-                             <Clock className="w-3 h-3 text-muted-foreground" />
-                             <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Entrega às {delivery.time}</span>
-                          </div>
-                       </div>
+        {/* SEARCH & FILTERS */}
+        <div className="flex flex-col md:flex-row items-center gap-2">
+          <div className="flex-1 w-full relative group">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <input
+              type="text"
+              placeholder="Pesquisar Romaneio, NF, Motorista ou Cliente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-[11px] font-bold text-slate-700 placeholder:text-slate-300 outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all"
+            />
+          </div>
 
-                       <button className="h-14 w-14 rounded-2xl bg-secondary hover:bg-primary hover:text-white transition-all flex items-center justify-center border border-border/40 group/btn">
-                          <ArrowRight className="w-5 h-5 transition-transform group-hover/btn:translate-x-1" />
-                       </button>
-                    </div>
-                  </div>
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setIsDateMenuOpen(!isDateMenuOpen)}
+              className="flex items-center justify-between gap-3 h-10 px-4 rounded-xl bg-white border border-slate-200 text-[10px] font-black text-slate-500 hover:border-blue-200 transition-all min-w-[200px]"
+            >
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                <span className="uppercase tracking-tight">{selectedPeriod}</span>
+              </div>
+              <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform", isDateMenuOpen && "rotate-180")} />
+            </button>
+
+            {isDateMenuOpen && (
+              <div className="absolute top-full right-0 mt-2 z-[100] animate-in fade-in zoom-in-95 duration-200">
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl p-1 overflow-hidden">
+                  <MiniCalendar
+                    mode="range"
+                    onSelectRange={handleRangeSelect}
+                    initialStartDate={startDate}
+                    initialEndDate={endDate}
+                  />
                 </div>
-              ))
-            ) : (
-              <div 
-                className="flex flex-col items-center justify-center py-20 bg-secondary/10 rounded-[3rem] border border-dashed border-border"
-              >
-                <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mb-4">
-                  <Search className="w-10 h-10 text-muted-foreground/30" />
-                </div>
-                <h3 className="text-lg font-black text-foreground uppercase tracking-tighter">Nenhum registro encontrado</h3>
-                <p className="text-sm text-muted-foreground mt-1 font-medium">Tente buscar por um número de NF ou nome de cliente diferente.</p>
-                <button 
-                  onClick={() => setSearchTerm("")}
-                  className="mt-6 text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
-                >
-                  Limpar todos os filtros
-                </button>
               </div>
             )}
           </div>
         </div>
-
-        {/* Dynamic Pagination/Load More */}
-        <div className="flex justify-center pt-8">
-           <button className="px-12 py-4 rounded-[2rem] bg-secondary/50 border border-border/40 text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground hover:bg-secondary hover:text-foreground transition-all">
-              Carregar Mais Registros
-           </button>
-        </div>
       </div>
+
+      {/* GROUPED LIST OF ROMANEIOS */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4">
+        {filteredRomaneios.length > 0 ? (
+          filteredRomaneios.map((rom) => (
+            <div key={rom.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              {/* Romaneio Header Group */}
+              <div className="p-3 px-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center border border-blue-100/50">
+                      <Truck className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-black text-slate-900 tracking-tighter uppercase leading-none">{rom.id}</span>
+                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{rom.date}</span>
+                    </div>
+                  </div>
+
+                  <div className="h-6 w-px bg-slate-200" />
+
+                  <div className="flex items-center gap-2">
+                    <UserIcon className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-tight">{rom.driver}</span>
+                  </div>
+
+                  <div className="h-6 w-px bg-slate-200" />
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Entregas:</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[9px] font-black">{rom.deliveredCount}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none block mb-0.5">Total Romaneio</span>
+                    <span className="text-[11px] font-black text-emerald-600 tracking-tighter leading-none">{rom.totalValue}</span>
+                  </div>
+                  <button className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 transition-all">
+                    <Download className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Nested Table for Deliveries */}
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-white">
+                    <th className="py-2.5 px-6 text-[8px] font-black text-slate-300 uppercase tracking-widest">NF</th>
+                    <th className="py-2.5 px-6 text-[8px] font-black text-slate-300 uppercase tracking-widest">Destinatário / Endereço</th>
+                    <th className="py-2.5 px-6 text-[8px] font-black text-slate-300 uppercase tracking-widest">Concluída</th>
+                    <th className="py-2.5 px-6 text-[8px] font-black text-slate-300 uppercase tracking-widest text-right">Valor Parcial</th>
+                    <th className="py-2.5 px-6 text-[8px] font-black text-slate-300 uppercase tracking-widest text-center">Docs</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {rom.deliveries.map((delivery) => (
+                    <tr key={delivery.id} className="hover:bg-slate-50/30 transition-colors group">
+                      <td className="py-2.5 px-6">
+                        <span className="text-[10px] font-black text-slate-600 tracking-tighter">#{delivery.nf}</span>
+                      </td>
+                      <td className="py-2.5 px-6">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-slate-800 uppercase tracking-tight leading-none mb-0.5">{delivery.client}</span>
+                          <span className="text-[8px] font-bold text-slate-400 truncate max-w-[400px] uppercase tracking-tighter opacity-70 group-hover:opacity-100 transition-opacity">
+                            {delivery.address}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-6">
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{delivery.time}</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-6 text-right">
+                        <span className="text-[10px] font-black text-emerald-600 tracking-tighter">{delivery.value}</span>
+                      </td>
+                      <td className="py-2.5 px-6 text-center">
+                        <button className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all scale-90">
+                          <FileText className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 bg-white border border-slate-200 rounded-xl opacity-40">
+            <Search className="w-10 h-10 text-slate-300 mb-3" />
+            <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Nenhum romaneio concluído encontrado</span>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

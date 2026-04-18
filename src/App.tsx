@@ -98,7 +98,7 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
           ) : ["Entregas", "Romaneios", "Concluídas"].includes(activeItem) ? (
             <EntregasView activeTab={activeItem} />
           ) : activeItem === "Usuários" ? (
-            <div className="p-8 h-full overflow-y-auto scrollbar-hide">
+            <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <UsersView />
             </div>
           ) : activeItem === "Geral" ? (
@@ -121,7 +121,7 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
         </div>
 
         {showRightPanel && (
-          <div className="hidden xl:flex flex-col w-80 fixed right-0 top-0 h-screen bg-transparent py-6 pr-6 pl-0 overflow-hidden z-40">
+          <div className="hidden xl:flex flex-col w-80 fixed right-0 top-0 h-screen bg-transparent py-4 pr-6 pl-0 overflow-hidden z-40">
             <button
               onClick={() => setIsVendedor(!isVendedor)}
               className="absolute top-2 right-8 text-[8px] font-bold opacity-0 hover:opacity-100 transition-opacity text-primary uppercase z-50"
@@ -136,9 +136,9 @@ function DashboardContent({ onLogout }: { onLogout: () => void }) {
         )}
       </main>
 
-      <SugestaoModal 
-        isOpen={isSugestaoModalOpen} 
-        onClose={() => setIsSugestaoModalOpen(false)} 
+      <SugestaoModal
+        isOpen={isSugestaoModalOpen}
+        onClose={() => setIsSugestaoModalOpen(false)}
       />
     </div>
   );
@@ -160,7 +160,7 @@ function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="carflax-theme">
       {isLoading && <LoadingScreen />}
-      
+
       {isAuthenticated ? (
         <DashboardContent onLogout={() => setIsAuthenticated(false)} />
       ) : (

@@ -1,0 +1,129 @@
+import { useState, useRef, useEffect } from "react";
+import { ChevronDown } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface DropdownOption {
+  label: string;
+  value: string;
+}
+
+interface TinyDropdownProps {
+  value: string;
+  options: (string | DropdownOption)[];
+  onChange: (value: string) => void;
+  icon: LucideIcon;
+  variant?: "blue" | "amber" | "emerald" | "slate";
+  className?: string;
+  placeholder?: string;
+}
+
+export function TinyDropdown({
+  value,
+  options,
+  onChange,
+  icon: Icon,
+  variant = "slate",
+  className,
+  placeholder
+}: TinyDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const variants = {
+    blue: {
+      active: "bg-blue-50 border-blue-200 text-blue-600",
+      hover: "hover:bg-blue-50/50 hover:text-blue-600",
+      itemHover: "hover:bg-blue-50 hover:text-blue-600",
+      dot: "bg-blue-600"
+    },
+    amber: {
+      active: "bg-amber-50 border-amber-200 text-amber-600",
+      hover: "hover:bg-amber-50/50 hover:text-amber-600",
+      itemHover: "hover:bg-amber-50 hover:text-amber-600",
+      dot: "bg-amber-600"
+    },
+    emerald: {
+      active: "bg-emerald-50 border-emerald-200 text-emerald-600",
+      hover: "hover:bg-emerald-50/50 hover:text-emerald-600",
+      itemHover: "hover:bg-emerald-50 hover:text-emerald-600",
+      dot: "bg-emerald-600"
+    },
+    slate: {
+      active: "bg-slate-50 border-slate-200 text-slate-800",
+      hover: "hover:bg-slate-50/50 hover:text-slate-800",
+      itemHover: "hover:bg-slate-50 hover:text-slate-800",
+      dot: "bg-slate-600"
+    }
+  };
+
+  const currentVariant = variants[variant];
+  
+  const getLabel = (val: string) => {
+    const opt = options.find(o => typeof o === 'string' ? o === val : o.value === val);
+    return opt ? (typeof opt === 'string' ? opt : opt.label) : val;
+  };
+
+  const isActive = value !== placeholder && (typeof options[0] === 'string' ? value !== options[0] : value !== options[0].value);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className={cn("relative", className)} ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "h-10 px-4 rounded-xl border text-[10px] font-black uppercase tracking-tight flex items-center gap-2 transition-all outline-none w-full",
+          isActive ? currentVariant.active : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 shadow-sm",
+          isOpen && "ring-4 ring-slate-900/5 border-slate-300"
+        )}
+      >
+        <Icon className={cn("w-3.5 h-3.5 shrink-0", isActive ? "opacity-100" : "opacity-40")} />
+        <span className="truncate flex-1 text-left">{getLabel(value)}</span>
+        <ChevronDown className={cn("w-3 h-3 transition-transform duration-300 opacity-40 shrink-0", isOpen && "rotate-180")} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-2 w-full min-w-[12rem] bg-white border border-slate-200 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="max-h-60 overflow-y-auto scrollbar-hide py-1">
+            {options.map((option) => {
+              const optLabel = typeof option === 'string' ? option : option.label;
+              const optValue = typeof option === 'string' ? option : option.value;
+              const isSelected = value === optValue;
+
+              return (
+                <button
+                  key={optValue}
+                  type="button"
+                  onClick={() => {
+                    onChange(optValue);
+                    setIsOpen(false);
+                  }}
+                  className={cn(
+                    "w-full px-4 py-2.5 text-[10px] font-bold text-left transition-all uppercase tracking-tighter flex items-center justify-between",
+                    isSelected ? "bg-slate-50 text-slate-900" : "text-slate-500",
+                    currentVariant.itemHover
+                  )}
+                >
+                  {optLabel}
+                  {isSelected && (
+                    <div className={cn("w-1.5 h-1.5 rounded-full", currentVariant.dot)} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

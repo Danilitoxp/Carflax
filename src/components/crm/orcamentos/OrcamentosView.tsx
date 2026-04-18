@@ -1,21 +1,27 @@
 import { useState, useMemo } from "react";
-import { 
-  Search, 
-  Calendar, 
-  ChevronDown, 
-  ChevronsUpDown, 
-  ChevronUp, 
-  Package, 
-  MessageSquare, 
-  X, 
-  Send, 
-  Handshake, 
+import {
+  Search,
+  Calendar,
+  ChevronDown,
+  ChevronsUpDown,
+  ChevronUp,
+  Package,
+  MessageSquare,
+  X,
+  Send,
+  Handshake,
   XCircle,
   Download
 } from "lucide-react";
 import { ChatModal } from "@/components/ui/ChatModal";
 import { cn } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
+import { TinyDropdown } from "@/components/ui/TinyDropdown";
+import {
+  User as UserIcon,
+  FileCheck,
+  AlertCircle,
+} from "lucide-react";
 
 export interface Orcamento {
   id: string;
@@ -52,7 +58,7 @@ export function OrcamentosView() {
   const [filterSeller, setFilterSeller] = useState("Todos os Vendedores");
   const [filterReason, setFilterReason] = useState("Todos os Motivos");
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Modals state
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
@@ -63,7 +69,7 @@ export function OrcamentosView() {
 
   const handleUpdateStatus = (newStatus: string) => {
     if (!selectedItem) return;
-    setOrçamentosData(prev => prev.map(item => 
+    setOrçamentosData(prev => prev.map(item =>
       item.id === selectedItem.id ? { ...item, status: newStatus.toUpperCase() } : item
     ));
     setIsStatusModalOpen(false);
@@ -84,13 +90,13 @@ export function OrcamentosView() {
   const handleDateMask = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, "");
     if (value.length > 8) value = value.slice(0, 8);
-    
+
     if (value.length >= 5) {
       value = value.replace(/(\d{2})(\d{2})(\d{1,4})/, "$1/$2/$3");
     } else if (value.length >= 3) {
       value = value.replace(/(\d{2})(\d{1,2})/, "$1/$2");
     }
-    
+
     e.target.value = value;
   };
 
@@ -120,7 +126,7 @@ export function OrcamentosView() {
 
     // Search Filter
     if (searchTerm) {
-      result = result.filter(item => 
+      result = result.filter(item =>
         item.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.seller.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.id.includes(searchTerm)
@@ -214,50 +220,47 @@ export function OrcamentosView() {
     document.body.removeChild(link);
   };
 
-  const dateLabel = endDate !== null 
+  const dateLabel = endDate !== null
     ? `${startDate?.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })} até ${endDate.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })}`
     : startDate ? `${startDate.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })}...` : "Selecione o período...";
 
   return (
-    <div className="h-full flex flex-col pt-3 px-6 pb-2 overflow-y-auto scrollbar-hide">
+    <div className="h-full flex flex-col pt-4 px-6 pb-2 overflow-y-auto scrollbar-hide">
       {/* Header & Filters (Tiny Style) */}
       <div className="flex flex-col lg:flex-row gap-4 items-center justify-between shrink-0 mb-4 px-1">
         <div className="flex flex-col sm:flex-row gap-2 items-center w-full lg:w-auto flex-1 flex-wrap">
           {/* 1. Search Bar */}
-          <div className="relative w-full sm:w-60 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Pesquisar..." 
+          <div className="flex-1 min-w-[200px] relative group">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <input
+              type="text"
+              placeholder="Pesquisar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-md pl-9 pr-3 py-2 text-xs font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all placeholder:text-slate-300" 
+              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all placeholder:text-slate-300 shadow-sm"
             />
           </div>
 
           {/* 2. Date Filter Button */}
-          <div className="relative w-full sm:w-auto">
-            <button 
+          <div className="relative">
+            <button
               onClick={() => setIsDateModalOpen(!isDateModalOpen)}
               className={cn(
-                "w-full sm:min-w-[200px] flex items-center justify-between gap-3 border rounded-md px-4 py-2 text-[10px] font-bold uppercase tracking-wider transition-all duration-300 outline-none",
-                isDateModalOpen 
-                  ? "bg-blue-600 text-white border-blue-600 shadow-sm" 
-                  : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                "h-10 px-4 rounded-xl border text-[10px] font-black uppercase tracking-tight flex items-center gap-2 transition-all outline-none",
+                startDate ? "bg-blue-50 border-blue-200 text-blue-600 shadow-sm" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 shadow-sm",
+                isDateModalOpen && "ring-4 ring-slate-900/5 border-slate-300"
               )}
             >
-              <div className="flex items-center gap-2">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>{dateLabel}</span>
-              </div>
-              <ChevronDown className={cn("w-3 h-3 transition-transform", isDateModalOpen && "rotate-180")} />
+              <Calendar className="w-3.5 h-3.5 opacity-40" />
+              <span>{dateLabel}</span>
+              <ChevronDown className={cn("w-3 h-3 transition-transform duration-300 opacity-40", isDateModalOpen && "rotate-180")} />
             </button>
 
             {isDateModalOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsDateModalOpen(false)} />
-                <div className="absolute top-11 left-0 z-50">
-                  <MiniCalendar 
+                <div className="absolute top-full left-0 mt-2 z-50">
+                  <MiniCalendar
                     mode="range"
                     onSelectRange={handleRangeSelect}
                     initialStartDate={startDate}
@@ -267,53 +270,41 @@ export function OrcamentosView() {
               </>
             )}
           </div>
-          
+
           {/* 3. Status Filter */}
-          <div className="relative w-full sm:w-36 group shrink-0">
-            <select 
-              value={filterStatus} 
-              onChange={(e) => setFilterStatus(e.target.value)} 
-              className="w-full bg-slate-50 border border-slate-200 rounded-md px-4 py-2 text-[10px] font-bold uppercase tracking-wider outline-none appearance-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 cursor-pointer transition-all text-slate-500 hover:bg-slate-100"
-            >
-              {["Todos os Status", "Em Aberto", "Emitido", "Enviado", "Negociação", "Lib. Crédito", "Aguard. Pedido", "Venda", "Perdido"].map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none group-hover:text-blue-600 transition-colors" />
-          </div>
+          <TinyDropdown
+            value={filterStatus}
+            options={["Todos os Status", "Em Aberto", "Emitido", "Enviado", "Negociação", "Lib. Crédito", "Aguard. Pedido", "Venda", "Perdido"]}
+            onChange={setFilterStatus}
+            icon={FileCheck}
+            variant="blue"
+            placeholder="Todos os Status"
+          />
 
           {/* 4. Seller Filter */}
-          <div className="relative w-full sm:w-36 group shrink-0">
-            <select 
-              value={filterSeller} 
-              onChange={(e) => setFilterSeller(e.target.value)} 
-              className="w-full bg-slate-50 border border-slate-200 rounded-md px-4 py-2 text-[10px] font-bold uppercase tracking-wider outline-none appearance-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 cursor-pointer transition-all text-slate-500 hover:bg-slate-100"
-            >
-              {uniqueSellers.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none group-hover:text-blue-600 transition-colors" />
-          </div>
+          <TinyDropdown
+            value={filterSeller}
+            options={uniqueSellers}
+            onChange={setFilterSeller}
+            icon={UserIcon}
+            variant="slate"
+            placeholder="Todos os Vendedores"
+          />
 
           {/* 5. Loss Reason Filter */}
-          <div className="relative w-full sm:w-36 group shrink-0">
-            <select 
-              value={filterReason} 
-              onChange={(e) => setFilterReason(e.target.value)} 
-              className="w-full bg-slate-50 border border-slate-200 rounded-md px-4 py-2 text-[10px] font-bold uppercase tracking-wider outline-none appearance-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 cursor-pointer transition-all text-slate-500 hover:bg-slate-100"
-            >
-              {lossReasons.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none group-hover:text-blue-600 transition-colors" />
-          </div>
+          <TinyDropdown
+            value={filterReason}
+            options={lossReasons}
+            onChange={setFilterReason}
+            icon={AlertCircle}
+            variant="amber"
+            placeholder="Todos os Motivos"
+          />
         </div>
 
-        <button 
+        <button
           onClick={handleExportCSV}
-          className="w-full lg:w-auto flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm shrink-0"
+          className="h-10 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm shrink-0 flex items-center gap-2"
         >
           <Download className="w-3.5 h-3.5" />
           Exportar CSV
@@ -361,7 +352,7 @@ export function OrcamentosView() {
               <div key={i} className="space-y-1">
                 <div className="flex justify-between items-center text-[9px] font-bold text-slate-500">
                   <span className="uppercase tracking-tight truncate pr-2">{m.label}</span>
-                  <span className="text-slate-900">{Math.floor(m.val/10)}</span>
+                  <span className="text-slate-900">{Math.floor(m.val / 10)}</span>
                 </div>
                 <div className="h-2.5 bg-slate-50 rounded-sm overflow-hidden border border-slate-100/50">
                   <div className={cn("h-full rounded-r-sm transition-all duration-700", m.color)} style={{ width: `${m.val}%` }} />
@@ -411,11 +402,11 @@ export function OrcamentosView() {
                   { id: 'markup', label: 'Markup' },
                   { id: 'status', label: 'Status' },
                 ].map((col) => (
-                  <th 
-                    key={col.id} 
-                    onClick={() => requestSort(col.id)} 
+                  <th
+                    key={col.id}
+                    onClick={() => requestSort(col.id)}
                     className={cn(
-                      "px-6 py-3 text-[9px] font-black uppercase tracking-[0.1em] cursor-pointer hover:bg-slate-100/50 transition-colors text-slate-400 group/th", 
+                      "px-6 py-3 text-[9px] font-black uppercase tracking-[0.1em] cursor-pointer hover:bg-slate-100/50 transition-colors text-slate-400 group/th",
                       col.id === 'status' && "text-center"
                     )}
                   >
@@ -432,7 +423,7 @@ export function OrcamentosView() {
               {filteredAndSortedItems.map((item, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4">
-                    <span 
+                    <span
                       className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
                     >
                       {item.id.replace('-OR', '')}
@@ -456,7 +447,7 @@ export function OrcamentosView() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col items-center gap-1">
-                      <div 
+                      <div
                         onClick={(e) => {
                           e.stopPropagation();
                           if (item.status !== "VENDA" && item.status !== "PERDIDO") {
@@ -464,16 +455,16 @@ export function OrcamentosView() {
                           }
                         }}
                         className={cn(
-                          "inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold tracking-tight transition-all", 
+                          "inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold tracking-tight transition-all",
                           (item.status !== "VENDA" && item.status !== "PERDIDO") ? "cursor-pointer hover:brightness-110 active:scale-95" : "cursor-default opacity-80",
                           item.status === "VENDA" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
-                          item.status === "EMITIDO" ? "bg-slate-50 text-slate-600 border border-slate-100" :
-                          item.status === "ENVIADO" ? "bg-blue-50 text-blue-600 border border-blue-100" :
-                          item.status === "NEGOCIAÇÃO" ? "bg-amber-50 text-amber-600 border border-amber-100" :
-                          item.status === "LIB. CRÉDITO" ? "bg-orange-50 text-orange-600 border border-orange-100" :
-                          item.status === "AGUARD. PEDIDO" ? "bg-indigo-50 text-indigo-600 border border-indigo-100" :
-                          item.status === "PERDIDO" ? "bg-rose-50 text-rose-600 border border-rose-100" :
-                          "bg-slate-50 text-slate-500 border border-slate-100"
+                            item.status === "EMITIDO" ? "bg-slate-50 text-slate-600 border border-slate-100" :
+                              item.status === "ENVIADO" ? "bg-blue-50 text-blue-600 border border-blue-100" :
+                                item.status === "NEGOCIAÇÃO" ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                                  item.status === "LIB. CRÉDITO" ? "bg-orange-50 text-orange-600 border border-orange-100" :
+                                    item.status === "AGUARD. PEDIDO" ? "bg-indigo-50 text-indigo-600 border border-indigo-100" :
+                                      item.status === "PERDIDO" ? "bg-rose-50 text-rose-600 border border-rose-100" :
+                                        "bg-slate-50 text-slate-500 border border-slate-100"
                         )}
                       >
                         {item.status}
@@ -487,8 +478,8 @@ export function OrcamentosView() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
-                      <button 
-                         onClick={() => {
+                      <button
+                        onClick={() => {
                           setSelectedItem(item);
                           setIsItemsModalOpen(true);
                         }}
@@ -497,7 +488,7 @@ export function OrcamentosView() {
                       >
                         <Package className="w-3.5 h-3.5" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedItem(item);
@@ -518,7 +509,7 @@ export function OrcamentosView() {
       </div>
 
       {/* CHAT MODAL (Reusable UI Component) */}
-      <ChatModal 
+      <ChatModal
         isOpen={isChatModalOpen && selectedItem !== null}
         onClose={() => setIsChatModalOpen(false)}
         id={selectedItem?.id.replace('-OR', '') || ""}
@@ -542,7 +533,7 @@ export function OrcamentosView() {
                   <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">Itens do Orçamento</h2>
                   {selectedItem && (
                     <div className="mt-1 flex items-center gap-2">
-                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
                         #{selectedItem.id.replace('-OR', '')}
                       </span>
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate max-w-[200px]">
@@ -552,7 +543,7 @@ export function OrcamentosView() {
                   )}
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setIsItemsModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
               >
@@ -595,7 +586,7 @@ export function OrcamentosView() {
 
             {/* Modal Footer */}
             <div className="p-6 border-t border-slate-100 bg-white shrink-0">
-              <button 
+              <button
                 onClick={() => setIsItemsModalOpen(false)}
                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/10"
               >
@@ -605,12 +596,12 @@ export function OrcamentosView() {
           </div>
         </div>
       )}
-        {/* STATUS CHANGE MODAL (Tiny Redesign) */}
+      {/* STATUS CHANGE MODAL (Tiny Redesign) */}
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-sm">
           <div className="fixed inset-0" onClick={() => setIsStatusModalOpen(false)} />
           <div className="relative w-full max-w-lg bg-white rounded-2xl p-8 shadow-2xl border border-slate-200 overflow-hidden">
-            <button 
+            <button
               onClick={() => setIsStatusModalOpen(false)}
               className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
             >
@@ -648,7 +639,7 @@ export function OrcamentosView() {
                       { label: "Aguard. Pedido", color: "text-indigo-600", dot: "bg-indigo-600", next: null },
                       { label: "Perdido", color: "text-rose-600", dot: "bg-rose-600", next: 'perdido' },
                     ].map((btn, i) => (
-                      <button 
+                      <button
                         key={i}
                         onClick={() => btn.next ? setStatusStep(btn.next as 'enviado' | 'negociacao' | 'perdido') : handleUpdateStatus(btn.label)}
                         className="flex items-center gap-3 py-3 px-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/80 transition-all text-left group"
@@ -679,8 +670,8 @@ export function OrcamentosView() {
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Observação</label>
                       <textarea placeholder="Ex: Cliente solicitou retorno na segunda..." rows={4} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all resize-none" />
                     </div>
-                    <button 
-                      onClick={() => handleUpdateStatus('ENVIADO')} 
+                    <button
+                      onClick={() => handleUpdateStatus('ENVIADO')}
                       className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/10 active:scale-[0.98] transition-all"
                     >
                       Confirmar Envio
@@ -717,8 +708,8 @@ export function OrcamentosView() {
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Observações</label>
                       <textarea placeholder="Detalhes da negociação..." rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none resize-none" />
                     </div>
-                    <button 
-                      onClick={() => handleUpdateStatus('NEGOCIAÇÃO')} 
+                    <button
+                      onClick={() => handleUpdateStatus('NEGOCIAÇÃO')}
                       className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-500/10 active:scale-[0.98] transition-all"
                     >
                       Salvar Negociação
@@ -748,8 +739,8 @@ export function OrcamentosView() {
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Observação Adicional</label>
                       <textarea placeholder="Explique por que o negócio não avançou..." rows={4} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none resize-none" />
                     </div>
-                    <button 
-                      onClick={() => handleUpdateStatus('PERDIDO')} 
+                    <button
+                      onClick={() => handleUpdateStatus('PERDIDO')}
                       className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-600/10 active:scale-[0.98] transition-all"
                     >
                       Confirmar Perda

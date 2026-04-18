@@ -18,71 +18,71 @@ export interface Campaign {
 export function CampanhasView() {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [isNewCampaignModalOpen, setIsNewCampaignModalOpen] = useState(false);
-  
+
   const campaigns: Campaign[] = [
-    { 
-      id: "premium", 
+    {
+      id: "premium",
       type: "highlight",
-      name: "Prêmio do Mês", 
+      name: "Prêmio do Mês",
       description: "Bata a meta • Concorra ao sorteio",
       badge: "NOVIDADE",
       color: "from-[#1A1A2E] to-[#16213E]",
       icon: Target
     },
-    { 
-      id: 1, 
+    {
+      id: 1,
       type: "brand",
-      name: "Amanco", 
+      name: "Amanco",
       date: "01/11/2025 - 30/11/2025",
-      status: "Encerrado", 
+      status: "Encerrado",
       logo: "https://logodownload.org/wp-content/uploads/2019/07/amanco-logo.png",
     },
-    { 
-      id: 2, 
+    {
+      id: 2,
       type: "brand",
-      name: "Italy valvulas - Dezembro", 
+      name: "Italy valvulas - Dezembro",
       date: "01/12/2025 - 31/12/2025",
-      status: "Encerrado", 
+      status: "Encerrado",
       logo: "https://italyvalvulas.com.br/wp-content/uploads/2022/08/logo-italy-valvulas.png",
     },
-    { 
-      id: 3, 
+    {
+      id: 3,
       type: "brand",
-      name: "Italy valvulas - Fevereiro", 
+      name: "Italy valvulas - Fevereiro",
       date: "01/02/2026 - 28/02/2026",
-      status: "Encerrado", 
+      status: "Encerrado",
       logo: "https://italyvalvulas.com.br/wp-content/uploads/2022/08/logo-italy-valvulas.png",
     },
-    { 
-      id: 4, 
+    {
+      id: 4,
       type: "brand",
-      name: "Italy valvulas - Janeiro", 
+      name: "Italy valvulas - Janeiro",
       date: "01/01/2026 - 31/01/2026",
-      status: "Encerrado", 
+      status: "Encerrado",
       logo: "https://italyvalvulas.com.br/wp-content/uploads/2022/08/logo-italy-valvulas.png",
     },
-    { 
-      id: 5, 
+    {
+      id: 5,
       type: "brand",
-      name: "Italy valvulas - Novembro", 
+      name: "Italy valvulas - Novembro",
       date: "01/11/2025 - 30/11/2025",
-      status: "Encerrado", 
+      status: "Encerrado",
       logo: "https://italyvalvulas.com.br/wp-content/uploads/2022/08/logo-italy-valvulas.png",
     },
-    { 
-      id: 6, 
+    {
+      id: 6,
       type: "brand",
-      name: "Italy Válvulas e Metais | GERAL", 
+      name: "Italy Válvulas e Metais | GERAL",
       date: "01/11/2025 - 28/02/2026",
-      status: "Encerrado", 
+      status: "Encerrado",
       logo: "https://italyvalvulas.com.br/wp-content/uploads/2022/08/logo-italy-valvulas.png",
     },
-    { 
-      id: 7, 
+    {
+      id: 7,
       type: "brand",
-      name: "Sansil Led", 
+      name: "Sansil Led",
       date: "01/11/2025 - 15/12/2025",
-      status: "Encerrado", 
+      status: "Encerrado",
       logo: "https://sansilled.com.br/wp-content/uploads/2021/04/logo-sansil-led.png",
     }
   ];
@@ -102,7 +102,7 @@ export function CampanhasView() {
   // ...
 
   return (
-    <div className="h-full flex flex-col pt-3 px-6 pb-2 overflow-hidden bg-[#F8FAFC]">
+    <div className="h-full flex flex-col pt-4 px-6 pb-2 overflow-hidden bg-[#F8FAFC]">
       {/* CSS for Border Trace and Float Animation */}
       <style>{`
         @keyframes border-trace {
@@ -143,7 +143,7 @@ export function CampanhasView() {
           <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Campanhas</h2>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Programas de Incentivo e Vendas</p>
         </div>
-        <button 
+        <button
           onClick={() => setIsNewCampaignModalOpen(true)}
           className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 uppercase tracking-wider active:scale-[0.98]"
         >
@@ -155,8 +155,8 @@ export function CampanhasView() {
       <div className="flex-1 overflow-y-auto scrollbar-hide pr-1">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 pb-6">
           {campaigns.map((camp) => (
-            <div 
-              key={camp.id} 
+            <div
+              key={camp.id}
               onClick={() => camp.type === 'brand' && setSelectedCampaign(camp)}
               className={cn(
                 "aspect-[4/5] rounded-xl p-4 flex flex-col border border-slate-200 transition-all duration-300 cursor-pointer group relative overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-300",
@@ -179,7 +179,7 @@ export function CampanhasView() {
                     <Speaker className="absolute top-1/2 left-2 w-4 h-4 text-blue-600 animate-float opacity-70" style={{ animationDelay: '2.2s' }} />
                     <Fan className="absolute bottom-12 right-2 w-5 h-5 text-blue-600 animate-float-vert opacity-80" style={{ animationDelay: '1.2s' }} />
                   </div>
-                  
+
                   <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 relative z-10">
                     <div className="relative">
                       <div className="absolute inset-0 bg-blue-400 blur-2xl opacity-10 animate-pulse" />
@@ -187,7 +187,7 @@ export function CampanhasView() {
                         <Trophy className="w-8 h-8 text-white" />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-1">
                       <h3 className="text-[16px] font-black text-blue-600 tracking-tight uppercase leading-tight">Prêmio do Mês</h3>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">Bata a meta • Concorra ao sorteio</p>
@@ -204,10 +204,10 @@ export function CampanhasView() {
               ) : (
                 <>
                   <div className="flex-1 bg-slate-50 rounded-lg p-4 flex items-center justify-center border border-slate-100 mb-3 transition-colors group-hover:bg-blue-50/50">
-                    <img 
-                      src={camp.logo} 
-                      className="max-h-12 w-auto object-contain brightness-100 group-hover:scale-110 transition-transform duration-500" 
-                      alt={camp.name} 
+                    <img
+                      src={camp.logo}
+                      className="max-h-12 w-auto object-contain brightness-100 group-hover:scale-110 transition-transform duration-500"
+                      alt={camp.name}
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -215,7 +215,7 @@ export function CampanhasView() {
                     <p className="text-[8px] font-bold text-slate-400 tracking-widest leading-none">{camp.date}</p>
                     <div className="pt-0.5">
                       <span className="inline-flex px-2 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-100 text-[7px] font-black uppercase tracking-widest">
-                         {camp.status}
+                        {camp.status}
                       </span>
                     </div>
                   </div>
@@ -242,7 +242,7 @@ export function CampanhasView() {
                   <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">{selectedCampaign.name}</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedCampaign(null)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
               >
@@ -265,9 +265,9 @@ export function CampanhasView() {
                       <div className={cn(
                         "w-6 h-6 rounded flex items-center justify-center text-[10px] font-black transition-all",
                         v.pos === 1 ? "bg-amber-400 text-amber-900 shadow-sm shadow-amber-400/20" :
-                        v.pos === 2 ? "bg-slate-200 text-slate-600" :
-                        v.pos === 3 ? "bg-orange-100 text-orange-600" :
-                        "bg-slate-50 text-slate-400"
+                          v.pos === 2 ? "bg-slate-200 text-slate-600" :
+                            v.pos === 3 ? "bg-orange-100 text-orange-600" :
+                              "bg-slate-50 text-slate-400"
                       )}>
                         {v.pos}
                       </div>
@@ -288,7 +288,7 @@ export function CampanhasView() {
             </div>
 
             <div className="p-6 border-t border-slate-100 bg-white shrink-0">
-              <button 
+              <button
                 onClick={() => setSelectedCampaign(null)}
                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/10"
               >
@@ -306,7 +306,7 @@ export function CampanhasView() {
           <div className="relative w-full max-w-[480px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
             {/* Modal Header */}
             <div className="px-8 py-6 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
-               <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
                   <Plus className="w-5 h-5 text-blue-600" />
                 </div>
@@ -315,7 +315,7 @@ export function CampanhasView() {
                   <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Cadastro de Incentivo</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setIsNewCampaignModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
               >
@@ -363,7 +363,7 @@ export function CampanhasView() {
             </div>
 
             <div className="p-8 border-t border-slate-100 bg-white shrink-0">
-               <button 
+              <button
                 onClick={() => setIsNewCampaignModalOpen(false)}
                 className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/10"
               >
