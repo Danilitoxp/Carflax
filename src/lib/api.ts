@@ -142,7 +142,17 @@ export const apiOtimizarRota = (body: { entregas: unknown[]; partida: unknown })
 
 // ── CRM ───────────────────────────────────────────────────────────────────────
 
-export const apiCrm = (params?: Record<string, string>) => get("/api/crm", params);
+// API externa com campos corretos: ORCAMENTO, VALOR_ORCAMENTO, MARKUP_PERC, etc.
+const CRM_EXTERNO = "https://marketing-banco-de-dados.velbav.easypanel.host";
+
+export async function apiCrm(params?: Record<string, string>): Promise<unknown[]> {
+  const url = new URL(`${CRM_EXTERNO}/api/crm`);
+  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`CRM API ${res.status}`);
+  const data = await res.json();
+  return Array.isArray(data) ? data : data.data ?? [];
+}
 
 export const apiCrmStatus = (body: unknown) => post("/api/crm/status", body);
 
