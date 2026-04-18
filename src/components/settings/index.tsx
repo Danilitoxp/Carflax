@@ -12,16 +12,14 @@ import {
   KeyRound,
   Bell,
   Monitor,
-  Globe,
   Sun,
   Moon,
   LogOut,
-  AlertTriangle,
   Check,
-  Megaphone,
-  Calendar,
   MessageSquare,
   Briefcase,
+  ShieldAlert,
+  Palette
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,20 +30,21 @@ interface SettingsSectionProps {
 }
 
 /* ─────────────────────────────────────────────
-   TOGGLE COMPONENT
+   TINY TOGGLE
+   Standardizado para o sistema Carflax
 ───────────────────────────────────────────── */
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200",
-        checked ? "bg-primary" : "bg-border"
+        "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out",
+        checked ? "bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]" : "bg-slate-200"
       )}
     >
       <span
         className={cn(
-          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition duration-200",
+          "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-300 ease-in-out",
           checked ? "translate-x-5" : "translate-x-0"
         )}
       />
@@ -54,7 +53,43 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 /* ─────────────────────────────────────────────
-   PASSWORD FIELD
+   TINY INPUT
+   Estilo unificado de alta densidade
+───────────────────────────────────────────── */
+function SettingsInput({
+  label,
+  value,
+  onChange,
+  icon: Icon,
+  type = "text",
+  placeholder
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  icon: any;
+  type?: string;
+  placeholder?: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
+      <div className="relative group">
+        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all placeholder:text-slate-300 shadow-sm"
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   TINY PASSWORD FIELD
 ───────────────────────────────────────────── */
 function PasswordField({
   label,
@@ -71,39 +106,39 @@ function PasswordField({
 }) {
   const [show, setShow] = useState(false);
   return (
-    <div className="space-y-3">
-      <label className="text-[11px] font-black text-primary uppercase tracking-[0.2em] ml-1">{label}</label>
+    <div className="space-y-2">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
       <div className="relative group">
-        <KeyRound className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+        <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
         <input
           type={show ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-14 pr-14 py-5 rounded-[1.5rem] bg-secondary/10 border border-border/50 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-base font-bold text-foreground"
+          className="w-full pl-11 pr-11 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all placeholder:text-slate-300 shadow-sm"
         />
         <button
           type="button"
           onClick={() => setShow(!show)}
-          className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
         >
-          {show ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
       </div>
       {strength !== undefined && value.length > 0 && (
-        <div className="flex items-center gap-2 px-1">
+        <div className="flex items-center gap-1.5 px-1 mt-1.5">
           {[1, 2, 3, 4].map((n) => (
             <div
               key={n}
               className={cn(
-                "h-1.5 flex-1 rounded-full transition-all",
+                "h-1 flex-1 rounded-full transition-all",
                 n <= strength
-                  ? strength <= 1 ? "bg-red-500" : strength === 2 ? "bg-orange-400" : strength === 3 ? "bg-yellow-400" : "bg-emerald-500"
-                  : "bg-border"
+                  ? strength <= 1 ? "bg-rose-500" : strength === 2 ? "bg-amber-500" : strength === 3 ? "bg-blue-500" : "bg-emerald-500"
+                  : "bg-slate-100"
               )}
             />
           ))}
-          <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">
+          <span className="text-[9px] font-black text-slate-400 tracking-tighter ml-1 uppercase">
             {strength <= 1 ? "Fraca" : strength === 2 ? "Média" : strength === 3 ? "Boa" : "Forte"}
           </span>
         </div>
@@ -122,7 +157,7 @@ function getStrength(pw: string): number {
 }
 
 /* ─────────────────────────────────────────────
-   PROFILE TAB
+   MEU PERFIL
 ───────────────────────────────────────────── */
 function ProfileTab() {
   const [form, setForm] = useState({
@@ -139,76 +174,66 @@ function ProfileTab() {
   }
 
   return (
-    <div className="space-y-10 h-full flex flex-col">
-      {/* Avatar */}
-      <div className="flex flex-col md:flex-row items-center gap-10 border-b border-border/10 pb-10">
-        <div className="relative group">
-          <div className="w-36 h-36 rounded-full border-4 border-primary/20 p-1 bg-background shadow-2xl relative overflow-hidden">
+    <div className="space-y-10 animate-in fade-in duration-500 max-w-4xl">
+      {/* Profile Header - More Minimalist */}
+      <div className="flex flex-col sm:flex-row items-center gap-8 pb-8 border-b border-slate-100">
+        <div className="relative group shrink-0">
+          <div className="w-24 h-24 rounded-2xl border-2 border-slate-100 shadow-sm overflow-hidden relative bg-white transition-transform group-hover:scale-105">
             <img
               src="https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo&backgroundColor=0053FC"
-              className="w-full h-full rounded-full object-cover"
+              className="w-full h-full object-cover"
               alt="Avatar"
             />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer backdrop-blur-[2px] rounded-full">
-              <Camera className="text-white w-9 h-9" />
-            </div>
+            <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer backdrop-blur-[2px]">
+              <Camera className="text-white w-6 h-6" />
+              <input type="file" className="hidden" />
+            </label>
           </div>
-          <div className="absolute bottom-1 right-1 bg-primary text-white p-2 rounded-2xl shadow-lg border-4 border-card">
-            <CheckCircle2 className="w-4 h-4" />
+          <div className="absolute -bottom-1.5 -right-1.5 bg-blue-600 text-white p-1 rounded-md shadow-md">
+            <CheckCircle2 className="w-3 h-3" strokeWidth={3} />
           </div>
         </div>
-        <div className="text-center md:text-left space-y-2">
-          <h3 className="text-3xl font-black text-foreground tracking-tight">{form.nome}</h3>
-          <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-            <span className="bg-primary text-white font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-widest">{form.cargo}</span>
-            <span className="bg-secondary text-muted-foreground font-bold text-[10px] px-3 py-1 rounded-full uppercase tracking-widest">Matriz SP</span>
-          </div>
-          <p className="text-muted-foreground text-sm opacity-70">Sua conta Carflax está ativa e verificada.</p>
-          <button className="text-xs font-bold text-primary hover:underline mt-1 transition-colors">Alterar foto de perfil</button>
-        </div>
-      </div>
 
-      {/* Fields */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {[
-          { key: "nome", label: "Nome Completo", icon: User, type: "text" },
-          { key: "email", label: "E-mail Corporativo", icon: Mail, type: "email" },
-          { key: "telefone", label: "WhatsApp / Telefone", icon: Smartphone, type: "tel" },
-          { key: "cargo", label: "Cargo", icon: Briefcase, type: "text" },
-        ].map(({ key, label, icon: Icon, type }) => (
-          <div key={key} className="space-y-3">
-            <label className="text-[11px] font-black text-primary uppercase tracking-[0.2em] ml-1">{label}</label>
-            <div className="relative group">
-              <Icon className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
-              <input
-                type={type}
-                value={form[key as keyof typeof form]}
-                onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                className="w-full pl-14 pr-6 py-5 rounded-[1.5rem] bg-secondary/10 border border-border/50 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-base font-bold text-foreground"
-              />
-            </div>
+        <div className="text-center sm:text-left space-y-1.5">
+          <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none group-hover:text-blue-600 transition-colors uppercase">{form.nome}</h3>
+          <div className="flex flex-wrap gap-2 justify-center sm:justify-start items-center">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">{form.cargo}</span>
+            <div className="w-1 h-1 rounded-full bg-slate-200" />
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">SÃO PAULO - MATRIZ</span>
           </div>
-        ))}
-      </div>
-
-      {/* Footer */}
-      <div className="pt-8 border-t border-border/10 flex flex-col md:flex-row gap-4 items-center justify-between mt-auto">
-        <div>
-          <p className="text-muted-foreground text-[10px] uppercase font-black tracking-widest opacity-40 leading-none mb-1">Status da Segurança</p>
-          <p className="text-emerald-500 text-xs font-bold flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4" /> Autenticação 2FA Ativa
+          <p className="text-[11px] font-medium text-slate-400 leading-tight max-w-md">
+            Identificador interno verificado. Seu acesso de Administrador permite gerenciar todos os módulos do sistema Carflax.
           </p>
         </div>
+      </div>
+
+      {/* Form Fields - High Density */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+        <SettingsInput label="NOME COMPLETO" value={form.nome} onChange={(v) => setForm({ ...form, nome: v })} icon={User} />
+        <SettingsInput label="E-MAIL CORPORATIVO" value={form.email} onChange={(v) => setForm({ ...form, email: v })} icon={Mail} type="email" />
+        <SettingsInput label="WHATSAPP / CELULAR" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} icon={Smartphone} type="tel" />
+        <SettingsInput label="CARGO / FUNÇÃO" value={form.cargo} onChange={(v) => setForm({ ...form, cargo: v })} icon={Briefcase} />
+      </div>
+
+      {/* Action Footer */}
+      <div className="pt-10 flex items-center justify-end">
         <Button
           onClick={handleSave}
           className={cn(
-            "w-full md:w-auto px-12 py-8 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all shadow-[0_15px_30px_-5px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95",
+            "h-12 px-12 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] transition-all shadow-xl active:scale-95",
             isSaved
-              ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20"
-              : "bg-primary hover:bg-primary/90 text-white shadow-primary/20"
+              ? "bg-emerald-600 text-white shadow-emerald-500/20"
+              : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/30"
           )}
         >
-          {isSaved ? <span className="flex items-center gap-2"><Check className="w-4 h-4" /> Configuração Atualizada</span> : "Confirmar Alterações"}
+          {isSaved ? (
+            <span className="flex items-center gap-2">
+              <Check className="w-4 h-4" /> 
+              DADOS ATUALIZADOS
+            </span>
+          ) : (
+            "SALVAR ALTERAÇÕES"
+          )}
         </Button>
       </div>
     </div>
@@ -216,73 +241,83 @@ function ProfileTab() {
 }
 
 /* ─────────────────────────────────────────────
-   NOTIFICATIONS TAB
+   NOTIFICAÇÕES
 ───────────────────────────────────────────── */
 const notifSections = [
   {
-    key: "sistema",
+    key: "alertas",
     icon: Bell,
-    title: "Sistema",
-    desc: "Atualizações e alertas da plataforma",
+    title: "Alertas Críticos",
+    desc: "Notificações urgentes do sistema",
+    color: "rose",
     items: [
-      { key: "updates", label: "Atualizações da plataforma" },
-      { key: "maintenance", label: "Manutenção programada" },
-      { key: "features", label: "Novas funcionalidades" },
-    ],
-  },
-  {
-    key: "email",
-    icon: Mail,
-    title: "E-mail",
-    desc: "Notificações enviadas ao seu e-mail",
-    items: [
-      { key: "weekly", label: "Relatório semanal" },
-      { key: "mentions", label: "Menções e respostas" },
-      { key: "tasks", label: "Tarefas atribuídas" },
-    ],
-  },
-  {
-    key: "push",
-    icon: Smartphone,
-    title: "Push",
-    desc: "Alertas no dispositivo em tempo real",
-    items: [
-      { key: "messages", label: "Novas mensagens" },
-      { key: "reminders", label: "Lembretes de agenda" },
-      { key: "approvals", label: "Aprovações pendentes" },
+      { key: "updates", label: "Atualizações de Segurança" },
+      { key: "maintenance", label: "Manutenção do Servidor" },
     ],
   },
   {
     key: "crm",
     icon: MessageSquare,
-    title: "CRM",
-    desc: "Atividades relacionadas a clientes",
+    title: "Vendas & CRM",
+    desc: "Atividades comerciais e leads",
+    color: "blue",
     items: [
-      { key: "newLead", label: "Novo lead cadastrado" },
-      { key: "dealClosed", label: "Negociação fechada" },
+      { key: "newLead", label: "Novos Orçamentos Criados" },
+      { key: "dealClosed", label: "Negociações Finalizadas" },
+      { key: "mentions", label: "Comentários em Chat" },
     ],
   },
   {
-    key: "agenda",
-    icon: Calendar,
-    title: "Agenda",
-    desc: "Compromissos e eventos",
+    key: "equipe",
+    icon: Smartphone,
+    title: "Comunicação Interna",
+    desc: "Comunicados e avisos da equipe",
+    color: "amber",
     items: [
-      { key: "eventReminder", label: "Lembrete de evento (1h antes)" },
-      { key: "newEvent", label: "Evento criado por outro membro" },
-    ],
-  },
-  {
-    key: "campanhas",
-    icon: Megaphone,
-    title: "Campanhas",
-    desc: "Resultados e status de campanhas",
-    items: [
-      { key: "start", label: "Início de campanha" },
-      { key: "result", label: "Resultado disponível" },
+      { key: "broadcast", label: "Novos Comunicados no Geral" },
+      { key: "events", label: "Eventos do Calendário" },
     ],
   },
 ];
+
+function NotificationsTab() {
+  const [state, setState] = useState<StateMap>(buildDefault);
+
+  function toggle(section: string, item: string) {
+    setState((prev) => ({ ...prev, [section]: { ...prev[section], [item]: !prev[section][item] } }));
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
+      {notifSections.map(({ key, icon: Icon, title, desc, items, color }) => (
+        <div key={key} className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-sm">
+          <div className="p-5 border-b border-slate-50 bg-slate-50/30 flex items-center gap-4">
+            <div className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center",
+              color === 'rose' ? "bg-rose-50 text-rose-600" :
+                color === 'blue' ? "bg-blue-50 text-blue-600" :
+                  "bg-amber-50 text-amber-600"
+            )}>
+              <Icon className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight leading-none mb-1">{title}</p>
+              <p className="text-[10px] text-slate-400 font-bold">{desc}</p>
+            </div>
+          </div>
+          <div className="flex-1 p-5 space-y-4">
+            {items.map((item) => (
+              <div key={item.key} className="flex items-center justify-between group">
+                <span className="text-[11px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{item.label}</span>
+                <Toggle checked={state[key][item.key]} onChange={() => toggle(key, item.key)} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type StateMap = Record<string, Record<string, boolean>>;
 
@@ -295,64 +330,12 @@ function buildDefault(): StateMap {
   return s;
 }
 
-function NotificationsTab() {
-  const [state, setState] = useState<StateMap>(buildDefault);
-
-  function toggle(section: string, item: string) {
-    setState((prev) => ({ ...prev, [section]: { ...prev[section], [item]: !prev[section][item] } }));
-  }
-
-  function toggleAll(section: string, value: boolean) {
-    const sec = notifSections.find((s) => s.key === section)!;
-    const updated: Record<string, boolean> = {};
-    for (const item of sec.items) updated[item.key] = value;
-    setState((prev) => ({ ...prev, [section]: updated }));
-  }
-
-  return (
-    <div className="space-y-4">
-      {notifSections.map(({ key, icon: Icon, title, desc, items }) => {
-        const allOn = items.every((i) => state[key][i.key]);
-        const anyOn = items.some((i) => state[key][i.key]);
-
-        return (
-          <div key={key} className="rounded-[1.5rem] border border-border/50 overflow-hidden bg-secondary/5">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Icon className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-black text-foreground uppercase tracking-tight">{title}</p>
-                  <p className="text-xs text-muted-foreground font-medium">{desc}</p>
-                </div>
-              </div>
-              <Toggle checked={allOn || anyOn} onChange={(v) => toggleAll(key, v)} />
-            </div>
-            {/* Items */}
-            <div className="divide-y divide-border/20">
-              {items.map((item) => (
-                <div key={item.key} className="flex items-center justify-between px-6 py-4 hover:bg-secondary/20 transition-colors">
-                  <span className="text-sm font-semibold text-foreground/80">{item.label}</span>
-                  <Toggle checked={state[key][item.key]} onChange={() => toggle(key, item.key)} />
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /* ─────────────────────────────────────────────
-   SECURITY TAB
+   SEGURANÇA
 ───────────────────────────────────────────── */
 const sessions = [
   { id: 1, device: "Chrome — Windows 11", icon: Monitor, location: "São Paulo, BR", time: "Agora", current: true },
   { id: 2, device: "Safari — iPhone 14", icon: Smartphone, location: "São Paulo, BR", time: "há 2 horas", current: false },
-  { id: 3, device: "Firefox — Linux", icon: Globe, location: "Campinas, BR", time: "há 3 dias", current: false },
 ];
 
 function SecurityTab() {
@@ -372,123 +355,114 @@ function SecurityTab() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Change Password */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="p-8 rounded-[2rem] bg-secondary/5 border border-border/50 space-y-6 md:col-span-2">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-              <Lock className="text-primary w-6 h-6" />
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Pass Change Card */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm flex flex-col h-full">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
+              <Lock className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <h4 className="text-lg font-black text-foreground uppercase tracking-tight">Alterar Senha</h4>
-              <p className="text-muted-foreground text-sm font-medium">Última alteração há 45 dias</p>
+              <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight">Alterar Senha</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Sua segurança vem primeiro</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <PasswordField
-              label="Senha Atual"
-              value={pw.current}
-              onChange={(v) => setPw({ ...pw, current: v })}
-              placeholder="••••••••"
-            />
-            <PasswordField
-              label="Nova Senha"
-              value={pw.next}
-              onChange={(v) => setPw({ ...pw, next: v })}
-              placeholder="Mínimo 8 caracteres"
-              strength={strength}
-            />
-            <PasswordField
-              label="Confirmar Nova Senha"
-              value={pw.confirm}
-              onChange={(v) => setPw({ ...pw, confirm: v })}
-              placeholder="Repita a nova senha"
-            />
-          </div>
+          <div className="space-y-5 flex-1">
+            <PasswordField label="Senha Atual" value={pw.current} onChange={(v) => setPw({ ...pw, current: v })} placeholder="••••••••" />
+            <PasswordField label="Nova Senha" value={pw.next} onChange={(v) => setPw({ ...pw, next: v })} placeholder="Mínimo 8 caracteres" strength={strength} />
+            <PasswordField label="Confirmar Nova Senha" value={pw.confirm} onChange={(v) => setPw({ ...pw, confirm: v })} placeholder="Repita a nova senha" />
 
-          {pw.confirm.length > 0 && !match && (
-            <div className="flex items-center gap-2 text-sm text-red-500 font-semibold">
-              <AlertTriangle className="w-4 h-4" />
-              As senhas não coincidem
-            </div>
-          )}
-
-          <Button
-            onClick={handleSave}
-            disabled={!pw.current || !pw.next || !match}
-            className={cn(
-              "px-10 py-6 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all hover:scale-105 active:scale-95",
-              saved
-                ? "bg-emerald-500 hover:bg-emerald-600 text-white"
-                : "bg-primary hover:bg-primary/90 text-white disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+            {pw.confirm.length > 0 && !match && (
+              <div className="flex items-center gap-2 p-3 bg-rose-50 rounded-xl border border-rose-100">
+                <ShieldAlert className="w-4 h-4 text-rose-600" />
+                <span className="text-[10px] font-black text-rose-600 uppercase">As senhas não coincidem</span>
+              </div>
             )}
-          >
-            {saved ? <span className="flex items-center gap-2"><Check className="w-4 h-4" /> Senha Atualizada!</span> : "Atualizar Senha"}
-          </Button>
+          </div>
+
+          <div className="mt-8">
+            <Button
+              onClick={handleSave}
+              disabled={!pw.current || !pw.next || !match}
+              className={cn(
+                "w-full h-12 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95",
+                saved
+                  ? "bg-emerald-600 text-white"
+                  : "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-30 disabled:shadow-none"
+              )}
+            >
+              {saved ? <span className="flex items-center gap-2"><Check className="w-4 h-4" /> Senha Atualizada</span> : "Atualizar Senha"}
+            </Button>
+          </div>
         </div>
 
-        {/* 2FA */}
-        <div className="p-8 rounded-[2rem] bg-secondary/5 border border-border/50 space-y-5">
-          <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
-            <ShieldCheck className="text-emerald-500 w-6 h-6" />
-          </div>
-          <div>
-            <h4 className="text-lg font-black text-foreground uppercase tracking-tight">Login em 2 Etapas</h4>
-            <p className="text-muted-foreground text-sm font-medium mt-1">O 2FA adiciona uma camada extra de proteção à sua conta.</p>
-          </div>
-          <div className="flex items-center justify-between bg-secondary/30 p-4 rounded-xl border border-border/30">
-            <div>
-              <p className={cn("text-sm font-black uppercase tracking-tight", twoFactor ? "text-emerald-600" : "text-muted-foreground")}>
-                {twoFactor ? "Ativado" : "Desativado"}
-              </p>
-              <p className="text-xs text-muted-foreground font-medium mt-0.5">
-                {twoFactor ? "Sua conta está protegida" : "Ative para maior segurança"}
-              </p>
+        {/* 2FA & Sessions Section */}
+        <div className="space-y-6">
+          {/* 2FA Card */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-colors">
+            <div className="flex items-center gap-5">
+              <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100">
+                <ShieldCheck className="w-6 h-6 text-emerald-600" />
+              </div>
+              <div>
+                <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-tight">Login em 2 Etapas</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase leading-none mt-1">Proteção via Aplicativo</p>
+              </div>
             </div>
             <Toggle checked={twoFactor} onChange={setTwoFactor} />
           </div>
-        </div>
 
-        {/* Sessions */}
-        <div className="p-8 rounded-[2rem] bg-secondary/5 border border-border/50 space-y-5">
-          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-            <Monitor className="text-primary w-6 h-6" />
-          </div>
-          <div>
-            <h4 className="text-lg font-black text-foreground uppercase tracking-tight">Sessões Ativas</h4>
-            <p className="text-muted-foreground text-sm font-medium mt-1">Dispositivos com acesso à sua conta agora.</p>
-          </div>
-          <div className="space-y-3">
-            {sessions.map((s) => {
-              const Icon = s.icon;
-              const revoked = revokedSessions.includes(s.id);
-              return (
-                <div key={s.id} className={cn("flex items-center justify-between p-4 rounded-xl bg-secondary/30 border border-border/30 transition-all", revoked && "opacity-40")}>
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <div className="min-w-0">
-                        <p className="text-xs font-bold text-foreground truncate">{s.device}</p>
-                        {s.current && (
-                          <span className="text-[9px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0">Esta</span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground font-medium uppercase">{s.location} · {s.time}</p>
-                    </div>
-                  {!s.current && !revoked && (
-                    <button
-                      onClick={() => setRevokedSessions([...revokedSessions, s.id])}
-                      className="flex items-center gap-1 text-[10px] font-black text-red-500 hover:text-red-600 hover:bg-red-500/10 px-2.5 py-1.5 rounded-lg transition-all uppercase shrink-0"
-                    >
-                      <LogOut className="w-3 h-3" />
-                      Revogar
-                    </button>
-                  )}
-                  {revoked && <span className="text-[10px] text-muted-foreground italic">Revogado</span>}
+          {/* Active Sessions List */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100">
+                  <Monitor className="w-5 h-5 text-slate-400" />
                 </div>
-              );
-            })}
+                <div>
+                  <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-tight">Sessões Ativas</h4>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">Dispositivos logados</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {sessions.map((s) => {
+                const Icon = s.icon;
+                const revoked = revokedSessions.includes(s.id);
+                return (
+                  <div key={s.id} className={cn(
+                    "flex items-center justify-between p-4 rounded-xl border transition-all",
+                    revoked ? "bg-slate-50 opacity-50 border-transparent" : "bg-white border-slate-100 hover:border-slate-200"
+                  )}>
+                    <div className="flex items-center gap-4">
+                      <div className="w-9 h-9 bg-slate-50 rounded-lg flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4 text-slate-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">{s.device}</p>
+                          {s.current && (
+                            <span className="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md uppercase tracking-widest border border-blue-100">Atual</span>
+                          )}
+                        </div>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{s.location} · {s.time}</p>
+                      </div>
+                    </div>
+                    {!s.current && !revoked && (
+                      <button
+                        onClick={() => setRevokedSessions([...revokedSessions, s.id])}
+                        className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -497,20 +471,10 @@ function SecurityTab() {
 }
 
 /* ─────────────────────────────────────────────
-   APPEARANCE TAB
+   APARÊNCIA
 ───────────────────────────────────────────── */
-const accentColors = [
-  { key: "blue", label: "Azul Carflax", value: "#0053FC" },
-  { key: "indigo", label: "Índigo", value: "#4F46E5" },
-  { key: "violet", label: "Violeta", value: "#7C3AED" },
-  { key: "emerald", label: "Esmeralda", value: "#059669" },
-  { key: "rose", label: "Rosa", value: "#E11D48" },
-  { key: "amber", label: "Âmbar", value: "#D97706" },
-];
-
 function AppearanceTab() {
   const { theme, setTheme } = useTheme();
-  const [accent, setAccent] = useState("blue");
   const [saved, setSaved] = useState(false);
 
   function handleSave() {
@@ -519,96 +483,68 @@ function AppearanceTab() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Theme */}
-      <div className="p-8 rounded-[2rem] bg-secondary/5 border border-border/50 space-y-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-            <Sun className="text-primary w-6 h-6" />
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Theme Cards */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
+            <Palette className="w-6 h-6 text-blue-600" />
           </div>
           <div>
-            <h4 className="text-lg font-black text-foreground uppercase tracking-tight">Tema</h4>
-            <p className="text-muted-foreground text-sm font-medium">Claro, escuro ou automático pelo sistema</p>
+            <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none mb-2">Tema & Interface</h4>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Escolha sua experiência visual</p>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {[
-            { key: "dark", label: "Escuro", icon: Moon },
-            { key: "light", label: "Claro", icon: Sun },
-            { key: "system", label: "Sistema", icon: Monitor },
-          ].map(({ key, label, icon: Icon }) => (
+            { key: "light", label: "Brilhante", icon: Sun, color: "text-amber-500 bg-amber-50" },
+            { key: "dark", label: "Profundo", icon: Moon, color: "text-blue-600 bg-blue-50" },
+            { key: "system", label: "Automático", icon: Monitor, color: "text-slate-500 bg-slate-50" },
+          ].map(({ key, label, icon: Icon, color }) => (
             <button
               key={key}
               onClick={() => setTheme(key as "light" | "dark" | "system")}
               className={cn(
-                "relative flex flex-col items-center gap-3 p-5 rounded-[1.5rem] border-2 transition-all",
+                "relative flex flex-col items-center gap-4 p-8 rounded-2xl border-2 transition-all group",
                 theme === key
-                  ? "border-primary bg-primary/5 shadow-[0_0_0_4px_rgba(0,83,252,0.1)]"
-                  : "border-border bg-background hover:border-primary/30 hover:bg-secondary/30"
+                  ? "border-blue-600 bg-blue-50/20 shadow-lg shadow-blue-600/10"
+                  : "border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50"
               )}
             >
               {theme === key && (
-                <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                  <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                <div className="absolute top-4 right-4 text-blue-600 animate-in zoom-in duration-300">
+                  <div className="w-5 h-5 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/30">
+                    <Check className="w-3 h-3 text-white" strokeWidth={4} />
+                  </div>
                 </div>
               )}
-              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", theme === key ? "bg-primary/15" : "bg-secondary")}>
-                <Icon className={cn("w-6 h-6", theme === key ? "text-primary" : "text-muted-foreground")} />
+              <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110 shadow-sm", color)}>
+                <Icon className="w-8 h-8" />
               </div>
-              <span className={cn("text-sm font-black uppercase tracking-tight", theme === key ? "text-primary" : "text-muted-foreground")}>
-                {label}
-              </span>
+              <div className="text-center">
+                <span className={cn("text-[11px] font-black uppercase tracking-widest block", theme === key ? "text-blue-600" : "text-slate-400")}>
+                  {label}
+                </span>
+                <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase opacity-60">Modo {key}</p>
+              </div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Accent Color */}
-      <div className="p-8 rounded-[2rem] bg-secondary/5 border border-border/50 space-y-5">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-            <div className="w-6 h-6 rounded-full bg-primary" />
-          </div>
-          <div>
-            <h4 className="text-lg font-black text-foreground uppercase tracking-tight">Cor de Destaque</h4>
-            <p className="text-muted-foreground text-sm font-medium">Cor de botões e seleções</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {accentColors.map(({ key, label, value }) => (
-            <button
-              key={key}
-              onClick={() => setAccent(key)}
-              title={label}
-              className={cn(
-                "relative w-10 h-10 rounded-2xl transition-all border-2",
-                accent === key ? "border-foreground scale-110 shadow-lg" : "border-transparent hover:scale-105"
-              )}
-              style={{ backgroundColor: value }}
-            >
-              {accent === key && (
-                <Check className="absolute inset-0 m-auto w-4 h-4 text-white" strokeWidth={3} />
-              )}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-          {accentColors.find((c) => c.key === accent)?.label}
-        </p>
-      </div>
-
-      {/* Save */}
-      <div className="flex justify-end pt-2 pb-4">
+      {/* Save Area */}
+      <div className="flex justify-end pt-4 pb-2 border-t border-slate-50">
         <Button
           onClick={handleSave}
           className={cn(
-            "px-12 py-8 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all shadow-[0_15px_30px_-5px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95",
+            "h-12 px-12 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95",
             saved
-              ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20"
-              : "bg-primary hover:bg-primary/90 text-white shadow-primary/20"
+              ? "bg-emerald-600 text-white shadow-emerald-500/20"
+              : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
           )}
         >
-          {saved ? <span className="flex items-center gap-2"><Check className="w-4 h-4" /> Preferências Salvas!</span> : "Salvar Preferências"}
+          {saved ? <span className="flex items-center gap-2"><Check className="w-4 h-4" /> Preferências Aplicadas</span> : "Salvar Configurações"}
         </Button>
       </div>
     </div>
@@ -616,7 +552,7 @@ function AppearanceTab() {
 }
 
 /* ─────────────────────────────────────────────
-   MAIN COMPONENT
+   COMPONENTE PRINCIPAL (TINY REDESIGN)
 ───────────────────────────────────────────── */
 export function SettingsSection({ externalTab }: SettingsSectionProps) {
   const [activeTab, setActiveTab] = useState("profile");
@@ -638,29 +574,11 @@ export function SettingsSection({ externalTab }: SettingsSectionProps) {
     }
   }
 
-  const tabLabel: Record<string, string> = {
-    profile: "Meu Perfil",
-    notifications: "Notificações",
-    security: "Segurança",
-    appearance: "Aparência",
-  };
-
   return (
-    <div className="flex flex-col h-full bg-background p-4 md:p-8 overflow-hidden">
-      <div className="max-w-5xl mx-auto w-full h-full flex flex-col">
-
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-4xl font-black text-foreground uppercase tracking-tighter">
-            {tabLabel[activeTab] ?? externalTab}
-          </h2>
-          <p className="text-muted-foreground text-sm font-medium uppercase tracking-widest mt-1 opacity-60">
-            Gerencie sua conta e preferências do sistema
-          </p>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 bg-card border border-border/50 rounded-[2.5rem] shadow-2xl overflow-y-auto scrollbar-hide p-8 md:p-12 relative">
+    <div className="h-full flex flex-col bg-[#F8FAFC] pt-4">
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-10 scrollbar-hide">
+        <div className="max-w-6xl mx-auto">
           {activeTab === "profile" && <ProfileTab />}
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "security" && <SecurityTab />}
