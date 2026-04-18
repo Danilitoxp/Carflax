@@ -36,6 +36,8 @@ export function UsersView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Filters State
   const [filterRole, setFilterRole] = useState("Todos os Cargos");
@@ -68,6 +70,7 @@ export function UsersView() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setAvatarLoading(true);
     setNewUser(u => ({ ...u, avatar: URL.createObjectURL(file), _avatarFile: file } as any));
   };
 
@@ -126,10 +129,13 @@ export function UsersView() {
       permissions: user.permissions || [],
       operatorCode: user.operatorCode || ""
     });
+    setAvatarLoading(false);
+    setSaving(false);
     setIsAddModalOpen(true);
   };
 
   const handleSaveUser = async () => {
+    setSaving(true);
     const avatarFile = (newUser as any)._avatarFile as File | undefined;
     let avatarUrl: string | null | undefined;
 
@@ -181,6 +187,7 @@ export function UsersView() {
       if (error) { console.error("[Users] Erro ao criar:", error); return; }
       if (data) setUsers(prev => [...prev, { ...data, permissions: data.permissions || [], lastLogin: "Recém criado" }]);
     }
+    setSaving(false);
     setIsAddModalOpen(false);
     setEditingUser(null);
   };
@@ -232,6 +239,8 @@ export function UsersView() {
             onClick={() => {
               setEditingUser(null);
               setNewUser({ name: "", email: "", role: "vendedor", company: "Carflax", department: "Comercial", avatar: "", permissions: ["Geral"], operatorCode: "" });
+              setAvatarLoading(false);
+              setSaving(false);
               setIsAddModalOpen(true);
             }}
             className="h-8 px-4 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm active:scale-95"
@@ -385,15 +394,11 @@ export function UsersView() {
                 <div className="relative group">
                   <div className="w-24 h-24 rounded-2xl border-4 border-slate-50 shadow-xl overflow-hidden bg-slate-50 flex items-center justify-center transition-transform duration-500 group-hover:scale-105 relative">
                     <>
-                      <div className="img-skeleton absolute inset-0 bg-slate-200 animate-pulse" />
+                      {avatarLoading && <div className="absolute inset-0 bg-slate-200 animate-pulse z-10" />}
                       <img
                         src={getAvatarSrc(newUser.avatar, newUser.name || "user")} alt="Avatar"
-                        onLoad={(e) => {
-                          e.currentTarget.style.opacity = "1";
-                          const sk = e.currentTarget.parentElement?.querySelector(".img-skeleton") as HTMLElement;
-                          if (sk) sk.style.display = "none";
-                        }}
-                        style={{ opacity: 0, transition: "opacity 0.3s", position: "relative", zIndex: 1 }}
+                        onLoad={() => setAvatarLoading(false)}
+                        style={{ opacity: avatarLoading ? 0 : 1, transition: "opacity 0.3s", position: "relative", zIndex: 1 }}
                         className="w-full h-full object-cover"
                       />
                     </>
@@ -490,8 +495,11 @@ export function UsersView() {
             </div>
 
             <div className="p-4 border-t border-slate-100 flex gap-2">
-              <button onClick={() => setIsAddModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
-              <button onClick={handleSaveUser} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/10">{editingUser ? "Salvar" : "Criar"}</button>
+              <button onClick={() => setIsAddModalOpen(false)} disabled={saving} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50">Cancelar</button>
+              <button onClick={handleSaveUser} disabled={saving} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/10 disabled:opacity-70 flex items-center justify-center gap-2">
+                {saving && <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/></svg>}
+                {saving ? "Salvando..." : editingUser ? "Salvar" : "Criar"}
+              </button>
             </div>
           </div>
         </div>
