@@ -216,31 +216,31 @@ export function UsersView() {
       admission_date: maskedToISO((newUser as any).admissionDate || "") || null,
     };
 
-    console.log("[Users] Salvando payload:", payload);
-
-    if (editingUser) {
-      const { error } = await supabase.from("usuarios").update(payload).eq("id", editingUser.id);
-      if (error) { console.error("[Users] Erro ao editar:", error); return; }
-      // Re-busca do banco para confirmar o que foi salvo
-      const { data: updated } = await supabase.from("usuarios").select("*").eq("id", editingUser.id).single();
-      if (updated) {
-        setUsers(prev => prev.map(u => u.id === editingUser.id ? {
-          id: updated.id, name: updated.name, email: updated.email, role: updated.role,
-          status: updated.status, avatar: updated.avatar || "", lastLogin: updated.last_login ? new Date(updated.last_login).toLocaleString("pt-BR") : "Nunca",
-          permissions: updated.permissions || [], operatorCode: updated.operator_code || "",
-          company: updated.company, department: updated.department,
-        } : u));
+    try {
+      if (editingUser) {
+        const { error } = await supabase.from("usuarios").update(payload).eq("id", editingUser.id);
+        if (error) { console.error("[Users] Erro ao editar:", error); return; }
+        const { data: updated } = await supabase.from("usuarios").select("*").eq("id", editingUser.id).single();
+        if (updated) {
+          setUsers(prev => prev.map(u => u.id === editingUser.id ? {
+            id: updated.id, name: updated.name, email: updated.email, role: updated.role,
+            status: updated.status, avatar: updated.avatar || "", lastLogin: updated.last_login ? new Date(updated.last_login).toLocaleString("pt-BR") : "Nunca",
+            permissions: updated.permissions || [], operatorCode: updated.operator_code || "",
+            company: updated.company, department: updated.department,
+          } : u));
+        } else {
+          setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...newUser, avatar: finalAvatar } : u));
+        }
       } else {
-        setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...newUser, avatar: finalAvatar } : u));
+        const { data, error } = await supabase.from("usuarios").insert({ ...payload, status: "ativo" }).select().single();
+        if (error) { console.error("[Users] Erro ao criar:", error); return; }
+        if (data) setUsers(prev => [...prev, { ...data, permissions: data.permissions || [], lastLogin: "Recém criado" }]);
       }
-    } else {
-      const { data, error } = await supabase.from("usuarios").insert({ ...payload, status: "ativo" }).select().single();
-      if (error) { console.error("[Users] Erro ao criar:", error); return; }
-      if (data) setUsers(prev => [...prev, { ...data, permissions: data.permissions || [], lastLogin: "Recém criado" }]);
+      setIsAddModalOpen(false);
+      setEditingUser(null);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setIsAddModalOpen(false);
-    setEditingUser(null);
   };
 
   const handleDeleteUser = async (id: string) => {
