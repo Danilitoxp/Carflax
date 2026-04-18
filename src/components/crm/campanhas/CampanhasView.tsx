@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { Target, Plus, X, Trophy, ChevronLeft, ChevronRight, Gift, Star, Lock } from "lucide-react";
+import { apiElegiveisParaSorteio, apiCampaignRanking, type MetaVendedor, type RankingVendedor } from "@/lib/api";
+import { Target, Plus, X, Trophy, ChevronLeft, ChevronRight, Gift, Star, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface Campaign {
@@ -47,6 +48,13 @@ export function CampanhasView() {
   const [premioAtual, setPremioAtual] = useState<PremioMes | null>(null);
   const [proximosPremios, setProximosPremios] = useState<PremioMes[]>([]);
   const [loadingPremio, setLoadingPremio] = useState(false);
+  const [elegiveis, setElegiveis] = useState<MetaVendedor[] | null>(null);
+  const [loadingElegiveis, setLoadingElegiveis] = useState(false);
+  const [erroApi, setErroApi] = useState(false);
+
+  // Ranking da campanha selecionada
+  const [rankingCampanha, setRankingCampanha] = useState<RankingVendedor[]>([]);
+  const [loadingRanking, setLoadingRanking] = useState(false);
 
   // Card do mês atual (visível no grid)
   const [premioCard, setPremioCard] = useState<PremioMes | null>(null);
@@ -77,11 +85,15 @@ export function CampanhasView() {
 
   const carregarPremio = useCallback(async (mes: number, ano: number) => {
     setLoadingPremio(true);
+    setLoadingElegiveis(true);
+    setErroApi(false);
     setPremioAtual(null);
+    setElegiveis(null);
 
     const now = new Date();
     const mesAtual = now.getMonth() + 1;
     const anoAtual = now.getFullYear();
+    const mesano = `${String(mes).padStart(2, "0")}${ano}`;
 
     const [{ data: premio }, { data: proximos }] = await Promise.all([
       supabase.from("premio_mes").select("*").eq("mes", mes).eq("ano", ano).single(),
@@ -95,6 +107,16 @@ export function CampanhasView() {
     if (premio) setPremioAtual(premio);
     setProximosPremios(proximos || []);
     setLoadingPremio(false);
+
+    // Busca elegíveis na API do ERP (≥97% da meta)
+    try {
+      const elig = await apiElegiveisParaSorteio(mesano);
+      setElegiveis(elig);
+    } catch {
+      setErroApi(true);
+      setElegiveis([]);
+    }
+    setLoadingElegiveis(false);
   }, []);
 
   const abrirModalPremio = () => {
@@ -109,6 +131,24 @@ export function CampanhasView() {
     const novo = offsetMes(mesSelecionado.mes, mesSelecionado.ano, delta);
     setMesSelecionado(novo);
     carregarPremio(novo.mes, novo.ano);
+  };
+
+  const abrirRankingCampanha = async (camp: Campaign) => {
+    setSelectedCampaign(camp);
+    setRankingCampanha([]);
+    setLoadingRanking(true);
+    try {
+      const now = new Date();
+      const data_ini = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      const ranking = await apiCampaignRanking({
+        fornecedor: camp.description || camp.name,
+        data_ini,
+      });
+      setRankingCampanha(ranking);
+    } catch {
+      setRankingCampanha([]);
+    }
+    setLoadingRanking(false);
   };
 
   const now = new Date();
@@ -185,7 +225,7 @@ export function CampanhasView() {
           {campaigns.map((camp) => (
             <div
               key={camp.id}
-              onClick={() => setSelectedCampaign(camp)}
+              onClick={() => abrirRankingCampanha(camp)}
               className="aspect-[4/5] rounded-xl p-4 flex flex-col border border-slate-200 transition-all duration-300 cursor-pointer group relative overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-300"
             >
               <div className="flex-1 bg-slate-50 rounded-lg p-4 flex items-center justify-center border border-slate-100 mb-3 transition-colors group-hover:bg-blue-50/50">
@@ -295,12 +335,46 @@ export function CampanhasView() {
                   <Star className="w-3.5 h-3.5 text-amber-500" />
                   <h4 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Vendedores Elegíveis</h4>
                   <span className="text-[9px] font-bold text-slate-400">≥ 97% da meta</span>
+                  {elegiveis && !loadingElegiveis && (
+                    <span className="ml-auto text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">
+                      {elegiveis.length} elegíveis
+                    </span>
+                  )}
                 </div>
-                <div className="bg-slate-50 border border-slate-200 border-dashed rounded-xl p-5 flex flex-col items-center justify-center gap-2 text-center">
-                  <Lock className="w-6 h-6 text-slate-300" />
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Aguardando integração ERP</p>
-                  <p className="text-[10px] text-slate-400">Os vendedores com ≥ 97% da meta aparecerão aqui automaticamente após a conexão com o sistema de metas.</p>
-                </div>
+
+                {loadingElegiveis ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="bg-slate-100 rounded-xl h-20 animate-pulse" />
+                    ))}
+                  </div>
+                ) : erroApi ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                    <p className="text-[11px] text-amber-700 font-semibold">API não disponível. Verifique se o servidor ERP está rodando.</p>
+                  </div>
+                ) : elegiveis && elegiveis.length === 0 ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-center">
+                    <p className="text-[11px] font-bold text-slate-400">Nenhum vendedor atingiu 97% da meta neste mês ainda.</p>
+                  </div>
+                ) : elegiveis && elegiveis.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {elegiveis.map((v) => {
+                      const pct = v.PERC_META_BATIDA;
+                      const borderColor = pct >= 100 ? "border-emerald-400" : "border-amber-400";
+                      const pctColor = pct >= 100 ? "text-emerald-600" : "text-amber-600";
+                      return (
+                        <div key={v.COD_VENDEDOR} className={cn("bg-white border-2 rounded-xl p-3 flex flex-col items-center text-center gap-1", borderColor)}>
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 flex items-center justify-center text-white text-xs font-black">
+                            {v.NOME_VENDEDOR.split(" ").map(n => n[0]).slice(0,2).join("")}
+                          </div>
+                          <p className="text-[10px] font-black text-slate-800 leading-tight line-clamp-2">{v.NOME_VENDEDOR}</p>
+                          <p className={cn("text-[11px] font-black", pctColor)}>{pct.toFixed(1)}%</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
 
               {/* Próximos Prêmios */}
@@ -359,10 +433,49 @@ export function CampanhasView() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-8 scrollbar-hide flex flex-col items-center justify-center gap-3 text-center">
-              <Lock className="w-10 h-10 text-slate-200" />
-              <p className="text-sm font-black text-slate-400 uppercase tracking-wider">Ranking pendente de integração ERP</p>
-              <p className="text-[11px] text-slate-400 max-w-xs">O ranking de vendedores por fornecedor/marca será exibido aqui após a conexão com o sistema de faturamento (MySQL).</p>
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+              {loadingRanking ? (
+                <div className="space-y-2">
+                  {[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-slate-100 rounded-lg animate-pulse" />)}
+                </div>
+              ) : rankingCampanha.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3 text-center h-40">
+                  <AlertCircle className="w-8 h-8 text-slate-200" />
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    {erroApi ? "API não disponível" : "Nenhum dado de faturamento encontrado para este fornecedor"}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="grid grid-cols-12 px-4 mb-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                    <div className="col-span-1">Pos</div>
+                    <div className="col-span-7">Vendedor</div>
+                    <div className="col-span-2 text-right">Qtd</div>
+                    <div className="col-span-2 text-right">Faturado</div>
+                  </div>
+                  {rankingCampanha.map((v, i) => (
+                    <div key={v.COD_VENDEDOR} className="grid grid-cols-12 items-center bg-white hover:bg-slate-50 px-4 py-2.5 rounded-lg border border-slate-100 transition-all">
+                      <div className="col-span-1">
+                        <div className={cn(
+                          "w-6 h-6 rounded flex items-center justify-center text-[10px] font-black",
+                          i === 0 ? "bg-amber-400 text-amber-900" : i === 1 ? "bg-slate-200 text-slate-600" : i === 2 ? "bg-orange-100 text-orange-600" : "bg-slate-50 text-slate-400"
+                        )}>{i + 1}</div>
+                      </div>
+                      <div className="col-span-7 pl-2">
+                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">{v.NOME_VENDEDOR}</span>
+                      </div>
+                      <div className="col-span-2 text-right">
+                        <span className="text-[10px] font-semibold text-slate-500">{v.QTD_VENDAS}</span>
+                      </div>
+                      <div className="col-span-2 text-right">
+                        <span className="text-[11px] font-black text-emerald-600">
+                          {Number(v.FATURADO).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="p-6 border-t border-slate-100 bg-white shrink-0">
               <button onClick={() => setSelectedCampaign(null)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98]">
