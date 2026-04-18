@@ -128,7 +128,7 @@ export function UsersView() {
   const handleSaveUser = async () => {
     const avatarFile = (newUser as any)._avatarFile as File | undefined;
     const avatarUrl = avatarFile
-      ? await uploadImage(avatarFile, "avatars")
+      ? await uploadImage(avatarFile, "avatares")
       : (newUser.avatar?.startsWith("blob:") ? editingUser?.avatar || "" : newUser.avatar);
 
     const payload = {
