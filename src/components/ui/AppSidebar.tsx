@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { OrgChartModal } from "./OrgChartModal";
 import {
   LayoutGrid,
   Settings,
@@ -105,6 +106,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout }: AppSidebarProps) {
   const { theme, setTheme } = useTheme();
+  const [orgChartOpen, setOrgChartOpen] = useState(false);
   const [openMenus, setOpenMenus] = useState<string[]>(["Dashboard"]);
 
   const toggleMenu = (label: string) => {
@@ -367,8 +369,26 @@ export function AppSidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose,
         </div>
       </div>
 
+      <OrgChartModal isOpen={orgChartOpen} onClose={() => setOrgChartOpen(false)} />
+
       {/* Footer - Minimalist */}
       <div className="p-4 mt-auto border-t border-border/50">
+        {/* Organograma Card */}
+        <button
+          onClick={() => setOrgChartOpen(true)}
+          className={cn(
+            "w-full mb-3 flex items-center gap-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl px-3 py-2.5 transition-all shadow-md shadow-blue-600/20 active:scale-95",
+            isCollapsed && "justify-center px-2"
+          )}
+        >
+          <Users className="w-4 h-4 shrink-0" />
+          {!isCollapsed && (
+            <div className="text-left">
+              <p className="text-[9px] font-black uppercase tracking-widest leading-none">Organograma</p>
+              <p className="text-[7px] font-bold text-blue-200 mt-0.5">Estrutura Corporativa</p>
+            </div>
+          )}
+        </button>
         <div className="flex items-center gap-3 px-2 py-2">
            <button 
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
