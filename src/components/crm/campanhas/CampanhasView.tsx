@@ -29,11 +29,12 @@ export function CampanhasView() {
       const { data, error } = await supabase
         .from("campanhas")
         .select("*")
+        .order("is_destaque", { ascending: false })
         .order("created_at", { ascending: false });
       if (!error && data) {
         const mapped: Campaign[] = data.map((c) => ({
           id: c.id,
-          type: "brand" as const,
+          type: c.is_destaque ? ("highlight" as const) : ("brand" as const),
           name: c.name,
           description: c.fornecedor || "",
           date: c.date ? new Date(c.date).toLocaleDateString("pt-BR") : "",
@@ -135,14 +136,19 @@ export function CampanhasView() {
                     </div>
 
                     <div className="space-y-1">
-                      <h3 className="text-[16px] font-black text-blue-600 tracking-tight uppercase leading-tight">Prêmio do Mês</h3>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">Bata a meta • Concorra ao sorteio</p>
+                      <h3 className="text-[16px] font-black text-blue-600 tracking-tight uppercase leading-tight">{camp.name}</h3>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">
+                        {camp.description ? camp.description : "Bata a meta • Concorra ao sorteio"}
+                      </p>
+                      {camp.date && (
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{camp.date}{camp.badge ? ` • ${camp.badge}` : ""}</p>
+                      )}
                     </div>
 
                     <div className="px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100 flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
                       <span className="text-[9px] font-black text-blue-600 tracking-[0.2em] uppercase flex items-center gap-1.5">
-                        <span className="text-[11px] leading-none mb-0.5">★</span> NOVIDADE
+                        <span className="text-[11px] leading-none mb-0.5">★</span> CAMPANHA DO MÊS
                       </span>
                     </div>
                   </div>
