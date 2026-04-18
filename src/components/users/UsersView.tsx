@@ -164,7 +164,18 @@ export function UsersView() {
     if (editingUser) {
       const { error } = await supabase.from("usuarios").update(payload).eq("id", editingUser.id);
       if (error) { console.error("[Users] Erro ao editar:", error); return; }
-      setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...newUser, avatar: finalAvatar } : u));
+      // Re-busca do banco para confirmar o que foi salvo
+      const { data: updated } = await supabase.from("usuarios").select("*").eq("id", editingUser.id).single();
+      if (updated) {
+        setUsers(prev => prev.map(u => u.id === editingUser.id ? {
+          id: updated.id, name: updated.name, email: updated.email, role: updated.role,
+          status: updated.status, avatar: updated.avatar || "", lastLogin: updated.last_login ? new Date(updated.last_login).toLocaleString("pt-BR") : "Nunca",
+          permissions: updated.permissions || [], operatorCode: updated.operator_code || "",
+          company: updated.company, department: updated.department,
+        } : u));
+      } else {
+        setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...newUser, avatar: finalAvatar } : u));
+      }
     } else {
       const { data, error } = await supabase.from("usuarios").insert({ ...payload, status: "ativo" }).select().single();
       if (error) { console.error("[Users] Erro ao criar:", error); return; }
@@ -386,14 +397,19 @@ export function UsersView() {
                         className="w-full h-full object-cover"
                       />
                     </>
-                    <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer backdrop-blur-[2px]">
+                    <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer backdrop-blur-[2px] z-10">
                       <Camera className="w-6 h-6 text-white mb-1" />
                       <span className="text-[8px] font-black text-white uppercase tracking-widest">Alterar</span>
                       <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
                     </label>
                   </div>
+                  {/* Botão de trocar foto sempre visível abaixo */}
+                  <label className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-1.5 shadow-lg cursor-pointer transition-all active:scale-95">
+                    <Camera className="w-3 h-3" />
+                    <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                  </label>
                 </div>
-                <div className="text-center">
+                <div className="text-center mt-2">
                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Foto de Perfil</p>
                 </div>
               </div>
