@@ -682,17 +682,14 @@ export function CampanhasView() {
                 {/* Fornecedor */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Fornecedor</label>
-                  <input
-                    list="fornecedores-list"
-                    type="text"
+                  <select
                     value={formData.fornecedor}
                     onChange={(e) => setFormData(f => ({ ...f, fornecedor: e.target.value }))}
-                    placeholder="Buscar fornecedor..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all"
-                  />
-                  <datalist id="fornecedores-list">
-                    {fornecedores.map(f => <option key={f} value={f} />)}
-                  </datalist>
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all appearance-none"
+                  >
+                    <option value="">Selecionar fornecedor...</option>
+                    {fornecedores.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
                 </div>
 
                 {/* Período */}
