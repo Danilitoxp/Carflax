@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { Target, Plus, X, Trophy, WashingMachine, Smartphone, Tv, Speaker, Fan, Refrigerator } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,8 +24,28 @@ export function CampanhasView() {
 
   const [ranking, setRanking] = useState<{ pos: number; name: string; value: string; color: string }[]>([]);
 
-  // Import Trophy from lucide-react (add to imports if not there)
-  // ...
+  useEffect(() => {
+    async function fetchCampanhas() {
+      const { data, error } = await supabase
+        .from("campanhas")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (!error && data) {
+        const mapped: Campaign[] = data.map((c) => ({
+          id: c.id,
+          type: "brand" as const,
+          name: c.name,
+          description: c.fornecedor || "",
+          date: c.date ? new Date(c.date).toLocaleDateString("pt-BR") : "",
+          status: c.status || "ativa",
+          logo: c.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(c.name)}`,
+          badge: c.periodo_fim ? `até ${new Date(c.periodo_fim).toLocaleDateString("pt-BR")}` : undefined,
+        }));
+        setCampaigns(mapped);
+      }
+    }
+    fetchCampanhas();
+  }, []);
 
   return (
     <div className="h-full flex flex-col pt-4 px-6 pb-2 overflow-hidden bg-[#F8FAFC]">
