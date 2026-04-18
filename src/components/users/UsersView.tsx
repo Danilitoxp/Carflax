@@ -469,7 +469,7 @@ export function UsersView() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
-                  <input type="text" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} placeholder="Andrew Smith" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all" />
+                  <input type="text" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value.toUpperCase() })} placeholder="DANILO OLIVEIRA" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all uppercase" />
                 </div>
                 <div className="col-span-2 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail Corporativo</label>
