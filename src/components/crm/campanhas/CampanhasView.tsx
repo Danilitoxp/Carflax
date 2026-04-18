@@ -21,31 +21,44 @@ export function CampanhasView() {
   const [isNewCampaignModalOpen, setIsNewCampaignModalOpen] = useState(false);
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [premioMes, setPremioMes] = useState<{ nome: string; descricao: string; valor: number | null; imagem: string | null } | null>(null);
 
   const [ranking, setRanking] = useState<{ pos: number; name: string; value: string; color: string }[]>([]);
 
   useEffect(() => {
-    async function fetchCampanhas() {
-      const { data, error } = await supabase
-        .from("campanhas")
-        .select("*")
-        .order("is_destaque", { ascending: false })
-        .order("created_at", { ascending: false });
-      if (!error && data) {
-        const mapped: Campaign[] = data.map((c) => ({
+    const now = new Date();
+    const mes = now.getMonth() + 1;
+    const ano = now.getFullYear();
+
+    async function fetchData() {
+      const [{ data: campanhasData }, { data: premioData }] = await Promise.all([
+        supabase.from("campanhas").select("*").order("created_at", { ascending: false }),
+        supabase.from("premio_mes").select("*").eq("mes", mes).eq("ano", ano).single(),
+      ]);
+
+      if (campanhasData) {
+        setCampaigns(campanhasData.map((c) => ({
           id: c.id,
-          type: c.is_destaque ? ("highlight" as const) : ("brand" as const),
+          type: "brand" as const,
           name: c.name,
           description: c.fornecedor || "",
           date: c.date ? new Date(c.date).toLocaleDateString("pt-BR") : "",
           status: c.status || "ativa",
           logo: c.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(c.name)}`,
           badge: c.periodo_fim ? `até ${new Date(c.periodo_fim).toLocaleDateString("pt-BR")}` : undefined,
-        }));
-        setCampaigns(mapped);
+        })));
+      }
+
+      if (premioData) {
+        setPremioMes({
+          nome: premioData.nome,
+          descricao: premioData.descricao || "",
+          valor: premioData.valor || null,
+          imagem: premioData.imagem || null,
+        });
       }
     }
-    fetchCampanhas();
+    fetchData();
   }, []);
 
   return (
@@ -101,60 +114,50 @@ export function CampanhasView() {
 
       <div className="flex-1 overflow-y-auto scrollbar-hide pr-1">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 pb-6">
+
+          {/* Card Prêmio do Mês */}
+          {premioMes && (
+            <div className="aspect-[4/5] rounded-xl p-4 flex flex-col border border-blue-200/50 transition-all duration-300 cursor-pointer group relative overflow-hidden bg-white shadow-xl shadow-blue-600/5 hover:shadow-md hover:border-blue-300">
+              <div className="absolute inset-0 z-0 pointer-events-none">
+                <div className="absolute inset-0 border-2 border-blue-600 rounded-xl animate-border-trace opacity-60" />
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-3 relative z-10">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-blue-400 blur-2xl opacity-10 animate-pulse" />
+                  {premioMes.imagem ? (
+                    <img
+                      src={premioMes.imagem}
+                      alt={premioMes.nome}
+                      className="w-20 h-20 object-contain relative group-hover:scale-110 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 flex items-center justify-center relative shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform duration-500">
+                      <Trophy className="w-8 h-8 text-white" />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Prêmio do Mês</p>
+                  <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight line-clamp-3">{premioMes.nome}</h3>
+                  {premioMes.valor && (
+                    <p className="text-[13px] font-black text-blue-600">R$ {Number(premioMes.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                  )}
+                </div>
+                <div className="px-3 py-1 rounded-full bg-blue-50 border border-blue-100 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
+                  <span className="text-[8px] font-black text-blue-600 tracking-[0.2em] uppercase">★ BATA A META</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {campaigns.map((camp) => (
             <div
               key={camp.id}
-              onClick={() => camp.type === 'brand' && setSelectedCampaign(camp)}
-              className={cn(
-                "aspect-[4/5] rounded-xl p-4 flex flex-col border border-slate-200 transition-all duration-300 cursor-pointer group relative overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-300",
-                camp.type === 'highlight' && "border-blue-200/50 shadow-xl shadow-blue-600/5"
-              )}
+              onClick={() => setSelectedCampaign(camp)}
+              className="aspect-[4/5] rounded-xl p-4 flex flex-col border border-slate-200 transition-all duration-300 cursor-pointer group relative overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-300"
             >
-              {camp.type === 'highlight' ? (
-                <>
-                  {/* Border Trace Effect */}
-                  <div className="absolute inset-0 z-0 pointer-events-none">
-                    <div className="absolute inset-0 border-2 border-blue-600 rounded-xl animate-border-trace opacity-60" />
-                  </div>
-
-                  {/* Floating Product Decorations */}
-                  <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-10">
-                    <Tv className="absolute top-4 left-4 w-5 h-5 text-blue-600 animate-float-diag opacity-80" style={{ animationDelay: '0s' }} />
-                    <WashingMachine className="absolute top-10 right-4 w-6 h-6 text-blue-600 animate-float-vert opacity-60" style={{ animationDelay: '1.5s' }} />
-                    <Smartphone className="absolute bottom-16 left-6 w-4 h-4 text-blue-600 animate-float opacity-90" style={{ animationDelay: '3s' }} />
-                    <Refrigerator className="absolute bottom-6 right-8 w-6 h-6 text-blue-600 animate-float-diag opacity-50" style={{ animationDelay: '0.8s' }} />
-                    <Speaker className="absolute top-1/2 left-2 w-4 h-4 text-blue-600 animate-float opacity-70" style={{ animationDelay: '2.2s' }} />
-                    <Fan className="absolute bottom-12 right-2 w-5 h-5 text-blue-600 animate-float-vert opacity-80" style={{ animationDelay: '1.2s' }} />
-                  </div>
-
-                  <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 relative z-10">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-blue-400 blur-2xl opacity-10 animate-pulse" />
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 flex items-center justify-center relative shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform duration-500">
-                        <Trophy className="w-8 h-8 text-white" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <h3 className="text-[16px] font-black text-blue-600 tracking-tight uppercase leading-tight">{camp.name}</h3>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">
-                        {camp.description ? camp.description : "Bata a meta • Concorra ao sorteio"}
-                      </p>
-                      {camp.date && (
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{camp.date}{camp.badge ? ` • ${camp.badge}` : ""}</p>
-                      )}
-                    </div>
-
-                    <div className="px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
-                      <span className="text-[9px] font-black text-blue-600 tracking-[0.2em] uppercase flex items-center gap-1.5">
-                        <span className="text-[11px] leading-none mb-0.5">★</span> CAMPANHA DO MÊS
-                      </span>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
+              <>
                   <div className="flex-1 bg-slate-50 rounded-lg p-4 flex items-center justify-center border border-slate-100 mb-3 transition-colors group-hover:bg-blue-50/50">
                     <img
                       src={camp.logo}
@@ -172,7 +175,6 @@ export function CampanhasView() {
                     </div>
                   </div>
                 </>
-              )}
             </div>
           ))}
         </div>
