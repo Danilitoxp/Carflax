@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiElegiveisParaSorteio, apiCampaignRanking, type MetaVendedor, type RankingVendedor } from "@/lib/api";
+import { uploadImage } from "@/lib/uploadImage";
 import { Target, Plus, X, Trophy, ChevronLeft, ChevronRight, Gift, Star, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -207,14 +208,6 @@ export function CampanhasView() {
     setFormData(f => ({ ...f, _imageFile: file } as any));
   };
 
-  const uploadImagem = async (file: File, campanhaName: string): Promise<string | null> => {
-    const ext = file.name.split(".").pop() ?? "jpg";
-    const path = `${Date.now()}-${campanhaName.replace(/\s+/g, "-").toLowerCase()}.${ext}`;
-    const { error } = await supabase.storage.from("campanhas").upload(path, file, { upsert: true });
-    if (error) { console.error("[Storage] Erro upload:", error); return null; }
-    const { data } = supabase.storage.from("campanhas").getPublicUrl(path);
-    return data.publicUrl;
-  };
 
   const abrirNovaCampanha = () => {
     setFormData({ name: "", fornecedor: "", data_ini: "", data_fim: "", logo: "" });
@@ -226,7 +219,7 @@ export function CampanhasView() {
     if (!formData.name.trim()) return;
     setSavingCampaign(true);
     const imageFile = (formData as any)._imageFile as File | undefined;
-    const logoUrl = imageFile ? await uploadImagem(imageFile, formData.name) : null;
+    const logoUrl = imageFile ? await uploadImage(imageFile, "campanhas") : null;
     const { error } = await supabase.from("campanhas").insert({
       name: formData.name.trim(),
       fornecedor: formData.fornecedor || null,
@@ -256,7 +249,7 @@ export function CampanhasView() {
     setSavingCampaign(true);
     const imageFile = (formData as any)._imageFile as File | undefined;
     const logoUrl = imageFile
-      ? await uploadImagem(imageFile, formData.name)
+      ? await uploadImage(imageFile, "campanhas")
       : (editingCampaign.logo?.startsWith("http") ? editingCampaign.logo : null);
     const { error } = await supabase.from("campanhas").update({
       name: formData.name.trim(),

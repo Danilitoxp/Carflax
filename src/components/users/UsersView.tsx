@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { uploadImage } from "@/lib/uploadImage";
 import {
   UserPlus,
   Search,
@@ -62,13 +63,8 @@ export function UsersView() {
   const companies = ["Carflax", "Zelex", "JCM"];
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewUser({ ...newUser, avatar: reader.result as string });
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    setNewUser(u => ({ ...u, avatar: URL.createObjectURL(file), _avatarFile: file } as any));
   };
 
   const roles = ["vendedor", "logistica", "financeiro", "admin", "comercial"];
@@ -129,22 +125,31 @@ export function UsersView() {
     setIsAddModalOpen(true);
   };
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
+    const avatarFile = (newUser as any)._avatarFile as File | undefined;
+    const avatarUrl = avatarFile
+      ? await uploadImage(avatarFile, "avatars")
+      : (newUser.avatar?.startsWith("blob:") ? editingUser?.avatar || "" : newUser.avatar);
+
+    const payload = {
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      company: (newUser as any).company,
+      department: (newUser as any).department,
+      avatar: avatarUrl || "",
+      permissions: newUser.permissions,
+      operator_code: (newUser as any).operatorCode || null,
+    };
+
     if (editingUser) {
-      setUsers(prev => prev.map(u =>
-        u.id === editingUser.id
-          ? { ...u, ...newUser as any }
-          : u
-      ));
+      const { error } = await supabase.from("usuarios").update(payload).eq("id", editingUser.id);
+      if (error) { console.error("[Users] Erro ao editar:", error); return; }
+      setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...newUser, avatar: avatarUrl || newUser.avatar } : u));
     } else {
-      const id = (users.length + 1).toString();
-      const userToAdd: User = {
-        id,
-        ...newUser as any,
-        status: "ativo",
-        lastLogin: "Recém criado"
-      };
-      setUsers(prev => [...prev, userToAdd]);
+      const { data, error } = await supabase.from("usuarios").insert({ ...payload, status: "ativo" }).select().single();
+      if (error) { console.error("[Users] Erro ao criar:", error); return; }
+      if (data) setUsers(prev => [...prev, { ...data, permissions: data.permissions || [], lastLogin: "Recém criado" }]);
     }
     setIsAddModalOpen(false);
     setEditingUser(null);

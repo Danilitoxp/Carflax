@@ -2,6 +2,7 @@ import { Plus, ThumbsUp, Edit2, Share2, X, Send, Image as ImageIcon, Type, Tag }
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { uploadImage } from "@/lib/uploadImage";
 import { Button } from "@/components/ui/button";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 
@@ -211,13 +212,10 @@ export function CommunicationSection() {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewPost({ ...newPost, image: reader.result as string });
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    // Preview local
+    const url = URL.createObjectURL(file);
+    setNewPost(p => ({ ...p, image: url, _imageFile: file } as any));
   };
 
   const filtered = activeCategory === "Todos"
