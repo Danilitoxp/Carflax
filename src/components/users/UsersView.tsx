@@ -127,9 +127,22 @@ export function UsersView() {
 
   const handleSaveUser = async () => {
     const avatarFile = (newUser as any)._avatarFile as File | undefined;
-    const avatarUrl = avatarFile
-      ? await uploadImage(avatarFile, "avatares")
-      : (newUser.avatar?.startsWith("blob:") ? editingUser?.avatar || "" : newUser.avatar);
+    let avatarUrl: string | null | undefined;
+
+    if (avatarFile) {
+      console.log("[Users] Fazendo upload de avatar para bucket 'avatares'...");
+      avatarUrl = await uploadImage(avatarFile, "avatares");
+      console.log("[Users] Resultado do upload:", avatarUrl);
+      if (!avatarUrl) {
+        console.error("[Users] Upload falhou — verifique a policy de INSERT no bucket 'avatares'");
+      }
+    }
+
+    // Se upload falhou ou não havia arquivo novo, manter avatar existente
+    const finalAvatar = avatarUrl
+      ?? (newUser.avatar?.startsWith("blob:") ? editingUser?.avatar || "" : newUser.avatar)
+      ?? editingUser?.avatar
+      ?? "";
 
     const payload = {
       name: newUser.name,
@@ -137,15 +150,17 @@ export function UsersView() {
       role: newUser.role,
       company: (newUser as any).company,
       department: (newUser as any).department,
-      avatar: avatarUrl || "",
+      avatar: finalAvatar,
       permissions: newUser.permissions,
       operator_code: (newUser as any).operatorCode || null,
     };
 
+    console.log("[Users] Salvando payload:", payload);
+
     if (editingUser) {
       const { error } = await supabase.from("usuarios").update(payload).eq("id", editingUser.id);
       if (error) { console.error("[Users] Erro ao editar:", error); return; }
-      setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...newUser, avatar: avatarUrl || newUser.avatar } : u));
+      setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...newUser, avatar: finalAvatar } : u));
     } else {
       const { data, error } = await supabase.from("usuarios").insert({ ...payload, status: "ativo" }).select().single();
       if (error) { console.error("[Users] Erro ao criar:", error); return; }
