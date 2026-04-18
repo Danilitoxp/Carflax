@@ -9,7 +9,9 @@ import {
   ShieldCheck,
   UserCog,
   Building2,
-  Briefcase
+  Briefcase,
+  Camera,
+  User as UserIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
@@ -57,7 +59,18 @@ export function UsersView() {
   ];
 
   const companies = ["Carflax", "Zelex", "JCM"];
-  const roles = ["admin", "vendedor", "logistica", "coletor"];
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewUser({ ...newUser, avatar: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const roles = ["vendedor", "logistica", "financeiro", "admin", "comercial"];
   const departments = ["Comercial", "Logística", "Administrativo", "Produção", "TI"];
 
   const [users, setUsers] = useState<User[]>([
@@ -339,7 +352,28 @@ export function UsersView() {
               <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-all"><X className="w-4 h-4" /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-hide p-6 space-y-5">
+            <div className="p-8 overflow-y-auto scrollbar-hide flex flex-col gap-6">
+              {/* Profile Photo Section */}
+              <div className="flex flex-col items-center gap-4 py-2">
+                <div className="relative group">
+                  <div className="w-24 h-24 rounded-2xl border-4 border-slate-50 shadow-xl overflow-hidden bg-slate-50 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
+                    {newUser.avatar ? (
+                      <img src={newUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon className="w-10 h-10 text-slate-300" />
+                    )}
+                    <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer backdrop-blur-[2px]">
+                      <Camera className="w-6 h-6 text-white mb-1" />
+                      <span className="text-[8px] font-black text-white uppercase tracking-widest">Alterar</span>
+                      <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                    </label>
+                  </div>
+                </div>
+                <div className="text-center">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Foto de Perfil</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
