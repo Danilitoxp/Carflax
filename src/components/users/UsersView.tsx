@@ -61,6 +61,10 @@ export function UsersView() {
   ];
 
   const companies = ["Carflax", "Zelex", "JCM"];
+
+  const getAvatarSrc = (avatar: string, name: string) =>
+    avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -296,7 +300,7 @@ export function UsersView() {
                       <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 relative shrink-0">
                         <div className="img-skeleton absolute inset-0 bg-slate-200 animate-pulse" />
                         <img
-                          src={user.avatar}
+                          src={getAvatarSrc(user.avatar, user.name)}
                           alt={user.name}
                           onLoad={(e) => {
                             e.currentTarget.style.opacity = "1";
@@ -369,23 +373,19 @@ export function UsersView() {
               <div className="flex flex-col items-center gap-4 py-2">
                 <div className="relative group">
                   <div className="w-24 h-24 rounded-2xl border-4 border-slate-50 shadow-xl overflow-hidden bg-slate-50 flex items-center justify-center transition-transform duration-500 group-hover:scale-105 relative">
-                    {newUser.avatar ? (
-                      <>
-                        <div className="img-skeleton absolute inset-0 bg-slate-200 animate-pulse" />
-                        <img
-                          src={newUser.avatar} alt="Avatar"
-                          onLoad={(e) => {
-                            e.currentTarget.style.opacity = "1";
-                            const sk = e.currentTarget.parentElement?.querySelector(".img-skeleton") as HTMLElement;
-                            if (sk) sk.style.display = "none";
-                          }}
-                          style={{ opacity: 0, transition: "opacity 0.3s", position: "relative", zIndex: 1 }}
-                          className="w-full h-full object-cover"
-                        />
-                      </>
-                    ) : (
-                      <UserIcon className="w-10 h-10 text-slate-300" />
-                    )}
+                    <>
+                      <div className="img-skeleton absolute inset-0 bg-slate-200 animate-pulse" />
+                      <img
+                        src={getAvatarSrc(newUser.avatar, newUser.name || "user")} alt="Avatar"
+                        onLoad={(e) => {
+                          e.currentTarget.style.opacity = "1";
+                          const sk = e.currentTarget.parentElement?.querySelector(".img-skeleton") as HTMLElement;
+                          if (sk) sk.style.display = "none";
+                        }}
+                        style={{ opacity: 0, transition: "opacity 0.3s", position: "relative", zIndex: 1 }}
+                        className="w-full h-full object-cover"
+                      />
+                    </>
                     <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer backdrop-blur-[2px]">
                       <Camera className="w-6 h-6 text-white mb-1" />
                       <span className="text-[8px] font-black text-white uppercase tracking-widest">Alterar</span>
