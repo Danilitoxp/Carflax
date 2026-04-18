@@ -18,43 +18,57 @@ export function VacationsView({ dayDate, vacations }: VacationsViewProps) {
   if (!dayDate) return null;
 
   const activeVacations = vacations.filter(v => dayDate >= v.start && dayDate <= v.end);
-
   if (activeVacations.length === 0) return null;
 
+  const isSingle = activeVacations.length === 1;
+
   return (
-    <div className="absolute inset-x-0 inset-y-0 flex flex-col pt-10 pb-2 px-0 z-10 pointer-events-none">
+    <div className={cn(
+      "absolute inset-x-0 bottom-0 flex flex-col gap-0.5 z-10 pointer-events-none justify-start pt-1",
+      isSingle ? "top-[1.5rem]" : "top-[2.2rem]"
+    )}>
       {activeVacations.map((v) => {
         const isStart = dayDate.toDateString() === v.start.toDateString();
         const isEnd = dayDate.toDateString() === v.end.toDateString();
-        
-        // Show indicator if it's the actual start OR if it's the first day of the current visible month
-        const showIndicator = isStart || (dayDate.getDate() === 1 && dayDate > v.start);
+        const isFirstOfMonth = dayDate.getDate() === 1 && dayDate > v.start;
+        const showIndicator = isStart || isEnd || isFirstOfMonth;
 
         return (
           <div 
             key={v.id}
             className={cn(
-              "flex-1 relative flex items-center px-4 transition-all shadow-none",
-              v.color,
-              isStart ? "border-l-2 border-white/30" : "",
-              isEnd ? "border-r-2 border-white/30" : "",
-              !isStart && !isEnd ? "opacity-95" : ""
+              "relative flex items-center px-3 transition-all",
+              isSingle ? "h-10" : "h-7",
+              v.color === 'bg-blue-600' ? (isSingle ? 'bg-blue-600/70' : 'bg-blue-600/90') : 
+              v.color === 'bg-orange-500' ? (isSingle ? 'bg-amber-500/70' : 'bg-amber-500/90') : 
+              v.color === 'bg-emerald-600' ? (isSingle ? 'bg-emerald-600/70' : 'bg-emerald-600/90') : v.color,
+              isStart ? "rounded-l-md ml-1" : "",
+              isEnd ? "rounded-r-md mr-1" : "",
+              !isStart && !isEnd ? "mx-0" : ""
             )}
           >
             {showIndicator && (
-              <div className="flex items-center gap-2 overflow-hidden shrink-0">
-                <div className="w-7 h-7 rounded-full border-2 border-white/50 overflow-hidden bg-white/20">
+              <div className="flex items-center gap-2 overflow-hidden shrink-0 z-20">
+                <div className={cn(
+                  "rounded-full border border-white/40 overflow-hidden bg-white/20 transition-all",
+                  isSingle ? "w-6 h-6" : "w-5 h-5"
+                )}>
                   <img src={v.avatar} className="w-full h-full object-cover" />
                 </div>
-                <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-white uppercase tracking-tighter truncate max-w-[90px] leading-tight text-shadow-none">
-                      {v.name.split(' ')[0]}
-                    </span>
-                    <span className="text-[7px] font-bold text-white/60 tracking-widest leading-none mt-0.5">FÉRIAS</span>
-                </div>
+                <span className={cn(
+                  "font-black text-white uppercase tracking-tight truncate max-w-[120px] leading-none transition-all",
+                  isSingle ? "text-[10px]" : "text-[9px]"
+                )}>
+                  {v.name}
+                </span>
+                <span className={cn(
+                  "font-bold text-white/50 tracking-widest leading-none ml-1 transition-all",
+                  isSingle ? "text-[8px]" : "text-[7px]"
+                )}>
+                  {isStart ? "INÍCIO" : isEnd ? "FIM" : "FÉRIAS"}
+                </span>
               </div>
             )}
-            <div className="absolute inset-x-0 inset-y-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
           </div>
         );
       })}

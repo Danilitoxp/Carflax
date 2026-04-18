@@ -27,86 +27,87 @@ export function EventModal({
   return (
     <>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-sm">
           <div 
             onClick={onClose}
-            className="absolute inset-0 bg-black/40 backdrop-blur-md"
+            className="absolute inset-0"
           />
           <div 
-            className="relative w-full max-w-lg bg-card/90 backdrop-blur-2xl rounded-[3rem] p-10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] border border-white/10 overflow-hidden"
+            className="relative w-full max-w-lg bg-white rounded-2xl p-8 shadow-2xl border border-slate-200 overflow-hidden"
           >
-            {/* Abstract Background Decoration */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-            
             <button 
               onClick={onClose}
-              className="absolute top-8 right-8 p-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full transition-all z-10"
+              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all z-10"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="relative">
-              <div className="flex flex-col items-center mb-10">
-                  <div className="w-16 h-16 bg-[#0053FC]/10 rounded-2xl flex items-center justify-center mb-4">
-                      <CalendarIcon className="w-8 h-8 text-[#0053FC]" />
+              <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
+                      <CalendarIcon className="w-6 h-6 text-blue-600" />
                   </div>
-                  <h2 className="text-3xl font-black text-foreground tracking-tighter uppercase">
-                      {editingEventId ? "Editar Evento" : "Novo Evento"}
-                  </h2>
-                  <p className="text-muted-foreground text-xs font-bold uppercase tracking-[0.3em] mt-1 opacity-60">
-                      Abril {selectedDay}, 2026
-                  </p>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                        {editingEventId ? "Editar Evento" : "Novo Evento"}
+                    </h2>
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">
+                        {selectedDay} de Abril, 2026
+                    </p>
+                  </div>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-5">
                   <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] ml-1">Título do Evento</label>
-                  <input 
-                      type="text" 
-                      placeholder="Ex: Entrega de Veículo..."
-                      value={newEvent.title}
-                      onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
-                      className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-6 py-4 text-sm font-semibold outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/40"
-                  />
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Título do Evento</label>
+                    <input 
+                        type="text" 
+                        placeholder="Ex: Entrega de Veículo..."
+                        value={newEvent.title}
+                        onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all placeholder:text-slate-300"
+                    />
                   </div>
 
                   <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] ml-1">Descrição Detalhada</label>
-                  <textarea 
-                      placeholder="Descreva os detalhes importantes..."
-                      value={newEvent.description}
-                      onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
-                      rows={3}
-                      className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-6 py-4 text-sm font-semibold outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all resize-none placeholder:text-muted-foreground/40"
-                  />
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Descrição Detalhada</label>
+                    <textarea 
+                        placeholder="Descreva os detalhes importantes..."
+                        value={newEvent.description}
+                        onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
+                        rows={3}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all resize-none placeholder:text-slate-300"
+                    />
                   </div>
 
                   <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] ml-1">Categoria</label>
-                  <div className="relative">
-                      <select 
-                          value={newEvent.type}
-                          onChange={(e) => setNewEvent({...newEvent, type: e.target.value as EventModalProps["newEvent"]["type"]})}
-                          className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-6 py-4 text-sm font-semibold outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer transition-all"
-                      >
-                          <option value="video">📹 Gravar Vídeo</option>
-                          <option value="birthday">🎂 Aniversário</option>
-                          <option value="star">⭐ Destaque Especial</option>
-                          <option value="education">🎓 Treinamento Técnico</option>
-                      </select>
-                      <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                  </div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Categoria</label>
+                    <div className="relative">
+                        <select 
+                            value={newEvent.type}
+                            onChange={(e) => setNewEvent({...newEvent, type: e.target.value as EventModalProps["newEvent"]["type"]})}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 appearance-none cursor-pointer transition-all"
+                        >
+                            <option value="video">📹 Gravar Vídeo</option>
+                            <option value="birthday">🎂 Aniversário</option>
+                            <option value="star">⭐ Destaque Especial</option>
+                            <option value="education">🎓 Treinamento Técnico</option>
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    </div>
                   </div>
 
-                  <Button 
-                  onClick={onSave}
-                  className="w-full bg-gradient-to-r from-[#032D9C] to-[#0053FC] hover:shadow-xl hover:shadow-primary/20 text-white rounded-[1.2rem] py-8 font-black text-sm uppercase tracking-widest transition-all mt-6 shadow-lg shadow-primary/10"
-                  >
-                  {editingEventId ? "Salvar Alterações" : "Salvar Evento no Calendário"}
-                  </Button>
+                  <div className="pt-2">
+                    <Button 
+                      onClick={onSave}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-blue-600/10 active:scale-[0.98]"
+                    >
+                      {editingEventId ? "Salvar Alterações" : "Adicionar ao Calendário"}
+                    </Button>
+                  </div>
               </div>
             </div>
-            </div>
+          </div>
         </div>
       )}
     </>

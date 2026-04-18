@@ -12,6 +12,7 @@ import { EventModal } from "./EventModal";
 import { EventsView } from "./Eventos/EventsView";
 import { VacationsView } from "./Ferias/VacationsView";
 import { VacationModal } from "./Ferias/VacationModal";
+import { Button } from "@/components/ui/button";
 
 interface CalendarEvent {
   id: number;
@@ -37,7 +38,7 @@ interface CalendarSectionProps {
 }
 
 export function CalendarSection({ activeTab }: CalendarSectionProps) {
-  const [viewMode, setViewMode] = useState<"events" | "vacations">("events");
+  const [viewMode, setViewMode] = useState<"events" | "vacations">(activeTab === "Férias" ? "vacations" : "events");
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)); // Abril 2026
   const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video"]);
   const [events, setEvents] = useState<CalendarEvent[]>([
@@ -112,8 +113,13 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const firstDayOfMonth = new Date(year, month, 1).getDay();
   
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-  const paddingDays = Array.from({ length: firstDayOfMonth }, () => null); 
-  const allSlots = [...paddingDays, ...days];
+  const paddingDaysStart = Array.from({ length: firstDayOfMonth }, () => null); 
+  
+  // Always fill to 42 slots (6 weeks)
+  const totalSlotsNeeded = 42;
+  const paddingDaysEnd = Array.from({ length: totalSlotsNeeded - (paddingDaysStart.length + days.length) }, () => null);
+  
+  const allSlots = [...paddingDaysStart, ...days, ...paddingDaysEnd];
 
   const handleDayClick = (day: number | null) => {
     if (!day || viewMode === "vacations") return;
@@ -165,7 +171,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const daysOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   return (
-    <div className="flex flex-col h-full bg-background p-3 md:p-6 overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-[#F8FAFC]">
       
       <EventModal 
         isOpen={isModalOpen}
@@ -177,52 +183,58 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
         setNewEvent={setNewEvent}
       />
 
-      {/* Header Area */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-6">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center bg-card border border-border/50 rounded-2xl px-6 py-3 shadow-none">
-            <span className="text-xl font-black text-foreground uppercase tracking-tighter">
-                {monthNames[month]} <span className="text-primary">{year}</span>
-            </span>
-            <div className="flex items-center gap-1.5 ml-6 pl-6 border-l border-border/50">
-               <button onClick={handlePrevMonth} className="p-2 hover:bg-secondary rounded-xl transition-all text-muted-foreground/60 hover:text-foreground active:scale-90"><ChevronLeft className="w-5 h-5" /></button>
-               <button onClick={handleNextMonth} className="p-2 hover:bg-secondary rounded-xl transition-all text-muted-foreground/60 hover:text-foreground active:scale-90"><ChevronRight className="w-5 h-5" /></button>
-            </div>
-          </div>
-          
-          {viewMode === "events" && (
-            <div className="flex items-center gap-1.5 bg-card border border-border/50 p-1.5 rounded-2xl shadow-none">
-              {[
-                { id: "birthday", icon: Gift, color: "text-rose-500", bg: "bg-rose-500/10" },
-                { id: "star", icon: Star, color: "text-amber-500", bg: "bg-amber-500/10" },
-                { id: "education", icon: GraduationCap, color: "text-indigo-500", bg: "bg-indigo-500/10" },
-                { id: "video", icon: Plus, color: "text-primary", bg: "bg-primary/10" },
-              ].map(f => (
-                <button 
-                  key={f.id}
-                  onClick={() => toggleFilter(f.id)}
-                  className={cn(
-                      "p-2.5 rounded-xl transition-all",
-                      activeFilters.length === 1 && activeFilters.includes(f.id) ? cn(f.bg, f.color) : "text-muted-foreground/60 hover:bg-secondary hover:text-foreground"
-                  )}
-                >
-                  <f.icon className="w-4.5 h-4.5" />
+      <div className="flex-1 overflow-y-auto px-4 pt-2 pb-4 flex flex-col min-h-0 scrollbar-hide">
+        {/* Header Area: Alinhado com Estilo do Dashboard */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/60 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
+                <button onClick={handlePrevMonth} className="p-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-blue-600">
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-              ))}
+                <div className="px-3 py-1 text-xs font-black text-slate-900 uppercase tracking-tighter border-x border-slate-100 min-w-[120px] text-center">
+                   {monthNames[month]} <span className="text-blue-600">{year}</span>
+                </div>
+                <button onClick={handleNextMonth} className="p-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-blue-600">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
             </div>
-          )}
-        </div>
+
+            {viewMode === "events" && (
+              <div className="flex items-center gap-1">
+                {[
+                  { id: "birthday", icon: Gift, label: "Aniversários", color: "rose" },
+                  { id: "star", icon: Star, label: "Destaques", color: "amber" },
+                  { id: "education", icon: GraduationCap, label: "Treinamentos", color: "indigo" },
+                  { id: "video", icon: Plus, label: "Outros", color: "blue" },
+                ].map(f => (
+                  <button 
+                    key={f.id}
+                    onClick={() => toggleFilter(f.id)}
+                    className={cn(
+                        "px-3 py-1.5 rounded-md transition-all text-[10px] font-bold uppercase tracking-widest flex items-center gap-2",
+                        activeFilters.length === 1 && activeFilters.includes(f.id) 
+                          ? "bg-slate-100 text-slate-900 shadow-sm"
+                          : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                    )}
+                  >
+                    <f.icon className="w-3.5 h-3.5" />
+                    {activeFilters.length === 1 && activeFilters.includes(f.id) && f.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-3 w-full lg:w-auto">
+        <div className="flex items-center gap-3">
           {viewMode === "vacations" && (
-              <button 
+              <Button 
                 onClick={() => setIsVacationModalOpen(true)}
-                className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-8 py-4 bg-orange-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all border border-white/10"
+                className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 uppercase tracking-wider group"
               >
-                <Plus className="w-4 h-4" />
-                Lançar Férias
-              </button>
+                <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" />
+                LANÇAR FÉRIAS
+              </Button>
           )}
         </div>
       </div>
@@ -233,18 +245,14 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
         onSave={handleSaveVacation}
       />
 
-      {/* Calendar Grid */}
-      <div className="flex-1 bg-card border border-border/50 rounded-[2.5rem] overflow-hidden flex flex-col shadow-none min-h-0 relative">
+      {/* Calendar Grid: Limpado e Corporativo */}
+      <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-0 relative mt-3">
         <div className={cn(
-          "grid grid-cols-7 bg-secondary/5",
-          viewMode === "events" ? "border-b border-border/10" : ""
+          "grid grid-cols-7 bg-slate-50/50 border-b border-slate-100",
         )}>
           {daysOfWeek.map((day) => (
-            <div key={day} className={cn(
-              "py-6 text-center last:border-r-0",
-              viewMode === "events" ? "border-r border-border/10" : ""
-            )}>
-              <span className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">{day}</span>
+            <div key={day} className="py-2.5 text-center">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</span>
             </div>
           ))}
         </div>
@@ -253,10 +261,9 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
           <div 
             className={cn(
               "grid grid-cols-7 min-h-full",
-              viewMode === "events" ? "divide-x divide-y divide-border/5 transition-all duration-700" : "divide-none"
             )}
             style={{ 
-              gridTemplateRows: `repeat(${Math.ceil(allSlots.length / 7)}, minmax(130px, max-content))` 
+              gridTemplateRows: `repeat(6, 1fr)` 
             }}
           >
           {allSlots.map((day, idx) => {
@@ -266,44 +273,62 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
             
             const dayDate = day ? new Date(year, month, day) : null;
             
+            const isLastCol = (idx + 1) % 7 === 0;
+            const isLastRow = idx >= 35;
+            const isFirstCol = idx % 7 === 0;
+            const isFirstRow = idx < 7;
+            
+            const neighborLeftHasNoDay = idx > 0 && allSlots[idx - 1] === null;
+            const neighborTopHasNoDay = idx >= 7 && allSlots[idx - 7] === null;
+
             return (
               <div 
                 key={idx} 
                 onClick={() => handleDayClick(day)}
                 className={cn(
-                  "relative group transition-all duration-500 cursor-pointer flex flex-col p-4",
-                  viewMode === "events" && "hover:bg-primary/[0.02]",
-                  viewMode === "events" && isToday && "bg-primary/[0.04]",
-                  !day && "bg-secondary/[0.03] opacity-40 shadow-inner"
+                   "relative group transition-all duration-300 cursor-pointer flex flex-col p-3",
+                   day ? "bg-white" : "bg-transparent",
+                   day && !isLastCol && "border-r border-slate-100",
+                   day && !isLastRow && "border-b border-slate-100",
+                   day && (isFirstCol || neighborLeftHasNoDay) && "border-l border-slate-100",
+                   day && (isFirstRow || neighborTopHasNoDay) && "border-t border-slate-100",
+                   viewMode === "events" && day && "hover:bg-slate-50/50",
                 )}
               >
                 {day && (
                   <>
-                    <div className="flex justify-between items-start mb-3 relative z-20">
+                    <div className="flex justify-between items-start mb-2 relative z-20">
                       <span className={cn(
-                        "text-xs md:text-base font-black transition-all duration-500 leading-none",
-                        isToday ? "text-[#0053FC] scale-125 origin-left" : "text-muted-foreground/30 group-hover:text-muted-foreground/60"
+                        "text-sm font-black transition-all leading-none",
+                        isToday ? "text-blue-600" : "text-slate-300 group-hover:text-slate-500"
                       )}>
-                        {day < 10 ? `0${day}` : day}
+                        {day}
                       </span>
-                      {isToday && <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
+                      {isToday && (
+                        <div className="flex flex-col items-center">
+                           <div className="w-1.5 h-1.5 rounded-full bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)]" />
+                           <span className="text-[7px] font-black text-blue-600 uppercase tracking-tighter mt-1">Hoje</span>
+                        </div>
+                      )}
                     </div>
                     
-                    {viewMode === "events" ? (
-                      <EventsView 
-                        day={day}
-                        month={month}
-                        year={year}
-                        events={events}
-                        activeFilters={activeFilters}
-                        onEventClick={handleEventClick}
-                      />
-                    ) : (
-                      <VacationsView 
-                        dayDate={dayDate}
-                        vacations={vacations}
-                      />
-                    )}
+                    <div className="flex-1 mt-1">
+                      {viewMode === "events" ? (
+                        <EventsView 
+                          day={day}
+                          month={month}
+                          year={year}
+                          events={events}
+                          activeFilters={activeFilters}
+                          onEventClick={handleEventClick}
+                        />
+                      ) : (
+                        <VacationsView 
+                          dayDate={dayDate}
+                          vacations={vacations}
+                        />
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -313,5 +338,6 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
         </div>
       </div>
     </div>
+  </div>
   );
 }

@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { 
   X, 
-  Plane, 
   Calendar as CalendarIcon, 
   User, 
-  CheckCircle2, 
-  XCircle 
+  CheckCircle2 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -55,34 +53,34 @@ export function VacationModal({ isOpen, onClose, onSave }: VacationModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-sm">
       <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-md transition-opacity" 
+        className="fixed inset-0" 
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-lg bg-card border border-border/50 rounded-[2.5rem] p-8 md:p-10 overflow-hidden">
+      <div className="relative w-full max-w-lg bg-white rounded-2xl p-8 md:p-10 shadow-2xl border border-slate-200 overflow-hidden">
         <button 
           onClick={onClose}
-          className="absolute top-8 right-8 p-3 text-muted-foreground/60 hover:text-foreground hover:bg-secondary rounded-2xl transition-all"
+          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-orange-500/10 rounded-2xl flex items-center justify-center border border-orange-500/20">
-              <Plane className="w-6 h-6 text-orange-500" />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="flex items-center gap-4 mb-2">
+            <div>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                  Lançar Férias
+                </h3>
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Gestão de Ausências</p>
             </div>
-            <h3 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">
-              Lançar Férias
-            </h3>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* Employee Name */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1 flex items-center gap-2">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
                 <User className="w-3 h-3" /> Funcionário
               </label>
               <input 
@@ -90,34 +88,34 @@ export function VacationModal({ isOpen, onClose, onSave }: VacationModalProps) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Nome do colaborador"
-                className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-6 py-4 text-sm font-bold focus:border-orange-500/40 outline-none transition-all"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all placeholder:text-slate-300"
                 required
               />
             </div>
 
             {/* Dates Grid */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1 flex items-center gap-2">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
                   <CalendarIcon className="w-3 h-3" /> Início
                 </label>
                 <input 
                   type="date"
                   value={start}
                   onChange={(e) => setStart(e.target.value)}
-                  className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-6 py-4 text-sm font-bold focus:border-orange-500/40 outline-none transition-all"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all"
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1 flex items-center gap-2">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
                   <CalendarIcon className="w-3 h-3" /> Fim
                 </label>
                 <input 
                   type="date"
                   value={end}
                   onChange={(e) => setEnd(e.target.value)}
-                  className="w-full bg-secondary/30 border border-border/50 rounded-2xl px-6 py-4 text-sm font-bold focus:border-orange-500/40 outline-none transition-all"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all"
                   required
                 />
               </div>
@@ -125,44 +123,42 @@ export function VacationModal({ isOpen, onClose, onSave }: VacationModalProps) {
 
             {/* Color Selection */}
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">
                 Identificação Visual
               </label>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 {colors.map((c, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => setSelectedColor(c.class)}
                     className={cn(
-                      "w-10 h-10 rounded-full transition-all relative flex items-center justify-center",
+                      "w-8 h-8 rounded-full transition-all relative flex items-center justify-center border-2 border-white shadow-sm ring-1 ring-slate-100",
                       c.class,
-                      selectedColor === c.class ? "ring-4 ring-offset-4 ring-orange-500/20 scale-110" : "hover:scale-105"
+                      selectedColor === c.class ? "ring-2 ring-blue-600 scale-110" : "hover:scale-105"
                     )}
                   >
-                    {selectedColor === c.class && <CheckCircle2 className="w-5 h-5 text-white/80" />}
+                    {selectedColor === c.class && <CheckCircle2 className="w-4 h-4 text-white/90" />}
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="flex gap-4 pt-4">
+          <div className="flex gap-3 pt-4">
             <Button 
               type="button"
               variant="ghost" 
               onClick={onClose}
-              className="flex-1 py-7 bg-secondary/50 hover:bg-secondary text-foreground rounded-2xl font-black text-xs uppercase tracking-widest gap-2"
+              className="flex-1 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 transition-all"
             >
-              <XCircle className="w-4 h-4" />
               Cancelar
             </Button>
             <Button 
               type="submit"
-              className="flex-1 py-7 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest gap-2 shadow-none transition-all active:scale-[0.98]"
+              className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 shadow-lg shadow-blue-600/10 transition-all active:scale-[0.98]"
             >
-              <Plane className="w-4 h-4" />
-              Confirmar Férias
+              Confirmar Lançamento
             </Button>
           </div>
         </form>
