@@ -53,7 +53,9 @@ export function UsersView() {
     department: "Comercial",
     avatar: "",
     permissions: ["Geral"] as string[],
-    operatorCode: ""
+    operatorCode: "",
+    birthDate: "",
+    admissionDate: "",
   });
 
   const availableModules = [
@@ -127,7 +129,9 @@ export function UsersView() {
       department: user.department,
       avatar: user.avatar,
       permissions: user.permissions || [],
-      operatorCode: user.operatorCode || ""
+      operatorCode: user.operatorCode || "",
+      birthDate: (user as any).birthDate || "",
+      admissionDate: (user as any).admissionDate || "",
     });
     setAvatarLoading(false);
     setSaving(false);
@@ -163,6 +167,8 @@ export function UsersView() {
       avatar: finalAvatar,
       permissions: newUser.permissions,
       operator_code: (newUser as any).operatorCode || null,
+      birth_date: (newUser as any).birthDate || null,
+      admission_date: (newUser as any).admissionDate || null,
     };
 
     console.log("[Users] Salvando payload:", payload);
@@ -239,7 +245,7 @@ export function UsersView() {
           <button
             onClick={() => {
               setEditingUser(null);
-              setNewUser({ name: "", email: "", role: "vendedor", company: "Carflax", department: "Comercial", avatar: "", permissions: ["Geral"], operatorCode: "" });
+              setNewUser({ name: "", email: "", role: "vendedor", company: "Carflax", department: "Comercial", avatar: "", permissions: ["Geral"], operatorCode: "", birthDate: "", admissionDate: "" } as any);
               setAvatarLoading(false);
               setSaving(false);
               setIsAddModalOpen(true);
@@ -409,11 +415,6 @@ export function UsersView() {
                       <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
                     </label>
                   </div>
-                  {/* Botão de trocar foto sempre visível abaixo */}
-                  <label className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-1.5 shadow-lg cursor-pointer transition-all active:scale-95">
-                    <Camera className="w-3 h-3" />
-                    <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-                  </label>
                 </div>
                 <div className="text-center mt-2">
                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Foto de Perfil</p>
@@ -469,6 +470,16 @@ export function UsersView() {
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cód. Operador</label>
                   <input type="text" maxLength={3} value={newUser.operatorCode} onChange={(e) => setNewUser({ ...newUser, operatorCode: e.target.value.replace(/\D/g, "") })} placeholder="000" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all text-center" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data de Nascimento</label>
+                  <input type="date" value={(newUser as any).birthDate} onChange={(e) => setNewUser({ ...newUser, birthDate: e.target.value } as any)} className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data de Admissão</label>
+                  <input type="date" value={(newUser as any).admissionDate} onChange={(e) => setNewUser({ ...newUser, admissionDate: e.target.value } as any)} className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all" />
                 </div>
               </div>
 
