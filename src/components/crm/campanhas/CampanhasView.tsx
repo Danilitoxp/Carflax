@@ -15,6 +15,9 @@ export interface Campaign {
   date?: string;
   status?: string;
   logo?: string;
+  fornecedor?: string;
+  data_ini?: string;
+  data_fim?: string;
 }
 
 interface PremioMes {
@@ -84,6 +87,9 @@ export function CampanhasView() {
             date: dateRange,
             status,
             logo: c.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(c.name)}`,
+            fornecedor: c.fornecedor || c.name,
+            data_ini: c.date || undefined,
+            data_fim: c.periodo_fim || undefined,
           };
         }));
       }
@@ -147,11 +153,10 @@ export function CampanhasView() {
     setRankingCampanha([]);
     setLoadingRanking(true);
     try {
-      const now = new Date();
-      const data_ini = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
       const ranking = await apiCampaignRanking({
-        fornecedor: camp.description || camp.name,
-        data_ini,
+        fornecedor: camp.fornecedor || camp.name,
+        data_ini: camp.data_ini,
+        data_fim: camp.data_fim,
       });
       setRankingCampanha(ranking);
     } catch {
