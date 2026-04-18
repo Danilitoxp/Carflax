@@ -192,10 +192,11 @@ export function UsersView() {
     setEditingUser(null);
   };
 
-  const handleDeleteUser = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este usuário?")) {
-      setUsers(prev => prev.filter(u => u.id !== id));
-    }
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
+    const { error } = await supabase.from("usuarios").delete().eq("id", id);
+    if (error) { console.error("[Users] Erro ao excluir:", error); return; }
+    setUsers(prev => prev.filter(u => u.id !== id));
   };
 
   const getRoleBadge = (role: string) => {
