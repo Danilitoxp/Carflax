@@ -72,13 +72,21 @@ export function CampanhasView() {
   useEffect(() => {
     const now = new Date();
     async function fetchData() {
-      const [{ data: campanhasData }, { data: premioData }, fornRes] = await Promise.all([
-        supabase.from("campanhas").select("*").order("created_at", { ascending: false }),
-        supabase.from("premio_mes").select("*").eq("mes", now.getMonth() + 1).eq("ano", now.getFullYear()).single(),
+      const [campanhasRes, premioRes, fornRes] = await Promise.all([
+        supabase.from("campanhas").select("*").order("updated_at", { ascending: false }),
+        supabase.from("premio_mes").select("*").eq("mes", now.getMonth() + 1).eq("ano", now.getFullYear()).maybeSingle(),
         fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/fornecedores").then(r => r.json()).catch(() => ({ fornecedores: [] })),
       ]);
+
+      if (campanhasRes.error) console.error("Campanhas erro:", campanhasRes.error);
+      if (premioRes.error) console.error("Premio erro:", premioRes.error);
+
+      const campanhasData = campanhasRes.data;
+      const premioData = premioRes.data;
+
       if (fornRes?.fornecedores) setFornecedores(fornRes.fornecedores);
       setLoadingCampaigns(false);
+      if (premioData) setPremioCard(premioData);
       if (campanhasData) {
         const hoje = new Date(); hoje.setHours(0,0,0,0);
         setCampaigns(campanhasData.map((c) => {
@@ -103,7 +111,6 @@ export function CampanhasView() {
           };
         }));
       }
-      if (premioData) setPremioCard(premioData);
     }
     fetchData();
   }, []);
