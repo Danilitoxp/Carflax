@@ -1,6 +1,7 @@
 import { Plus, ThumbsUp, Edit2, Share2, X, Send, Image as ImageIcon, Type, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 
@@ -124,9 +125,36 @@ export function CommunicationCard({ data, onEdit }: { data: CommunicationPost; o
 
 export function CommunicationSection() {
   const [activeCategory, setActiveCategory] = useState("Todos");
-  const [comms, setComms] = useState(initialCommunications);
+  const [comms, setComms] = useState<CommunicationPost[]>(initialCommunications);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function fetchComunicados() {
+      const { data, error } = await supabase
+        .from("comunicados")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setComms(data.map((c, i) => ({
+          id: i + 1,
+          title: c.titulo,
+          content: c.descricao || "",
+          category: c.filtro || c.tag || "Empresa",
+          author: c.tag || "Carflax",
+          authorAvatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${c.firebase_id}`,
+          date: new Date(c.created_at).toLocaleDateString("pt-BR"),
+          image: c.image_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.firebase_id}`,
+          likes: c.likes || 0,
+          dislikes: c.dislikes || 0,
+        })));
+      }
+      setLoading(false);
+    }
+    fetchComunicados();
+  }, []);
 
   // Form states
   const [newPost, setNewPost] = useState(() => ({
@@ -353,6 +381,12 @@ export function CommunicationSection() {
 
       {/* BOTTOM PART: Cards - No longer scrollable here, parent handles it */}
       <div className="flex flex-col gap-4">
+        {loading && (
+          <p className="text-center text-slate-400 text-sm py-8">Carregando comunicados...</p>
+        )}
+        {!loading && filtered.length === 0 && (
+          <p className="text-center text-slate-400 text-sm py-8">Nenhum comunicado encontrado.</p>
+        )}
         {filtered.map((item) => (
           <CommunicationCard key={item.id} data={item} onEdit={handleEdit} />
         ))}
