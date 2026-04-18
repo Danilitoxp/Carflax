@@ -67,16 +67,23 @@ export function CampanhasView() {
         supabase.from("premio_mes").select("*").eq("mes", now.getMonth() + 1).eq("ano", now.getFullYear()).single(),
       ]);
       if (campanhasData) {
-        setCampaigns(campanhasData.map((c) => ({
-          id: c.id,
-          type: "brand" as const,
-          name: c.name,
-          description: c.fornecedor || "",
-          date: c.date ? new Date(c.date).toLocaleDateString("pt-BR") : "",
-          status: c.status || "ativa",
-          logo: c.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(c.name)}`,
-          badge: c.periodo_fim ? `até ${new Date(c.periodo_fim).toLocaleDateString("pt-BR")}` : undefined,
-        })));
+        const hoje = new Date(); hoje.setHours(0,0,0,0);
+        setCampaigns(campanhasData.map((c) => {
+          const fim = c.periodo_fim ? new Date(c.periodo_fim) : null;
+          const ini = c.date ? new Date(c.date) : null;
+          const status = fim && fim < hoje ? "encerrada" : ini && ini > hoje ? "futura" : "ativa";
+          const fornecedor = c.fornecedor || "";
+          const showDesc = fornecedor && fornecedor.toLowerCase() !== c.name.toLowerCase();
+          return {
+            id: c.id,
+            type: "brand" as const,
+            name: c.name,
+            description: showDesc ? fornecedor : "",
+            date: fim ? `até ${fim.toLocaleDateString("pt-BR")}` : ini ? ini.toLocaleDateString("pt-BR") : "",
+            status,
+            logo: c.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(c.name)}`,
+          };
+        }));
       }
       if (premioData) setPremioCard(premioData);
     }
@@ -238,7 +245,12 @@ export function CampanhasView() {
                   <p className="text-[8px] font-semibold text-slate-500 truncate">{camp.description}</p>
                 )}
                 <div className="pt-0.5">
-                  <span className="inline-flex px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100 text-[7px] font-black uppercase tracking-widest">
+                  <span className={cn(
+                    "inline-flex px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest border",
+                    camp.status === "ativa" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                    camp.status === "futura" ? "bg-blue-50 text-blue-600 border-blue-100" :
+                    "bg-slate-50 text-slate-400 border-slate-200"
+                  )}>
                     {camp.status}
                   </span>
                 </div>
