@@ -5,9 +5,12 @@ import {
   ChevronRight,
   Gift,
   Star,
-  GraduationCap,
   Plus,
-  Flag
+  Flag,
+  Users,
+  Trophy,
+  DollarSign,
+  AlertCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EventModal } from "./EventModal";
@@ -20,7 +23,7 @@ interface CalendarEvent {
   id: number;
   day: number;
   title: string;
-  type: "birthday" | "star" | "education" | "video" | "holiday";
+  type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch";
   description?: string;
   month?: number;
   year?: number;
@@ -42,7 +45,7 @@ interface CalendarSectionProps {
 export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [viewMode, setViewMode] = useState<"events" | "vacations">(activeTab === "Férias" ? "vacations" : "events");
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)); // Abril 2026
-  const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video", "holiday"]);
+  const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video", "holiday", "meeting", "celebration", "finance", "important", "launch"]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
 
   const [vacations, setVacations] = useState<Vacation[]>([]);
@@ -138,7 +141,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [newEvent, setNewEvent] = useState<{
     title: string;
     description: string;
-    type: "birthday" | "star" | "education" | "video" | "holiday";
+    type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch";
   }>({
     title: "",
     description: "",
@@ -176,7 +179,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const toggleFilter = (filter: string) => {
     setActiveFilters(prev => {
       if (prev.length === 1 && prev.includes(filter)) {
-        return ["birthday", "star", "education", "video", "holiday"];
+        return ["birthday", "star", "education", "video", "holiday", "meeting", "celebration", "finance", "important", "launch"];
       }
       return [filter];
     });
@@ -277,12 +280,14 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
 
             {viewMode === "events" && (
               <div className="flex items-center gap-1">
-                {([
-                  { id: "holiday", icon: Flag, label: "Feriados", color: "slate" },
-                  { id: "birthday", icon: Gift, label: "Aniversários", color: "rose" },
-                  { id: "star", icon: Star, label: "Destaques", color: "amber" },
-                  { id: "education", icon: GraduationCap, label: "Treinamentos", color: "indigo" },
-                  { id: "video", icon: Plus, label: "Outros", color: "blue" },
+                {( [
+                  { id: "holiday", icon: Flag, label: "Feriados", color: "amber" },
+                  { id: "meeting", icon: Users, label: "Reuniões", color: "violet" },
+                  { id: "finance", icon: DollarSign, label: "Contas", color: "emerald" },
+                  { id: "important", icon: AlertCircle, label: "Urgente", color: "red" },
+                  { id: "celebration", icon: Trophy, label: "Metas", color: "pink" },
+                  { id: "birthday", icon: Gift, label: "Níver", color: "rose" },
+                  { id: "star", icon: Star, label: "Jubileu", color: "amber" },
                 ] as const).map(f => (
                   <button
                     key={f.id}

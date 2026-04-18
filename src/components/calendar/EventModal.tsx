@@ -11,7 +11,7 @@ interface EventModalProps {
   newEvent: {
     title: string;
     description: string;
-    type: "birthday" | "star" | "education" | "video" | "holiday";
+    type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch";
   };
   setNewEvent: (event: EventModalProps["newEvent"]) => void;
 }
@@ -86,11 +86,16 @@ export function EventModal({
                     <TinyDropdown 
                         value={newEvent.type}
                         options={[
-                            { value: "video", label: "📹 Gravar Vídeo" },
+                            { value: "meeting", label: "🤝 Reunião Geral" },
+                            { value: "celebration", label: "🏆 Meta Batida / Festa" },
+                            { value: "finance", label: "💰 Pagamento / Financeiro" },
+                            { value: "important", label: "🚨 Urgente / Importante" },
+                            { value: "launch", label: "🚀 Lançamento / Novidade" },
+                            { value: "education", label: "🎓 Treinamento Técnico" },
                             { value: "birthday", label: "🎂 Aniversário" },
                             { value: "star", label: "⭐ Destaque Especial" },
-                            { value: "education", label: "🎓 Treinamento Técnico" },
-                            { value: "holiday", label: "🚩 Feriado Nacional/Local" }
+                            { value: "holiday", label: "🚩 Feriado Nacional/Local" },
+                            { value: "video", label: "📹 Gravar Vídeo" }
                         ]}
                         onChange={(val) => setNewEvent({...newEvent, type: val as any})}
                         icon={Tag}
