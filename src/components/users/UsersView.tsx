@@ -279,12 +279,18 @@ export function UsersView() {
                   <td className="py-3 px-6">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 relative shrink-0">
-                        <img src={user.avatar} className="w-full h-full object-cover" alt={user.name} />
-                        {user.operatorCode && (
-                          <div className="absolute -bottom-0.5 -right-0.5 bg-blue-600 text-[6px] font-black text-white px-1 rounded-sm border border-white uppercase">
-                            {user.operatorCode}
-                          </div>
-                        )}
+                        <div className="img-skeleton absolute inset-0 bg-slate-200 animate-pulse" />
+                        <img
+                          src={user.avatar}
+                          alt={user.name}
+                          onLoad={(e) => {
+                            e.currentTarget.style.opacity = "1";
+                            const sk = e.currentTarget.parentElement?.querySelector(".img-skeleton") as HTMLElement;
+                            if (sk) sk.style.display = "none";
+                          }}
+                          style={{ opacity: 0, transition: "opacity 0.3s", position: "relative", zIndex: 1 }}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <div className="flex flex-col min-w-0">
                         <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight leading-none truncate">{user.name}</span>
@@ -347,9 +353,21 @@ export function UsersView() {
               {/* Profile Photo Section */}
               <div className="flex flex-col items-center gap-4 py-2">
                 <div className="relative group">
-                  <div className="w-24 h-24 rounded-2xl border-4 border-slate-50 shadow-xl overflow-hidden bg-slate-50 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
+                  <div className="w-24 h-24 rounded-2xl border-4 border-slate-50 shadow-xl overflow-hidden bg-slate-50 flex items-center justify-center transition-transform duration-500 group-hover:scale-105 relative">
                     {newUser.avatar ? (
-                      <img src={newUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                      <>
+                        <div className="img-skeleton absolute inset-0 bg-slate-200 animate-pulse" />
+                        <img
+                          src={newUser.avatar} alt="Avatar"
+                          onLoad={(e) => {
+                            e.currentTarget.style.opacity = "1";
+                            const sk = e.currentTarget.parentElement?.querySelector(".img-skeleton") as HTMLElement;
+                            if (sk) sk.style.display = "none";
+                          }}
+                          style={{ opacity: 0, transition: "opacity 0.3s", position: "relative", zIndex: 1 }}
+                          className="w-full h-full object-cover"
+                        />
+                      </>
                     ) : (
                       <UserIcon className="w-10 h-10 text-slate-300" />
                     )}
