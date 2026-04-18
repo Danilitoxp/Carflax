@@ -72,8 +72,9 @@ export function CampanhasView() {
   useEffect(() => {
     const now = new Date();
     async function fetchData() {
+      try {
       const [campanhasRes, premioRes, fornRes] = await Promise.all([
-        supabase.from("campanhas").select("*").order("updated_at", { ascending: false }),
+        supabase.from("campanhas").select("*").order("id", { ascending: false }),
         supabase.from("premio_mes").select("*").eq("mes", now.getMonth() + 1).eq("ano", now.getFullYear()).maybeSingle(),
         fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/fornecedores").then(r => r.json()).catch(() => ({ fornecedores: [] })),
       ]);
@@ -110,6 +111,10 @@ export function CampanhasView() {
             data_fim: c.periodo_fim || undefined,
           };
         }));
+      }
+      } catch (err) {
+        console.error("fetchData erro:", err);
+        setLoadingCampaigns(false);
       }
     }
     fetchData();
