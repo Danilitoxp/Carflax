@@ -199,13 +199,21 @@ export function CampanhasView() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Preview imediato
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target?.result as string;
-      setImagePreview(base64);
-      setFormData(f => ({ ...f, logo: base64 }));
-    };
+    reader.onload = (ev) => setImagePreview(ev.target?.result as string);
     reader.readAsDataURL(file);
+    // Guarda o File para upload no save
+    setFormData(f => ({ ...f, _imageFile: file } as any));
+  };
+
+  const uploadImagem = async (file: File, campanhaName: string): Promise<string | null> => {
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `${Date.now()}-${campanhaName.replace(/\s+/g, "-").toLowerCase()}.${ext}`;
+    const { error } = await supabase.storage.from("campanhas").upload(path, file, { upsert: true });
+    if (error) { console.error("[Storage] Erro upload:", error); return null; }
+    const { data } = supabase.storage.from("campanhas").getPublicUrl(path);
+    return data.publicUrl;
   };
 
   const abrirNovaCampanha = () => {
@@ -217,19 +225,20 @@ export function CampanhasView() {
   const salvarNovaCampanha = async () => {
     if (!formData.name.trim()) return;
     setSavingCampaign(true);
+    const imageFile = (formData as any)._imageFile as File | undefined;
+    const logoUrl = imageFile ? await uploadImagem(imageFile, formData.name) : null;
     const { error } = await supabase.from("campanhas").insert({
       name: formData.name.trim(),
       fornecedor: formData.fornecedor || null,
       date: formData.data_ini || null,
       periodo_fim: formData.data_fim || null,
-      logo: formData.logo || null,
+      logo: logoUrl,
       type: "highlight",
       status: "ativa",
     });
     setSavingCampaign(false);
     if (error) { console.error("[Campanhas] Erro ao criar:", error); alert(`Erro ao criar campanha: ${error.message}`); return; }
     setIsNewCampaignModalOpen(false);
-    // Recarrega lista para pegar o id gerado
     const { data: lista } = await supabase.from("campanhas").select("*");
     if (lista) setCampaigns(lista.map(mapCampaign));
   };
@@ -245,23 +254,26 @@ export function CampanhasView() {
   const salvarEdicao = async () => {
     if (!editingCampaign || !formData.name.trim()) return;
     setSavingCampaign(true);
+    const imageFile = (formData as any)._imageFile as File | undefined;
+    const logoUrl = imageFile
+      ? await uploadImagem(imageFile, formData.name)
+      : (editingCampaign.logo?.startsWith("http") ? editingCampaign.logo : null);
     const { error } = await supabase.from("campanhas").update({
       name: formData.name.trim(),
       fornecedor: formData.fornecedor || null,
       date: formData.data_ini || null,
       periodo_fim: formData.data_fim || null,
-      logo: formData.logo || null,
+      logo: logoUrl,
     }).eq("id", editingCampaign.id);
     setSavingCampaign(false);
     if (error) { console.error("[Campanhas] Erro ao editar:", error); alert(`Erro ao salvar: ${error.message}`); return; }
-    // Atualiza localmente com os dados do formData
     const updated = mapCampaign({
       id: editingCampaign.id,
       name: formData.name.trim(),
       fornecedor: formData.fornecedor || null,
       date: formData.data_ini || null,
       periodo_fim: formData.data_fim || null,
-      logo: formData.logo || editingCampaign.logo || null,
+      logo: logoUrl,
     });
     setCampaigns(prev => prev.map(c => c.id === editingCampaign.id ? updated : c));
     setEditingCampaign(null);
