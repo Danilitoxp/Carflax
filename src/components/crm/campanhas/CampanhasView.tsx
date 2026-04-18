@@ -385,8 +385,19 @@ export function CampanhasView() {
                 </button>
               </div>
 
-              <div className="flex-1 bg-slate-50 rounded-lg p-4 flex items-center justify-center border border-slate-100 mb-3 transition-colors group-hover:bg-blue-50/50">
-                <img src={camp.logo} className="max-h-12 w-auto object-contain group-hover:scale-110 transition-transform duration-500" alt={camp.name} />
+              <div className="flex-1 bg-slate-50 rounded-lg p-4 flex items-center justify-center border border-slate-100 mb-3 transition-colors group-hover:bg-blue-50/50 relative overflow-hidden">
+                <img
+                  src={camp.logo}
+                  alt={camp.name}
+                  onLoad={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                    const skeleton = e.currentTarget.parentElement?.querySelector(".img-skeleton") as HTMLElement;
+                    if (skeleton) skeleton.style.display = "none";
+                  }}
+                  style={{ opacity: 0, transition: "opacity 0.3s", position: "relative", zIndex: 1 }}
+                  className="max-h-12 w-auto object-contain group-hover:scale-110 transition-transform duration-500"
+                />
+                <div className="img-skeleton absolute inset-0 bg-slate-100 animate-pulse rounded-lg" />
               </div>
               <div className="space-y-1.5">
                 <h3 className="text-[10px] font-black text-slate-900 truncate uppercase tracking-tight">{camp.name}</h3>
