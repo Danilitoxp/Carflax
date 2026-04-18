@@ -18,6 +18,7 @@ import { EventsView } from "./Eventos/EventsView";
 import { VacationsView } from "./Ferias/VacationsView";
 import { VacationModal } from "./Ferias/VacationModal";
 import { Button } from "@/components/ui/button";
+import { TinyLoader } from "@/components/ui/TinyLoader";
 
 interface CalendarEvent {
   id: number;
@@ -303,10 +304,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
         <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-0 relative mt-3">
           {loading && (
             <div className="absolute inset-0 z-[30] bg-white/40 backdrop-blur-[1px] flex items-center justify-center">
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Sincronizando...</span>
-              </div>
+              <TinyLoader size="sm" />
             </div>
           )}
           

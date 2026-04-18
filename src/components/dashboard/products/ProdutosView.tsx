@@ -2,11 +2,11 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Search,
   ArrowUpDown,
-  Tag,
-  Loader2
+  Tag
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
+import { TinyLoader } from "@/components/ui/TinyLoader";
 
 interface Product {
   cod: string;
@@ -134,8 +134,15 @@ export function ProdutosView() {
         </div>
       </div>
 
-      {/* PRODUCTS TABLE */}
-      <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+      {/* PRODUCTS TABLE CONTAINER */}
+      <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col relative">
+        {/* ABSOLUTE CENTER LOADING */}
+        {loading && (
+          <div className="absolute inset-0 z-20 bg-white/60 backdrop-blur-[2px] flex items-center justify-center">
+            <TinyLoader />
+          </div>
+        )}
+
         <div 
           className="flex-1 overflow-y-auto scrollbar-hide"
           onScroll={handleScroll}
@@ -154,16 +161,7 @@ export function ProdutosView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <Loader2 className="w-8 h-8 text-blue-600 animate-spin opacity-40" />
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Carregando Estoque Atualizado...</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : visibleProducts.map((p, i) => (
+              {visibleProducts.map((p, i) => (
                 <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="py-3 px-6 text-[10px] font-bold text-slate-400">{p.cod}</td>
                   <td className="py-3 px-6">
@@ -197,10 +195,9 @@ export function ProdutosView() {
               
               {!loading && visibleCount < filteredProducts.length && (
                 <tr>
-                  <td colSpan={6} className="py-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                       <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />
-                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Carregando mais itens...</span>
+                  <td colSpan={6} className="py-6">
+                    <div className="flex justify-center w-full">
+                      <TinyLoader size="sm" />
                     </div>
                   </td>
                 </tr>
