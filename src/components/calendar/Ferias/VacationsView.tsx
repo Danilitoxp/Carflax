@@ -31,8 +31,7 @@ export function VacationsView({ dayDate, vacations, onVacationClick }: Vacations
       {activeVacations.map((v) => {
         const isStart = dayDate.toDateString() === v.start.toDateString();
         const isEnd = dayDate.toDateString() === v.end.toDateString();
-        const isFirstOfMonth = dayDate.getDate() === 1 && dayDate > v.start;
-        const showIndicator = isStart || isEnd || isFirstOfMonth;
+        const showIndicator = isStart || isEnd;
 
         return (
           <div 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   X, 
   Calendar as CalendarIcon, 
@@ -15,6 +15,7 @@ interface VacationModalProps {
   onDelete?: (id: number) => void;
   editingVacation?: any;
   employees: { name: string; avatar?: string }[];
+  vacations: any[];
 }
 
 export function VacationModal({ 
@@ -23,29 +24,31 @@ export function VacationModal({
   onSave, 
   onDelete, 
   editingVacation, 
-  employees 
+  employees,
+  vacations
 }: VacationModalProps) {
-  const [name, setName] = useState(editingVacation?.name || "");
+  const [name, setName] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
-  const [selectedColor, setSelectedColor] = useState(editingVacation?.color || "bg-orange-500");
+  const [selectedColor, setSelectedColor] = useState("bg-orange-500");
 
-  useState(() => {
-    if (editingVacation) {
-      setName(editingVacation.name);
-      setSelectedColor(editingVacation.color);
-      // Format dates YYYY-MM-DD for input
-      const s = editingVacation.start;
-      const e = editingVacation.end;
-      setStart(`${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}-${String(s.getDate()).padStart(2, '0')}`);
-      setEnd(`${e.getFullYear()}-${String(e.getMonth() + 1).padStart(2, '0')}-${String(e.getDate()).padStart(2, '0')}`);
-    } else {
-      setName("");
-      setStart("");
-      setEnd("");
-      setSelectedColor("bg-orange-500");
+  useEffect(() => {
+    if (isOpen) {
+      if (editingVacation) {
+        setName(editingVacation.name);
+        setSelectedColor(editingVacation.color);
+        const s = editingVacation.start;
+        const e = editingVacation.end;
+        setStart(`${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}-${String(s.getDate()).padStart(2, '0')}`);
+        setEnd(`${e.getFullYear()}-${String(e.getMonth() + 1).padStart(2, '0')}-${String(e.getDate()).padStart(2, '0')}`);
+      } else {
+        setName("");
+        setStart("");
+        setEnd("");
+        setSelectedColor("bg-orange-500");
+      }
     }
-  });
+  }, [isOpen, editingVacation]);
 
   const colors = [
     { name: "Laranja", class: "bg-orange-500" },
@@ -53,9 +56,35 @@ export function VacationModal({
     { name: "Verde", class: "bg-emerald-600" },
     { name: "Roxo", class: "bg-violet-600" },
     { name: "Rosa", class: "bg-rose-500" },
+    { name: "Ciano", class: "bg-cyan-500" },
+    { name: "Âmbar", class: "bg-amber-500" },
+    { name: "Slate", class: "bg-slate-600" },
+    { name: "Indigo", class: "bg-indigo-600" },
+    { name: "Teal", class: "bg-teal-600" },
   ];
 
   if (!isOpen) return null;
+
+  const handleNameChange = (newName: string) => {
+    setName(newName);
+    if (!editingVacation) {
+      // Tenta encontrar uma cor já usada por este funcionário em outros lançamentos
+      const existingColor = vacations.find(v => v.name === newName)?.color;
+      if (existingColor) {
+        setSelectedColor(existingColor);
+      } else {
+        // Se não encontrar, pega uma cor que esteja sendo "menos usada" no momento
+        const colorUsage: Record<string, number> = {};
+        colors.forEach(c => colorUsage[c.class] = 0);
+        vacations.forEach(v => {
+          if (colorUsage[v.color] !== undefined) colorUsage[v.color]++;
+        });
+        
+        const sortedColors = [...colors].sort((a, b) => colorUsage[a.class] - colorUsage[b.class]);
+        setSelectedColor(sortedColors[0].class);
+      }
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +136,7 @@ export function VacationModal({
               </label>
               <select 
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => handleNameChange(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all"
                 required
               >
@@ -149,7 +178,7 @@ export function VacationModal({
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">
                 Identificação Visual
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2.5 gap-y-3">
                 {colors.map((c, i) => (
                   <button
                     key={i}

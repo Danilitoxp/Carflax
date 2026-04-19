@@ -336,6 +336,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
           onDelete={handleDeleteVacation}
           editingVacation={editingVacation}
           employees={employees}
+          vacations={vacations}
         />
         <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-0 relative mt-3">
           {loading && (
