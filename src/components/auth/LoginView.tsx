@@ -38,7 +38,6 @@ export function LoginView({ onLogin }: LoginViewProps) {
       if (error) {
         showNotification("error", "Erro de Acesso", "E-mail ou senha incorretos. Verifique suas credenciais.");
       } else {
-        showNotification("success", "Bem-vindo!", "Login realizado com sucesso. Carregando seu painel...");
         onLogin();
       }
     } catch (err) {

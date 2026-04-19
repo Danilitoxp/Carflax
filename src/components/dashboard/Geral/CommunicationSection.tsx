@@ -47,7 +47,7 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
       }
       
       // 1. Pegar os IDs mais recentes
-      const sortedIds = [...data.likedBy].reverse().slice(0, 3);
+      const sortedIds = [...data.likedBy].reverse().slice(0, 5);
       
       const { data: users } = await supabase
         .from('usuarios')
@@ -68,14 +68,14 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
       if (currentUserId && data.likedBy.includes(currentUserId)) {
         const alreadyIn = finalAvatars.includes(userAvatar);
         if (!alreadyIn) {
-          finalAvatars = [userAvatar, ...finalAvatars].slice(0, 3);
+          finalAvatars = [userAvatar, ...finalAvatars].slice(0, 5);
         }
       }
           
       setLikersAvatars(finalAvatars);
     };
     fetchAvatars();
-  }, [data.likedBy]);
+  }, [data.likedBy, currentUserId, userAvatar]);
 
   const handleLike = async () => {
     if (!currentUserId) return;
@@ -88,7 +88,7 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
     setInteraction(isLiking ? "like" : null);
 
     if (isLiking) {
-      setLikersAvatars(prev => [userAvatar, ...prev.filter(a => a !== userAvatar)].slice(0, 3));
+      setLikersAvatars(prev => [userAvatar, ...prev.filter(a => a !== userAvatar)].slice(0, 5));
     } else {
       setLikersAvatars(prev => prev.filter(a => a !== userAvatar));
     }
@@ -100,7 +100,7 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
         .from("comunicados")
         .select("liked_by")
         .eq("id", data.dbId)
-        .single();
+        .maybeSingle();
 
       let newLikedBy = currentPost?.liked_by || [];
       
@@ -178,21 +178,31 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
           <div className="flex items-center gap-6">
              <button
                onClick={handleLike}
-               className={cn("flex items-center gap-2 text-xs font-black transition-all transform active:scale-95", interaction === "like" ? "text-blue-600" : "text-slate-400 hover:text-slate-600")}
+               className={cn(
+                 "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-3 py-1.5 rounded-xl", 
+                 interaction === "like" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+               )}
              >
-               <ThumbsUp className={cn("w-4 h-4", interaction === "like" && "fill-blue-600")} />
+               <ThumbsUp className={cn("w-4 h-4", interaction === "like" && "fill-white")} />
                {likes}
              </button>
-             <div className="flex -space-x-2">
+              <div className="flex items-center -space-x-2">
                 {likersAvatars.map((url, i) => (
-                  <img key={i} src={url} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover bg-slate-100" alt="liker" />
+                  <div key={i} className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-slate-100 ring-1 ring-slate-100 shadow-sm transition-transform hover:scale-110 hover:z-10">
+                    <img src={url} className="w-full h-full object-cover" alt="liker" />
+                  </div>
                 ))}
-             </div>
+                {likes > likersAvatars.length && (
+                  <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-50 flex items-center justify-center shadow-sm">
+                    <span className="text-[10px] font-black text-slate-400">+{likes - likersAvatars.length}</span>
+                  </div>
+                )}
+              </div>
           </div>
           <div className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-             <img src={data.authorAvatar} className="w-6 h-6 rounded-full shadow-sm" alt={data.author} />
-             <div className="flex flex-col leading-none">
-               <span className="text-[10px] font-black text-slate-900 uppercase tracking-tighter">{data.author}</span>
+             <img src={data.authorAvatar} className="w-7 h-7 rounded-full shadow-sm object-cover" alt={data.author} />
+             <div className="flex flex-col leading-none text-left">
+               <span className="text-[10px] font-black text-slate-900 uppercase tracking-tighter truncate max-w-[80px]">{data.author}</span>
                <span className="text-[9px] font-bold text-slate-400 uppercase">Autor</span>
              </div>
           </div>

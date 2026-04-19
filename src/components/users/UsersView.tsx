@@ -29,6 +29,8 @@ interface User {
   operatorCode?: string;
   company: "Carflax" | "Zelex" | "JCM";
   department: string;
+  birthDate?: string;
+  admissionDate?: string;
 }
 
 export function UsersView() {
@@ -146,6 +148,8 @@ export function UsersView() {
           operatorCode: u.operator_code || "",
           company: u.company,
           department: u.department,
+          birthDate: isoToMasked(u.birth_date || ""),
+          admissionDate: isoToMasked(u.admission_date || ""),
         })));
       }
       setLoading(false);
@@ -174,8 +178,8 @@ export function UsersView() {
       avatar: user.avatar,
       permissions: user.permissions || [],
       operatorCode: user.operatorCode || "",
-      birthDate: isoToMasked((user as any).birthDate || ""),
-      admissionDate: isoToMasked((user as any).admissionDate || ""),
+      birthDate: isoToMasked(user.birthDate || ""),
+      admissionDate: isoToMasked(user.admissionDate || ""),
     });
     setAvatarLoading(false);
     setSaving(false);

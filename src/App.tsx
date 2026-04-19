@@ -7,6 +7,8 @@ import { CrmSection } from "@/components/crm";
 import {
   SalesMetricsCard,
   BirthdayList,
+  UpcomingEventsCard,
+  EmployeeOfMonthCard,
 } from "@/components/dashboard/Geral/RightPanelComponents";
 import { GeralView } from "@/components/dashboard/Geral/GeralView";
 import { LayoutGrid } from "lucide-react";
@@ -44,7 +46,14 @@ function DashboardContent({
   const isDashboardView = ["Geral", "Performance", "Campanhas", "Dashboard", "Orçamentos"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência", "Banners"].includes(activeItem);
   const isCrmView = ["Orçamentos", "CRM", "Produtos", "Campanhas"].includes(activeItem);
-  const showRightPanel = activeItem === "Geral"; // Mostrar apenas no dashboard principal
+  const isComercial = 
+    userProfile?.department === "Comercial" || 
+    userProfile?.department === "Vendas" ||
+    userProfile?.role?.toLowerCase().includes("vendedor") ||
+    userProfile?.role?.toLowerCase().includes("venda") ||
+    isVendedor;
+
+  const showRightPanel = activeItem === "Geral"; // Mostrar para todos no dashboard principal
 
   return (
     <div className="h-screen bg-background font-sans transition-colors duration-300 overflow-hidden flex relative">
@@ -141,7 +150,15 @@ function DashboardContent({
               Simular {isVendedor ? 'Interno' : 'Vendedor'}
             </button>
             <div className="flex-1 flex flex-col gap-4 pb-0 overflow-y-auto scrollbar-hide">
-              <SalesMetricsCard userProfile={userProfile} data={vendedorMetrics} />
+              {isComercial ? (
+                <SalesMetricsCard userProfile={userProfile} data={vendedorMetrics} />
+              ) : (
+                <>
+                  <EmployeeOfMonthCard />
+                  <UpcomingEventsCard />
+                </>
+              )}
+              
               <BirthdayList />
             </div>
           </div>
@@ -212,28 +229,40 @@ function App() {
   const fetchProfile = async (uid: string) => {
     try {
       // 1. Tentar buscar pelo ID (vínculo direto)
-      let { data, error } = await supabase
+      let { data: idMatches } = await supabase
         .from("usuarios")
         .select("*")
-        .eq("id", uid)
-        .single();
+        .eq("id", uid);
+      
+      let data = idMatches?.[0];
 
       // 2. AUTO-CURA: Se não achou pelo ID, tenta pelo e-mail da sessão
-      if (error || !data) {
+      if (!data) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.email) {
           console.log("[App] Perfil não achou ID, tentando por e-mail:", user.email);
-          const { data: byEmail } = await supabase
+          const { data: emailMatches } = await supabase
             .from("usuarios")
             .select("*")
-            .eq("email", user.email)
-            .single();
+            .eq("email", user.email);
+          
+          const byEmail = emailMatches?.[0];
 
           if (byEmail) {
-            console.log("[App] Usuário achado por e-mail! Atualizando ID no banco...");
+            console.log("[App] Usuário achado por e-mail! Tentando sincronizar ID...");
             // Atualiza o registro antigo com o novo ID do Auth
-            await supabase.from("usuarios").update({ id: uid }).eq("email", user.email);
-            data = { ...byEmail, id: uid };
+            const { error: syncError } = await supabase
+              .from("usuarios")
+              .update({ id: uid })
+              .eq("email", user.email);
+
+            if (syncError) {
+              console.error("[App] Erro na sincronização de ID:", syncError);
+              // Mesmo se falhar o sync físico, usamos os dados do e-mail para a sessão atual
+              data = { ...byEmail };
+            } else {
+              data = { ...byEmail, id: uid };
+            }
           }
         }
       }

@@ -28,18 +28,19 @@ export function ProdutosView() {
   useEffect(() => {
     async function fetchProducts() {
       try {
-        const response = await fetch("https://marketing-banco-de-dados.velbav.easypanel.host/api/produtos");
+        const response = await fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/produtos");
         const json = await response.json();
         
         if (json.success && json.data) {
           const mapped = json.data.map((p: any) => {
+            const precoVenda = parseFloat(p.PRECO_VENDA || 0) || 0;
             return {
-              cod: p.ITE_CODITE,
-              desc: p.ITE_DESITE,
-              stock: parseFloat(p.TOTAL_DISPONIVEL) || 0,
-              debit: parseFloat(p.PRECO_VENDA || 0) || 0,
-              credit: (parseFloat(p.PRECO_VENDA || 0) || 0) * 1.0465,
-              brand: p.MARCA || "OUTROS",
+              cod: p.COD_PRODUTO || p.ITE_CODITE,
+              desc: p.PRODUTO || p.ITE_DESITE,
+              stock: parseFloat(p.SALDO || p.TOTAL_DISPONIVEL || 0) || 0,
+              debit: precoVenda,
+              credit: precoVenda * 1.0466,
+              brand: p.MARCA || "GERAL",
               location: p.ITE_LOCFIS || "---"
             };
           });
@@ -59,7 +60,13 @@ export function ProdutosView() {
   const [visibleCount, setVisibleCount] = useState(50);
 
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.desc.toLowerCase().includes(searchTerm.toLowerCase()) || p.cod.includes(searchTerm);
+    const searchLower = searchTerm.trim().toLowerCase();
+    const words = searchLower.split(/\s+/).filter(Boolean);
+    
+    const matchesSearch = words.length === 0 || 
+      words.every(word => p.desc.toLowerCase().includes(word)) || 
+      p.cod.toLowerCase().includes(searchLower);
+
     const matchesBrand = filterBrand === "Todas as Marcas" || p.brand === filterBrand;
     const matchesStock = filterStock === "TODOS" ||
       (filterStock === "COM ESTOQUE" && p.stock > 0) ||
