@@ -13,7 +13,6 @@ import {
   XCircle,
   Download,
   RefreshCw,
-  DatabaseZap,
 } from "lucide-react";
 import { ChatModal } from "@/components/ui/ChatModal";
 import { cn } from "@/lib/utils";
@@ -443,26 +442,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: any }) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Migrar do Firebase */}
-          <button
-            onClick={handleMigrar}
-            disabled={migrando}
-            title="Importar dados do Firebase"
-            className="h-10 px-4 bg-white border border-slate-200 hover:bg-violet-50 hover:border-violet-200 text-slate-600 hover:text-violet-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm flex items-center gap-2 disabled:opacity-50"
-          >
-            <DatabaseZap className={cn("w-3.5 h-3.5", migrando && "animate-spin")} />
-            {migrando ? "Importando..." : "Importar Firebase"}
-          </button>
-
-          {/* Refresh */}
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="h-10 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition-all active:scale-95 shadow-sm flex items-center gap-2 disabled:opacity-50"
-          >
-            <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
-          </button>
-
           <button
             onClick={handleExportCSV}
             className="h-10 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm flex items-center gap-2"

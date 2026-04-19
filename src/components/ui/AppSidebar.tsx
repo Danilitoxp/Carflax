@@ -24,6 +24,7 @@ import {
   FileText,
   CheckCircle2,
   Image,
+  Phone,
   type LucideIcon,
 } from "lucide-react";
 import organogramaIcon from "@/assets/organograma.svg";
@@ -65,6 +66,7 @@ const menuItems: MenuItem[] = [
     isDropdown: true,
     subItems: [
       { label: "Orçamentos", icon: FileBadge },
+      { label: "Ligações", icon: Phone },
       { label: "Campanhas", icon: Megaphone },
     ],
   },

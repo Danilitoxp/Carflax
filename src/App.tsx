@@ -43,9 +43,9 @@ function DashboardContent({
     }
   };
 
-  const isDashboardView = ["Geral", "Performance", "Campanhas", "Dashboard", "Orçamentos"].includes(activeItem);
+  const isDashboardView = ["Geral", "Performance", "Campanhas", "Dashboard", "Orçamentos", "Ligações"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência", "Banners"].includes(activeItem);
-  const isCrmView = ["Orçamentos", "CRM", "Produtos", "Campanhas"].includes(activeItem);
+  const isCrmView = ["Orçamentos", "CRM", "Produtos", "Campanhas", "Ligações"].includes(activeItem);
   const isComercial = 
     userProfile?.department === "Comercial" || 
     userProfile?.department === "Vendas" ||
