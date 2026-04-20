@@ -117,7 +117,7 @@ export async function addConversa(conversa: Omit<CrmConversa, "id">): Promise<vo
     });
 }
 
-// ─── Migração Firebase → Supabase ─────────────────────────────────────────────
+// ─── Migração Firebase → Supabase (completa) ──────────────────────────────────
 export async function migrarDoFirebase(): Promise<{ status: number; conversas: number }> {
   // 1. crm_status
   const statusRows = await fsGetAll("crm_status");
@@ -143,7 +143,7 @@ export async function migrarDoFirebase(): Promise<{ status: number; conversas: n
     if (!error) statusCount = statusRows.length;
   }
 
-  // 2. crm_notificacoes → crm.conversas
+  // 2. crm_notificacoes → crm_conversas
   const notifRows = await fsGetAll("crm_notificacoes");
   let conversasCount = 0;
   if (notifRows.length > 0) {
@@ -170,17 +170,66 @@ export async function migrarDoFirebase(): Promise<{ status: number; conversas: n
   return { status: statusCount, conversas: conversasCount };
 }
 
-// ─── Carrega mapa de status para uma lista de documentos ────────────────────
+// ─── Sincroniza apenas lembrete_data faltante do Firestore → Supabase ────────
+export async function sincronizarLembreteData(): Promise<{ atualizados: number; erros: number }> {
+  const fsRows = await fsGetAll("crm_status");
+  let atualizados = 0;
+  let erros = 0;
+
+  const comLembrete = fsRows.filter((r) =>
+    r.lembrete_data ?? r.lembreteData ?? r.proximo_contato
+  );
+
+  for (const r of comLembrete) {
+    const documento = String(r.documento ?? "");
+    if (!documento) continue;
+    const lembrete = String(r.lembrete_data ?? r.lembreteData ?? r.proximo_contato);
+
+    const { error } = await supabase
+      .from("crm_status")
+      .update({ lembrete_data: lembrete })
+      .eq("documento", documento)
+      .is("lembrete_data", null);
+
+    if (error) erros++;
+    else atualizados++;
+  }
+
+  return { atualizados, erros };
+}
+
 export async function getCrmStatusMap(
   documentos: string[]
 ): Promise<Map<string, CrmStatus>> {
-  if (documentos.length === 0) return new Map();
-  const { data, error } = await supabase
-    .from("crm_status")
-    .select("*")
-    .in("documento", documentos);
-  if (error) console.error("[CRM] getCrmStatusMap error:", error);
+  if (!documentos || documentos.length === 0) return new Map();
+
+  // Divide em blocos de 500 para evitar limites de query do Supabase/Postgrest
+  const chunks: string[][] = [];
+  for (let i = 0; i < documentos.length; i += 500) {
+    chunks.push(documentos.slice(i, i + 500));
+  }
+
   const map = new Map<string, CrmStatus>();
-  for (const row of data ?? []) map.set(row.documento, row);
+
+  for (const chunk of chunks) {
+    const { data, error } = await supabase
+      .from("crm_status")
+      .select("*")
+      .in("documento", chunk);
+
+    if (error) {
+      console.error("[CRM] getCrmStatusMap error:", error.code, error.message, error.details);
+      continue;
+    }
+
+    if (!data || data.length === 0) {
+      console.warn(`[CRM] No data found for chunk of ${chunk.length} items. First ID: ${chunk[0]}`);
+    }
+
+    for (const row of data ?? []) {
+      map.set(row.documento.trim(), row);
+    }
+  }
+
   return map;
 }

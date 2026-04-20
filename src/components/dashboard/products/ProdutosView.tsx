@@ -7,6 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 import { TinyLoader } from "@/components/ui/TinyLoader";
+import { apiDashboardProdutos, type ProductInfo } from "@/lib/api";
 
 interface Product {
   cod: string;
@@ -28,20 +29,20 @@ export function ProdutosView() {
   useEffect(() => {
     async function fetchProducts() {
       try {
-        const response = await fetch("https://marketing-gestao-de-tempo.velbav.easypanel.host/api/produtos");
-        const json = await response.json();
+        setLoading(true);
+        const response = await apiDashboardProdutos();
         
-        if (json.success && json.data) {
-          const mapped = json.data.map((p: any) => {
-            const precoVenda = parseFloat(p.PRECO_VENDA || 0) || 0;
+        if (response && response.length > 0) {
+          const mapped = response.map((p: ProductInfo) => {
+            const precoVenda = typeof p.PRECO_VENDA === 'string' ? parseFloat(p.PRECO_VENDA) : Number(p.PRECO_VENDA || 0);
             return {
-              cod: p.COD_PRODUTO || p.ITE_CODITE,
-              desc: p.PRODUTO || p.ITE_DESITE,
-              stock: parseFloat(p.SALDO || p.TOTAL_DISPONIVEL || 0) || 0,
+              cod: p.COD_ITEM,
+              desc: p.DESCRICAO,
+              stock: typeof p.TOTAL_DISPONIVEL === 'string' ? parseFloat(p.TOTAL_DISPONIVEL) : Number(p.TOTAL_DISPONIVEL || 0),
               debit: precoVenda,
               credit: precoVenda * 1.0466,
               brand: p.MARCA || "GERAL",
-              location: p.ITE_LOCFIS || "---"
+              location: "---"
             };
           });
           setProducts(mapped);
@@ -168,7 +169,7 @@ export function ProdutosView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {visibleProducts.map((p, i) => (
+              {visibleProducts.map((p: Product, i) => (
                 <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="py-3 px-6 text-[10px] font-bold text-slate-400">{p.cod}</td>
                   <td className="py-3 px-6">

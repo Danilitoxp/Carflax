@@ -1,6 +1,6 @@
 const API_BASE =
-  typeof window !== "undefined" && (window as any).__API_ORIGIN__
-    ? (window as any).__API_ORIGIN__
+  typeof window !== "undefined" && (window as Window & { __API_ORIGIN__?: string }).__API_ORIGIN__
+    ? (window as Window & { __API_ORIGIN__?: string }).__API_ORIGIN__
     : import.meta.env.VITE_API_URL ||
       "https://marketing-gestao-de-tempo.velbav.easypanel.host";
 
@@ -29,19 +29,25 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export interface VendedorResumo {
   COD_VENDEDOR: string;
   NOME_VENDEDOR: string;
-  META: number;
-  FATURADO: number;
-  EM_ABERTO: number;
-  TOTAL: number;
-  ATINGIMENTO_PCT: number;
-  FALTANTE: number;
+  META: number | string;
+  FATURADO: number | string;
+  EM_ABERTO: number | string;
+  TOTAL: number | string;
+  ATINGIMENTO_PCT?: number | string;
+  FALTANTE: number | string;
+  CUSTO?: number | string;
+  MARGEM_REAL?: number | string;
+  MARGEM_REAL_PERC?: number | string;
   QTD_VENDAS: number;
-  TICKET_MEDIO: number;
-  QTD_ORCAMENTOS: number;
-  TAXA_CONVERSAO: number;
-  MARGEM_PCT: number;
-  PRAZO_MEDIO_DIAS: number;
-  TOTAL_VENDIDO_HOJE: number;
+  TICKET_MEDIO: number | string;
+  CUSTO_EM_ABERTO?: number | string;
+  QTD_ORCAMENTOS: number | string;
+  ORC_FECHADOS?: number | string;
+  TAXA_CONVERSAO?: number | string;
+  MARGEM_PCT?: number | string;
+  PRAZO_MEDIO_DIAS: number | string;
+  PRAZO_MEDIO_DIAS_HOJE?: number | string;
+  TOTAL_VENDIDO_HOJE: number | string;
   dias_trabalhados?: number;
 }
 
@@ -49,15 +55,21 @@ export interface VendedoresResponse {
   mesano: string;
   dias_trabalhados: number;
   resumo: VendedorResumo[];
-  detalhe?: any[];
-  vendas_diarias?: any[];
-  vendas_mensais?: any[];
+  detalhe?: unknown[];
+  vendas_diarias?: unknown[];
+  vendas_mensais?: unknown[];
 }
 
 export const apiVendedores = (mesano: string, vendedor?: string) =>
   get<VendedoresResponse>("/api/vendedores", { 
     mesano, 
     ...(vendedor ? { vendedor } : {}) 
+  });
+
+export const apiDashboardGeral = (vendedor?: string, data?: string) =>
+  get<VendedorResumo[]>("/api/dashboard/geral", {
+    ...(vendedor ? { vendedor } : {}),
+    ...(data ? { data } : {})
   });
 
 // ── Metas de Campanha (Elegíveis para Sorteio) ────────────────────────────────
@@ -129,7 +141,7 @@ export const apiCampaignRanking = async (params: {
     "/api/campaign-ranking",
     params as Record<string, string>
   );
-  return Array.isArray(data) ? data : (data as any).rows ?? [];
+  return Array.isArray(data) ? data : (data as { rows?: RankingVendedor[] }).rows ?? [];
 };
 
 // ── Entregas ──────────────────────────────────────────────────────────────────
@@ -143,7 +155,7 @@ export const apiOtimizarRota = (body: { entregas: unknown[]; partida: unknown })
 // ── CRM ───────────────────────────────────────────────────────────────────────
 
 // API externa com campos corretos: ORCAMENTO, VALOR_ORCAMENTO, MARKUP_PERC, etc.
-const CRM_EXTERNO = "https://marketing-banco-de-dados.velbav.easypanel.host";
+const CRM_EXTERNO = "https://marketing-gestao-de-tempo.velbav.easypanel.host";
 
 export async function apiCrm(params?: Record<string, string>): Promise<unknown[]> {
   const url = new URL(`${CRM_EXTERNO}/api/crm`);
@@ -174,6 +186,22 @@ export async function apiCrmItens(documento: string): Promise<CrmItem[]> {
 }
 
 // ── Outros ────────────────────────────────────────────────────────────────────
+
+export interface ProductInfo {
+  COD_ITEM: string;
+  DESCRICAO: string;
+  MARCA: string;
+  VALOR_CREDITO: number | string;
+  VALOR_DEBITO: string | null;
+  PRECO_VENDA: number | string;
+  TOTAL_DISPONIVEL: number | string;
+  ULT_ALT: string;
+}
+
+export const apiDashboardProdutos = (codigo?: string) =>
+  get<ProductInfo[]>("/api/dashboard/produtos", {
+    ...(codigo ? { codigo } : {})
+  });
 
 export const apiFornecedores = () => get("/api/fornecedores");
 export const apiProdutos = () => get("/api/produtos");

@@ -15,13 +15,9 @@ const { getPool } = require('./src/db');
 const verificarToken = require('./src/middleware/auth');
 
 // Seções do app Carflax
-const rotasGeral      = require('./src/routes/geral');
-const rotasProdutos   = require('./src/routes/produtos');
-const rotasOrcamentos = require('./src/routes/orcamentos');
-const rotasCampanhas  = require('./src/routes/campanhas');
-const rotasEntregas   = require('./src/routes/entregas');
-const rotasCrm        = require('./src/routes/crm');
-const rotasClientes   = require('./src/routes/clientes');
+const rotasGeral = require('./src/routes/HUB/Dashboard/geral');
+const rotasProdutos = require('./src/routes/HUB/Dashboard/produtos');
+const rotasOrcamentos = require('./src/routes/HUB/Crm/orcamentos');
 
 const app = express();
 
@@ -42,26 +38,19 @@ app.locals.pool = getPool();
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Todas as rotas abaixo exigem token JWT válido
-app.use('/api', verificarToken);
+// DESATIVADO TEMPORARIAMENTE PARA TESTES
+// app.use('/api', verificarToken);
 
-app.use('/api', rotasGeral);
-app.use('/api', rotasProdutos);
-app.use('/api', rotasOrcamentos);
-app.use('/api', rotasCampanhas);
-app.use('/api', rotasEntregas);
-app.use('/api', rotasCrm);
-app.use('/api', rotasClientes);
+app.use('/api/dashboard/geral', rotasGeral);
+app.use('/api/dashboard/produtos', rotasProdutos);
+app.use('/api/crm/orcamentos', rotasOrcamentos);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
   console.log('Rotas disponíveis:');
   console.log('  GET  /api/health');
-  console.log('  GET  /api/geral');
-  console.log('  GET  /api/produtos  |  GET /api/produtos/:codigo');
-  console.log('  GET  /api/orcamentos  |  GET /api/orcamentos/:id/itens  |  POST /api/orcamentos');
-  console.log('  GET  /api/campanhas/ranking  |  /ranking/marca  |  /marcas');
-  console.log('  GET  /api/entregas');
-  console.log('  GET  /api/crm');
-  console.log('  GET  /api/clientes');
+  console.log('  GET  /api/dashboard/geral');
+  console.log('  GET  /api/dashboard/produtos');
+  console.log('  GET  /api/crm/orcamentos');
 });

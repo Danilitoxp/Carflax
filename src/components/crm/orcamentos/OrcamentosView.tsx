@@ -46,11 +46,6 @@ export interface Orcamento {
   empresa?: string;
 }
 
-interface UserProfile {
-  role?: string;
-  name?: string;
-}
-
 interface RawOrcamento {
   ORCAMENTO?: string | number;
   DOCUMENTO?: string | number;
@@ -70,13 +65,19 @@ interface RawOrcamento {
   MOTIVO_CANCELAMENTO?: string;
   motivo_perda?: string;
   PEDIDO?: unknown;
-  DATA_BAIXA?: unknown;
+  DATA_BAIXA?: string;
   VENDEDOR?: string;
   vendedor?: string;
   CLIENTE?: string;
   cliente?: string;
-  EMPRESA?: string;
-  empresa?: string;
+  EMPRESA?: string | number;
+  empresa?: string | number;
+}
+
+interface UserProfile {
+  name: string;
+  role: string;
+  avatar?: string;
 }
 
 function parseName(raw: string): string {
@@ -89,16 +90,7 @@ function parseName(raw: string): string {
 function parseOrcamentos(raw: unknown[]): Orcamento[] {
   return (raw as RawOrcamento[]).map((r) => {
     // API externa: ORCAMENTO já vem como "000001026819-OR"
-    let id = String(r.ORCAMENTO || r.DOCUMENTO || r.documento || "").trim();
-    if (id && !id.endsWith("-OR")) id += "-OR";
-    // Normalização para 12 dígitos antes do -OR (padrão Supabase)
-    if (id.includes("-OR")) {
-      const parts = id.split("-");
-      if (/^\d+$/.test(parts[0])) {
-        parts[0] = parts[0].padStart(12, "0");
-        id = parts.join("-");
-      }
-    }
+    const id = String(r.ORCAMENTO || r.DOCUMENTO || r.documento || "");
 
     const total = Number(r.VALOR_ORCAMENTO || r.VALOR_VENDA || r.TOTAL || r.total || 0);
     const markup = Number(r.MARKUP_PERC || r.MARKUP || r.markup || 0);
@@ -141,7 +133,6 @@ function isGerente(role?: string) {
 export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [orçamentosData, setOrçamentosData] = useState<Orcamento[]>([]);
   const [loading, setLoading] = useState(false);
-  const [migMsg, setMigMsg] = useState<string | null>(null);
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "id", direction: "desc" });
   const [filterStatus, setFilterStatus] = useState("Todos os Status");
@@ -216,6 +207,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   }, [startDate, endDate, userProfile]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
 
 
   // ── Status update ────────────────────────────────────────────────────────
@@ -478,13 +470,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         </div>
       </div>
 
-      {/* Migration message */}
-      {migMsg && (
-        <div className={cn("mb-3 px-4 py-2 rounded-xl text-[11px] font-bold border shrink-0", migMsg.startsWith("Erro") ? "bg-rose-50 border-rose-200 text-rose-600" : "bg-emerald-50 border-emerald-200 text-emerald-700")}>
-          {migMsg}
-          <button onClick={() => setMigMsg(null)} className="ml-3 opacity-50 hover:opacity-100">×</button>
-        </div>
-      )}
+
 
       {/* INSIGHTS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 shrink-0">
@@ -833,10 +819,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     ].map((btn, i) => (
                       <button
                         key={i}
-                        onClick={() => {
-                          if (btn.next) setStatusStep(btn.next as "enviado" | "negociacao" | "perdido");
-                          else handleUpdateStatus(btn.label.toUpperCase());
-                        }}
+                        onClick={() => btn.next ? setStatusStep(btn.next as "enviado" | "negociacao" | "perdido") : handleUpdateStatus(btn.label.toUpperCase())}
                         className="flex items-center gap-3 py-3 px-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/80 transition-all text-left"
                       >
                         <div className={cn("w-2 h-2 rounded-full", btn.dot)} />

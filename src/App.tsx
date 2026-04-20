@@ -19,16 +19,30 @@ import { UsersView } from "@/components/users/UsersView";
 import { LoginView } from "@/components/auth/LoginView";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { OrgChartView } from "@/components/ui/OrgChartModal";
+import { type VendedorResumo } from "@/lib/api";
+
+export interface UserProfile {
+  id?: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string;
+  department?: string;
+  operator_code?: string;
+  operatorCode?: string;
+}
+
+interface DashboardContentProps {
+  userProfile: UserProfile | null;
+  vendedorMetrics: VendedorResumo | null; 
+  onLogout: () => void;
+}
 
 function DashboardContent({ 
   userProfile, 
   vendedorMetrics, 
   onLogout 
-}: { 
-  userProfile: any, 
-  vendedorMetrics: any, 
-  onLogout: () => void 
-}) {
+}: DashboardContentProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
@@ -175,61 +189,38 @@ function DashboardContent({
 
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { supabase } from "@/lib/supabase";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 function App() {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<unknown>(null); // From Supabase Auth
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
-  const [vendedorMetrics, setVendedorMetrics] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [vendedorMetrics, setVendedorMetrics] = useState<VendedorResumo | null>(null);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-        setVendedorMetrics(null);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchVendedorMetrics = async (codVendedor: string) => {
+  const fetchVendedorMetrics = useCallback(async (codVendedor: string) => {
     try {
       const now = new Date();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
       const yyyy = now.getFullYear();
-      const mesano = `${mm}${yyyy}`;
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const dataStr = `${yyyy}-${mm}-${dd}`;
       
-      const { apiVendedores } = await import("@/lib/api");
-      const response = await apiVendedores(mesano, codVendedor);
+      const { apiDashboardGeral } = await import("@/lib/api");
+      const response = await apiDashboardGeral(codVendedor, dataStr);
       
-      if (response && response.resumo) {
-        const myData = response.resumo.find((r: any) => r.COD_VENDEDOR === codVendedor) || response.resumo[0];
-        setVendedorMetrics({ ...myData, dias_trabalhados: response.dias_trabalhados });
+      if (response && response.length > 0) {
+        const myData = response.find((r: VendedorResumo) => r.COD_VENDEDOR === codVendedor) || response[0];
+        setVendedorMetrics(myData);
       }
     } catch (error) {
       console.error("Erro ao buscar métricas:", error);
     }
-  };
+  }, []);
 
-  const fetchProfile = async (uid: string) => {
+  const fetchProfile = useCallback(async (uid: string) => {
     try {
       // 1. Tentar buscar pelo ID (vínculo direto)
-      let { data: idMatches } = await supabase
+      const { data: idMatches } = await supabase
         .from("usuarios")
         .select("*")
         .eq("id", uid);
@@ -287,7 +278,31 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchVendedorMetrics]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+        setVendedorMetrics(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [fetchProfile]);
 
   if (loading) return <LoadingScreen />;
 

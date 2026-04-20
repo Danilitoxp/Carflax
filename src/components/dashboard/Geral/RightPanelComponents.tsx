@@ -22,9 +22,16 @@ import {
 import { cn } from "@/lib/utils";
 
 import { useState, useEffect } from "react";
-import { apiVendedores, type VendedorResumo } from "@/lib/api";
+import { apiDashboardGeral, type VendedorResumo } from "@/lib/api";
 
-export function SalesMetricsCard({ isCompact, userProfile, data: externalData }: { isCompact?: boolean, userProfile?: any, data?: VendedorResumo }) {
+interface UserProfileLite {
+  operator_code?: string;
+  operatorCode?: string;
+  name?: string;
+  avatar?: string;
+}
+
+export function SalesMetricsCard({ isCompact, userProfile, data: externalData }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo }) {
   const [loading, setLoading] = useState(!externalData);
   const [data, setData] = useState<VendedorResumo | null>(externalData || null);
 
@@ -38,21 +45,19 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData }:
     async function fetchData() {
       try {
         setLoading(true);
-        // Pegar mês/ano atual no formato MMYYYY (ex: 042026)
         const now = new Date();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
         const yyyy = now.getFullYear();
-        const mesano = `${mm}${yyyy}`;
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const dataStr = `${yyyy}-${mm}-${dd}`;
 
-        // Usar operator_code do perfil ou 049 como fallback
         const codVendedor = userProfile?.operator_code || userProfile?.operatorCode || "049";
 
-        const response = await apiVendedores(mesano, codVendedor);
+        const response = await apiDashboardGeral(codVendedor, dataStr);
 
-        if (response && response.resumo) {
-          const myData = response.resumo.find(r => r.COD_VENDEDOR === codVendedor) || response.resumo[0];
-          // Injetar dias_trabalhados da resposta no objeto do vendedor
-          setData({ ...myData, dias_trabalhados: response.dias_trabalhados });
+        if (response && response.length > 0) {
+          const myData = response.find(r => r.COD_VENDEDOR === codVendedor) || response[0];
+          setData(myData);
         }
       } catch (error) {
         console.error("Erro ao carregar métricas:", error);
@@ -64,22 +69,26 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData }:
     fetchData();
   }, [userProfile, externalData]);
 
-  const formatBRL = (val: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
+  const formatBRL = (val: number | string) => {
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(num || 0);
+  };
 
 
   const calculateEquilibrio = () => {
     if (!data) return 0;
     const daysWorked = data.dias_trabalhados || 15;
     const totalWorkingDays = 22; // Base de dias úteis padrão
-    return (data.META / totalWorkingDays) * daysWorked;
+    const meta = typeof data.META === 'string' ? parseFloat(data.META) : data.META;
+    return (meta / totalWorkingDays) * daysWorked;
   };
 
   const getDiasRestantes = () => 9; // Conforme screenshot (24 dias operacionais - 15 trabalhados)
 
   const calculateDiarioNecessario = () => {
     if (!data) return 0;
-    return data.FALTANTE / getDiasRestantes();
+    const faltante = typeof data.FALTANTE === 'string' ? parseFloat(data.FALTANTE) : data.FALTANTE;
+    return faltante / getDiasRestantes();
   };
 
   const metrics = data ? [
@@ -91,10 +100,14 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData }:
     { label: m("Equilíbrio"), value: formatBRL(calculateEquilibrio()), icon: BarChart3, valueColor: "text-blue-600" },
     { label: m("Dias Restantes"), value: `${getDiasRestantes()}`, icon: Calendar, valueColor: "text-slate-900" },
     { label: m("Diário"), value: formatBRL(calculateDiarioNecessario()), icon: Zap, valueColor: "text-slate-900" },
-    { label: m("Tx Conversão"), value: `${data.TAXA_CONVERSAO?.toFixed(2) || 0}%`, icon: PieChart, valueColor: "text-blue-600" },
+    { label: m("Tx Conversão"), value: `${
+      data.TAXA_CONVERSAO 
+        ? Number(typeof data.TAXA_CONVERSAO === 'string' ? parseFloat(data.TAXA_CONVERSAO) : data.TAXA_CONVERSAO).toFixed(2)
+        : ((Number(data.ORC_FECHADOS || 0) / Math.max(Number(data.QTD_ORCAMENTOS || 1), 1)) * 100).toFixed(2)
+    }%`, icon: PieChart, valueColor: "text-blue-600" },
     { label: m("Ticket Médio"), value: formatBRL(data.TICKET_MEDIO), icon: DollarSign, valueColor: "text-slate-900" },
-    { label: m("Margem Real"), value: `${data.MARGEM_PCT?.toFixed(2) || 0}%`, icon: TrendingUp, valueColor: "text-blue-600" },
-    { label: m("Prazo Médio"), value: `${data.PRAZO_MEDIO_DIAS?.toFixed(0) || 0} d`, icon: Clock, valueColor: "text-slate-900" },
+    { label: m("Margem Real"), value: `${Number(typeof (data.MARGEM_REAL_PERC || data.MARGEM_PCT) === 'string' ? parseFloat((data.MARGEM_REAL_PERC || data.MARGEM_PCT) as string) : (data.MARGEM_REAL_PERC || data.MARGEM_PCT || 0)).toFixed(2)}%`, icon: TrendingUp, valueColor: "text-blue-600" },
+    { label: m("Prazo Médio"), value: `${Number(typeof data.PRAZO_MEDIO_DIAS === 'string' ? parseFloat(data.PRAZO_MEDIO_DIAS) : data.PRAZO_MEDIO_DIAS || 0).toFixed(0)} d`, icon: Clock, valueColor: "text-slate-900" },
   ] : [];
 
   function m(text: string) { return text; }
@@ -114,7 +127,8 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData }:
   }
 
   const equilibrio = calculateEquilibrio();
-  const percentageVsEquilibrio = equilibrio > 0 ? (data.TOTAL / equilibrio) * 100 : 0;
+  const total = typeof data.TOTAL === 'string' ? parseFloat(data.TOTAL) : data.TOTAL;
+  const percentageVsEquilibrio = equilibrio > 0 ? (total / equilibrio) * 100 : 0;
 
   return (
     <div className={cn(
@@ -184,12 +198,12 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData }:
       <div className="mb-8 px-2">
         <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
           <span className="text-blue-600">Meta</span>
-          <span className="text-slate-900">{((data?.TOTAL || 0) / (data?.META || 1) * 100).toFixed(1)}%</span>
+          <span className="text-slate-900">{((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100).toFixed(1)}%</span>
         </div>
         <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
           <div
             className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(37,99,235,0.4)]"
-            style={{ width: `${Math.min(((data?.TOTAL || 0) / (data?.META || 1) * 100), 100)}%` }}
+            style={{ width: `${Math.min(((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100), 100)}%` }}
           />
         </div>
       </div>
@@ -402,7 +416,7 @@ export function WeatherTrafficCard() {
 }
 
 export function ActiveVacationsCard() {
-  const [vacations, setVacations] = useState<{ id: any; name: string; avatar: string; end_date: string }[]>([]);
+  const [vacations, setVacations] = useState<{ id: string | number; name: string; avatar: string; end_date: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -464,7 +478,7 @@ export function ActiveVacationsCard() {
 }
 
 export function UpcomingEventsCard() {
-  const [events, setEvents] = useState<{ id: any; title: string; day: number; month: number; year: number; type: string }[]>([]);
+  const [events, setEvents] = useState<{ id: string | number; title: string; day: number; month: number; year: number; type: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -614,11 +628,14 @@ export function BirthdayList() {
         const filtered = (data || [])
           .filter(u => {
             if (!u.birth_date) return false;
-            const [_, m] = u.birth_date.split("-").map(Number);
+            const parts = u.birth_date.split("-");
+            const m = parseInt(parts[1]);
             return m === currentMonth;
           })
           .map(u => {
-            const [_, m, d] = u.birth_date.split("-");
+            const parts = u.birth_date.split("-");
+            const m = parts[1];
+            const d = parts[2];
             return {
               name: u.name,
               date: `${d}/${m}`,
