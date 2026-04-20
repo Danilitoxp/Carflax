@@ -1,5 +1,9 @@
+import { useState, useEffect, useCallback } from "react";
+import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { ThemeProvider } from "@/context/theme-provider";
 import { AppSidebar } from "@/components/ui/AppSidebar";
+import { ChatModal } from "@/components/ui/ChatModal";
+import { supabase } from "@/lib/supabase";
 import { CommunicationSection } from "@/components/dashboard/Geral/CommunicationSection";
 import { CalendarSection } from "@/components/calendar";
 import { SettingsSection } from "@/components/settings";
@@ -49,6 +53,39 @@ function DashboardContent({
   const [activeItem, setActiveItem] = useState("Geral");
   const [isSugestaoModalOpen, setIsSugestaoModalOpen] = useState(false);
 
+  // ── Sincronização Global do Chat ───────────────────────────────────────
+  const [globalChat, setGlobalChat] = useState<{ open: boolean; doc: string; title: string } | null>(null);
+
+  useEffect(() => {
+    if (!userProfile?.id) return;
+
+    const channel = supabase
+      .channel('global_crm')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' }, 
+        (payload) => {
+          const newMsg = payload.new as { destino: string; enviado_por: string; documento: string };
+          if (newMsg.destino === userProfile.id && newMsg.enviado_por !== userProfile.id) {
+            setGlobalChat({ 
+              open: true, 
+              doc: newMsg.documento, 
+              title: newMsg.documento.includes("-OR") ? "Alerta de Orçamento" : "Nova Mensagem" 
+            });
+          }
+      })
+      .subscribe();
+
+    const handleOpenChat = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) setGlobalChat({ open: true, doc: detail.doc, title: detail.title });
+    };
+    window.addEventListener('open-crm-chat', handleOpenChat);
+
+    return () => { 
+      supabase.removeChannel(channel);
+      window.removeEventListener('open-crm-chat', handleOpenChat);
+    };
+  }, [userProfile?.id]);
+
   const handleActiveItemChange = (item: string) => {
     if (item === "Sugestões") {
       setIsSugestaoModalOpen(true);
@@ -58,7 +95,7 @@ function DashboardContent({
   };
 
   const isDashboardView = ["Geral", "Performance", "Campanhas", "Dashboard", "Orçamentos", "Ligações"].includes(activeItem);
-  const isSettingsView = ["Configurações", "Meu Perfil", "Notificações", "Segurança", "Aparência", "Banners"].includes(activeItem);
+  const isSettingsView = ["Configurações", "Meu Perfil", "Config. Orçamentos", "Notificações", "Segurança", "Aparência", "Banners"].includes(activeItem);
   const isCrmView = ["Orçamentos", "CRM", "Produtos", "Campanhas", "Ligações"].includes(activeItem);
   const isComercial = 
     userProfile?.department === "Comercial" || 
@@ -179,17 +216,23 @@ function DashboardContent({
         )}
       </main>
 
-      <SugestaoModal
-        isOpen={isSugestaoModalOpen}
-        onClose={() => setIsSugestaoModalOpen(false)}
-      />
+        <SugestaoModal 
+          isOpen={isSugestaoModalOpen} 
+          onClose={() => setIsSugestaoModalOpen(false)} 
+        />
+
+        <ChatModal
+          isOpen={globalChat?.open || false}
+          onClose={() => setGlobalChat(null)}
+          documento={globalChat?.doc || ""}
+          empresa="001"
+          title={globalChat?.title || ""}
+          userProfile={userProfile}
+        />
     </div>
   );
 }
 
-import { NotificationProvider } from "@/components/ui/NotificationProvider";
-import { supabase } from "@/lib/supabase";
-import { useEffect, useState, useCallback } from "react";
 
 function App() {
   const [session, setSession] = useState<unknown>(null); // From Supabase Auth

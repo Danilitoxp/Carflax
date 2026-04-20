@@ -2,6 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { X, Send, Minus, Square, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getConversas, addConversa, type CrmConversa } from "@/lib/crm-service";
+import { supabase } from "@/lib/supabase";
+
+interface UserProfile {
+  id?: string;
+  name: string;
+  role: string;
+  avatar?: string;
+}
 
 interface ChatModalProps {
   isOpen: boolean;
@@ -9,11 +17,11 @@ interface ChatModalProps {
   documento: string;
   empresa: string;
   title: string;
-  subtitle: string;
   avatarText?: string;
+  userProfile?: UserProfile;
 }
 
-export function ChatModal({ isOpen, onClose, documento, empresa, title, subtitle, avatarText }: ChatModalProps) {
+export function ChatModal({ isOpen, onClose, documento, empresa, title, avatarText, userProfile }: ChatModalProps) {
   const [isMinimized, setIsMinimized] = useState(false);
   const [messageText, setMessageText] = useState("");
   const [conversas, setConversas] = useState<CrmConversa[]>([]);
@@ -33,12 +41,39 @@ export function ChatModal({ isOpen, onClose, documento, empresa, title, subtitle
     if (!isMinimized) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversas, isMinimized]);
 
+  const [centralizer, setCentralizer] = useState<{ id: string; name: string; avatar: string } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    async function fetchConfig() {
+      const { data: config } = await supabase
+        .from("crm_config")
+        .select("value")
+        .eq("key", "centralizer_user_id")
+        .maybeSingle();
+      
+      if (config?.value) {
+        const { data: userData } = await supabase
+          .from("usuarios")
+          .select("id, name, avatar")
+          .eq("id", config.value)
+          .maybeSingle();
+        
+        if (userData) setCentralizer(userData);
+      }
+    }
+    
+    fetchConfig();
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSend = async () => {
     const text = messageText.trim();
     if (!text || sending) return;
     setSending(true);
+
     const nova: Omit<CrmConversa, "id"> = {
       documento,
       empresa,
@@ -46,16 +81,21 @@ export function ChatModal({ isOpen, onClose, documento, empresa, title, subtitle
       enviado_por_nome: "Você",
       lida: false,
       fechada: false,
-      destino: "todos",
+      destino: centralizer?.id || "todos",
       timestamp: new Date().toISOString(),
     };
     setConversas((prev) => [...prev, { ...nova, id: `tmp-${Date.now()}` }]);
     setMessageText("");
     try {
-      await addConversa(nova);
-      // Reload to get server-assigned id + timestamp
+      await addConversa({
+        ...nova,
+        enviado_por: userProfile?.id || null,
+        enviado_por_nome: userProfile?.name || "Você"
+      });
       const updated = await getConversas(documento);
       setConversas(updated);
+    } catch (err) {
+      console.error("Erro ao enviar mensagem:", err);
     } finally {
       setSending(false);
     }
@@ -87,12 +127,20 @@ export function ChatModal({ isOpen, onClose, documento, empresa, title, subtitle
           onClick={() => isMinimized && setIsMinimized(false)}
         >
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-[10px] font-black">
-              {avatarText || title.split(" ").map((n) => n[0]).join("")}
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-[10px] font-black overflow-hidden border border-blue-50">
+              {centralizer?.avatar ? (
+                <img src={centralizer.avatar} alt={centralizer.name} className="w-full h-full object-cover" />
+              ) : (
+                <span>{centralizer ? centralizer.name.split(" ").map(n => n[0]).join("") : (avatarText || title.split(" ").map((n) => n[0]).join(""))}</span>
+              )}
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-black text-slate-900 tracking-tight leading-none mb-0.5">#{documento}</span>
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">{subtitle}</span>
+              <span className="text-[10px] font-black text-slate-900 tracking-tight leading-none mb-1 uppercase">
+                {centralizer ? centralizer.name : title}
+              </span>
+              <span className="text-[9px] font-black text-blue-600 uppercase tracking-tighter">
+                #{documento}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-1">

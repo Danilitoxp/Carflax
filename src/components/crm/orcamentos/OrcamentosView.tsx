@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, memo } from "react";
+import { supabase } from "@/lib/supabase";
 import {
   Search,
   Calendar,
@@ -14,7 +15,7 @@ import {
   Download,
   RefreshCw,
 } from "lucide-react";
-import { ChatModal } from "@/components/ui/ChatModal";
+
 import { cn } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
@@ -27,6 +28,7 @@ import { apiCrmOrcamentos, type CrmOrcamento, type CrmItem } from "@/lib/api";
 import {
   getCrmStatusMap,
   upsertCrmStatus,
+  addConversa,
   type CrmStatus,
 } from "@/lib/crm-service";
 
@@ -49,6 +51,7 @@ export interface Orcamento {
 
 
 interface UserProfile {
+  id?: string;
   name: string;
   role: string;
   avatar?: string;
@@ -112,9 +115,104 @@ function isGerente(role?: string) {
   return r.includes("gerente") || r.includes("diretor") || r.includes("marketing") || r.includes("admin");
 }
 
+interface RowProps {
+  item: Orcamento;
+  onOpenItems: (o: Orcamento) => void;
+  onOpenStatus: (o: Orcamento) => void;
+  onOpenChat: (o: Orcamento) => void;
+}
+
+const OrcamentoRow = memo(({ item, onOpenItems, onOpenStatus, onOpenChat }: RowProps) => {
+  return (
+    <tr className="hover:bg-slate-50/50 transition-colors group">
+      <td className="px-6 py-4">
+        <span className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
+          {item.id.replace("-OR", "")}
+        </span>
+      </td>
+      <td className="px-6 py-4"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{item.seller}</span></td>
+      <td className="px-6 py-4"><span className="text-[11px] font-black text-slate-800 uppercase tracking-tighter transition-colors group-hover:text-blue-600">{item.client}</span></td>
+      <td className="px-6 py-4">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[10px] font-bold text-slate-600 whitespace-nowrap">{item.date}</span>
+          <span className="text-[9px] font-medium text-slate-400">{item.time}</span>
+        </div>
+      </td>
+      <td className="px-6 py-4"><span className="text-[11px] font-black text-emerald-600 whitespace-nowrap">{item.total}</span></td>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <span className="text-[11px] font-black text-slate-700">{item.markup}</span>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex flex-col items-center gap-1">
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              if (item.status !== "VENDA" && item.status !== "PERDIDO") onOpenStatus(item);
+            }}
+            className={cn(
+              "inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold tracking-tight transition-all",
+              item.status !== "VENDA" && item.status !== "PERDIDO" ? "cursor-pointer hover:brightness-110 active:scale-95" : "cursor-default opacity-80",
+              item.status === "VENDA" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
+              item.status === "EMITIDO" ? "bg-slate-50 text-slate-600 border border-slate-100" :
+              item.status === "ENVIADO" ? "bg-blue-50 text-blue-600 border border-blue-100" :
+              item.status === "NEGOCIAÇÃO" ? "bg-amber-50 text-amber-600 border border-amber-100" :
+              item.status === "LIB. CRÉDITO" ? "bg-orange-50 text-orange-600 border border-orange-100" :
+              item.status === "AGUARD. PEDIDO" ? "bg-indigo-50 text-indigo-600 border border-indigo-100" :
+              item.status === "PERDIDO" ? "bg-rose-50 text-rose-600 border border-rose-100" :
+              "bg-slate-50 text-slate-500 border border-slate-100"
+            )}
+          >
+            {item.status}
+          </div>
+          {item.status === "PERDIDO" && (
+            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{item.lossReason || "Não Informado"}</span>
+          )}
+          {(item.status === "ENVIADO" || item.status === "NEGOCIAÇÃO") && item.lembreteData && (() => {
+            const raw = item.lembreteData!;
+            const display = /^\d{2}\/\d{2}\/\d{4}$/.test(raw)
+              ? raw
+              : /^\d{4}-\d{2}-\d{2}/.test(raw)
+              ? raw.slice(8, 10) + "/" + raw.slice(5, 7) + "/" + raw.slice(0, 4)
+              : (() => { const d = new Date(raw); return isNaN(d.getTime()) ? raw : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }); })();
+            const color = item.status === "NEGOCIAÇÃO" ? "text-amber-400" : "text-blue-400";
+            return (
+              <div className={`flex items-center gap-0.5 text-[8px] font-bold ${color}`}>
+                <Calendar className="w-2.5 h-2.5" />
+                <span>{display}</span>
+              </div>
+            );
+          })()}
+        </div>
+      </td>
+      <td className="px-6 py-4 text-right">
+        <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => onOpenItems(item)}
+            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
+            title="Ver Itens"
+          >
+            <Package className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => onOpenChat(item)}
+            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
+            title="Conversas / Observações"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+});
+
 export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [orçamentosData, setOrçamentosData] = useState<Orcamento[]>([]);
   const [loading, setLoading] = useState(false);
+  const visibleCount = 50;
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "id", direction: "desc" });
   const [filterStatus, setFilterStatus] = useState("Todos os Status");
@@ -122,7 +220,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [filterReason, setFilterReason] = useState("Todos os Motivos");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [isItemsModalOpen, setIsItemsModalOpen] = useState(false);
   const [itens, setItens] = useState<CrmItem[]>([]);
@@ -200,11 +297,15 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // ── Status update ────────────────────────────────────────────────────────
+
 
 
   // ── Status update ────────────────────────────────────────────────────────
   const handleUpdateStatus = async (newStatus: string, extra?: Partial<CrmStatus>) => {
     if (!selectedItem) return;
+    
+    // 1. Salvar Status
     await upsertCrmStatus({
       documento: selectedItem.id,
       empresa: selectedItem.empresa ?? "001",
@@ -216,6 +317,50 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       vendedor: selectedItem.seller,
     });
 
+    // 2. Notificação Automática para o Centralizador
+    const triggerStatuses = ["ENVIADO", "NEGOCIAÇÃO", "LIB. CRÉDITO", "AGUARD. PEDIDO", "PERDIDO"];
+    if (triggerStatuses.includes(newStatus.toUpperCase())) {
+      try {
+        const { data: config } = await supabase
+          .from("crm_config")
+          .select("value")
+          .eq("key", "centralizer_user_id")
+          .maybeSingle();
+
+        if (config?.value) {
+          const statusEmblema: Record<string, string> = {
+            "ENVIADO": "🔵 ENVIADO",
+            "NEGOCIAÇÃO": "🤝 NEGOCIAÇÃO",
+            "LIB. CRÉDITO": "💳 LIB. CRÉDITO",
+            "AGUARD. PEDIDO": "⏳ AGUARD. PEDIDO",
+            "PERDIDO": "❌ PERDIDO"
+          };
+          
+          const msgFormatada = [
+            `🔄 *STATUS ATUALIZADO*`,
+            `📑 *Orçamento:* #${selectedItem.id.replace("-OR", "")}`,
+            `🏢 *Cliente:* ${selectedItem.client}`,
+            `👤 *Vendedor:* ${selectedItem.seller}`,
+            ``,
+            `📢 *Novo Status:* ${statusEmblema[newStatus.toUpperCase()] || newStatus.toUpperCase()}`,
+            extra?.motivo_perda ? `📉 *Motivo da Perda:* ${extra.motivo_perda}` : "",
+            statusObs ? `\n💬 *Obs:* ${statusObs}` : "",
+          ].filter(Boolean).join("\n");
+
+          await addConversa({
+            documento: selectedItem.id,
+            empresa: selectedItem.empresa ?? "001",
+            obs: msgFormatada,
+            enviado_por_nome: "SISTEMA",
+            destino: config.value,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.error("Erro ao enviar notificação automática:", err);
+      }
+    }
+
     setOrçamentosData((prev) =>
       prev.map((item) =>
         item.id === selectedItem.id
@@ -224,6 +369,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       )
     );
     setIsStatusModalOpen(false);
+    setStatusObs(""); // Resetar obs após envio
   };
 
   const handleRangeSelect = (start: Date, end: Date | null) => {
@@ -240,17 +386,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     e.target.value = value;
   };
 
-  const handleOpenStatus = (item: Orcamento) => {
-    setSelectedItem(item);
-    setStatusStep("selection");
-    setStatusObs("");
-    setStatusData("");
-    setStatusEnderecoObra("");
-    setStatusFechamento("");
-    setStatusEntrega("");
-    setStatusMotivoPerdido("");
-    setIsStatusModalOpen(true);
-  };
 
   const uniqueSellers = useMemo(() => {
     const sellers = new Set(orçamentosData.map((item) => item.seller));
@@ -324,6 +459,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   }, [orçamentosData, searchTerm, filterStatus, filterSeller, filterReason, startDate, endDate, sortConfig]);
 
   // ── Insights (calculados dos dados reais) ───────────────────────────────
+  const visibleProducts = useMemo(() => {
+    return filteredAndSortedItems.slice(0, visibleCount);
+  }, [filteredAndSortedItems, visibleCount]);
+
   const insights = useMemo(() => {
     const total = filteredAndSortedItems.length;
     const statusCounts = filteredAndSortedItems.reduce<Record<string, number>>((acc, o) => {
@@ -577,93 +716,26 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     </td>
                   </tr>
                 )}
-                {filteredAndSortedItems.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <span className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
-                        {item.id.replace("-OR", "")}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{item.seller}</span></td>
-                    <td className="px-6 py-4"><span className="text-[11px] font-black text-slate-800 uppercase tracking-tighter transition-colors group-hover:text-blue-600">{item.client}</span></td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-[10px] font-bold text-slate-600 whitespace-nowrap">{item.date}</span>
-                        <span className="text-[9px] font-medium text-slate-400">{item.time}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4"><span className="text-[11px] font-black text-emerald-600 whitespace-nowrap">{item.total}</span></td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                        <span className="text-[11px] font-black text-slate-700">{item.markup}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col items-center gap-1">
-                        <div
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (item.status !== "VENDA" && item.status !== "PERDIDO") handleOpenStatus(item);
-                          }}
-                          className={cn(
-                            "inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold tracking-tight transition-all",
-                            item.status !== "VENDA" && item.status !== "PERDIDO" ? "cursor-pointer hover:brightness-110 active:scale-95" : "cursor-default opacity-80",
-                            item.status === "VENDA" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
-                            item.status === "EMITIDO" ? "bg-slate-50 text-slate-600 border border-slate-100" :
-                            item.status === "ENVIADO" ? "bg-blue-50 text-blue-600 border border-blue-100" :
-                            item.status === "NEGOCIAÇÃO" ? "bg-amber-50 text-amber-600 border border-amber-100" :
-                            item.status === "LIB. CRÉDITO" ? "bg-orange-50 text-orange-600 border border-orange-100" :
-                            item.status === "AGUARD. PEDIDO" ? "bg-indigo-50 text-indigo-600 border border-indigo-100" :
-                            item.status === "PERDIDO" ? "bg-rose-50 text-rose-600 border border-rose-100" :
-                            "bg-slate-50 text-slate-500 border border-slate-100"
-                          )}
-                        >
-                          {item.status}
-                        </div>
-                        {item.status === "PERDIDO" && (
-                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{item.lossReason || "Não Informado"}</span>
-                        )}
-                        {(item.status === "ENVIADO" || item.status === "NEGOCIAÇÃO") && item.lembreteData && (() => {
-                          const raw = item.lembreteData!;
-                          const display = /^\d{2}\/\d{2}\/\d{4}$/.test(raw)
-                            ? raw
-                            : /^\d{4}-\d{2}-\d{2}/.test(raw)
-                            ? raw.slice(8, 10) + "/" + raw.slice(5, 7) + "/" + raw.slice(0, 4)
-                            : (() => { const d = new Date(raw); return isNaN(d.getTime()) ? raw : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }); })();
-                          const color = item.status === "NEGOCIAÇÃO" ? "text-amber-400" : "text-blue-400";
-                          return (
-                            <div className={`flex items-center gap-0.5 text-[8px] font-bold ${color}`}>
-                              <Calendar className="w-2.5 h-2.5" />
-                              <span>{display}</span>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => {
-                            setSelectedItem(item);
-                            setIsItemsModalOpen(true);
-                            setItens(item.items);
-                          }}
-                          className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
-                          title="Ver Itens"
-                        >
-                          <Package className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setIsChatModalOpen(true); }}
-                          className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
-                          title="Conversas / Observações"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                {visibleProducts.map((item) => (
+                  <OrcamentoRow 
+                    key={item.id} 
+                    item={item} 
+                    onOpenItems={(o) => {
+                      setSelectedItem(o);
+                      setIsItemsModalOpen(true);
+                      setItens(o.items);
+                    }}
+                    onOpenStatus={(o) => {
+                      setSelectedItem(o);
+                      setIsStatusModalOpen(true);
+                      setStatusStep("selection");
+                    }}
+                    onOpenChat={(o) => {
+                      window.dispatchEvent(new CustomEvent('open-crm-chat', { 
+                        detail: { doc: o.id, title: o.client } 
+                      }));
+                    }}
+                  />
                 ))}
               </tbody>
             </table>
@@ -671,16 +743,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         )}
       </div>
 
-      {/* CHAT MODAL */}
-      <ChatModal
-        isOpen={isChatModalOpen && selectedItem !== null}
-        onClose={() => setIsChatModalOpen(false)}
-        documento={selectedItem?.id ?? ""}
-        empresa={selectedItem?.empresa ?? "001"}
-        title={selectedItem?.client || ""}
-        subtitle={selectedItem?.seller || ""}
-        avatarText={selectedItem?.seller.split(" ").map((n) => n[0]).join("")}
-      />
+
 
       {/* ITEMS MODAL */}
       {isItemsModalOpen && (

@@ -20,8 +20,13 @@ import {
   Palette,
   Image as ImageIcon,
   Sparkles,
-  Plus
+  Plus,
+  FileBadge,
+  ChevronDown,
+  type LucideIcon,
 } from "lucide-react";
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 /* ─────────────────────────────────────────────
    BANNERS
@@ -138,7 +143,7 @@ function SettingsInput({
   label: string;
   value: string;
   onChange: (v: string) => void;
-  icon: any;
+  icon: LucideIcon;
   type?: string;
   placeholder?: string;
 }) {
@@ -621,6 +626,118 @@ function AppearanceTab() {
 }
 
 /* ─────────────────────────────────────────────
+   ORÇAMENTOS - CONFIGURAÇÕES
+───────────────────────────────────────────── */
+function OrcamentosTab() {
+  const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      // 1. Fetch users
+      const { data: usersData } = await supabase
+        .from("usuarios")
+        .select("id, name")
+        .eq("status", "ativo")
+        .order("name");
+
+      if (usersData) setUsers(usersData);
+
+      // 2. Fetch current config
+      const { data: configData } = await supabase
+        .from("crm_config")
+        .select("value")
+        .eq("key", "centralizer_user_id")
+        .maybeSingle();
+
+      if (configData) setSelectedUserId(configData.value);
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+
+  async function handleSave() {
+    setSaving(true);
+    const { error } = await supabase
+      .from("crm_config")
+      .upsert({ key: "centralizer_user_id", value: selectedUserId || null });
+
+    setSaving(false);
+    if (!error) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    }
+  }
+
+  if (loading) return <div className="py-12 text-center text-[11px] font-bold text-slate-400 animate-pulse uppercase tracking-widest">Carregando configurações...</div>;
+
+  return (
+    <div className="max-w-[800px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-50">
+          <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
+            <FileBadge className="w-6 h-6 text-blue-600" />
+          </div>
+          <div>
+            <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none mb-2">Centralizador de Mensagens</h4>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+              Defina qual usuário receberá todas as comunicações e observações internas originadas na tela de orçamentos.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Usuário Centralizador</label>
+            <div className="relative group">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-600/50 focus:bg-white transition-all appearance-none"
+              >
+                <option value="">Nenhum usuário selecionado</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <ChevronDown className="w-4 h-4 text-slate-400" />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl flex items-start gap-3">
+            <Sparkles className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+            <p className="text-[10px] font-medium text-blue-800 leading-relaxed uppercase tracking-tight">
+              Este usuário será notificado automaticamente sempre que houver novas mensagens ou alterações de status críticas que exijam supervisão centralizada.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-10 pt-6 border-t border-slate-50 flex items-center justify-between">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Configuração Global</p>
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className={cn(
+              "h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-95",
+              saved ? "bg-emerald-600 text-white shadow-emerald-500/20" : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
+            )}
+          >
+            {saving ? "Salvando..." : saved ? "Configuração Salva!" : "Salvar Configuração"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    COMPONENTE PRINCIPAL (TINY REDESIGN)
 ───────────────────────────────────────────── */
 export function SettingsSection({ externalTab }: SettingsSectionProps) {
@@ -632,6 +749,7 @@ export function SettingsSection({ externalTab }: SettingsSectionProps) {
     if (externalTab) {
       const tabMap: Record<string, string> = {
         "Meu Perfil": "profile",
+        "Config. Orçamentos": "orcamentos",
         "Notificações": "notifications",
         "Segurança": "security",
         "Aparência": "appearance",
@@ -650,6 +768,7 @@ export function SettingsSection({ externalTab }: SettingsSectionProps) {
       <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-10 scrollbar-hide">
         <div className="max-w-6xl mx-auto">
           {activeTab === "profile" && <ProfileTab />}
+          {activeTab === "orcamentos" && <OrcamentosTab />}
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "security" && <SecurityTab />}
           {activeTab === "appearance" && <AppearanceTab />}
