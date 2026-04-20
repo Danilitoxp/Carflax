@@ -88,18 +88,18 @@ export function EventModal({
                     <TinyDropdown 
                         value={newEvent.type}
                         options={[
-                            { value: "meeting", label: "🤝 Reunião Geral" },
-                            { value: "celebration", label: "🏆 Meta Batida / Festa" },
-                            { value: "finance", label: "💰 Pagamento / Financeiro" },
-                            { value: "important", label: "🚨 Urgente / Importante" },
-                            { value: "launch", label: "🚀 Lançamento / Novidade" },
-                            { value: "education", label: "🎓 Treinamento Técnico" },
-                            { value: "birthday", label: "🎂 Aniversário" },
-                            { value: "star", label: "⭐ Destaque Especial" },
-                            { value: "holiday", label: "🚩 Feriado Nacional/Local" },
-                            { value: "video", label: "📹 Gravar Vídeo" }
+                            { value: "meeting", label: "Reunião Geral" },
+                            { value: "celebration", label: "Meta Batida / Festa" },
+                            { value: "finance", label: "Pagamento / Financeiro" },
+                            { value: "important", label: "Urgente / Importante" },
+                            { value: "launch", label: "Lançamento / Novidade" },
+                            { value: "education", label: "Treinamento Técnico" },
+                            { value: "birthday", label: "Aniversário" },
+                            { value: "star", label: "Destaque Especial" },
+                            { value: "holiday", label: "Feriado Nacional/Local" },
+                            { value: "video", label: "Gravar Vídeo" }
                         ]}
-                        onChange={(val) => setNewEvent({...newEvent, type: val as any})}
+                        onChange={(val) => setNewEvent({...newEvent, type: val as EventModalProps["newEvent"]["type"]})}
                         icon={Tag}
                         variant="blue"
                         className="w-full"

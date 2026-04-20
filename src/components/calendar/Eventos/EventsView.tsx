@@ -33,7 +33,7 @@ export function EventsView({ day, month, year, events, activeFilters, onEventCli
     switch (type) {
       case "birthday": return "bg-rose-50/80 text-rose-600 border-rose-100/50 hover:bg-rose-100 transition-colors";
       case "star": return "bg-amber-50/80 text-amber-600 border-amber-100/50 hover:bg-amber-100";
-      case "holiday": return "bg-amber-50 text-amber-600 border-amber-200/60 hover:bg-amber-100 shadow-sm";
+      case "holiday": return "bg-orange-100/80 text-orange-700 border-orange-200 hover:bg-orange-200 shadow-sm";
       case "education": return "bg-indigo-50/80 text-indigo-600 border-indigo-100/50 hover:bg-indigo-100";
       case "meeting": return "bg-violet-50/80 text-violet-600 border-violet-100/50 hover:bg-violet-100";
       case "celebration": return "bg-pink-50/80 text-pink-600 border-pink-100/50 hover:bg-pink-100";
@@ -49,7 +49,7 @@ export function EventsView({ day, month, year, events, activeFilters, onEventCli
     switch (type) {
       case "birthday": return <Gift className="w-3 h-3" />;
       case "star": return <Star className="w-2.5 h-2.5" />;
-      case "holiday": return <Flag className="w-2.5 h-2.5 fill-amber-400/20" />;
+      case "holiday": return <Flag className="w-2.5 h-2.5 fill-orange-400/20" />;
       case "education": return <GraduationCap className="w-3 h-3" />;
       case "meeting": return <Users className="w-3 h-3" />;
       case "celebration": return <Trophy className="w-2.5 h-2.5" />;
@@ -62,18 +62,22 @@ export function EventsView({ day, month, year, events, activeFilters, onEventCli
   };
 
   return (
-    <div className="w-full space-y-1 relative z-10">
+    <div className="w-full h-full flex flex-col gap-0.5 relative z-10 overflow-hidden">
       {dayEvents.map(event => (
         <div 
           key={event.id}
           onClick={(e) => onEventClick(e, event)}
           className={cn(
-            "py-1.5 px-2.5 rounded-lg flex items-center gap-2 transition-all active:scale-95 text-left w-full border shadow-[0_1px_2px_rgba(0,0,0,0.02)] group/item",
+            "flex-1 min-h-[18px] max-h-[32px] px-2 rounded-md flex items-center gap-2 transition-all active:scale-95 text-left w-full border shadow-[0_1px_2px_rgba(0,0,0,0.02)] group/item overflow-hidden",
             getEventStyles(event.type)
           )}
         >
-          <div className="shrink-0 opacity-80">{getEventIcon(event.type)}</div>
-          <span className="text-[10px] font-bold uppercase tracking-tight leading-tight line-clamp-2">{event.title}</span>
+          <div className="shrink-0 opacity-80 scale-75 origin-left">
+            {getEventIcon(event.type)}
+          </div>
+          <span className="text-[9px] font-black uppercase tracking-tight leading-none truncate flex-1">
+            {event.title}
+          </span>
         </div>
       ))}
     </div>

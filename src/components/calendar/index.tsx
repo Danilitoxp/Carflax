@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   ChevronLeft,
@@ -43,6 +43,19 @@ interface CalendarSectionProps {
   activeTab?: string;
 }
 
+// Cache global para evitar delays entre trocas de meses
+const calendarCache: {
+  events: Record<string, CalendarEvent[]>;
+  vacations: Vacation[] | null;
+  employees: { name: string; avatar?: string }[] | null;
+  holidays: Record<number, { date: string; name: string }[]>;
+} = {
+  events: {},
+  vacations: null,
+  employees: null,
+  holidays: {}
+};
+
 export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [viewMode, setViewMode] = useState<"events" | "vacations">(activeTab === "Férias" ? "vacations" : "events");
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)); // Abril 2026
@@ -62,7 +75,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
-  const [editingVacation, setEditingVacation] = useState<any>(null);
+  const [editingVacation, setEditingVacation] = useState<Vacation | null>(null);
   const [newEvent, setNewEvent] = useState<{
     title: string;
     description: string;
@@ -76,15 +89,33 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  const fetchAllData = async () => {
-    setLoading(true);
+  const fetchAllData = useCallback(async () => {
+    const cacheKey = `${year}-${month}`;
+    const hasCache = calendarCache.events[cacheKey] || calendarCache.vacations;
+
+    if (!hasCache) {
+      setLoading(true);
+    } else {
+      // Usar cache imediatamente para ser instantâneo
+      if (calendarCache.events[cacheKey]) setEvents(calendarCache.events[cacheKey]);
+      if (calendarCache.vacations) setVacations(calendarCache.vacations);
+      if (calendarCache.employees) setEmployees(calendarCache.employees);
+    }
+
     try {
       const [evResp, vacResp, userResp, holidayResp] = await Promise.all([
         supabase.from("eventos_calendario").select("*").eq("month", month + 1).eq("year", year),
         supabase.from("ferias").select("*"),
         supabase.from("usuarios").select("name, avatar, birth_date, admission_date"),
-        fetch(`https://brasilapi.com.br/api/feriados/v1/${year}`).then(r => r.ok ? r.json() : [])
+        calendarCache.holidays[year] 
+          ? Promise.resolve(calendarCache.holidays[year]) 
+          : fetch(`https://brasilapi.com.br/api/feriados/v1/${year}`).then(r => r.ok ? r.json() : [])
       ]);
+
+      // Guardar feriados no cache
+      if (!calendarCache.holidays[year]) {
+        calendarCache.holidays[year] = holidayResp;
+      }
 
       // Processar Eventos
       const manualEvents = (evResp.data || []).map((e) => ({
@@ -110,22 +141,22 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
           avatar: v.avatar || ""
         };
       });
-      setVacations(loadedVacations);
 
       // Processar Usuários
       const emps = (userResp.data || []).map(u => ({ name: u.name, avatar: u.avatar }));
-      setEmployees(emps);
 
       const birthdayEvents = (userResp.data || [])
         .filter(u => u.birth_date)
         .map((u, i) => {
-          const [_, m, d] = u.birth_date.split("-");
+          const parts = u.birth_date.split("-");
+          const m = parts[1];
+          const d = parts[2];
           return {
             id: 1000 + i,
             day: parseInt(d),
             month: parseInt(m) - 1,
             year: year,
-            title: `${u.name} 🎂`,
+            title: u.name,
             type: "birthday" as const,
             description: `Aniversário de ${u.name}`,
           };
@@ -142,37 +173,47 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
             day: parseInt(d),
             month: parseInt(m) - 1,
             year: year,
-            title: `${u.name} - ${years} ${years === 1 ? 'ANO' : 'ANOS'} 🏢`,
+            title: `${u.name} - ${years} ${years === 1 ? 'ANO' : 'ANOS'}`,
             type: "star" as const,
             description: `Aniversário de Empresa: ${years} anos de Carflax!`,
           };
         }).filter(Boolean) as CalendarEvent[];
 
       // Processar Feriados
-      const holidayEvents = (holidayResp || []).map((h: any, i: number) => {
-        const [y, m, d] = h.date.split("-");
+      const currentHolidayEvents = (holidayResp || []).map((h: { date: string; name: string }, i: number) => {
+        const [hY, hM, hD] = h.date.split("-");
         return {
           id: 3000 + i,
-          day: parseInt(d),
-          month: parseInt(m) - 1,
-          year: parseInt(y),
+          day: parseInt(hD),
+          month: parseInt(hM) - 1,
+          year: parseInt(hY),
           title: h.name.toUpperCase(),
           type: "holiday" as const,
           description: "Feriado Nacional",
         };
       });
 
-      setEvents([...manualEvents, ...birthdayEvents, ...admissionEvents, ...holidayEvents]);
+      const finalEvents = [...manualEvents, ...birthdayEvents, ...admissionEvents, ...currentHolidayEvents];
+
+      // Atualizar cache
+      calendarCache.events[cacheKey] = finalEvents;
+      calendarCache.vacations = loadedVacations;
+      calendarCache.employees = emps;
+
+      // Atualizar estado
+      setEvents(finalEvents);
+      setVacations(loadedVacations);
+      setEmployees(emps);
     } catch (e) {
       console.error("[Calendar] Erro ao carregar dados:", e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [month, year]);
 
   useEffect(() => {
     fetchAllData();
-  }, [year, month]);
+  }, [fetchAllData]);
 
   const handleSaveVacation = async (vData: { name: string; start: Date; end: Date; color: string; avatar: string; id?: number }) => {
     try {
@@ -350,8 +391,8 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
               <div key={day} className="py-2.5 text-center"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</span></div>
             ))}
           </div>
-          <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0">
-            <div className="grid grid-cols-7 min-h-full" style={{ gridTemplateRows: `repeat(6, 1fr)` }}>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="grid grid-cols-7 h-full w-full" style={{ gridTemplateRows: `repeat(6, 1fr)` }}>
               {allSlots.map((day, idx) => {
                 const isToday = day === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear();
                 const dayDate = day ? new Date(year, month, day) : null;
@@ -361,11 +402,11 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
                 const neighborLeftHasNoDay = idx > 0 && allSlots[idx - 1] === null;
                 const neighborTopHasNoDay = idx >= 7 && allSlots[idx - 7] === null;
                 return (
-                  <div key={idx} onClick={() => handleDayClick(day)} className={cn("relative group transition-all duration-300 cursor-pointer flex flex-col p-3", day ? (isToday ? "bg-blue-300 shadow-lg shadow-blue-500/20 z-10" : "bg-white") : "bg-transparent", day && !isLastCol && "border-r border-slate-100", day && !isLastRow && "border-b border-slate-100", day && (isFirstCol || neighborLeftHasNoDay) && "border-l border-slate-100", day && (idx < 7 || neighborTopHasNoDay) && "border-t border-slate-100", viewMode === "events" && day && "hover:bg-slate-50/50")}>
+                  <div key={idx} onClick={() => handleDayClick(day)} className={cn("relative group transition-all duration-300 cursor-pointer flex flex-col p-2 min-h-0 overflow-hidden", day ? (isToday ? "bg-blue-300 shadow-lg shadow-blue-500/20 z-10" : "bg-white") : "bg-transparent", day && !isLastCol && "border-r border-slate-100", day && !isLastRow && "border-b border-slate-100", day && (isFirstCol || neighborLeftHasNoDay) && "border-l border-slate-100", day && (idx < 7 || neighborTopHasNoDay) && "border-t border-slate-100", viewMode === "events" && day && "hover:bg-slate-50/50")}>
                     {day && (
                       <>
-                        <div className="flex justify-between items-start mb-2 relative z-20"><span className={cn("text-sm font-black transition-all leading-none", isToday ? "text-white" : "text-slate-300 group-hover:text-slate-500")}>{day}</span>{isToday && <div className="flex flex-col items-center"><div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" /></div>}</div>
-                        <div className="flex-1 mt-1">{viewMode === "events" ? <EventsView day={day} month={month} year={year} events={events} activeFilters={activeFilters} onEventClick={handleEventClick} /> : <VacationsView dayDate={dayDate} vacations={vacations} onVacationClick={handleVacationClick} />}</div>
+                        <div className="flex justify-between items-start mb-1 relative z-20"><span className={cn("text-xs font-black transition-all leading-none", isToday ? "text-white" : "text-slate-300 group-hover:text-slate-500")}>{day}</span>{isToday && <div className="flex flex-col items-center"><div className="w-1 h-1 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" /></div>}</div>
+                        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">{viewMode === "events" ? <EventsView day={day} month={month} year={year} events={events} activeFilters={activeFilters} onEventClick={handleEventClick} /> : <VacationsView dayDate={dayDate} vacations={vacations} onVacationClick={handleVacationClick} />}</div>
                       </>
                     )}
                   </div>

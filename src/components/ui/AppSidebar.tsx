@@ -99,7 +99,11 @@ const settingsItems: MenuItem[] = [
 ];
 
 interface AppSidebarProps {
-  userProfile?: any;
+  userProfile?: {
+    name: string;
+    avatar?: string;
+    role?: string;
+  };
   isCollapsed: boolean;
   onToggle: () => void;
   isMobileOpen?: boolean;
@@ -154,7 +158,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                 />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[10px] font-bold text-foreground truncate">
+                <span className="text-[10px] font-bold text-foreground truncate uppercase">
                   {userProfile?.name || "Carregando..."}
                 </span>
                 <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-widest leading-none mt-1">
