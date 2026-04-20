@@ -27,7 +27,6 @@ import { apiCrm, apiCrmItens, type CrmItem } from "@/lib/api";
 import {
   getCrmStatusMap,
   upsertCrmStatus,
-  migrarDoFirebase,
   type CrmStatus,
 } from "@/lib/crm-service";
 
@@ -47,6 +46,39 @@ export interface Orcamento {
   empresa?: string;
 }
 
+interface UserProfile {
+  role?: string;
+  name?: string;
+}
+
+interface RawOrcamento {
+  ORCAMENTO?: string | number;
+  DOCUMENTO?: string | number;
+  documento?: string | number;
+  VALOR_ORCAMENTO?: string | number;
+  VALOR_VENDA?: string | number;
+  TOTAL?: string | number;
+  total?: string | number;
+  MARKUP_PERC?: string | number;
+  MARKUP?: string | number;
+  markup?: string | number;
+  DATA_ORCAMENTO?: string;
+  DATA_ENTRADA?: string;
+  data?: string;
+  HORA_ORCAMENTO?: string;
+  HORA_ENTRADA?: string;
+  MOTIVO_CANCELAMENTO?: string;
+  motivo_perda?: string;
+  PEDIDO?: unknown;
+  DATA_BAIXA?: unknown;
+  VENDEDOR?: string;
+  vendedor?: string;
+  CLIENTE?: string;
+  cliente?: string;
+  EMPRESA?: string;
+  empresa?: string;
+}
+
 function parseName(raw: string): string {
   // "009-JULIANA OLIVEIRA" → "JULIANA OLIVEIRA"
   // "00015060-INFINITYCRED..." → "INFINITYCRED..."
@@ -55,9 +87,18 @@ function parseName(raw: string): string {
 }
 
 function parseOrcamentos(raw: unknown[]): Orcamento[] {
-  return raw.map((r: any) => {
+  return (raw as RawOrcamento[]).map((r) => {
     // API externa: ORCAMENTO já vem como "000001026819-OR"
-    const id = String(r.ORCAMENTO || r.DOCUMENTO || r.documento || "");
+    let id = String(r.ORCAMENTO || r.DOCUMENTO || r.documento || "").trim();
+    if (id && !id.endsWith("-OR")) id += "-OR";
+    // Normalização para 12 dígitos antes do -OR (padrão Supabase)
+    if (id.includes("-OR")) {
+      const parts = id.split("-");
+      if (/^\d+$/.test(parts[0])) {
+        parts[0] = parts[0].padStart(12, "0");
+        id = parts.join("-");
+      }
+    }
 
     const total = Number(r.VALOR_ORCAMENTO || r.VALOR_VENDA || r.TOTAL || r.total || 0);
     const markup = Number(r.MARKUP_PERC || r.MARKUP || r.markup || 0);
@@ -97,10 +138,9 @@ function isGerente(role?: string) {
   return r.includes("gerente") || r.includes("diretor") || r.includes("marketing") || r.includes("admin");
 }
 
-export function OrcamentosView({ userProfile }: { userProfile?: any }) {
+export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [orçamentosData, setOrçamentosData] = useState<Orcamento[]>([]);
   const [loading, setLoading] = useState(false);
-  const [migrando, setMigrando] = useState(false);
   const [migMsg, setMigMsg] = useState<string | null>(null);
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "id", direction: "desc" });
@@ -173,24 +213,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: any }) {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, userProfile]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ── Migração Firebase → Supabase ─────────────────────────────────────────
-  const handleMigrar = async () => {
-    setMigrando(true);
-    setMigMsg(null);
-    try {
-      const { status, conversas } = await migrarDoFirebase();
-      setMigMsg(`✓ Migrado: ${status} status e ${conversas} conversas`);
-      await fetchData();
-    } catch (e: any) {
-      setMigMsg(`Erro: ${e.message}`);
-    } finally {
-      setMigrando(false);
-    }
-  };
 
   // ── Status update ────────────────────────────────────────────────────────
   const handleUpdateStatus = async (newStatus: string, extra?: Partial<CrmStatus>) => {
@@ -807,7 +833,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: any }) {
                     ].map((btn, i) => (
                       <button
                         key={i}
-                        onClick={() => btn.next ? setStatusStep(btn.next as any) : handleUpdateStatus(btn.label.toUpperCase())}
+                        onClick={() => {
+                          if (btn.next) setStatusStep(btn.next as "enviado" | "negociacao" | "perdido");
+                          else handleUpdateStatus(btn.label.toUpperCase());
+                        }}
                         className="flex items-center gap-3 py-3 px-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/80 transition-all text-left"
                       >
                         <div className={cn("w-2 h-2 rounded-full", btn.dot)} />
