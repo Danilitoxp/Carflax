@@ -154,36 +154,37 @@ export const apiOtimizarRota = (body: { entregas: unknown[]; partida: unknown })
 
 // ── CRM ───────────────────────────────────────────────────────────────────────
 
-// API externa com campos corretos: ORCAMENTO, VALOR_ORCAMENTO, MARKUP_PERC, etc.
-const CRM_EXTERNO = "https://marketing-gestao-de-tempo.velbav.easypanel.host";
-
-export async function apiCrm(params?: Record<string, string>): Promise<unknown[]> {
-  const url = new URL(`${CRM_EXTERNO}/api/crm`);
-  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`CRM API ${res.status}`);
-  const data = await res.json();
-  return Array.isArray(data) ? data : data.data ?? [];
-}
-
-export const apiCrmStatus = (body: unknown) => post("/api/crm/status", body);
-
-const CRM_LEGADO = "https://marketing-gestao-de-tempo.velbav.easypanel.host";
-
 export interface CrmItem {
   COD_PRODUTO: string;
   PRODUTO: string;
-  QTDITE: string;
-  VALUNI: string;
+  QUANTIDADE: string | number;
+  PRECO_UNITARIO: string | number;
+  CUSTO_UNITARIO: string | number;
+  MARKUP_PERCENTUAL: string | number;
+  MARCA: string;
   UN: string;
-  TOTCUS: string;
 }
 
-export async function apiCrmItens(documento: string): Promise<CrmItem[]> {
-  const res = await fetch(`${CRM_LEGADO}/api/crm/itens/${encodeURIComponent(documento)}`);
-  if (!res.ok) throw new Error(`CRM Itens ${res.status}`);
-  return res.json();
+export interface CrmOrcamento {
+  ORCAMENTO: string;
+  PEDIDO: string;
+  NOTA_FISCAL?: string | number;
+  DATA_ORCAMENTO: string;
+  HORA_ORCAMENTO: string;
+  COD_VENDEDOR: string;
+  VENDEDOR: string;
+  CLIENTE: string;
+  EMPRESA: string;
+  VALOR_TOTAL_ORCAMENTO: string;
+  DATA_BAIXA: string;
+  MOTIVO_CANCELAMENTO: string;
+  PRODUTOS: CrmItem[];
 }
+
+export const apiCrmOrcamentos = (params: { vendedor?: string, inicio?: string, fim?: string }) =>
+  get<CrmOrcamento[]>("/api/crm/orcamentos", params as Record<string, string>);
+
+export const apiCrmStatus = (body: unknown) => post("/api/crm/status", body);
 
 // ── Outros ────────────────────────────────────────────────────────────────────
 

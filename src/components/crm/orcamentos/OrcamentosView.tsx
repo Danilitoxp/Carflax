@@ -23,7 +23,7 @@ import {
   FileCheck,
   AlertCircle,
 } from "lucide-react";
-import { apiCrm, apiCrmItens, type CrmItem } from "@/lib/api";
+import { apiCrmOrcamentos, type CrmOrcamento, type CrmItem } from "@/lib/api";
 import {
   getCrmStatusMap,
   upsertCrmStatus,
@@ -44,35 +44,9 @@ export interface Orcamento {
   lossReason?: string;
   lembreteData?: string;
   empresa?: string;
+  items: CrmItem[];
 }
 
-interface RawOrcamento {
-  ORCAMENTO?: string | number;
-  DOCUMENTO?: string | number;
-  documento?: string | number;
-  VALOR_ORCAMENTO?: string | number;
-  VALOR_VENDA?: string | number;
-  TOTAL?: string | number;
-  total?: string | number;
-  MARKUP_PERC?: string | number;
-  MARKUP?: string | number;
-  markup?: string | number;
-  DATA_ORCAMENTO?: string;
-  DATA_ENTRADA?: string;
-  data?: string;
-  HORA_ORCAMENTO?: string;
-  HORA_ENTRADA?: string;
-  MOTIVO_CANCELAMENTO?: string;
-  motivo_perda?: string;
-  PEDIDO?: unknown;
-  DATA_BAIXA?: string;
-  VENDEDOR?: string;
-  vendedor?: string;
-  CLIENTE?: string;
-  cliente?: string;
-  EMPRESA?: string | number;
-  empresa?: string | number;
-}
 
 interface UserProfile {
   name: string;
@@ -81,45 +55,53 @@ interface UserProfile {
 }
 
 function parseName(raw: string): string {
-  // "009-JULIANA OLIVEIRA" → "JULIANA OLIVEIRA"
-  // "00015060-INFINITYCRED..." → "INFINITYCRED..."
-  const idx = raw.indexOf("-");
-  return idx !== -1 ? raw.slice(idx + 1).trim() : raw.trim();
+  // Remove apenas o código inicial (tudo antes do primeiro dash)
+  const clean = raw.includes("-") 
+    ? raw.slice(raw.indexOf("-") + 1).trim() 
+    : raw.trim();
+  
+  // Se o resultado for apenas uma letra (ex: "G" de GERAL), retorna o original limpo
+  // mas vamos garantir que pegamos as palavras corretamente
+  const parts = clean.split(/\s+/).filter(p => p.length > 0);
+  if (parts.length <= 2) return clean;
+  return `${parts[0]} ${parts[1]}`;
 }
 
-function parseOrcamentos(raw: unknown[]): Orcamento[] {
-  return (raw as RawOrcamento[]).map((r) => {
-    // API externa: ORCAMENTO já vem como "000001026819-OR"
-    const id = String(r.ORCAMENTO || r.DOCUMENTO || r.documento || "");
+function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
+  return raw.map((r) => {
+    const id = r.ORCAMENTO;
+    const total = parseFloat(r.VALOR_TOTAL_ORCAMENTO) || 0;
+    
+    // Calcular markup médio do orçamento baseado nos produtos
+    const products = r.PRODUTOS || [];
+    const avgMarkup = products.length > 0 
+      ? products.reduce((acc, p) => acc + (parseFloat(String(p.MARKUP_PERCENTUAL)) || 0), 0) / products.length
+      : 0;
 
-    const total = Number(r.VALOR_ORCAMENTO || r.VALOR_VENDA || r.TOTAL || r.total || 0);
-    const markup = Number(r.MARKUP_PERC || r.MARKUP || r.markup || 0);
-
-    const rawDate = r.DATA_ORCAMENTO || r.DATA_ENTRADA || r.data || "";
-    const dateObj = rawDate ? new Date(rawDate) : null;
+    const dateObj = r.DATA_ORCAMENTO ? new Date(r.DATA_ORCAMENTO) : null;
     const dateBR = dateObj
       ? dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
       : "";
-    const hora = String(r.HORA_ORCAMENTO || r.HORA_ENTRADA || "00:00:00").slice(0, 5);
+    const hora = String(r.HORA_ORCAMENTO || "00:00:00").slice(0, 5);
 
-    // Status: MOTIVO_CANCELAMENTO → PERDIDO; PEDIDO ou DATA_BAIXA → VENDA (mesma lógica do sistema antigo)
     let defaultStatus = "EMITIDO";
-    if (r.MOTIVO_CANCELAMENTO) defaultStatus = "PERDIDO";
-    else if (r.PEDIDO || r.DATA_BAIXA) defaultStatus = "VENDA";
+    if (r.MOTIVO_CANCELAMENTO !== "SEM MOTIVO") defaultStatus = "PERDIDO";
+    else if (r.PEDIDO === "Sim" || r.NOTA_FISCAL || (r.DATA_BAIXA && r.DATA_BAIXA !== "SEM DATA")) defaultStatus = "VENDA";
 
     return {
       id,
-      seller: parseName(String(r.VENDEDOR || r.vendedor || "S/V")),
-      client: parseName(String(r.CLIENTE || r.cliente || "Consumidor")),
+      seller: parseName(r.VENDEDOR),
+      client: parseName(r.CLIENTE),
       date: dateBR,
       time: hora,
       total: total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
-      markup: `${markup.toFixed(1)}%`,
+      markup: `${avgMarkup.toFixed(1)}%`,
       status: defaultStatus,
       totalValue: total,
-      markupValue: markup,
-      lossReason: r.MOTIVO_CANCELAMENTO || r.motivo_perda || undefined,
-      empresa: String(r.EMPRESA || r.empresa || "001"),
+      markupValue: avgMarkup,
+      lossReason: r.MOTIVO_CANCELAMENTO !== "SEM MOTIVO" ? r.MOTIVO_CANCELAMENTO : undefined,
+      empresa: r.EMPRESA,
+      items: products
     };
   });
 }
@@ -144,7 +126,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [isItemsModalOpen, setIsItemsModalOpen] = useState(false);
   const [itens, setItens] = useState<CrmItem[]>([]);
-  const [itensLoading, setItensLoading] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusStep, setStatusStep] = useState<"selection" | "enviado" | "negociacao" | "perdido">("selection");
   const [selectedItem, setSelectedItem] = useState<Orcamento | null>(null);
@@ -168,7 +149,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       if (startDate) params.inicio = startDate.toISOString().slice(0, 10);
       if (endDate) params.fim = endDate.toISOString().slice(0, 10);
 
-      const raw = (await apiCrm(params)) as unknown[];
+      const raw = await apiCrmOrcamentos(params);
       let orcamentos = parseOrcamentos(raw);
 
       // Vendedor só vê seus próprios orçamentos
@@ -182,14 +163,25 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       }
 
       // Overlay with Supabase CRM status
-      const docs = orcamentos.map((o) => o.id);
+      const docs = orcamentos.map((o) => o.id.trim());
       const statusMap = await getCrmStatusMap(docs);
 
       const merged = orcamentos.map((o) => {
-        // ERP hard statuses não podem ser sobrescritos pelo CRM manual
-        if (o.status === "VENDA" || o.status === "PERDIDO") return o;
-        const crm = statusMap.get(o.id);
+        const crm = statusMap.get(o.id.trim());
+
+        // Prioridade ABSOLUTA para o ERP se for VENDA ou PERDIDO
+        if (o.status === "VENDA" || o.status === "PERDIDO") {
+          if (!crm) return o;
+          return {
+            ...o,
+            lossReason: crm.motivo_perda ?? o.lossReason,
+            lembreteData: crm.lembrete_data ?? undefined,
+          };
+        }
+
         if (!crm) return o;
+
+        // Para orçamentos em aberto (EMITIDO), o controle manual do CRM tem precedência
         return {
           ...o,
           status: crm.status_crm.toUpperCase(),
@@ -462,10 +454,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleExportCSV}
-            className="h-10 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm flex items-center gap-2"
+            className="w-10 h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition-all active:scale-95 shadow-sm flex items-center justify-center"
+            title="Exportar CSV"
           >
-            <Download className="w-3.5 h-3.5" />
-            Exportar CSV
+            <Download className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -590,7 +582,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     <td className="px-6 py-4">
                       <span className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
                         {item.id.replace("-OR", "")}
-                        <span className="text-[9px] opacity-40 ml-0.5 font-medium">-OR</span>
                       </span>
                     </td>
                     <td className="px-6 py-4"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{item.seller}</span></td>
@@ -653,13 +644,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={async () => {
+                          onClick={() => {
                             setSelectedItem(item);
                             setIsItemsModalOpen(true);
-                            setItens([]);
-                            setItensLoading(true);
-                            try { setItens(await apiCrmItens(item.id)); } catch { setItens([]); }
-                            finally { setItensLoading(false); }
+                            setItens(item.items);
                           }}
                           className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
                           title="Ver Itens"
@@ -723,9 +711,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-hide">
-              {itensLoading ? (
-                <div className="flex items-center justify-center py-12 text-[11px] text-slate-400 font-bold">Carregando itens...</div>
-              ) : itens.length === 0 ? (
+              {itens.length === 0 ? (
                 <div className="flex items-center justify-center py-12 text-[11px] text-slate-400 font-bold">Nenhum item encontrado</div>
               ) : (
                 <table className="w-full text-[11px]">
@@ -736,15 +722,15 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-16">Qtd</th>
                       <th className="px-4 py-3 text-center font-black text-slate-400 uppercase tracking-wider w-12">UN</th>
                       <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-28">Val. Unit</th>
-                      <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-28">Custo</th>
+                      <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-28">Margem</th>
                       <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-28">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {itens.map((it, i) => {
-                      const qtd = parseFloat(it.QTDITE) || 0;
-                      const valuni = parseFloat(it.VALUNI) || 0;
-                      const custo = parseFloat(it.TOTCUS) || 0;
+                      const qtd = parseFloat(String(it.QUANTIDADE)) || 0;
+                      const valuni = parseFloat(String(it.PRECO_UNITARIO)) || 0;
+                      const mkp = parseFloat(String(it.MARKUP_PERCENTUAL)) || 0;
                       const total = qtd * valuni;
                       const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
                       return (
@@ -754,7 +740,9 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                           <td className="px-4 py-3 text-right text-slate-600 font-bold">{qtd.toFixed(2)}</td>
                           <td className="px-4 py-3 text-center text-slate-400 font-bold">{it.UN || "UN"}</td>
                           <td className="px-4 py-3 text-right text-slate-600 font-bold">{fmt(valuni)}</td>
-                          <td className="px-4 py-3 text-right font-bold text-rose-500">{custo > 0 ? fmt(custo) : "—"}</td>
+                          <td className={cn("px-4 py-3 text-right font-bold", mkp >= 30 ? "text-emerald-500" : "text-amber-500")}>
+                            {mkp.toFixed(1)}%
+                          </td>
                           <td className="px-4 py-3 text-right font-black text-emerald-600">{fmt(total)}</td>
                         </tr>
                       );
@@ -764,7 +752,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     <tr>
                       <td colSpan={6} className="px-4 py-3 text-right text-[10px] font-black text-slate-500 uppercase tracking-wider">Total do Orçamento</td>
                       <td className="px-4 py-3 text-right font-black text-emerald-600">
-                        {itens.reduce((acc, it) => acc + (parseFloat(it.QTDITE) || 0) * (parseFloat(it.VALUNI) || 0), 0)
+                        {itens.reduce((acc, it) => acc + (parseFloat(String(it.QUANTIDADE)) || 0) * (parseFloat(String(it.PRECO_UNITARIO)) || 0), 0)
                           .toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                       </td>
                     </tr>

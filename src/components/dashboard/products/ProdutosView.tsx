@@ -44,7 +44,7 @@ export function ProdutosView() {
               brand: p.MARCA || "GERAL",
               location: "---"
             };
-          });
+          }).filter((p) => p.cod !== "99999");
           setProducts(mapped);
         }
       } catch (error) {
