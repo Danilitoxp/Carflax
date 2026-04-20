@@ -181,7 +181,6 @@ exports.obterDadosGerais = async (req, res) => {
         sqlParams.push(primeiroDiaMesStr);
         sqlParams.push(primeiroDiaMesHifen, primeiroDiaProxMesHifen, dataHoje);
 
-        console.log('[DEBUG] Executando consulta com params:', sqlParams);
 
         const [rows] = await pool.query(sql, sqlParams);
         res.json(rows);

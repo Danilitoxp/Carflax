@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   Image,
   Phone,
+  Database,
   type LucideIcon,
 } from "lucide-react";
 import organogramaIcon from "@/assets/organograma.svg";
@@ -80,6 +81,7 @@ const menuItems: MenuItem[] = [
     ],
   },
   { icon: Users, label: "Usuários" },
+  { icon: Database, label: "DB Admin" },
   { icon: Lightbulb, label: "Sugestões" },
 ];
 

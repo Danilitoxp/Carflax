@@ -87,8 +87,8 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData }:
 
   const calculateDiarioNecessario = () => {
     if (!data) return 0;
-    const faltante = typeof data.FALTANTE === 'string' ? parseFloat(data.FALTANTE) : data.FALTANTE;
-    return faltante / getDiasRestantes();
+    const faltante = typeof data.FALTANTE === 'string' ? parseFloat(data.FALTANTE) : (data.FALTANTE || 0);
+    return (faltante as number) / getDiasRestantes();
   };
 
   const metrics = data ? [
@@ -127,8 +127,8 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData }:
   }
 
   const equilibrio = calculateEquilibrio();
-  const total = typeof data.TOTAL === 'string' ? parseFloat(data.TOTAL) : data.TOTAL;
-  const percentageVsEquilibrio = equilibrio > 0 ? (total / equilibrio) * 100 : 0;
+  const total = data ? (typeof data.TOTAL === 'string' ? parseFloat(data.TOTAL) : data.TOTAL) : 0;
+  const percentageVsEquilibrio = equilibrio > 0 ? (Number(total) / equilibrio) * 100 : 0;
 
   return (
     <div className={cn(

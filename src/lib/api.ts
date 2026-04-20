@@ -2,7 +2,7 @@ const API_BASE =
   typeof window !== "undefined" && (window as Window & { __API_ORIGIN__?: string }).__API_ORIGIN__
     ? (window as Window & { __API_ORIGIN__?: string }).__API_ORIGIN__
     : import.meta.env.VITE_API_URL ||
-      "https://marketing-gestao-de-tempo.velbav.easypanel.host";
+      "https://marketing-carflax.velbav.easypanel.host";
 
 console.log("[API] BASE:", API_BASE);
 
@@ -146,11 +146,33 @@ export const apiCampaignRanking = async (params: {
 
 // ── Entregas ──────────────────────────────────────────────────────────────────
 
-export const apiEntregas = () => get("/api/entregas");
-export const apiEntregasHoje = () => get("/api/entregas-hoje");
+export interface EntregaResumo {
+  NF: string;
+  CLIENTE: string;
+  ENDERECO: string;
+  BAIRRO: string;
+  CIDADE: string;
+  CEP: string;
+  DATA_ENTREGA: string;
+}
 
-export const apiOtimizarRota = (body: { entregas: unknown[]; partida: unknown }) =>
-  post("/api/otimizar-rota", body);
+export interface DetalhesEntregaResponse {
+  success: boolean;
+  motoristas: { COD: string; NOME: string }[];
+  data: EntregaResumo | null;
+}
+
+export const apiEntregasRomaneios = () => 
+  get<{ success: boolean; data: EntregaResumo[] }>("/api/entregas/romaneios");
+
+export const apiEntregasConcluidas = () => 
+  get<{ success: boolean; data: EntregaResumo[] }>("/api/entregas/concluidas");
+
+export const apiEntregasDetalhes = (nf: string) => 
+  get<DetalhesEntregaResponse>(`/api/entregas/detalhes/${nf}`);
+
+export const apiMotoristas = () => 
+  get<DetalhesEntregaResponse>("/api/entregas");
 
 // ── CRM ───────────────────────────────────────────────────────────────────────
 
@@ -207,6 +229,7 @@ export const apiDashboardProdutos = (codigo?: string) =>
 export const apiFornecedores = () => get("/api/fornecedores");
 export const apiProdutos = () => get("/api/produtos");
 export const apiClientes = () => get("/api/clientes");
+export const apiAdminSQL = (query: string) => post("/api/admin/sql", { query, secret: "carflax_admin_2026" });
 export const apiHealth = () => get<{ status: string }>("/api/health");
 
 export { API_BASE };

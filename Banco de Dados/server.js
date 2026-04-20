@@ -2,10 +2,10 @@ require('dotenv').config();
 
 // Valida variáveis obrigatórias antes de subir
 const requiredEnv = ['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME', 'JWT_SECRET'];
-const missing = requiredEnv.filter((k) => !process.env[k]);
+const missing = requiredEnv.filter((k) => process.env[k] === undefined);
 if (missing.length) {
-  console.error('[ERROR] Variáveis de ambiente ausentes:', missing.join(', '));
-  console.error('Crie um arquivo .env com as configurações necessárias.');
+  console.error('[ERROR] Variáveis de ambiente ausentes no processo:', missing.join(', '));
+  console.error('Certifique-se de que o arquivo .env contenha essas chaves.');
   process.exit(1);
 }
 
@@ -18,6 +18,10 @@ const verificarToken = require('./src/middleware/auth');
 const rotasGeral = require('./src/routes/HUB/Dashboard/geral');
 const rotasProdutos = require('./src/routes/HUB/Dashboard/produtos');
 const rotasOrcamentos = require('./src/routes/HUB/Crm/orcamentos');
+const rotasEntregas = require('./src/routes/HUB/Entregas/entregas');
+const rotasRomaneios = require('./src/routes/HUB/Entregas/romaneios');
+const rotasConcluidas = require('./src/routes/HUB/Entregas/concluidas');
+const rotasAdminSQL = require('./src/routes/HUB/Admin/sql');
 
 const app = express();
 
@@ -44,13 +48,12 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/dashboard/geral', rotasGeral);
 app.use('/api/dashboard/produtos', rotasProdutos);
 app.use('/api/crm/orcamentos', rotasOrcamentos);
+app.use('/api/entregas', rotasEntregas);
+app.use('/api/entregas/romaneios', rotasRomaneios);
+app.use('/api/entregas/concluidas', rotasConcluidas);
+app.use('/api/admin/sql', rotasAdminSQL);
 
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
-  console.log('Rotas disponíveis:');
-  console.log('  GET  /api/health');
-  console.log('  GET  /api/dashboard/geral');
-  console.log('  GET  /api/dashboard/produtos');
-  console.log('  GET  /api/crm/orcamentos');
+  console.log('Banco de Dados Carflax Rodando ✅');
 });

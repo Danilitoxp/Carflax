@@ -23,6 +23,7 @@ import { UsersView } from "@/components/users/UsersView";
 import { LoginView } from "@/components/auth/LoginView";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { OrgChartView } from "@/components/ui/OrgChartModal";
+import { SqlRunnerView } from "@/components/admin/SqlRunnerView";
 import { type VendedorResumo } from "@/lib/api";
 
 export interface UserProfile {
@@ -170,6 +171,8 @@ function DashboardContent({
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <UsersView />
             </div>
+          ) : activeItem === "DB Admin" ? (
+            <SqlRunnerView />
           ) : activeItem === "Geral" ? (
             <GeralView userProfile={userProfile} />
           ) : activeItem === "Organograma" ? (

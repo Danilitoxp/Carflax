@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   CheckCircle2,
@@ -7,11 +7,14 @@ import {
   FileText,
   ChevronDown,
   Truck,
-  User as UserIcon
+  User as UserIcon,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
 import type { Delivery } from "../romaneios/RomaneiosView";
+import { apiEntregasConcluidas } from "@/lib/api";
+import type { EntregaResumo } from "@/lib/api";
 
 interface RomaneioConcluido {
   id: string;
@@ -25,11 +28,58 @@ interface RomaneioConcluido {
 export function ConcluidasView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState("Hoje: 17 de Abr, 2026");
+  const [selectedPeriod, setSelectedPeriod] = useState("Últimas 50 entregas");
   const [startDate, setStartDate] = useState<Date | null>(new Date());
   const [endDate, setEndDate] = useState<Date | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const [romaneiosHistory, setRomaneiosHistory] = useState<RomaneioConcluido[]>([]);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const res = await apiEntregasConcluidas();
+      if (res.success) {
+        // Agrupar por data (simplificado para demonstração)
+        const groups: Record<string, RomaneioConcluido> = {};
+        
+        res.data.forEach((e: EntregaResumo) => {
+          const dateKey = new Date(e.DATA_ENTREGA).toLocaleDateString("pt-BR");
+          if (!groups[dateKey]) {
+            groups[dateKey] = {
+              id: `HIST-${dateKey.replace(/\//g, "")}`,
+              driver: "Frota Carflax",
+              date: dateKey,
+              deliveredCount: 0,
+              totalValue: "R$ 0,00",
+              deliveries: []
+            };
+          }
+          
+          groups[dateKey].deliveries.push({
+            id: e.NF,
+            nf: e.NF,
+            client: e.CLIENTE,
+            address: `${e.ENDERECO}, ${e.BAIRRO} - ${e.CIDADE}`,
+            status: "completed",
+            time: "FINALIZADO",
+            value: "R$ 0,00"
+          });
+          groups[dateKey].deliveredCount++;
+        });
+
+        setRomaneiosHistory(Object.values(groups));
+      }
+    } catch (error) {
+      console.error("Erro ao buscar histórico:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredRomaneios = romaneiosHistory.filter(rom =>
     rom.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -67,9 +117,12 @@ export function ConcluidasView() {
             </p>
           </div>
 
-          <button className="h-8 px-3 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm shadow-blue-600/10 active:scale-95">
-            <FileText className="w-3.5 h-3.5" />
-            Exportar Geral
+          <button 
+            onClick={fetchData}
+            className="h-8 px-3 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
+            {loading ? "Carregando..." : "Atualizar"}
           </button>
         </div>
 
@@ -206,11 +259,12 @@ export function ConcluidasView() {
         ) : (
           <div className="flex flex-col items-center justify-center py-20 bg-white border border-slate-200 rounded-xl opacity-40">
             <Search className="w-10 h-10 text-slate-300 mb-3" />
-            <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Nenhum romaneio concluído encontrado</span>
+            <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+              {loading ? "Carregando histórico..." : "Nenhum romaneio concluído encontrado"}
+            </span>
           </div>
         )}
       </div>
-
     </div>
   );
 }
