@@ -131,6 +131,29 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     );
   };
 
+  const isAllowed = (label: string) => {
+    // Admin e Gerente vê tudo
+    const role = userProfile?.role?.toUpperCase();
+    if (role === 'ADMIN' || role === 'GERENTE') return true;
+
+    // Itens padrão (que todos vêem por contrato social rs)
+    const alwaysAllowed = ["Meu Perfil", "Aparência", "Notificações", "Segurança"];
+    if (alwaysAllowed.includes(label)) return true;
+
+    // Permissões específicas do VENDEDOR
+    const vendedorStandard = [
+      "Geral", "Produtos", "Dashboard", 
+      "Calendário", "Eventos", "Férias", 
+      "CRM", "Orçamentos", "Campanhas", "Relatórios", 
+      "Entregas", "Romaneios", "Concluídas",
+      "Sugestões"
+    ];
+    if (role === 'VENDEDOR' && vendedorStandard.includes(label)) return true;
+
+    // Permissões manuais (Database)
+    return userProfile?.permissions?.includes(label);
+  };
+
   return (
     <aside
       className={cn(
@@ -201,19 +224,13 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
           <div className="space-y-1">
             {menuItems
               .filter(item => {
-                // Se for dropdown, checa se pelo menos um subitem é permitido
                 if (item.isDropdown && item.subItems) {
-                  return item.subItems.some(sub => 
-                    sub.label === "Geral" || sub.label === "Relatórios" || userProfile?.permissions?.includes(sub.label)
-                  );
+                  return item.subItems.some(sub => isAllowed(sub.label));
                 }
-                // Itens simples
-                return item.label === "Geral" || item.label === "Relatórios" || userProfile?.permissions?.includes(item.label);
+                return isAllowed(item.label);
               })
               .map((item, idx) => {
-                const filteredSubItems = item.subItems?.filter(sub => 
-                  sub.label === "Geral" || sub.label === "Relatórios" || userProfile?.permissions?.includes(sub.label)
-                );
+                const filteredSubItems = item.subItems?.filter(sub => isAllowed(sub.label));
                 
                 const isOpen = openMenus.includes(item.label);
                 const isActive = activeItem === item.label || filteredSubItems?.some(s => s.label === activeItem);
@@ -314,18 +331,12 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
             {settingsItems
               .filter(item => {
                 if (item.isDropdown && item.subItems) {
-                  return item.subItems.some(sub => 
-                    ["Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(sub.label) || 
-                    userProfile?.permissions?.includes(sub.label)
-                  );
+                  return item.subItems.some(sub => isAllowed(sub.label));
                 }
-                return true; 
+                return isAllowed(item.label); 
               })
               .map((item, idx) => {
-                const filteredSettingsSubItems = item.subItems?.filter(sub => 
-                  ["Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(sub.label) || 
-                  userProfile?.permissions?.includes(sub.label)
-                );
+                const filteredSettingsSubItems = item.subItems?.filter(sub => isAllowed(sub.label));
                 
                 const isOpen = openMenus.includes(item.label);
                 const isSubActive = filteredSettingsSubItems?.some(sub => activeItem === sub.label);

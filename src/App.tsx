@@ -66,9 +66,22 @@ function DashboardContent({
       return () => clearTimeout(timer);
     }
 
-    const publicItems = ["Geral", "Dashboard", "Meu Perfil", "Notificações", "Segurança", "Aparência", "Organograma", "Sugestões", "Relatórios"];
-    const isPublic = publicItems.includes(activeItem);
-    const hasPermission = userProfile?.permissions?.includes(activeItem);
+    const role = userProfile?.role?.toUpperCase();
+    const isVendedorRole = role === "VENDEDOR";
+    const sellerAllowedItems = [
+      "Geral", "Produtos", "Calendário", "Eventos", "Férias", 
+      "Orçamentos", "Campanhas", "Relatórios", 
+      "Entregas", "Romaneios", "Concluídas", 
+      "Sugestões", "Meu Perfil", "Notificações", "Segurança", "Aparência"
+    ];
+
+    const isPublic = [
+      "Geral", "Dashboard", "Meu Perfil", "Notificações", 
+      "Segurança", "Aparência", "Organograma", "Sugestões", 
+      "Relatórios"
+    ].includes(activeItem);
+
+    const hasPermission = userProfile?.permissions?.includes(activeItem) || (isVendedorRole && sellerAllowedItems.includes(activeItem));
 
     if (!isPublic && !hasPermission && activeItem !== "Geral") {
       console.warn(`[Security] Acesso negado para: ${activeItem}. Redirecionando para Geral.`);
