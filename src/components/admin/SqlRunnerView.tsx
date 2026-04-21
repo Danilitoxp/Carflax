@@ -196,7 +196,7 @@ const ResultsGrid = memo(({ results, error, loading }: { results: any[], error: 
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-card scrollbar-hide">
+      <div className="flex-1 overflow-auto bg-card">
         {loading ? (
           <table className="w-full border-separate border-spacing-0 animate-pulse">
             <thead>
@@ -489,7 +489,7 @@ export function SqlRunnerView() {
                 <>
                   <div 
                     id="sql-highlight"
-                    className="absolute inset-0 p-6 pointer-events-none whitespace-pre-wrap break-words overflow-auto scrollbar-hide text-foreground/80 font-bold tracking-tight"
+                    className="absolute inset-0 p-6 pointer-events-none whitespace-pre-wrap break-words overflow-auto text-foreground/80 font-bold tracking-tight leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: highlightSql(query) + "\n" }}
                   />
                   <textarea 
@@ -501,7 +501,7 @@ export function SqlRunnerView() {
                     }}
                     onKeyDown={handleKeyDown}
                     spellCheck={false}
-                    className="absolute inset-0 w-full h-full p-6 bg-transparent text-transparent caret-blue-400 leading-relaxed outline-none resize-none overflow-auto scrollbar-hide"
+                    className="absolute inset-0 w-full h-full p-6 bg-transparent text-transparent caret-blue-500 leading-relaxed outline-none resize-none overflow-auto font-bold tracking-tight"
                     placeholder="DIGITE SUA QUERY SQL AQUI... (F9 PARA EXECUTAR)"
                   />
                 </>
@@ -560,8 +560,14 @@ const SqlAiAssistant = ({ isOpen, onClose, setQuery, onExecute }: { isOpen: bool
     setThinking(true);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyDUWAG8o4Wffhap5T__awTPckyNJTYs0Ns";
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
+      if (!apiKey) {
+        alert("Configuração Pendente: A chave VITE_GEMINI_API_KEY não foi encontrada no seu arquivo .env. Verifique o arquivo e reinicie o servidor (npm run dev).");
+        setThinking(false);
+        return;
+      }
+
       const systemPrompt = `Você é um analista de dados especialista no ERP Autcom. 
       ESTRUTURA DO BANCO: ${JSON.stringify({ primary: DB_KNOWLEDGE.primaryTables, allTableNames: DB_KNOWLEDGE.allTables })}
       
@@ -579,7 +585,7 @@ const SqlAiAssistant = ({ isOpen, onClose, setQuery, onExecute }: { isOpen: bool
       3. Importante: Se escolher uma tabela que não está na lista 'primary', use '*' (pois não sabemos as colunas).
       4. Responda APENAS com o código SQL, sem explicações, sem markdown.`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -589,8 +595,8 @@ const SqlAiAssistant = ({ isOpen, onClose, setQuery, onExecute }: { isOpen: bool
 
       if (!response.ok) {
         const errData = await response.json();
-        console.error("Erro Gemini:", errData);
-        throw new Error(`Erro na API: ${response.status}`);
+        console.error("Erro Gemini Detalhado:", errData);
+        throw new Error(`Erro na API (${response.status}): ${errData.error?.message || "Sem detalhes"}`);
       }
 
       const data = await response.json();

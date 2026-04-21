@@ -8,7 +8,8 @@ import {
   ChevronDown,
   Truck,
   User as UserIcon,
-  RefreshCw
+  RefreshCw,
+  Image as ImageIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
@@ -81,7 +82,8 @@ export function ConcluidasView() {
             status: "completed",
             time: new Date(e.updated_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' }),
             value: `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-            instrucoes: e.instructions || ""
+            instrucoes: e.instructions || "",
+            image: e.image
           });
           
           groups[romId].deliveredCount++;
@@ -297,9 +299,20 @@ export function ConcluidasView() {
                         <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 tracking-tighter">{delivery.value}</span>
                       </td>
                       <td className="py-2.5 px-6 text-center">
-                        <button className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-blue-500 transition-all scale-90">
-                          <FileText className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          {delivery.image && (
+                            <button 
+                              onClick={() => window.open(delivery.image, "_blank")}
+                              className="p-1.5 rounded-md bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-all scale-90"
+                              title="Ver Comprovante"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-blue-500 transition-all scale-90">
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

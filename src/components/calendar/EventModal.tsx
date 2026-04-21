@@ -15,6 +15,7 @@ interface EventModalProps {
     type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch";
   };
   setNewEvent: (event: EventModalProps["newEvent"]) => void;
+  canManage?: boolean;
 }
 
 export function EventModal({
@@ -25,7 +26,8 @@ export function EventModal({
   selectedDay,
   editingEventId,
   newEvent,
-  setNewEvent
+  setNewEvent,
+  canManage = true
 }: EventModalProps) {
   return (
     <>
@@ -107,7 +109,7 @@ export function EventModal({
                   </div>
 
                   <div className="pt-2 flex items-center gap-2">
-                    {editingEventId && (
+                    {editingEventId && canManage && (
                       <Button 
                         onClick={() => onDelete(editingEventId)}
                         variant="ghost"
@@ -116,12 +118,14 @@ export function EventModal({
                         Excluir
                       </Button>
                     )}
-                    <Button 
-                      onClick={onSave}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
-                    >
-                      {editingEventId ? "Salvar Alterações" : "Adicionar ao Calendário"}
-                    </Button>
+                    {canManage && (
+                      <Button 
+                        onClick={onSave}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+                      >
+                        {editingEventId ? "Salvar Alterações" : "Adicionar ao Calendário"}
+                      </Button>
+                    )}
                   </div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import { ProdutosView } from "@/components/dashboard/products/ProdutosView";
 import { AnalyticsView } from "./analytics/AnalyticsView";
 import { CampanhasView } from "./campanhas/CampanhasView";
 import { OrcamentosView } from "./orcamentos/OrcamentosView";
+import { RelatoriosView } from "./relatorios/RelatoriosView";
 import { LigacoesView } from "@/components/crm/ligacoes/LigacoesView";
 import { cn } from "@/lib/utils";
 
@@ -25,12 +26,14 @@ export function CrmSection({ activeTab, userProfile }: CrmSectionProps) {
             <ProdutosView />
           ) : activeTab === "Campanhas" ? (
             <div className="h-full overflow-y-auto scrollbar-hide">
-              <CampanhasView />
+              <CampanhasView userProfile={userProfile} />
             </div>
           ) : activeTab === "Ligações" ? (
             <div className="h-full overflow-y-auto scrollbar-hide">
               <LigacoesView />
             </div>
+          ) : activeTab === "Relatórios" ? (
+            <RelatoriosView orcamentos={[]} userProfile={userProfile} />
           ) : (
             <OrcamentosView userProfile={userProfile} />
           )}

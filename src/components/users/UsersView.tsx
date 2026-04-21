@@ -62,7 +62,10 @@ export function UsersView() {
   const availableModules = [
     "Geral", "Produtos", "Eventos", "Férias",
     "Orçamentos", "Ligações", "Campanhas", "Romaneios",
-    "Concluídas", "Usuários", "DB Admin", "Sugestões"
+    "Concluídas", "Usuários", "DB Admin", "Sugestões",
+    "Gerenciar Comunicados", "Gerenciar Férias", "Gerenciar Banners", "Gerenciar Calendário",
+    "Lançar Entrega",
+    "Criar Campanha"
   ];
 
   const companies = ["Carflax", "Zelex", "JCM"];

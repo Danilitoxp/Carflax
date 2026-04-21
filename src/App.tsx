@@ -19,6 +19,7 @@ import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SugestaoModal } from "@/components/sugestao";
 import { EntregasView } from "@/components/entregas";
+import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
 import { UsersView } from "@/components/users/UsersView";
 import { LoginView } from "@/components/auth/LoginView";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
@@ -65,7 +66,7 @@ function DashboardContent({
       return () => clearTimeout(timer);
     }
 
-    const publicItems = ["Geral", "Dashboard", "Meu Perfil", "Notificações", "Segurança", "Aparência", "Organograma", "Sugestões"];
+    const publicItems = ["Geral", "Dashboard", "Meu Perfil", "Notificações", "Segurança", "Aparência", "Organograma", "Sugestões", "Relatórios"];
     const isPublic = publicItems.includes(activeItem);
     const hasPermission = userProfile?.permissions?.includes(activeItem);
 
@@ -83,6 +84,7 @@ function DashboardContent({
     title: string;
     sellerName?: string;
     sellerCode?: string;
+    items?: any[];
   } | null>(() => {
     // Restaurar estado do chat do localStorage ao iniciar
     const saved = localStorage.getItem("carflax_global_chat");
@@ -112,7 +114,6 @@ function DashboardContent({
           const cache: any = {};
           data.forEach(u => cache[u.id] = u);
           (window as any)._carflaxUserCache = cache;
-          console.log("[CRM] Cache de usuários carregado:", Object.keys(cache).length);
         }
       } catch (e) {
         console.error("[CRM] Falha ao carregar cache de usuários:", e);
@@ -195,7 +196,8 @@ function DashboardContent({
           doc: detail.doc, 
           title: detail.title?.toUpperCase() === "SISTEMA" ? `Aviso: #${detail.doc}` : detail.title,
           sellerName: detail.sellerName,
-          sellerCode: detail.sellerCode
+          sellerCode: detail.sellerCode,
+          items: detail.items
         });
       }
     };
@@ -218,7 +220,7 @@ function DashboardContent({
 
   const isDashboardView = ["Geral", "Performance", "Campanhas", "Dashboard", "Orçamentos", "Ligações"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Config. Orçamentos", "Notificações", "Segurança", "Aparência", "Banners"].includes(activeItem);
-  const isCrmView = ["Orçamentos", "CRM", "Produtos", "Campanhas", "Ligações"].includes(activeItem);
+  const isCrmView = ["Orçamentos", "CRM", "Produtos", "Campanhas", "Ligações", "Relatórios"].includes(activeItem);
   const isComercial = 
     userProfile?.department === "Comercial" || 
     userProfile?.department === "Vendas" ||
@@ -281,13 +283,13 @@ function DashboardContent({
         {/* Content Area */}
         <div className="flex flex-col h-full w-full mx-auto overflow-hidden">
           {["Calendário", "Eventos", "Férias"].includes(activeItem) ? (
-            <CalendarSection activeTab={activeItem} />
+            <CalendarSection activeTab={activeItem} userProfile={userProfile} />
           ) : isSettingsView ? (
-            <SettingsSection externalTab={activeItem} />
+            <SettingsSection externalTab={activeItem} userProfile={userProfile} />
           ) : isCrmView ? (
             <CrmSection activeTab={activeItem} userProfile={userProfile} />
           ) : ["Entregas", "Romaneios", "Concluídas"].includes(activeItem) ? (
-            <EntregasView activeTab={activeItem} />
+            <EntregasView activeTab={activeItem} userProfile={userProfile} />
           ) : activeItem === "Usuários" ? (
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <UsersView />
@@ -354,6 +356,7 @@ function DashboardContent({
           userProfile={userProfile}
           sellerName={globalChat?.sellerName}
           sellerCode={globalChat?.sellerCode}
+          itemsInitial={globalChat?.items}
           amICentralizer={isCentralizer}
         />
     </div>
@@ -475,6 +478,18 @@ function App() {
   }, [fetchProfile]);
 
   if (loading) return <LoadingScreen />;
+
+  const isMotoristaRoute = window.location.pathname.includes("/motorista") || window.location.search.includes("v=");
+
+  if (isMotoristaRoute) {
+    return (
+      <ThemeProvider defaultTheme="light" storageKey="carflax-theme">
+        <NotificationProvider>
+          <MotoristaView />
+        </NotificationProvider>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider defaultTheme="light" storageKey="carflax-theme">

@@ -28,16 +28,22 @@ import {
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
+interface SettingsSectionProps {
+  externalTab?: string;
+  userProfile?: any;
+}
+
 /* ─────────────────────────────────────────────
    BANNERS
    Gestão de imagens de topo e avisos
    ───────────────────────────────────────────── */
-function BannersTab() {
+function BannersTab({ userProfile }: { userProfile?: any }) {
   const [transitionEnabled, setTransitionEnabled] = useState(true);
   const [banners] = useState([
     { id: 1, title: "Banner Promoção Abril", url: "https://images.unsplash.com/photo-1549416805-0e6d62635928?q=80&w=1200", dims: "1800 x 600px" },
     { id: 2, title: "Aviso Nova Filial", url: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=1200", dims: "1800 x 600px" },
   ]);
+  const canManage = userProfile?.permissions?.includes("Gerenciar Banners") || userProfile?.role === "admin";
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -58,7 +64,7 @@ function BannersTab() {
               <Sparkles className={cn("w-4 h-4", transitionEnabled ? "text-blue-600 dark:text-blue-400" : "text-slate-300 dark:text-slate-700")} />
               <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest leading-none">Efeito Transição</span>
             </div>
-            <Toggle checked={transitionEnabled} onChange={setTransitionEnabled} />
+            <Toggle checked={transitionEnabled} onChange={setTransitionEnabled} disabled={!canManage} />
           </div>
         </div>
 
@@ -68,9 +74,11 @@ function BannersTab() {
               <div className="aspect-[3/1] bg-slate-200 dark:bg-slate-800 relative overflow-hidden">
                 <img src={b.url} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                 <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Button className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800 h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest border-none">
-                    SUBSTITUIR IMAGEM
-                  </Button>
+                  {canManage && (
+                    <Button className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800 h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest border-none">
+                      SUBSTITUIR IMAGEM
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="p-4 flex items-center justify-between">
@@ -78,20 +86,24 @@ function BannersTab() {
                   <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight">{b.title}</p>
                   <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">Dimensões: {b.dims}</p>
                 </div>
-                <Button className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 p-0 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-100 transition-all">
-                  <ImageIcon className="w-4 h-4" />
-                </Button>
+                {canManage && (
+                  <Button className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 p-0 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-100 transition-all">
+                    <ImageIcon className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </div>
           ))}
 
           {/* ADD NEW CARD */}
-          <button className="aspect-[3/1] md:aspect-auto flex flex-col items-center justify-center gap-3 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-white/[0.02] hover:bg-blue-50/30 dark:hover:bg-blue-500/5 hover:border-blue-300 dark:hover:border-blue-500/30 transition-all group">
-            <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-white/10 shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all">
-              <Plus className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
-            </div>
-            <span className="text-[10px] font-black text-slate-400 dark:text-slate-600 group-hover:text-blue-600 uppercase tracking-widest">Adicionar Banner</span>
-          </button>
+          {canManage && (
+            <button className="aspect-[3/1] md:aspect-auto flex flex-col items-center justify-center gap-3 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-white/[0.02] hover:bg-blue-50/30 dark:hover:bg-blue-500/5 hover:border-blue-300 dark:hover:border-blue-500/30 transition-all group">
+              <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-white/10 shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all">
+                <Plus className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
+              </div>
+              <span className="text-[10px] font-black text-slate-400 dark:text-slate-600 group-hover:text-blue-600 uppercase tracking-widest">Adicionar Banner</span>
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -109,13 +121,15 @@ interface SettingsSectionProps {
    TINY TOGGLE
    Standardizado para o sistema Carflax
 ───────────────────────────────────────────── */
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button
-      onClick={() => onChange(!checked)}
+      onClick={() => !disabled && onChange(!checked)}
+      disabled={disabled}
       className={cn(
         "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out",
-        checked ? "bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]" : "bg-slate-200 dark:bg-slate-800"
+        checked ? "bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]" : "bg-slate-200 dark:bg-slate-800",
+        disabled && "opacity-30 cursor-not-allowed shadow-none"
       )}
     >
       <span
@@ -239,7 +253,7 @@ function getStrength(pw: string): number {
    MEU PERFIL - REDESIGN ESTRUTURADO
    Foco em cards, hierarquia e organização
 ───────────────────────────────────────────── */
-function ProfileTab() {
+function ProfileTab({ userProfile }: { userProfile?: any }) {
   const [form, setForm] = useState({
     nome: "",
     email: "",
@@ -628,7 +642,7 @@ function AppearanceTab() {
 /* ─────────────────────────────────────────────
    ORÇAMENTOS - CONFIGURAÇÕES
 ───────────────────────────────────────────── */
-function OrcamentosTab() {
+function OrcamentosTab({ userProfile }: { userProfile?: any }) {
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -740,7 +754,7 @@ function OrcamentosTab() {
 /* ─────────────────────────────────────────────
    COMPONENTE PRINCIPAL (TINY REDESIGN)
 ───────────────────────────────────────────── */
-export function SettingsSection({ externalTab }: SettingsSectionProps) {
+export function SettingsSection({ externalTab, userProfile }: SettingsSectionProps) {
   const [activeTab, setActiveTab] = useState("profile");
 
   useEffect(() => {
@@ -766,12 +780,12 @@ export function SettingsSection({ externalTab }: SettingsSectionProps) {
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto px-6 md:px-10 py-10 scrollbar-hide">
         <div className="max-w-[1200px] mx-auto">
-          {activeTab === "profile" && <ProfileTab />}
-          {activeTab === "orcamentos" && <OrcamentosTab />}
+          {activeTab === "profile" && <ProfileTab userProfile={userProfile} />}
+          {activeTab === "orcamentos" && <OrcamentosTab userProfile={userProfile} />}
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "security" && <SecurityTab />}
           {activeTab === "appearance" && <AppearanceTab />}
-          {activeTab === "banners" && <BannersTab />}
+          {activeTab === "banners" && <BannersTab userProfile={userProfile} />}
         </div>
       </div>
     </div>

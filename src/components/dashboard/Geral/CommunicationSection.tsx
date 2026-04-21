@@ -25,6 +25,7 @@ export interface CommunicationPost {
 
 export function CommunicationCard({ data, onEdit, userProfile }: { data: CommunicationPost; onEdit: (d: CommunicationPost) => void, userProfile?: any }) {
   const currentUserId = userProfile?.id;
+  const canManage = userProfile?.permissions?.includes("Gerenciar Comunicados") || userProfile?.role === "admin";
   const isLiked = currentUserId ? data.likedBy.includes(currentUserId) : false;
   const [likes, setLikes] = useState(data.likes);
   const [interaction, setInteraction] = useState<"like" | null>(isLiked ? "like" : null);
@@ -164,9 +165,11 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
             <button onClick={handleShare} className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all" title="Compartilhar">
               <Share2 className="w-4 h-4" />
             </button>
-            <button onClick={() => onEdit(data)} className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all" title="Editar">
-              <Edit2 className="w-4 h-4" />
-            </button>
+            {canManage && (
+              <button onClick={() => onEdit(data)} className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all" title="Editar">
+                <Edit2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -214,6 +217,7 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
   const [comms, setComms] = useState<CommunicationPost[]>([]);
   const [internalLoading, setInternalLoading] = useState(true);
 
+  const canManage = userProfile?.permissions?.includes("Gerenciar Comunicados") || userProfile?.role === "admin";
   const loading = externalLoading !== undefined ? externalLoading : internalLoading;
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -423,11 +427,11 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
         </div>
         {loading ? (
           <div className="h-9 w-40 bg-secondary dark:bg-slate-800/80 rounded-md animate-pulse shadow-sm" />
-        ) : (
+        ) : canManage ? (
           <Button onClick={() => { setEditingId(null); setNewPost({ title: "", content: "", category: "Empresa", image: "" }); setIsModalOpen(true); }} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md h-9 px-4 text-[11px] font-bold shadow-sm group">
             <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" /> NOVO COMUNICADO
           </Button>
-        )}
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-4">

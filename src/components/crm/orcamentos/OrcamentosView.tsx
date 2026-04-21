@@ -236,6 +236,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [statusFechamento, setStatusFechamento] = useState("");
   const [statusEntrega, setStatusEntrega] = useState("");
   const [statusMotivoPerdido, setStatusMotivoPerdido] = useState("");
+  const [lostItemsIds, setLostItemsIds] = useState<string[]>([]);
 
   const [startDate, setStartDate] = useState<Date | null>(new Date(2026, 3, 1));
   const [endDate, setEndDate] = useState<Date | null>(new Date(2026, 3, 30));
@@ -338,16 +339,54 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
             "PERDIDO": "❌ PERDIDO"
           };
           
+          const lostItemsList = (lostItemsIds.length > 0 && selectedItem.items)
+            ? selectedItem.items
+                .filter(it => lostItemsIds.includes(String(it.COD_PRODUTO)))
+                .map(it => `  • ${it.PRODUTO}`)
+                .join("\n")
+            : "";
+          
+          const header = `━━━━━━━━━━━━━━━━━━━━━━━━\n   🔄  *ATUALIZAÇÃO DE STATUS*\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+          const footer = `━━━━━━━━━━━━━━━━━━━━━━━━`;
+
           const msgFormatada = [
-            `🔄 *STATUS ATUALIZADO*`,
-            `📑 *Orçamento:* #${selectedItem.id.replace("-OR", "")}`,
-            `🏢 *Cliente:* ${selectedItem.client}`,
-            `👤 *Vendedor:* ${selectedItem.seller}`,
+            header,
+            `📑 *ORÇAMENTO:*  #${selectedItem.id.replace("-OR", "")}`,
+            `🏢 *CLIENTE:*    ${selectedItem.client}`,
+            `👤 *VENDEDOR:*   ${selectedItem.seller}`,
             ``,
-            `📢 *Novo Status:* ${statusEmblema[newStatus.toUpperCase()] || newStatus.toUpperCase()}`,
-            extra?.motivo_perda ? `📉 *Motivo da Perda:* ${extra.motivo_perda}` : "",
-            statusObs ? `\n💬 *Obs:* ${statusObs}` : "",
+            `📢 *STATUS:*     ${statusEmblema[newStatus.toUpperCase()] || newStatus.toUpperCase()}`,
+            extra?.motivo_perda ? `📉 *MOTIVO:*     ${extra.motivo_perda.toUpperCase()}` : "",
+            lostItemsList ? `\n📦 *ITENS AFETADOS:*\n${lostItemsList}` : "",
+            statusObs && !lostItemsList ? `\n💬 *OBSERVAÇÃO:*\n${statusObs}` : "",
+            footer
           ].filter(Boolean).join("\n");
+
+          // Preparar payload para o Supabase com as novas colunas
+          const crmStatusUpdate: any = {
+            documento: selectedItem.id,
+            empresa: selectedItem.empresa ?? "001",
+            status_crm: newStatus.toUpperCase(),
+            vendedor: selectedItem.seller,
+            updated_at: new Date().toISOString()
+          };
+
+          if (newStatus.toUpperCase() === "PERDIDO") {
+            crmStatusUpdate.motivo_perda = extra?.motivo_perda?.toUpperCase();
+            if (extra?.motivo_perda?.toUpperCase().includes("ESTOQUE")) {
+              crmStatusUpdate.itens_estoque = lostItemsIds;
+            } else if (extra?.motivo_perda?.toUpperCase().includes("PREÇO")) {
+              crmStatusUpdate.itens_preco = lostItemsIds;
+            }
+          }
+
+          const { error: statusError } = await supabase
+            .from("crm_status")
+            .upsert(crmStatusUpdate, { onConflict: 'documento,empresa' });
+
+          if (statusError) {
+            console.error("Erro ao salvar status:", statusError);
+          }
 
           await addConversa({
             documento: selectedItem.id,
@@ -372,6 +411,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     );
     setIsStatusModalOpen(false);
     setStatusObs(""); // Resetar obs após envio
+    setLostItemsIds([]); // Resetar itens selecionados
   };
 
   const handleRangeSelect = (start: Date, end: Date | null) => {
@@ -590,7 +630,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           </div>
 
           <TinyDropdown value={filterStatus} options={["Todos os Status", "Em Aberto", "Emitido", "Enviado", "Negociação", "Lib. Crédito", "Aguard. Pedido", "Venda", "Perdido"]} onChange={setFilterStatus} icon={FileCheck} variant="blue" placeholder="Todos os Status" />
-          <TinyDropdown value={filterSeller} options={uniqueSellers} onChange={setFilterSeller} icon={UserIcon} variant="slate" placeholder="Todos os Vendedores" />
+          
+          {(userProfile?.role === 'ADMIN' || userProfile?.role === 'GERENTE') && (
+            <TinyDropdown value={filterSeller} options={uniqueSellers} onChange={setFilterSeller} icon={UserIcon} variant="slate" placeholder="Todos os Vendedores" />
+          )}
+
           <TinyDropdown value={filterReason} options={lossReasons} onChange={setFilterReason} icon={AlertCircle} variant="amber" placeholder="Todos os Motivos" />
         </div>
 
@@ -778,7 +822,8 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                             doc: o.id, 
                             title: o.client,
                             sellerName: o.seller,
-                            sellerCode: o.sellerCode
+                            sellerCode: o.sellerCode,
+                            items: o.items
                           } 
                         }));
                       }}
@@ -1021,13 +1066,46 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                         className="w-full" 
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Observação Adicional</label>
-                      <textarea placeholder="Explique por que o negócio não avançou..." rows={4} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/5 transition-all resize-none placeholder:text-muted-foreground/50" />
-                    </div>
+                    {(statusMotivoPerdido === "Preço Alto" || statusMotivoPerdido === "Falta de Estoque") ? (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Marque os Itens Perdidos *</label>
+                        <div className="max-h-[220px] overflow-y-auto border border-border rounded-xl bg-secondary/40 divide-y divide-border/50 scrollbar-hide">
+                          {selectedItem?.items.map((it) => (
+                            <label key={it.COD_PRODUTO} className="flex items-center gap-3 p-3 hover:bg-secondary/60 cursor-pointer transition-colors group">
+                                <div className="relative flex items-center justify-center">
+                                  <input 
+                                    type="checkbox" 
+                                    id={`lost-${it.COD_PRODUTO}`}
+                                    checked={lostItemsIds.includes(String(it.COD_PRODUTO))}
+                                    onChange={(e) => {
+                                      const id = String(it.COD_PRODUTO);
+                                      if (e.target.checked) setLostItemsIds(prev => [...prev, id]);
+                                      else setLostItemsIds(prev => prev.filter(x => x !== id));
+                                    }}
+                                    className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border border-slate-300 transition-all checked:border-rose-500 checked:bg-rose-500"
+                                  />
+                                  <span className="absolute text-white opacity-0 peer-checked:opacity-100 pointer-events-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" stroke="currentColor" strokeWidth="1"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>
+                                  </span>
+                                </div>
+                              <div className="flex-1">
+                                <p className="text-[10px] font-black text-foreground uppercase tracking-tight group-hover:text-rose-500 transition-colors leading-none">{it.PRODUTO}</p>
+                                <p className="text-[9px] font-bold text-muted-foreground mt-0.5">Cód: {it.COD_PRODUTO}</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Observação Adicional</label>
+                        <textarea placeholder="Explique por que o negócio não avançou..." rows={4} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/5 transition-all resize-none placeholder:text-muted-foreground/50" />
+                      </div>
+                    )}
                     <button
                       onClick={() => handleUpdateStatus("PERDIDO", { motivo_perda: statusMotivoPerdido })}
-                      className="w-full h-14 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-500/20 active:scale-[0.98] transition-all"
+                      disabled={!statusMotivoPerdido || ((statusMotivoPerdido === "Preço Alto" || statusMotivoPerdido === "Falta de Estoque") && lostItemsIds.length === 0)}
+                      className="w-full h-14 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-500/20 active:scale-[0.98] transition-all"
                     >
                       Confirmar Perda
                     </button>

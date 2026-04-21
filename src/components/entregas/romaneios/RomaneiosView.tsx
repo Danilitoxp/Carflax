@@ -9,8 +9,11 @@ import {
   ChevronRight,
   User as UserIcon,
   Package,
-  X
+  X,
+  GripVertical,
+  Camera
 } from "lucide-react";
+import { Reorder } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { apiMotoristas, apiAdminSQL } from "@/lib/api";
@@ -31,9 +34,11 @@ export interface Delivery {
   romaneio_id?: string;
   driverCode?: string;
   romNumber?: number;
+  romStatus?: string;
 }
 
-export function RomaneiosView() {
+export function RomaneiosView({ userProfile }: { userProfile?: any }) {
+  const canLancar = userProfile?.permissions?.includes("Lançar Entrega") || userProfile?.role === "admin";
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [motoristas, setMotoristas] = useState<{ COD: string; NOME: string }[]>([]);
   const [selectedMotorista, setSelectedMotorista] = useState<string>("");
@@ -41,17 +46,24 @@ export function RomaneiosView() {
   const [nfInput, setNfInput] = useState("");
   const [driverAvatars, setDriverAvatars] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"pending" | "completed">("pending");
   
-  const now = new Date();
-  const hoje = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const hoje = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     fetchData();
+    // Sincronização em Tempo Real de Entregas e Status de Romaneio
+    const channel = supabase
+      .channel('admin_full_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'entregas' }, () => fetchData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'romaneios' }, () => fetchData(true))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [selectedMotorista]);
 
-  const fetchData = async () => {
+  const fetchData = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const motoristasRes = await apiMotoristas();
       if (motoristasRes.success) {
         setMotoristas(motoristasRes.motoristas);
@@ -60,14 +72,13 @@ export function RomaneiosView() {
       let romIds: string[] = [];
 
       // 1. Buscar romaneios de hoje
-      const query = supabase.from("romaneios").select("id, driver, motorista_cod, rom_number").eq("date", hoje);
+      const query = supabase.from("romaneios").select("id, driver, motorista_cod, rom_number, status").eq("date", hoje);
       
       if (selectedMotorista) {
         query.eq("motorista_cod", selectedMotorista);
       }
 
       const { data: roms } = await query;
-
       if (roms && roms.length > 0) {
         romIds = roms.map(r => r.id);
         if (selectedMotorista && roms.length === 1) {
@@ -81,11 +92,12 @@ export function RomaneiosView() {
       if (romIds.length > 0) {
         const { data: lancados } = await supabase
           .from("entregas")
-          .select("*, romaneios(driver, motorista_cod, rom_number)")
-          .in("romaneio_id", romIds);
+          .select("*, romaneios(driver, motorista_cod, rom_number, status)")
+          .in("romaneio_id", romIds)
+          .order("created_at", { ascending: true });
 
         if (lancados) {
-          setDeliveries(lancados.map(d => ({
+          const mapped = lancados.map(d => ({
             id: d.id,
             nf: d.nf,
             client: d.client,
@@ -93,14 +105,38 @@ export function RomaneiosView() {
             status: d.status,
             value: `R$ ${Number(d.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
             instrucoes: d.instructions || "",
+            image: d.image,
             driverName: d.romaneios?.driver,
             driverCode: d.romaneios?.motorista_cod,
             romaneio_id: d.romaneio_id,
-            romNumber: d.romaneios?.rom_number
-          })));
+            romNumber: d.romaneios?.rom_number,
+            romStatus: d.romaneios?.status
+          }));
+          
+          setDeliveries(mapped);
+
+          const uniqueRoms = Array.from(new Set(lancados.map(l => l.romaneio_id)));
+          for (const rid of uniqueRoms) {
+            const romDeliveries = lancados.filter(l => l.romaneio_id === rid);
+            const romInfo = romDeliveries[0]?.romaneios;
+            
+            // Verificação robusta: status atual é em_andamento, existe lista de entregas, e nenhuma delas é 'pending'
+            if (romInfo?.status === 'em_andamento' && 
+                romDeliveries.length > 0 && 
+                romDeliveries.every(d => d.status === 'completed' || d.status === 'failed')) {
+              console.log(`[Admin] Finalizando romaneio ${rid} automaticamente...`);
+              const { error } = await supabase.from("romaneios").update({ status: 'concluido' }).eq("id", rid);
+              if (error) {
+                console.error("[Admin] Erro ao finalizar romaneio:", error.message);
+              } else {
+                fetchData(true);
+              }
+            }
+          }
         }
       } else {
-        setDeliveries([]);
+        // Se não houver romaneios hoje, só limpamos se não estivermos carregando silenciosamente
+        if (!isSilent) setDeliveries([]);
       }
 
 
@@ -116,12 +152,45 @@ export function RomaneiosView() {
     } catch (error) {
       console.error("Erro ao buscar entregas:", error);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
+    }
+  };
+
+  const handleReorder = async (newOrder: Delivery[]) => {
+    // Atualiza o estado local imediatamente para fluidez
+    setDeliveries(newOrder);
+
+    try {
+      // Para persistir a ordem via created_at, vamos pegar todos os timestamps 
+      // atuais e reatribuí-los na nova ordem desejada.
+      const { data: currentTimestamps } = await supabase
+        .from("entregas")
+        .select("id, created_at")
+        .in("id", newOrder.map(d => d.id))
+        .order("created_at", { ascending: true });
+
+      if (currentTimestamps) {
+        const updates = newOrder.map((delivery, index) => ({
+          id: delivery.id,
+          created_at: currentTimestamps[index].created_at
+        }));
+
+        // Atualização em lote (batch)
+        for (const up of updates) {
+          await supabase.from("entregas").update({ created_at: up.created_at }).eq("id", up.id);
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao persistir nova ordem:", err);
     }
   };
 
   const handleLancar = async () => {
     try {
+      // Limpar a NF: pegar só os números e completar com zeros à esquerda até 12 dígitos
+      const cleanNum = nfInput.replace(/\D/g, ''); 
+      const nfFormatada = cleanNum.padStart(12, '0');
+
       const sql = `
         SELECT 
           GER_NUMDOC as NF,
@@ -132,7 +201,7 @@ export function RomaneiosView() {
           GER_VLRCON as VALOR,
           GER_MENEX2 as OBS
         FROM MOVGER 
-        WHERE GER_NUMDOC = '${nfInput}'
+        WHERE GER_NUMDOC = '${nfFormatada}'
         LIMIT 1
       `;
       
@@ -149,18 +218,19 @@ export function RomaneiosView() {
         const driverName = motorista ? motorista.NOME : (selectedMotorista || "Geral");
 
         let romId = currentRomaneioId;
+        let romNumValue = 0;
 
-        // 1. Tentar encontrar o romaneio no banco se não estiver no estado local
         if (!romId) {
           const { data: existingRom } = await supabase
             .from("romaneios")
-            .select("id")
+            .select("id, rom_number")
             .eq("motorista_cod", selectedMotorista || "geral")
             .eq("date", hoje)
             .maybeSingle();
           
           if (existingRom) {
             romId = existingRom.id;
+            romNumValue = existingRom.rom_number;
             setCurrentRomaneioId(romId);
           }
         }
@@ -180,10 +250,11 @@ export function RomaneiosView() {
           
           if (romErr) throw romErr;
           romId = newRom.id;
+          romNumValue = newRom.rom_number;
           setCurrentRomaneioId(romId);
         }
 
-        // 3. Preparar a entrega
+        // 3. Preparar a entrega completa para evitar sumiço no filtro
         const newDelivery: Delivery = {
           id: e.NF,
           nf: e.NF,
@@ -192,7 +263,11 @@ export function RomaneiosView() {
           status: "pending",
           value: formattedValue,
           instrucoes: e.OBS || "",
-          romaneio_id: romId
+          romaneio_id: romId,
+          driverName: driverName,
+          driverCode: selectedMotorista || "geral",
+          romNumber: romNumValue,
+          romStatus: 'em_andamento'
         };
 
         const cleanValue = Number(String(e.VALOR).replace(',', '.')) || 0;
@@ -252,12 +327,7 @@ export function RomaneiosView() {
   };
 
   const [selectedNfItems, setSelectedNfItems] = useState<string | null>(null);
-
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}/motorista?v=${selectedMotorista || "geral"}`;
-    navigator.clipboard.writeText(url);
-    alert("Link do motorista copiado para o clipboard!");
-  };
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
 
   return (
     <div className="flex-1 flex flex-col gap-4 pb-6 px-0 overflow-hidden bg-background">
@@ -269,6 +339,29 @@ export function RomaneiosView() {
               <span className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
               Monitoramento de Entregas em Tempo Real
             </p>
+          </div>
+
+          <div className="flex bg-secondary/30 p-1 rounded-xl border border-border/50">
+            <button 
+              onClick={() => setActiveTab("pending")}
+              className={cn(
+                "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                activeTab === "pending" ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Clock className="w-3.5 h-3.5" />
+               Em Andamento
+            </button>
+            <button 
+              onClick={() => setActiveTab("completed")}
+              className={cn(
+                "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                activeTab === "completed" ? "bg-white dark:bg-slate-800 text-emerald-600 shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Concluídos
+            </button>
           </div>
         </div>
 
@@ -302,14 +395,16 @@ export function RomaneiosView() {
             </select>
           </div>
 
-          <button 
-            onClick={handleLancar}
-            disabled={!nfInput}
-            className="h-9 px-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-md shadow-blue-600/10 flex items-center gap-2 active:scale-95"
-          >
-            Lançar Entrega
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+          {canLancar && (
+            <button 
+              onClick={handleLancar}
+              disabled={!nfInput}
+              className="h-9 px-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-md shadow-blue-600/10 flex items-center gap-2 active:scale-95"
+            >
+              Lançar Entrega
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -335,175 +430,243 @@ export function RomaneiosView() {
               </div>
             </div>
           </div>
-        ) : deliveries.length > 0 ? (
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-border bg-secondary/20 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {(() => {
-                  const motoristaAtivo = motoristas.find(m => m.COD === selectedMotorista);
-                  return (
-                    <>
+        ) : (() => {
+            const filteredDeliveries = deliveries.filter(d => {
+              const isRomCompleted = (d as any).romStatus === "concluido";
+              return activeTab === "completed" ? isRomCompleted : !isRomCompleted;
+            });
+            
+            // Agrupar por romaneio_id para exibir os cards
+            const romGroups = Array.from(new Set(filteredDeliveries.map(d => d.romaneio_id)));
+
+            return romGroups.length > 0 ? romGroups.map(romId => {
+              const items = filteredDeliveries.filter(d => d.romaneio_id === romId);
+              const motoristaNome = items[0]?.driverName || "Motorista";
+              const motoristaCod = items[0]?.driverCode || "000";
+              const romNum = items[0]?.romNumber || 0;
+              
+              return (
+                <div key={romId} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm mb-6">
+                  <div className="p-4 border-b border-border bg-secondary/20 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
                       <div className="relative">
                         <img
-                          src={driverAvatars[selectedMotorista] || driverAvatars[deliveries[0]?.driverCode || ""] || `https://api.dicebear.com/7.x/avataaars/svg?seed=${motoristaAtivo?.NOME || "geral"}`}
+                          src={driverAvatars[motoristaCod] || `https://api.dicebear.com/7.x/avataaars/svg?seed=${motoristaNome}`}
                           className="w-10 h-10 rounded-xl border border-slate-200 shadow-sm object-cover bg-white"
                           alt="Motorista"
                         />
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center shadow-sm">
+                        <div className={cn(
+                          "absolute -bottom-1 -right-1 w-4 h-4 border-2 border-white rounded-full flex items-center justify-center shadow-sm",
+                          items.every(i => i.status === "completed") ? "bg-emerald-500" : "bg-blue-500"
+                        )}>
                           <CheckCircle2 className="w-2.5 h-2.5 text-white" />
                         </div>
                       </div>
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2 mb-0.5">
                           <h4 className="text-[12px] font-black text-foreground uppercase tracking-tight leading-none flex items-center gap-2">
-                            {selectedMotorista 
-                              ? (motoristaAtivo ? motoristaAtivo.NOME : "STATUS DA FROTA")
-                              : (deliveries[0]?.driverName ? deliveries[0].driverName : "STATUS DA FROTA")
-                            }
-                            {(selectedMotorista || deliveries.length > 0) && (() => {
-                              const dateParts = hoje.split('-');
-                              const formattedDate = `${dateParts[2]}${dateParts[1]}${dateParts[0]}`;
-                              const sequence = String(deliveries[0]?.romNumber || 0).padStart(3, '0');
-                              return (
-                                <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 text-[9px] font-black tracking-tight">
-                                  RM-{formattedDate}-{sequence}
-                                </span>
-                              );
-                            })()}
+                            {motoristaNome}
+                            <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 text-[9px] font-black tracking-tight">
+                              RM-{hoje.replace(/-/g, '')}-{String(romNum).padStart(3, '0')}
+                            </span>
                           </h4>
-                          <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50 text-[8px] font-black tracking-widest uppercase">
-                            {deliveries.length} ENTREGAS HOJE
+                          <span className={cn(
+                            "px-2 py-0.5 rounded border text-[8px] font-black tracking-widest uppercase",
+                            activeTab === "completed" 
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                              : "bg-blue-50 text-blue-600 border-blue-100"
+                          )}>
+                            {items.length} ENTREGAS {activeTab === "completed" ? "FINALIZADAS" : ""}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
-                            {selectedMotorista 
-                              ? (motoristaAtivo ? `MOTORISTA CÓD: ${motoristaAtivo.COD}` : "Monitorando movimentações do dia")
-                              : (deliveries[0]?.driverCode ? `MOTORISTA CÓD: ${deliveries[0].driverCode}` : "Monitorando movimentações do dia")
-                            }
+                            CÓD: {motoristaCod}
                           </span>
                         </div>
                       </div>
-                    </>
-                  );
-                })()}
-              </div>
+                    </div>
 
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={handleCopyLink}
-                  className="h-8 px-3 bg-card border border-border text-muted-foreground rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-secondary transition-all flex items-center gap-2 shadow-sm active:scale-95"
-                >
-                  <Link2 className="w-3.5 h-3.5" />
-                  Copiar Link Motorista
-                </button>
-                <button className="h-8 px-4 rounded-lg bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/10">
-                  <Navigation className="w-3.5 h-3.5" />
-                  Rastrear Tudo
-                </button>
-              </div>
-            </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => {
+                          const url = `${window.location.origin}/motorista?v=${motoristaCod}`;
+                          navigator.clipboard.writeText(url);
+                          alert("Link do motorista copiado!");
+                        }}
+                        className="h-8 px-3 bg-card border border-border text-muted-foreground rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-secondary transition-all flex items-center gap-2 shadow-sm active:scale-95"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        Link Rota
+                      </button>
+                    </div>
+                  </div>
 
-            <div className="p-1">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
-                    <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">NF</th>
-                    <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Cliente / Endereço</th>
-                    <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-right">Valor</th>
-                    <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-center">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {deliveries.map((delivery) => (
-                    <tr key={delivery.id} className="hover:bg-secondary/20 transition-colors group">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          {delivery.status === "completed" ? (
-                            <div className="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center border border-emerald-100/50">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
-                            </div>
-                          ) : (
-                            <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center border border-amber-100/50">
-                              <Clock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 animate-pulse" />
-                            </div>
-                          )}
-                          <span className={cn(
-                            "text-[9px] font-black uppercase tracking-widest",
-                            delivery.status === "completed" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
-                          )}>
-                            {delivery.status === "completed" ? delivery.time : "AGUARD."}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-[11px] font-black text-foreground tracking-tighter">#{delivery.nf}</span>
-                      </td>
-                      <td className="py-3 px-4 max-w-[400px]">
-                        <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-black text-foreground uppercase tracking-tight leading-none mb-0.5">{delivery.client}</span>
-                            {!selectedMotorista && delivery.driverName && (
-                              <span className="text-[8px] px-1.5 py-0.5 rounded bg-secondary dark:bg-slate-800 text-muted-foreground font-bold uppercase tracking-tighter">
-                                {delivery.driverName.split(' ')[0]} {delivery.driverCode ? `[${delivery.driverCode}]` : ""}
-                              </span>
+                  <div className="p-1">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
+                          <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">NF</th>
+                          <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Cliente / Endereço</th>
+                          <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-right">Valor</th>
+                          <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-center">Ações</th>
+                        </tr>
+                      </thead>
+                      <Reorder.Group 
+                        as="tbody" 
+                        axis="y" 
+                        values={items} 
+                        onReorder={(newOrder) => {
+                          // Só permitimos reordenar se estivermos na aba de Pendentes
+                          if (activeTab === "pending") handleReorder(newOrder);
+                        }}
+                        className="divide-y divide-border/50"
+                      >
+                        {items.map((delivery) => (
+                          <Reorder.Item 
+                            as="tr" 
+                            key={delivery.id} 
+                            value={delivery}
+                            dragListener={activeTab === "pending"}
+                            className={cn(
+                              "hover:bg-secondary/20 transition-colors group bg-card",
+                              activeTab === "pending" ? "cursor-grab active:cursor-grabbing" : "cursor-default"
                             )}
-                          </div>
-                          <div className="flex items-center gap-1.5 opacity-60">
-                            <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
-                            <span className="text-[9px] font-bold text-muted-foreground uppercase truncate tracking-tight">{delivery.address}</span>
-                          </div>
-                          {delivery.instrucoes && (
-                            <div className="flex items-center gap-1.5 mt-1.5 p-1 px-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-100/50 dark:border-amber-900/50 rounded-md self-start">
-                              <Navigation className="w-2.5 h-2.5 text-amber-500 dark:text-amber-400" />
-                              <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest italic">{delivery.instrucoes}</span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className="text-[11px] font-black text-emerald-600 tracking-tighter">{delivery.value}</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center justify-center gap-1.5 transition-all">
-                          <button 
-                            onClick={() => setSelectedNfItems(delivery.nf)}
-                            className="p-1.5 rounded-md hover:bg-blue-50 text-slate-300 hover:text-blue-600 transition-colors"
-                            title="Ver Itens"
                           >
-                            <Package className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteDelivery(delivery.nf, delivery.romaneio_id)}
-                            className="p-1.5 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500" 
-                            title="Excluir"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-card border border-border border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center">
-            <div className="w-12 h-12 rounded-full bg-secondary/50 flex items-center justify-center mb-4">
-              <Navigation className="w-6 h-6 text-muted-foreground" />
-            </div>
-            <h3 className="text-[14px] font-black text-foreground uppercase">Nenhum Romaneio Ativo</h3>
-            <p className="text-[11px] font-bold text-muted-foreground max-w-[200px] mt-1 uppercase">Lance uma NF acima para iniciar o monitoramento de entregas.</p>
-          </div>
-        )}
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                {activeTab === "pending" && <GripVertical className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />}
+                                {delivery.status === "completed" ? (
+                                  <div className="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center border border-emerald-100/50">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                                  </div>
+                                ) : (
+                                  <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center border border-amber-100/50">
+                                    <Clock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 animate-pulse" />
+                                  </div>
+                                )}
+                                <span className={cn(
+                                  "text-[9px] font-black uppercase tracking-widest",
+                                  delivery.status === "completed" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                                )}>
+                                  {delivery.status === "completed" ? delivery.time : "AGUARD."}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="text-[11px] font-black text-foreground tracking-tighter">#{delivery.nf}</span>
+                            </td>
+                            <td className="py-3 px-4 max-w-[400px]">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[11px] font-black text-foreground uppercase tracking-tight leading-none mb-0.5">{delivery.client}</span>
+                                <div className="flex items-center gap-1.5 opacity-60">
+                                  <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
+                                  <span className="text-[9px] font-bold text-muted-foreground uppercase truncate tracking-tight">{delivery.address}</span>
+                                </div>
+                                {delivery.instrucoes && (
+                                  <div className="mt-1 flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-black uppercase tracking-tighter border border-blue-100/50">OBS</span>
+                                    <span className="text-[9px] font-bold text-muted-foreground uppercase italic tracking-tight truncate">{delivery.instrucoes}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                             <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-5">
+                                {delivery.image && (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setViewingImage(delivery.image!);
+                                    }}
+                                    className="w-10 h-10 rounded-lg border border-border/50 shadow-sm overflow-hidden hover:scale-125 hover:ring-2 hover:ring-blue-500 transition-all bg-muted group relative z-10"
+                                  >
+                                    <img 
+                                      src={delivery.image} 
+                                      className="w-full h-full object-cover transition-opacity duration-300" 
+                                      alt="Comprovante"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        e.currentTarget.parentElement?.querySelector('.fallback')?.classList.remove('hidden');
+                                      }}
+                                    />
+                                    <div className="fallback hidden absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-800">
+                                      <Camera className="w-4 h-4 text-slate-300" />
+                                    </div>
+                                  </button>
+                                )}
+                                <span className="text-[11px] font-black text-emerald-600 tracking-tighter whitespace-nowrap">{delivery.value}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center justify-center gap-1.5 transition-all">
+                                <button 
+                                  onClick={() => setSelectedNfItems(delivery.nf)}
+                                  className="p-1.5 rounded-md hover:bg-blue-50 text-slate-300 hover:text-blue-600 transition-colors"
+                                  title="Ver Itens"
+                                >
+                                  <Package className="w-4 h-4" />
+                                </button>
+                                {canLancar && activeTab === "pending" && (
+                                  <button 
+                                    onClick={() => handleDeleteDelivery(delivery.nf, delivery.romaneio_id)}
+                                    className="p-1.5 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500" 
+                                    title="Excluir"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </Reorder.Item>
+                        ))}
+                      </Reorder.Group>
+                    </table>
+                  </div>
+                </div>
+              );
+            }) : (
+              <div className="bg-card border border-border border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 rounded-full bg-secondary/50 flex items-center justify-center mb-4">
+                  <Navigation className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <h3 className="text-[14px] font-black text-foreground uppercase">
+                  Nenhum Romaneio {activeTab === "completed" ? "Concluído" : "em Aberto"}
+                </h3>
+                <p className="text-[11px] font-bold text-muted-foreground max-w-[200px] mt-1 uppercase">
+                  {activeTab === "completed" ? "Os romaneios finalizados aparecerão aqui." : "Lance uma NF acima para iniciar."}
+                </p>
+              </div>
+            )
+        })()}
       </div>
 
       <ItemsModal 
         nf={selectedNfItems} 
         onClose={() => setSelectedNfItems(null)} 
       />
+
+      {viewingImage && (
+        <div 
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300"
+          onClick={() => setViewingImage(null)}
+        >
+          <div className="relative max-w-4xl w-full flex flex-col items-center">
+            <button 
+              className="absolute -top-12 right-0 p-2 text-white hover:text-red-400 transition-colors flex items-center gap-2 font-black uppercase text-[10px] tracking-widest"
+              onClick={() => setViewingImage(null)}
+            >
+              Fechar Visualização <X className="w-5 h-5" />
+            </button>
+            <img 
+              src={viewingImage} 
+              className="max-h-[85vh] w-auto rounded-2xl shadow-2xl border-4 border-white/10 ring-1 ring-white/20 object-contain animate-in zoom-in-95 duration-300" 
+              alt="Comprovante Full" 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

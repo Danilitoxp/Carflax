@@ -40,6 +40,7 @@ interface Vacation {
 
 interface CalendarSectionProps {
   activeTab?: string;
+  userProfile?: any;
 }
 
 // Cache global para evitar delays entre trocas de meses
@@ -55,9 +56,12 @@ const calendarCache: {
   holidays: {}
 };
 
-export function CalendarSection({ activeTab }: CalendarSectionProps) {
+export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps) {
   const [viewMode, setViewMode] = useState<"events" | "vacations">(activeTab === "Férias" ? "vacations" : "events");
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)); // Abril 2026
+  
+  const canManageFerias = userProfile?.permissions?.includes("Gerenciar Férias") || userProfile?.role === "admin";
+  const canManageEvents = userProfile?.permissions?.includes("Gerenciar Calendário") || userProfile?.role === "admin";
   const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video", "holiday", "meeting", "celebration", "finance", "important", "launch"]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [vacations, setVacations] = useState<Vacation[]>([]);
@@ -301,6 +305,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
 
   const handleDayClick = (day: number | null) => {
     if (!day || viewMode === "vacations") return;
+    if (!canManageEvents) return;
     setEditingEventId(null);
     setSelectedDay(day);
     setNewEvent({ title: "", description: "", type: "video" });
@@ -309,6 +314,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
 
   const handleEventClick = (e: React.MouseEvent, event: CalendarEvent) => {
     e.stopPropagation();
+    if (!canManageEvents) return;
     setEditingEventId(event.id);
     setSelectedDay(event.day);
     setNewEvent({ title: event.title, description: event.description || "", type: event.type });
@@ -316,6 +322,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   };
 
   const handleVacationClick = (vac: Vacation) => {
+    if (!canManageFerias) return;
     setEditingVacation(vac);
     setIsVacationModalOpen(true);
   };
@@ -333,6 +340,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
         editingEventId={editingEventId} 
         newEvent={newEvent} 
         setNewEvent={setNewEvent} 
+        canManage={canManageEvents}
       />
       <div className="flex-1 overflow-hidden px-6 pt-4 pb-2 flex flex-col min-h-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border shrink-0">
@@ -385,7 +393,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
             {loading ? (
                <div className="h-9 w-32 bg-secondary rounded-md animate-pulse" />
             ) : (
-              viewMode === "vacations" && (
+              viewMode === "vacations" && canManageFerias && (
                 <Button onClick={() => { setEditingVacation(null); setIsVacationModalOpen(true); }} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 uppercase tracking-wider group">
                   <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" /> LANÇAR FÉRIAS
                 </Button>
@@ -401,6 +409,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
           editingVacation={editingVacation}
           employees={employees}
           vacations={vacations}
+          canManage={canManageFerias}
         />
         <div className="flex-1 bg-card border border-border rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-0 relative mt-3 h-full">
           <div className="grid grid-cols-7 bg-secondary/30 border-b border-border">

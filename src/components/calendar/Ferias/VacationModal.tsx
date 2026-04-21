@@ -16,6 +16,7 @@ interface VacationModalProps {
   editingVacation?: any;
   employees: { name: string; avatar?: string }[];
   vacations: any[];
+  canManage?: boolean;
 }
 
 export function VacationModal({ 
@@ -25,7 +26,8 @@ export function VacationModal({
   onDelete, 
   editingVacation, 
   employees,
-  vacations
+  vacations,
+  canManage = true
 }: VacationModalProps) {
   const [name, setName] = useState("");
   const [start, setStart] = useState("");
@@ -205,17 +207,19 @@ export function VacationModal({
                 onClick={onClose}
                 className="flex-1 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 transition-all"
               >
-                Cancelar
+                {canManage ? "Cancelar" : "Fechar"}
               </Button>
-              <Button 
-                type="submit"
-                className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 shadow-lg shadow-blue-600/10 transition-all active:scale-[0.98]"
-              >
-                {editingVacation ? "Salvar Alterações" : "Confirmar Lançamento"}
-              </Button>
+              {canManage && (
+                <Button 
+                  type="submit"
+                  className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 shadow-lg shadow-blue-600/10 transition-all active:scale-[0.98]"
+                >
+                  {editingVacation ? "Salvar Alterações" : "Confirmar Lançamento"}
+                </Button>
+              )}
             </div>
             
-            {editingVacation && onDelete && (
+            {editingVacation && onDelete && canManage && (
               <button
                 type="button"
                 onClick={() => {

@@ -41,7 +41,8 @@ function offsetMes(mes: number, ano: number, delta: number): { mes: number; ano:
   return { mes: m, ano: a };
 }
 
-export function CampanhasView() {
+export function CampanhasView({ userProfile }: { userProfile?: any }) {
+  const canManage = userProfile?.permissions?.includes("Criar Campanha") || userProfile?.role === "admin";
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
@@ -340,13 +341,15 @@ export function CampanhasView() {
           <h2 className="text-2xl font-black text-foreground uppercase tracking-tight">Campanhas Ativas</h2>
           <p className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em] mt-1 opacity-70">Programas de Incentivo e Vendas Digitais</p>
         </div>
-        <button
-          onClick={abrirNovaCampanha}
-          className="h-10 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[11px] font-black transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2 uppercase tracking-widest active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          Nova Campanha
-        </button>
+        {canManage && (
+          <button
+            onClick={abrirNovaCampanha}
+            className="h-10 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[11px] font-black transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2 uppercase tracking-widest active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Campanha
+          </button>
+        )}
       </div>
 
       {/* Grid */}
@@ -408,18 +411,22 @@ export function CampanhasView() {
             >
               {/* Ações editar/excluir */}
               <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 z-10">
-                <button
-                  onClick={(e) => abrirEdicao(camp, e)}
-                  className="w-8 h-8 bg-card border border-border rounded-xl shadow-lg text-muted-foreground hover:text-blue-500 hover:border-blue-500/50 flex items-center justify-center transition-all bg-secondary/50"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(camp.id); }}
-                  className="w-8 h-8 bg-card border border-border rounded-xl shadow-lg text-muted-foreground hover:text-rose-500 hover:border-rose-500/50 flex items-center justify-center transition-all bg-secondary/50"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {canManage && (
+                  <>
+                    <button
+                      onClick={(e) => abrirEdicao(camp, e)}
+                      className="w-8 h-8 bg-card border border-border rounded-xl shadow-lg text-muted-foreground hover:text-blue-500 hover:border-blue-500/50 flex items-center justify-center transition-all bg-secondary/50"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(camp.id); }}
+                      className="w-8 h-8 bg-card border border-border rounded-xl shadow-lg text-muted-foreground hover:text-rose-500 hover:border-rose-500/50 flex items-center justify-center transition-all bg-secondary/50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
               </div>
 
               <div className="flex-1 bg-secondary/30 rounded-[24px] p-6 flex items-center justify-center border border-border/20 mb-4 transition-all group-hover:bg-blue-500/5 group-hover:rotate-1 relative overflow-hidden group-hover:border-blue-500/20">

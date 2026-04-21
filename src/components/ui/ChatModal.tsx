@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Minus, Square, Loader2 } from "lucide-react";
+import { X, Send, Minus, Square, Loader2, Package, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getConversas, addConversa, type CrmConversa } from "@/lib/crm-service";
 import { supabase } from "@/lib/supabase";
+import { apiCrmOrcamentos, type CrmItem } from "@/lib/api";
 
 interface UserProfile {
   id?: string;
@@ -21,6 +22,7 @@ interface ChatModalProps {
   sellerName?: string;
   sellerCode?: string;
   amICentralizer?: boolean;
+  itemsInitial?: CrmItem[];
 }
 
 export function ChatModal({ 
@@ -32,7 +34,8 @@ export function ChatModal({
   userProfile, 
   sellerName, 
   sellerCode,
-  amICentralizer 
+  amICentralizer,
+  itemsInitial
 }: ChatModalProps) {
   const [isMinimized, setIsMinimized] = useState(false);
   const [messageText, setMessageText] = useState("");
@@ -46,13 +49,19 @@ export function ChatModal({
   const [headerLoading, setHeaderLoading] = useState(false);
   const [centralizer, setCentralizer] = useState<{ id: string; name: string; avatar: string } | null>(null);
 
+  // Estados para Itens do Orçamento
+  const [showItems, setShowItems] = useState(false);
+  const [items, setItems] = useState<CrmItem[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+
   // 1. Efeito Principal de Inicialização e Realtime
   useEffect(() => {
     if (!isOpen || !documento) return;
 
-    console.log("[Chat] Abrindo orçamento:", documento);
+    // Resetar itens ao trocar de documento. Priorizar itemsInitial se vier do evento
+    setItems(itemsInitial || []);
+    setShowItems(false);
 
-    // 1. Tentar resolver pelo Cache Global primeiro (instantâneo) e evitar skeleton
     const userCache = (window as any)._carflaxUserCache || {};
     let resolvedImmediately = false;
 
@@ -168,7 +177,7 @@ export function ChatModal({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isOpen, documento, userProfile?.id]);
+  }, [isOpen, documento, userProfile?.id, itemsInitial]);
 
   // 2. Efeito de Resolução Dinâmica de Perfil baseada em Mensagens e Cache Global
   useEffect(() => {
@@ -267,6 +276,45 @@ export function ChatModal({
               "Centralizador Carflax", 
         avatar: centralizer?.avatar || "" 
       };
+
+  const handleToggleItems = async () => {
+    if (showItems) {
+      setShowItems(false);
+      return;
+    }
+
+    setShowItems(true);
+    
+    // Se já temos itens no estado ou no initial, não buscamos de novo
+    if (items.length > 0) return;
+    
+    if (itemsInitial && itemsInitial.length > 0) {
+      setItems(itemsInitial);
+      return;
+    }
+
+    setItemsLoading(true);
+    try {
+      const fullDocId = documento.trim();
+      const cleanDocId = documento.replace("#", "").split("-")[0].trim();
+      
+      const raw = await apiCrmOrcamentos({});
+      // Busca flexível: tenta ID completo ou ID limpo
+      const budget = raw.find(b => 
+        b.ORCAMENTO === fullDocId || 
+        b.ORCAMENTO === cleanDocId || 
+        b.ORCAMENTO?.includes(cleanDocId)
+      );
+
+      if (budget) {
+        setItems(budget.PRODUTOS || []);
+      }
+    } catch (e) {
+      console.error("[Chat] Erro ao buscar produtos:", e);
+    } finally {
+      setItemsLoading(false);
+    }
+  };
 
   const handleSend = async () => {
     const text = messageText.trim();
@@ -414,6 +462,18 @@ export function ChatModal({
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {amICentralizer && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); handleToggleItems(); }} 
+                className={cn(
+                  "p-1.5 rounded-lg transition-all active:scale-95",
+                  showItems ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "hover:bg-secondary text-muted-foreground hover:text-blue-600"
+                )}
+                title="Ver Itens do Orçamento"
+              >
+                <Package className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground">
               {isMinimized ? <Square className="w-3 h-3" /> : <Minus className="w-3.5 h-3.5" />}
             </button>
@@ -424,7 +484,59 @@ export function ChatModal({
         </div>
 
         {!isMinimized && (
-          <>
+          <div className="flex-1 flex flex-col min-h-0 relative">
+            {/* PAINEL DE ITENS DO ORCAMENTO */}
+            {showItems && (
+              <div className="absolute inset-0 z-50 bg-card flex flex-col animate-in slide-in-from-right-full duration-300">
+                <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/20">
+                  <div className="flex items-center gap-2">
+                    <ShoppingBag className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="text-[10px] font-black text-foreground uppercase tracking-widest">Produtos do Orçamento</span>
+                  </div>
+                  <button onClick={() => setShowItems(false)} className="p-1.5 hover:bg-secondary rounded-lg text-muted-foreground">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide">
+                  {itemsLoading ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase">Carregando Itens...</span>
+                    </div>
+                  ) : items.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full py-8 text-center px-4">
+                      <Package className="w-8 h-8 text-muted-foreground/20 mb-2" />
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase">Nenhum item encontrado para este orçamento.</p>
+                    </div>
+                  ) : (
+                    items.map((it, i) => (
+                      <div key={i} className="p-2.5 rounded-xl bg-secondary/30 border border-border/50 hover:border-blue-500/30 transition-colors">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-[9px] font-black text-blue-500 uppercase tracking-tighter">CÓD: {it.COD_PRODUTO}</span>
+                          <span className="text-[9px] font-black text-emerald-500">{parseFloat(String(it.QUANTIDADE)).toFixed(0)} {it.UN || 'UN'}</span>
+                        </div>
+                        <p className="text-[10px] font-bold text-foreground leading-tight uppercase tracking-tight mb-1">{it.PRODUTO}</p>
+                        <div className="flex justify-between items-center text-[9px] font-black opacity-60">
+                          <span>UNIT: {(parseFloat(String(it.PRECO_UNITARIO))).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL'})}</span>
+                          <span className="text-foreground">TOTAL: {(parseFloat(String(it.QUANTIDADE)) * parseFloat(String(it.PRECO_UNITARIO))).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL'})}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                
+                <div className="p-3 border-t border-border bg-secondary/10 shrink-0">
+                  <div className="flex justify-between items-center px-2">
+                    <span className="text-[9px] font-black text-muted-foreground uppercase">Valor Total:</span>
+                    <span className="text-[11px] font-black text-emerald-500">
+                      {items.reduce((acc, it) => acc + (parseFloat(String(it.QUANTIDADE)) * parseFloat(String(it.PRECO_UNITARIO))), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL'})}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
               {(loading || headerLoading) && <ChatSkeleton />}
               {!(loading || headerLoading) && conversas.length === 0 && (
@@ -467,7 +579,7 @@ export function ChatModal({
                 </button>
               </div>
             </form>
-          </>
+          </div>
         )}
       </div>
     </div>

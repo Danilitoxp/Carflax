@@ -69,6 +69,7 @@ const menuItems: MenuItem[] = [
       { label: "Orçamentos", icon: FileBadge },
       { label: "Ligações", icon: Phone },
       { label: "Campanhas", icon: Megaphone },
+      { label: "Relatórios", icon: BarChart3 },
     ],
   },
   {
@@ -203,15 +204,15 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                 // Se for dropdown, checa se pelo menos um subitem é permitido
                 if (item.isDropdown && item.subItems) {
                   return item.subItems.some(sub => 
-                    sub.label === "Geral" || userProfile?.permissions?.includes(sub.label)
+                    sub.label === "Geral" || sub.label === "Relatórios" || userProfile?.permissions?.includes(sub.label)
                   );
                 }
                 // Itens simples
-                return item.label === "Geral" || userProfile?.permissions?.includes(item.label);
+                return item.label === "Geral" || item.label === "Relatórios" || userProfile?.permissions?.includes(item.label);
               })
               .map((item, idx) => {
                 const filteredSubItems = item.subItems?.filter(sub => 
-                  sub.label === "Geral" || userProfile?.permissions?.includes(sub.label)
+                  sub.label === "Geral" || sub.label === "Relatórios" || userProfile?.permissions?.includes(sub.label)
                 );
                 
                 const isOpen = openMenus.includes(item.label);
