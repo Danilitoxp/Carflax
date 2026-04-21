@@ -151,18 +151,35 @@ function DashboardContent({
   useEffect(() => {
     if (!userProfile?.id) return;
 
-    // 1. Setup do Canal IMEDIATO e Síncrono para evitar erro de "subscribe()"
-    const channel = supabase.channel(`global_crm_${userProfile.id}_${Date.now()}`);
+    // Função para inicializar sessão e identidade
+    async function initSession() {
+      try {
+        const { data: config } = await supabase.from("crm_config").select("value").eq("key", "centralizer_user_id").maybeSingle();
+        const isCent = config?.value === userProfile?.id;
+        isCentRef.current = isCent;
+        setIsCentralizer(isCent);
+        console.log(`[CRM] Identidade resolvida: ${isCent ? "CENTRALIZADOR" : "VENDEDOR"}`);
+      } catch (e) {
+        console.error("[CRM] Erro ao resolver identidade:", e);
+      }
+    }
+
+    initSession();
+
+    // Listener de Mensagens
+    const channelName = `global_crm_${userProfile.id}`;
+    const channel = supabase.channel(channelName);
     
     channel
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' }, (payload) => {
         const newMsg = payload.new as any;
         if (newMsg.enviado_por === userProfile?.id) return;
 
-        // USA O REF para saber se é centralizador sem depender do escopo async
+        // USA O REF que é atualizado pelo initSession
         const isForMe = newMsg.destino === userProfile?.id || (isCentRef.current && newMsg.destino === "todos");
         
         if (isForMe) {
+          console.log("[CRM] Nova mensagem detectada para este usuário!");
           const isSystem = newMsg.enviado_por_nome?.toUpperCase() === "SISTEMA";
           const title = isSystem ? `Aviso: #${newMsg.documento}` : `Mensagem de ${newMsg.enviado_por_nome}`;
           
@@ -174,53 +191,48 @@ function DashboardContent({
             sellerCode: undefined
           });
 
-          // Notificação Nativa do Chrome/Windows
+          // Notificação Nativa
           if ("Notification" in window && Notification.permission === "granted") {
             new Notification(title, {
-              body: newMsg.mensagem || "Nova mensagem recebida no Carflax HUB",
+              body: newMsg.mensagem || newMsg.obs || "Nova mensagem recebida",
               icon: "/favicon.png",
-              tag: "carflax-chat-msg" // Agrupa notificações para não entupir a tela
+              tag: "carflax-chat-msg"
             });
           }
 
           try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play().catch(()=>{}); } catch(e){}
         }
       })
-      .subscribe();
-
-    // 2. Lógica Async (Verificações paralelas)
-    async function initSession() {
-      // Resolver se é Centralizador e atualizar Ref e State
-      const { data: config } = await supabase.from("crm_config").select("value").eq("key", "centralizer_user_id").maybeSingle();
-      const isCent = config?.value === userProfile?.id;
-      isCentRef.current = isCent;
-      setIsCentralizer(isCent);
-
-      // Verificação Inicial (Apenas uma vez)
-      if (!initialCheckPerformed.current) {
-        const { data: unread } = await supabase
-          .from("crm_conversas")
-          .select("*")
-          .eq("destino", userProfile?.id)
-          .eq("lida", false)
-          .order("timestamp", { ascending: false })
-          .limit(1);
-        
-        if (unread && unread.length > 0) {
-          const isSystem = unread[0].enviado_por_nome?.toUpperCase() === "SISTEMA";
-          setGlobalChat({
-            open: true,
-            doc: unread[0].documento,
-            title: isSystem ? `Aviso: #${unread[0].documento}` : unread[0].enviado_por_nome,
-            sellerName: unread[0].enviado_por_nome,
-            sellerCode: undefined
-          });
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`[CRM] Ouvindo mensagens globais em: ${channelName}`);
         }
-        initialCheckPerformed.current = true;
-      }
-    }
+      });
 
-    initSession();
+    // Verificação Inicial de Mensagens não lidas (Apenas uma vez ao carregar)
+    if (!initialCheckPerformed.current) {
+      initialCheckPerformed.current = true;
+      supabase
+        .from("crm_conversas")
+        .select("*")
+        .eq("destino", userProfile.id)
+        .eq("lida", false)
+        .order("timestamp", { ascending: false })
+        .limit(1)
+        .then(({ data: unread }) => {
+          if (unread && unread.length > 0) {
+            const msg = unread[0];
+            const isSystem = msg.enviado_por_nome?.toUpperCase() === "SISTEMA";
+            setGlobalChat({
+              open: true,
+              doc: msg.documento,
+              title: isSystem ? `Aviso: #${msg.documento}` : `Mensagem pendente: ${msg.enviado_por_nome}`,
+              sellerName: msg.enviado_por_nome,
+              sellerCode: undefined
+            });
+          }
+        });
+    }
 
     const handleOpenChat = (e: Event) => {
       const detail = (e as CustomEvent).detail;
