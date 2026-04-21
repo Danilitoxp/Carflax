@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://images.unsplash.com/photo-1551288049-bbda38a5f850?q=80&w=2070&auto=format&fit=crop" width="100%" alt="Carflax HUB Banner" style="border-radius: 20px; margin-bottom: 20px;">
+  <img src="./src/assets/Banner.png" width="100%" alt="Carflax HUB Banner" style="border-radius: 20px; margin-bottom: 20px;">
 
   # 🚀 CARFLAX HUB
   
