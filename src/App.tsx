@@ -136,6 +136,15 @@ function DashboardContent({
     preloadUsers();
   }, [userProfile?.id]);
 
+  // 0. Permissão para Notificações do Navegador
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
+
   // 2. Realtime e Verificação Inicial
   const isCentRef = useRef(false);
 
@@ -155,13 +164,25 @@ function DashboardContent({
         
         if (isForMe) {
           const isSystem = newMsg.enviado_por_nome?.toUpperCase() === "SISTEMA";
+          const title = isSystem ? `Aviso: #${newMsg.documento}` : `Mensagem de ${newMsg.enviado_por_nome}`;
+          
           setGlobalChat({
             open: true,
             doc: newMsg.documento,
-            title: isSystem ? `Aviso: #${newMsg.documento}` : `Mensagem de ${newMsg.enviado_por_nome}`,
+            title,
             sellerName: newMsg.enviado_por_nome,
             sellerCode: undefined
           });
+
+          // Notificação Nativa do Chrome/Windows
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification(title, {
+              body: newMsg.mensagem || "Nova mensagem recebida no Carflax HUB",
+              icon: "/favicon.png",
+              tag: "carflax-chat-msg" // Agrupa notificações para não entupir a tela
+            });
+          }
+
           try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play().catch(()=>{}); } catch(e){}
         }
       })
