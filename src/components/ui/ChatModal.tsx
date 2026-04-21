@@ -156,15 +156,18 @@ export function ChatModal({
       }
     });
 
-    // Realtime para este documento
+    // Realtime para este documento (Filtragem manual interna para maior confiabilidade)
     const channel = supabase
-      .channel(`chat_${documento}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas', filter: `documento=eq.${documento}` }, 
+      .channel(`chat_doc_${documento.replace("#", "")}_${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' }, 
         (payload) => {
           const newMsg = payload.new as CrmConversa;
+          
+          // Filtro manual: só aceita se for para este documento
+          if (newMsg.documento !== documento) return;
+
           setConversas((prev) => {
             if (prev.find(m => m.id === newMsg.id)) return prev;
-            // Se for resposta de um envio nosso (tmp), remove o tmp
             return [...prev, newMsg];
           });
           
