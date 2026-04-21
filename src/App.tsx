@@ -35,6 +35,7 @@ export interface UserProfile {
   department?: string;
   operator_code?: string;
   operatorCode?: string;
+  permissions?: string[];
 }
 
 interface DashboardContentProps {
@@ -63,7 +64,17 @@ function DashboardContent({
       const timer = setTimeout(() => setGeralLoading(false), 500);
       return () => clearTimeout(timer);
     }
-  }, [activeItem]);
+
+    const publicItems = ["Geral", "Dashboard", "Meu Perfil", "Notificações", "Segurança", "Aparência", "Organograma", "Sugestões"];
+    const isPublic = publicItems.includes(activeItem);
+    const hasPermission = userProfile?.permissions?.includes(activeItem);
+
+    if (!isPublic && !hasPermission && activeItem !== "Geral") {
+      console.warn(`[Security] Acesso negado para: ${activeItem}. Redirecionando para Geral.`);
+      setActiveItem("Geral");
+      localStorage.setItem("carflax-active-section", "Geral");
+    }
+  }, [activeItem, userProfile?.permissions]);
 
   // ── Sincronização Global do Chat ───────────────────────────────────────
   const [globalChat, setGlobalChat] = useState<{ open: boolean; doc: string; title: string } | null>(null);

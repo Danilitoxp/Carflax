@@ -60,9 +60,9 @@ export function UsersView() {
   });
 
   const availableModules = [
-    "Geral", "Produtos", "Calendário", "Analytics",
-    "Orçamentos", "Campanhas", "Romaneios",
-    "Concluídas", "Usuários", "Sugestões"
+    "Geral", "Produtos", "Eventos", "Férias",
+    "Orçamentos", "Ligações", "Campanhas", "Romaneios",
+    "Concluídas", "Usuários", "DB Admin", "Sugestões"
   ];
 
   const companies = ["Carflax", "Zelex", "JCM"];

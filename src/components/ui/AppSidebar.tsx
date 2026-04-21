@@ -106,6 +106,7 @@ interface AppSidebarProps {
     name: string;
     avatar?: string;
     role?: string;
+    permissions?: string[];
   };
   isCollapsed: boolean;
   onToggle: () => void;
@@ -191,9 +192,24 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
       <div className="flex-1 overflow-y-auto pt-4 px-3 space-y-6 scrollbar-hide">
         <div>
           <div className="space-y-1">
-            {menuItems.map((item, idx) => {
-              const isOpen = openMenus.includes(item.label);
-              const isActive = activeItem === item.label || item.subItems?.some(s => s.label === activeItem);
+            {menuItems
+              .filter(item => {
+                // Se for dropdown, checa se pelo menos um subitem é permitido
+                if (item.isDropdown && item.subItems) {
+                  return item.subItems.some(sub => 
+                    sub.label === "Geral" || userProfile?.permissions?.includes(sub.label)
+                  );
+                }
+                // Itens simples
+                return item.label === "Geral" || userProfile?.permissions?.includes(item.label);
+              })
+              .map((item, idx) => {
+                const filteredSubItems = item.subItems?.filter(sub => 
+                  sub.label === "Geral" || userProfile?.permissions?.includes(sub.label)
+                );
+                
+                const isOpen = openMenus.includes(item.label);
+                const isActive = activeItem === item.label || filteredSubItems?.some(s => s.label === activeItem);
 
               return (
                 <div key={idx} className="space-y-1">
@@ -253,7 +269,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                   >
                     <div className="overflow-hidden">
                       <div className="pl-4 space-y-0.5 mt-1">
-                        {item.subItems?.map((sub, i) => (
+                        {filteredSubItems?.map((sub, i) => (
                           <div
                             key={i}
                             onClick={() => {
@@ -288,10 +304,25 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
         {/* Settings Section */}
         <div>
           <div className="space-y-1">
-            {settingsItems.map((item, idx) => {
-              const isOpen = openMenus.includes(item.label);
-              const isSubActive = item.subItems?.some(sub => activeItem === sub.label);
-              const isActive = activeItem === item.label || isSubActive;
+            {settingsItems
+              .filter(item => {
+                if (item.isDropdown && item.subItems) {
+                  return item.subItems.some(sub => 
+                    ["Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(sub.label) || 
+                    userProfile?.permissions?.includes(sub.label)
+                  );
+                }
+                return true; 
+              })
+              .map((item, idx) => {
+                const filteredSettingsSubItems = item.subItems?.filter(sub => 
+                  ["Meu Perfil", "Notificações", "Segurança", "Aparência"].includes(sub.label) || 
+                  userProfile?.permissions?.includes(sub.label)
+                );
+                
+                const isOpen = openMenus.includes(item.label);
+                const isSubActive = filteredSettingsSubItems?.some(sub => activeItem === sub.label);
+                const isActive = activeItem === item.label || isSubActive;
 
               return (
                 <div key={idx} className="space-y-1">
@@ -351,7 +382,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                   >
                     <div className="overflow-hidden">
                       <div className="pl-4 space-y-0.5 mt-1">
-                        {item.subItems?.map((sub, i) => (
+                        {filteredSettingsSubItems?.map((sub, i) => (
                           <div
                             key={i}
                             onClick={() => {
