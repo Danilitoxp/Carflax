@@ -256,16 +256,16 @@ export function ChatModal({
   // Lógica de exibição no Header: Prioridade TOTAL ao humano (Vendedor/Dono do Orçamento)
   const displayUser = amICentralizer 
     ? { 
-        name: (ownerProfile?.name && ownerProfile.name.toUpperCase() !== "SISTEMA" ? ownerProfile.name : null) || 
-              (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName !== userProfile?.name ? sellerName : null) || 
-              title, 
+        name: (ownerProfile?.name && ownerProfile.name.toUpperCase() !== "SISTEMA" && ownerProfile.name.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? ownerProfile.name : null) || 
+              (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? sellerName : null) || 
+              (title.toUpperCase().includes(userProfile?.name?.toUpperCase() || "---") ? `Orçamento #${documento.replace("#", "")}` : title), 
         avatar: ownerProfile?.avatar || "" 
       }
     : { 
-        name: (ownerProfile?.name && ownerProfile.name.toUpperCase() !== "SISTEMA" ? ownerProfile.name : null) || 
-              (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName !== userProfile?.name ? sellerName : null) || 
+        name: (centralizer?.name) || 
+              (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? sellerName : null) || 
               "Centralizador Carflax", 
-        avatar: ownerProfile?.avatar || "" 
+        avatar: centralizer?.avatar || "" 
       };
 
   const handleSend = async () => {
@@ -324,12 +324,23 @@ export function ChatModal({
 
   const isMe = (msg: CrmConversa) => {
     if (!userProfile) return false;
-    if (msg.enviado_por === userProfile.id) return true;
-    if (msg.enviado_por_nome && userProfile.name) {
-      const nameA = msg.enviado_por_nome.toUpperCase().trim();
-      const nameB = userProfile.name.toUpperCase().trim();
-      if (nameA === nameB && nameA !== "SISTEMA") return true;
+    const myId = userProfile.id;
+    const myName = userProfile.name?.toUpperCase().trim();
+    
+    // 1. Check ID
+    if (myId && msg.enviado_por === myId) return true;
+    
+    // 2. Check Name OR System-Attributed Name
+    const rawSender = msg.enviado_por_nome?.toUpperCase().trim();
+    let resolvedSender = rawSender;
+
+    if (rawSender === "SISTEMA") {
+      const match = msg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
+      if (match) resolvedSender = match[1].replace(/\*/g, "").trim().toUpperCase();
     }
+
+    if (resolvedSender && myName && resolvedSender === myName) return true;
+    
     return false;
   };
 
@@ -426,7 +437,17 @@ export function ChatModal({
               )}
               {!(loading || headerLoading) && conversas.map((msg) => (
                 <div key={msg.id} className={cn("flex flex-col space-y-1", isMe(msg) ? "items-end" : "items-start")}>
-                  {!isMe(msg) && <span className="text-[8px] font-black text-muted-foreground uppercase ml-1 tracking-widest">{msg.enviado_por_nome}</span>}
+                  {!isMe(msg) && (
+                    <span className="text-[8px] font-black text-muted-foreground uppercase ml-1 tracking-widest">
+                      {(() => {
+                        if (msg.enviado_por_nome?.toUpperCase() === "SISTEMA") {
+                          const match = msg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
+                          return match ? match[1].replace(/\*/g, "").trim() : "Sistema";
+                        }
+                        return msg.enviado_por_nome;
+                      })()}
+                    </span>
+                  )}
                   <div className={cn("p-3.5 rounded-2xl max-w-[90%] text-[11px] font-medium shadow-xl", isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40")}>
                     {renderFormattedText(msg.obs)}
                   </div>
