@@ -31,20 +31,22 @@ interface UserProfileLite {
   avatar?: string;
 }
 
-export function SalesMetricsCard({ isCompact, userProfile, data: externalData }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo }) {
-  const [loading, setLoading] = useState(!externalData);
+export function SalesMetricsCard({ isCompact, userProfile, data: externalData, loading: externalLoading }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo, loading?: boolean }) {
+  const [internalLoading, setInternalLoading] = useState(!externalData);
   const [data, setData] = useState<VendedorResumo | null>(externalData || null);
+
+  const loading = externalLoading !== undefined ? externalLoading : internalLoading;
 
   useEffect(() => {
     if (externalData) {
       setData(externalData);
-      setLoading(false);
+      setInternalLoading(false);
       return;
     }
 
     async function fetchData() {
       try {
-        setLoading(true);
+        setInternalLoading(true);
         const now = new Date();
         const yyyy = now.getFullYear();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -62,7 +64,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData }:
       } catch (error) {
         console.error("Erro ao carregar métricas:", error);
       } finally {
-        setLoading(false);
+        setInternalLoading(false);
       }
     }
 
@@ -114,12 +116,24 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData }:
 
   if (loading) {
     return (
-      <div className="bg-white border border-border rounded-xl p-5 shadow-sm space-y-4 animate-pulse">
-        <div className="h-4 w-20 bg-slate-100 rounded" />
-        <div className="flex justify-center"><div className="w-24 h-24 rounded-full border-4 border-slate-50" /></div>
+      <div className="bg-white border border-border rounded-xl p-5 shadow-sm space-y-8 animate-pulse">
+        <div className="flex justify-center flex-col items-center gap-3">
+          <div className="w-24 h-24 rounded-full bg-slate-100" />
+          <div className="h-3 w-20 bg-slate-100 rounded" />
+        </div>
+        <div className="space-y-3">
+          <div className="h-2 w-full bg-slate-100 rounded" />
+          <div className="h-10 w-full bg-slate-50 rounded-xl" />
+        </div>
         <div className="grid grid-cols-2 gap-4">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-10 bg-slate-50 rounded-lg" />
+            <div key={i} className="flex gap-2">
+              <div className="w-8 h-8 bg-slate-50 rounded-lg" />
+              <div className="space-y-2 flex-1">
+                <div className="h-1.5 w-1/2 bg-slate-100 rounded" />
+                <div className="h-2 w-3/4 bg-slate-50 rounded" />
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -228,7 +242,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData }:
   );
 }
 
-export function EmployeeOfMonthCard() {
+export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
   const [likes, setLikes] = useState<{name: string, avatar: string}[]>([]);
   
   useEffect(() => {
@@ -248,6 +262,25 @@ export function EmployeeOfMonthCard() {
     }
     fetchLikes();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col min-h-[380px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-pulse">
+        <div className="h-28 bg-slate-100 shrink-0" />
+        <div className="flex-1 flex flex-col items-center px-6 -mt-12 relative z-10 pb-6 space-y-6">
+           <div className="w-24 h-24 rounded-3xl bg-white p-1.5 shadow-xl">
+             <div className="w-full h-full rounded-2xl bg-slate-50" />
+           </div>
+           <div className="text-center space-y-2 w-full">
+              <div className="h-4 w-3/4 bg-slate-100 rounded mx-auto" />
+              <div className="h-3 w-1/2 bg-slate-50 rounded mx-auto" />
+           </div>
+           <div className="flex-1 w-full bg-slate-50 rounded-2xl" />
+           <div className="w-full h-10 bg-slate-50 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   const employee = {
     name: "Danilo Oliveira",
@@ -415,9 +448,11 @@ export function WeatherTrafficCard() {
   );
 }
 
-export function ActiveVacationsCard() {
+export function ActiveVacationsCard({ loading: externalLoading }: { loading?: boolean }) {
   const [vacations, setVacations] = useState<{ id: string | number; name: string; avatar: string; end_date: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [internalLoading, setInternalLoading] = useState(true);
+
+  const loading = externalLoading !== undefined ? externalLoading : internalLoading;
 
   useEffect(() => {
     async function fetchVacations() {
@@ -434,7 +469,7 @@ export function ActiveVacationsCard() {
       } catch (err) {
         console.error("Erro ferias:", err);
       } finally {
-        setLoading(false);
+        setInternalLoading(false);
       }
     }
     fetchVacations();
@@ -450,8 +485,13 @@ export function ActiveVacationsCard() {
       </div>
 
       {loading ? (
-        <div className="flex-1 flex items-center justify-center py-4">
-          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="flex gap-3 animate-pulse">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="flex flex-col items-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-slate-100" />
+              <div className="h-1.5 w-8 bg-slate-50 rounded" />
+            </div>
+          ))}
         </div>
       ) : vacations.length > 0 ? (
         <div className="flex flex-wrap gap-3">
@@ -477,9 +517,11 @@ export function ActiveVacationsCard() {
   );
 }
 
-export function UpcomingEventsCard() {
+export function UpcomingEventsCard({ loading: externalLoading }: { loading?: boolean }) {
   const [events, setEvents] = useState<{ id: string | number; title: string; day: number; month: number; year: number; type: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [internalLoading, setInternalLoading] = useState(true);
+
+  const loading = externalLoading !== undefined ? externalLoading : internalLoading;
 
   useEffect(() => {
     async function fetchEvents() {
@@ -512,7 +554,7 @@ export function UpcomingEventsCard() {
       } catch (err) {
         console.error("Erro events:", err);
       } finally {
-        setLoading(false);
+        setInternalLoading(false);
       }
     }
     fetchEvents();
@@ -540,22 +582,32 @@ export function UpcomingEventsCard() {
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col group min-h-[160px]">
-      <div className="flex items-center justify-between mb-5 shrink-0">
-        <div className="flex flex-col">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">
-            Agenda
-          </h4>
-          <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Próximos Eventos</h3>
+      {!loading && (
+        <div className="flex items-center justify-between mb-5 shrink-0">
+          <div className="flex flex-col">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">
+              Agenda
+            </h4>
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Próximos Eventos</h3>
+          </div>
+          <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100/50">
+            <Calendar className="w-4 h-4 text-blue-600" />
+          </div>
         </div>
-        <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100/50">
-          <Calendar className="w-4 h-4 text-blue-600" />
-        </div>
-      </div>
+      )}
 
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {loading ? (
-          <div className="flex-1 flex items-center justify-center py-6">
-            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="space-y-4 animate-pulse">
+            {[1, 2].map(i => (
+              <div key={i} className="flex gap-4">
+                <div className="w-8 h-8 bg-slate-100 rounded-xl" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-2 w-3/4 bg-slate-100 rounded" />
+                  <div className="h-1.5 w-1/4 bg-slate-50 rounded" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : events.length > 0 ? (
           <div className="space-y-4">
@@ -608,9 +660,11 @@ export function UpcomingEventsCard() {
   );
 }
 
-export function BirthdayList() {
+export function BirthdayList({ loading: externalLoading }: { loading?: boolean }) {
   const [birthdays, setBirthdays] = useState<{ name: string; date: string; img: string; day: number }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [internalLoading, setInternalLoading] = useState(true);
+
+  const loading = externalLoading !== undefined ? externalLoading : internalLoading;
 
   useEffect(() => {
     async function fetchBirthdays() {
@@ -649,7 +703,7 @@ export function BirthdayList() {
       } catch (err) {
         console.error("Erro ao carregar aniversariantes:", err);
       } finally {
-        setLoading(false);
+        setInternalLoading(false);
       }
     }
 
@@ -658,22 +712,32 @@ export function BirthdayList() {
 
   return (
     <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col overflow-hidden group min-h-[160px]">
-      <div className="flex items-center justify-between mb-5 shrink-0">
-        <div className="flex flex-col">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">
-            Social
-          </h4>
-          <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Aniversariantes</h3>
+      {!loading && (
+        <div className="flex items-center justify-between mb-5 shrink-0">
+          <div className="flex flex-col">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">
+              Social
+            </h4>
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Aniversariantes</h3>
+          </div>
+          <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100/50">
+            <Gift className="w-4 h-4 text-blue-600" />
+          </div>
         </div>
-        <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100/50">
-          <Gift className="w-4 h-4 text-blue-600" />
-        </div>
-      </div>
+      )}
 
       <div className="flex-1 overflow-y-auto scrollbar-hide pr-1 -mr-1">
         {loading ? (
-          <div className="flex-1 flex items-center justify-center py-8">
-            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="space-y-4 animate-pulse">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-2 w-1/2 bg-slate-100 rounded" />
+                  <div className="h-1.5 w-1/3 bg-slate-50 rounded" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : birthdays.length > 0 ? (
           <div className="space-y-4 pt-2 px-1">

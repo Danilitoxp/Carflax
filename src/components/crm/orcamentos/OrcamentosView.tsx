@@ -13,7 +13,6 @@ import {
   Handshake,
   XCircle,
   Download,
-  RefreshCw,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -609,20 +608,32 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Distribuição por Status</h3>
           <div className="space-y-3">
-            {statusBarData.map((s, i) => {
-              const val = insights.statusCounts[s.key] || 0;
-              return (
-                <div key={i} className="space-y-1">
-                  <div className="flex justify-between items-center text-[9px] font-bold text-slate-500">
-                    <span className="uppercase tracking-tight truncate pr-2">{s.label}</span>
-                    <span className="text-slate-900">{val}</span>
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="space-y-1 animate-pulse">
+                  <div className="flex justify-between">
+                    <div className="h-2 w-16 bg-slate-100 rounded" />
+                    <div className="h-2 w-4 bg-slate-50 rounded" />
                   </div>
-                  <div className="h-1 bg-slate-50 rounded-full overflow-hidden">
-                    <div className={cn("h-full rounded-full", s.color)} style={{ width: `${(val / maxStatusCount) * 100}%` }} />
-                  </div>
+                  <div className="h-1 w-full bg-slate-50 rounded-full" />
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              statusBarData.map((s, i) => {
+                const val = insights.statusCounts[s.key] || 0;
+                return (
+                  <div key={i} className="space-y-1">
+                    <div className="flex justify-between items-center text-[9px] font-bold text-slate-500">
+                      <span className="uppercase tracking-tight truncate pr-2">{s.label}</span>
+                      <span className="text-slate-900">{val}</span>
+                    </div>
+                    <div className="h-1 bg-slate-50 rounded-full overflow-hidden">
+                      <div className={cn("h-full rounded-full", s.color)} style={{ width: `${(val / maxStatusCount) * 100}%` }} />
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -630,7 +641,17 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Motivos de Perda</h3>
           <div className="space-y-3.5">
-            {reasonEntries.length === 0 ? (
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="space-y-1 animate-pulse">
+                  <div className="flex justify-between">
+                    <div className="h-2 w-24 bg-slate-100 rounded" />
+                    <div className="h-2 w-4 bg-slate-50 rounded" />
+                  </div>
+                  <div className="h-2.5 w-full bg-slate-50 rounded-sm" />
+                </div>
+              ))
+            ) : reasonEntries.length === 0 ? (
               <p className="text-[10px] text-slate-400 italic">Nenhum registro ainda</p>
             ) : (
               reasonEntries.map(([label, count], i) => (
@@ -652,35 +673,38 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Resumo Geral</h3>
           <div className="space-y-4">
-            {[
-              { label: "Valor em Pipeline", value: insights.pipeline.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), color: "text-emerald-600" },
-              { label: "Qtde. Orçamentos", value: String(insights.total), color: "text-slate-900" },
-              { label: "Vendas Fechadas", value: String(insights.vendas), color: "text-slate-900" },
-              { label: "Perdidos", value: String(insights.perdidos), color: "text-rose-500" },
-              { label: "Conv. por Qtde.", value: `${insights.convQtd}%`, color: "text-emerald-600", trend: "up" },
-            ].map((r, i) => (
-              <div key={i} className="flex flex-col border-b border-slate-50 pb-2 last:border-0 last:pb-0">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{r.label}</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn("text-[12px] font-black", r.color)}>{r.value}</span>
-                    {r.trend === "up" && <span className="text-[10px] text-emerald-500 animate-pulse">↗</span>}
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex justify-between items-center border-b border-slate-50 pb-2 animate-pulse">
+                  <div className="h-2 w-20 bg-slate-100 rounded" />
+                  <div className="h-3 w-24 bg-slate-50 rounded" />
+                </div>
+              ))
+            ) : (
+              [
+                { label: "Valor em Pipeline", value: insights.pipeline.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), color: "text-emerald-600" },
+                { label: "Qtde. Orçamentos", value: String(insights.total), color: "text-slate-900" },
+                { label: "Vendas Fechadas", value: String(insights.vendas), color: "text-slate-900" },
+                { label: "Perdidos", value: String(insights.perdidos), color: "text-rose-500" },
+                { label: "Conv. por Qtde.", value: `${insights.convQtd}%`, color: "text-emerald-600", trend: "up" },
+              ].map((r, i) => (
+                <div key={i} className="flex flex-col border-b border-slate-50 pb-2 last:border-0 last:pb-0">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{r.label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("text-[12px] font-black", r.color)}>{r.value}</span>
+                      {r.trend === "up" && <span className="text-[10px] text-emerald-500 animate-pulse">↗</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
 
       {/* Table */}
       <div className="flex-1 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-0">
-        {loading && (
-          <div className="flex items-center justify-center py-8 text-[11px] text-slate-400 font-bold gap-2">
-            <RefreshCw className="w-4 h-4 animate-spin" /> Carregando orçamentos...
-          </div>
-        )}
-        {!loading && (
           <div className="flex-1 overflow-x-auto overflow-y-auto scrollbar-hide">
             <table className="w-full text-left border-collapse min-w-[1000px]">
               <thead className="sticky top-0 z-20">
@@ -696,12 +720,12 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                   ].map((col) => (
                     <th
                       key={col.id}
-                      onClick={() => requestSort(col.id)}
-                      className={cn("px-6 py-3 text-[9px] font-black uppercase tracking-[0.1em] cursor-pointer hover:bg-slate-100/50 transition-colors text-slate-400 group/th", col.id === "status" && "text-center")}
+                      onClick={() => !loading && requestSort(col.id)}
+                      className={cn("px-6 py-3 text-[9px] font-black uppercase tracking-[0.1em] transition-colors text-slate-400 group/th", col.id === "status" && "text-center", !loading && "cursor-pointer hover:bg-slate-100/50")}
                     >
                       <div className={cn("flex items-center gap-2", col.id === "status" && "justify-center")}>
                         <span className={cn(sortConfig.key === col.id ? "text-blue-600" : "text-slate-400 group-hover/th:text-slate-600")}>{col.label}</span>
-                        {getSortIcon(col.id)}
+                        {!loading && getSortIcon(col.id)}
                       </div>
                     </th>
                   ))}
@@ -709,38 +733,51 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredAndSortedItems.length === 0 && (
+                {loading ? (
+                  Array.from({ length: 10 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="px-6 py-4"><div className="h-3 w-12 bg-slate-100 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-24 bg-slate-50 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-48 bg-slate-100 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-20 bg-slate-50 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-24 bg-emerald-50 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-12 bg-slate-50 rounded" /></td>
+                      <td className="px-6 py-4"><div className="flex justify-center"><div className="h-5 w-16 bg-slate-100 rounded-full" /></div></td>
+                      <td className="px-6 py-4"><div className="flex justify-end gap-2"><div className="h-6 w-6 bg-slate-50 rounded" /><div className="h-6 w-6 bg-slate-50 rounded" /></div></td>
+                    </tr>
+                  ))
+                ) : filteredAndSortedItems.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-6 py-12 text-center text-[11px] text-slate-400 font-bold">
                       Nenhum orçamento encontrado para o período selecionado.
                     </td>
                   </tr>
+                ) : (
+                  visibleProducts.map((item) => (
+                    <OrcamentoRow 
+                      key={item.id} 
+                      item={item} 
+                      onOpenItems={(o) => {
+                        setSelectedItem(o);
+                        setIsItemsModalOpen(true);
+                        setItens(o.items);
+                      }}
+                      onOpenStatus={(o) => {
+                        setSelectedItem(o);
+                        setIsStatusModalOpen(true);
+                        setStatusStep("selection");
+                      }}
+                      onOpenChat={(o) => {
+                        window.dispatchEvent(new CustomEvent('open-crm-chat', { 
+                          detail: { doc: o.id, title: o.client } 
+                        }));
+                      }}
+                    />
+                  ))
                 )}
-                {visibleProducts.map((item) => (
-                  <OrcamentoRow 
-                    key={item.id} 
-                    item={item} 
-                    onOpenItems={(o) => {
-                      setSelectedItem(o);
-                      setIsItemsModalOpen(true);
-                      setItens(o.items);
-                    }}
-                    onOpenStatus={(o) => {
-                      setSelectedItem(o);
-                      setIsStatusModalOpen(true);
-                      setStatusStep("selection");
-                    }}
-                    onOpenChat={(o) => {
-                      window.dispatchEvent(new CustomEvent('open-crm-chat', { 
-                        detail: { doc: o.id, title: o.client } 
-                      }));
-                    }}
-                  />
-                ))}
               </tbody>
             </table>
           </div>
-        )}
       </div>
 
 

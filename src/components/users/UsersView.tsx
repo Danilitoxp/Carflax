@@ -373,7 +373,42 @@ export function UsersView() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {loading && (
-                <tr><td colSpan={5} className="py-12 text-center text-slate-400 text-sm">Carregando usuários...</td></tr>
+                <>
+                  {Array.from({ length: 15 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="py-3 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-slate-100" />
+                          <div className="space-y-2">
+                            <div className="h-2 w-24 bg-slate-100 rounded" />
+                            <div className="h-2 w-32 bg-slate-50 rounded" />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-6">
+                        <div className="space-y-2">
+                          <div className="h-2 w-20 bg-slate-100 rounded" />
+                          <div className="h-2 w-16 bg-slate-50 rounded" />
+                        </div>
+                      </td>
+                      <td className="py-3 px-6">
+                        <div className="h-5 w-16 bg-slate-100 rounded-lg" />
+                      </td>
+                      <td className="py-3 px-6">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-100" />
+                          <div className="h-2 w-12 bg-slate-50 rounded" />
+                        </div>
+                      </td>
+                      <td className="py-3 px-6 text-right">
+                        <div className="flex justify-end gap-2">
+                          <div className="w-7 h-7 bg-slate-50 rounded-lg" />
+                          <div className="w-7 h-7 bg-slate-50 rounded-lg" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </>
               )}
               {!loading && filteredUsers.length === 0 && (
                 <tr><td colSpan={5} className="py-12 text-center text-slate-400 text-sm">Nenhum usuário encontrado.</td></tr>

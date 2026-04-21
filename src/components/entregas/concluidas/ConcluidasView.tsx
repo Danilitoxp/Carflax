@@ -13,8 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
 import type { Delivery } from "../romaneios/RomaneiosView";
-import { apiEntregasConcluidas } from "@/lib/api";
-import type { EntregaResumo } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 interface RomaneioConcluido {
   id: string;
@@ -42,34 +41,55 @@ export function ConcluidasView() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await apiEntregasConcluidas();
-      if (res.success) {
-        // Agrupar por data (simplificado para demonstração)
+      
+      // Buscar entregas concluídas no Supabase
+      const { data, error } = await supabase
+        .from("entregas")
+        .select("*, romaneios(*)")
+        .eq("status", "completed")
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
         const groups: Record<string, RomaneioConcluido> = {};
         
-        res.data.forEach((e: EntregaResumo) => {
-          const dateKey = new Date(e.DATA_ENTREGA).toLocaleDateString("pt-BR");
-          if (!groups[dateKey]) {
-            groups[dateKey] = {
-              id: `HIST-${dateKey.replace(/\//g, "")}`,
-              driver: "Frota Carflax",
-              date: dateKey,
+        data.forEach((e: any) => {
+          const romId = e.romaneio_id || "sem-romaneio";
+          if (!groups[romId]) {
+            const romDate = e.romaneios?.date || e.updated_at.split('T')[0];
+            const dateParts = romDate.split('-');
+            const formattedDateCode = `${dateParts[2]}${dateParts[1]}${dateParts[0]}`;
+            const romNum = String(e.romaneios?.rom_number || 0).padStart(3, '0');
+
+            groups[romId] = {
+              id: e.romaneios?.rom_number ? `RM-${formattedDateCode}-${romNum}` : `RESIDUAL-${romId.slice(0,4)}`,
+              driver: e.romaneios?.driver || "Motorista Externo",
+              date: new Date(romDate).toLocaleDateString("pt-BR"),
               deliveredCount: 0,
               totalValue: "R$ 0,00",
               deliveries: []
             };
           }
           
-          groups[dateKey].deliveries.push({
-            id: e.NF,
-            nf: e.NF,
-            client: e.CLIENTE,
-            address: `${e.ENDERECO}, ${e.BAIRRO} - ${e.CIDADE}`,
+          const val = Number(e.value || 0);
+          groups[romId].deliveries.push({
+            id: e.id,
+            nf: e.nf,
+            client: e.client,
+            address: e.address,
             status: "completed",
-            time: "FINALIZADO",
-            value: "R$ 0,00"
+            time: new Date(e.updated_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' }),
+            value: `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+            instrucoes: e.instructions || ""
           });
-          groups[dateKey].deliveredCount++;
+          
+          groups[romId].deliveredCount++;
+          
+          // Somar valor total
+          const currentTotal = parseFloat(groups[romId].totalValue.replace("R$ ", "").replace(".", "").replace(",", ".")) || 0;
+          const newTotal = currentTotal + val;
+          groups[romId].totalValue = `R$ ${newTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
         });
 
         setRomaneiosHistory(Object.values(groups));
@@ -169,7 +189,33 @@ export function ConcluidasView() {
 
       {/* GROUPED LIST OF ROMANEIOS */}
       <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4">
-        {filteredRomaneios.length > 0 ? (
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2].map(i => (
+              <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 animate-pulse">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-slate-100" />
+                    <div className="space-y-2">
+                      <div className="h-3 w-32 bg-slate-100 rounded" />
+                      <div className="h-2 w-16 bg-slate-50 rounded" />
+                    </div>
+                  </div>
+                  <div className="h-3 w-20 bg-slate-100 rounded" />
+                </div>
+                <div className="space-y-2 border-t border-slate-50 pt-4">
+                  {[1, 2].map(j => (
+                    <div key={j} className="flex items-center justify-between py-2">
+                      <div className="h-2 w-1/4 bg-slate-50 rounded" />
+                      <div className="h-2 w-1/3 bg-slate-50 rounded" />
+                      <div className="h-2 w-12 bg-slate-50 rounded" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredRomaneios.length > 0 ? (
           filteredRomaneios.map((rom) => (
             <div key={rom.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               {/* Romaneio Header Group */}
@@ -234,6 +280,11 @@ export function ConcluidasView() {
                           <span className="text-[8px] font-bold text-slate-400 truncate max-w-[400px] uppercase tracking-tighter opacity-70 group-hover:opacity-100 transition-opacity">
                             {delivery.address}
                           </span>
+                          {delivery.instrucoes && (
+                            <div className="flex items-center gap-1.5 mt-1.5 p-1 px-2 bg-amber-50 border border-amber-100/50 rounded-md self-start">
+                              <span className="text-[7.5px] font-black text-amber-600 uppercase tracking-widest italic">{delivery.instrucoes}</span>
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="py-2.5 px-6">

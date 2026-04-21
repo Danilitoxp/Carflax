@@ -55,6 +55,15 @@ function DashboardContent({
     return localStorage.getItem("carflax-active-section") || "Geral";
   });
   const [isSugestaoModalOpen, setIsSugestaoModalOpen] = useState(false);
+  const [geralLoading, setGeralLoading] = useState(true);
+
+  useEffect(() => {
+    if (activeItem === "Geral") {
+      setGeralLoading(true);
+      const timer = setTimeout(() => setGeralLoading(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [activeItem]);
 
   // ── Sincronização Global do Chat ───────────────────────────────────────
   const [globalChat, setGlobalChat] = useState<{ open: boolean; doc: string; title: string } | null>(null);
@@ -177,7 +186,7 @@ function DashboardContent({
           ) : activeItem === "DB Admin" ? (
             <SqlRunnerView />
           ) : activeItem === "Geral" ? (
-            <GeralView userProfile={userProfile} />
+            <GeralView userProfile={userProfile} loading={geralLoading} />
           ) : activeItem === "Organograma" ? (
 
             <OrgChartView />
@@ -208,15 +217,15 @@ function DashboardContent({
             </button>
             <div className="flex-1 flex flex-col gap-4 pb-0 overflow-y-auto scrollbar-hide">
               {isComercial ? (
-                <SalesMetricsCard userProfile={userProfile} data={vendedorMetrics} />
+                <SalesMetricsCard userProfile={userProfile} data={vendedorMetrics} loading={geralLoading} />
               ) : (
                 <>
-                  <EmployeeOfMonthCard />
-                  <UpcomingEventsCard />
+                  <EmployeeOfMonthCard loading={geralLoading} />
+                  <UpcomingEventsCard loading={geralLoading} />
                 </>
               )}
               
-              <BirthdayList />
+              <BirthdayList loading={geralLoading} />
             </div>
           </div>
         )}
@@ -373,4 +382,3 @@ function App() {
 }
 
 export default App;
-

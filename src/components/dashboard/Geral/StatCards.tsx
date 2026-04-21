@@ -3,14 +3,16 @@ import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react";
 import { apiVendedores, type VendedorResumo } from "@/lib/api";
 
-export function StatCards({ userProfile }: { userProfile?: any }) {
-  const [loading, setLoading] = useState(true);
+export function StatCards({ userProfile, loading: externalLoading }: { userProfile?: any, loading?: boolean }) {
+  const [internalLoading, setInternalLoading] = useState(true);
   const [data, setData] = useState<VendedorResumo | null>(null);
+
+  const loading = externalLoading !== undefined ? externalLoading : internalLoading;
 
   useEffect(() => {
     async function fetchData() {
       try {
-        setLoading(true);
+        setInternalLoading(true);
         const now = new Date();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const yyyy = now.getFullYear();
@@ -24,7 +26,7 @@ export function StatCards({ userProfile }: { userProfile?: any }) {
       } catch (error) {
         console.error("Erro ao carregar StatCards:", error);
       } finally {
-        setLoading(false);
+        setInternalLoading(false);
       }
     }
     fetchData();
@@ -36,28 +38,28 @@ export function StatCards({ userProfile }: { userProfile?: any }) {
   const stats = data ? [
     {
       title: "Total Vendido",
-      value: formatBRL(data.TOTAL),
-      change: `${data.ATINGIMENTO_PCT?.toFixed(1)}% da meta`,
+      value: formatBRL(Number(data.TOTAL || 0)),
+      change: `${Number(data.ATINGIMENTO_PCT || 0).toFixed(1)}% da meta`,
       icon: Wallet,
       color: "blue",
     },
     {
       title: "Taxa de Conversão",
-      value: `${data.TAXA_CONVERSAO?.toFixed(1)}%`,
+      value: `${Number(data.TAXA_CONVERSAO || 0).toFixed(1)}%`,
       change: "Mensal",
       icon: ArrowUpRight,
       color: "emerald",
     },
     {
       title: "Qtd. Vendas",
-      value: String(data.QTD_VENDAS),
+      value: String(data.QTD_VENDAS || 0),
       change: "Este mês",
       icon: ShoppingBag,
       color: "amber",
     },
     {
       title: "Ticket Médio",
-      value: formatBRL(data.TICKET_MEDIO),
+      value: formatBRL(Number(data.TICKET_MEDIO || 0)),
       change: "Por venda",
       icon: Tag,
       color: "rose",
@@ -99,12 +101,12 @@ export function StatCards({ userProfile }: { userProfile?: any }) {
                 <div className="mt-3 space-y-1.5">
                   <div className="flex items-center justify-between text-[10px] font-bold">
                     <span className="text-blue-500">Meta</span>
-                    <span className="text-slate-900">{data.ATINGIMENTO_PCT?.toFixed(1)}%</span>
+                    <span className="text-slate-900">{Number(data.ATINGIMENTO_PCT || 0).toFixed(1)}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                      style={{ width: `${Math.min(data.ATINGIMENTO_PCT || 0, 100)}%` }}
+                      style={{ width: `${Math.min(Number(data.ATINGIMENTO_PCT || 0), 100)}%` }}
                     />
                   </div>
                 </div>

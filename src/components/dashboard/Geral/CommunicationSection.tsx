@@ -147,9 +147,8 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
           onLoad={() => setImageLoaded(true)}
           onError={() => setImageLoaded(true)}
           className={cn(
-            "w-full h-full object-cover transition-all duration-700",
-            imageLoaded ? "opacity-100 scale-100" : "opacity-0 scale-110",
-            "group-hover:scale-110"
+            "w-full h-full object-cover",
+            "group-hover:scale-110 transition-transform duration-500"
           )}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -192,11 +191,6 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
                     <img src={url} className="w-full h-full object-cover" alt="liker" />
                   </div>
                 ))}
-                {likes > likersAvatars.length && (
-                  <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-50 flex items-center justify-center shadow-sm">
-                    <span className="text-[10px] font-black text-slate-400">+{likes - likersAvatars.length}</span>
-                  </div>
-                )}
               </div>
           </div>
           <div className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
@@ -212,17 +206,19 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
   );
 }
 
-export function CommunicationSection({ userProfile }: { userProfile?: any }) {
+export function CommunicationSection({ userProfile, loading: externalLoading }: { userProfile?: any, loading?: boolean }) {
   const { showNotification } = useNotification();
   const [activeCategory, setActiveCategory] = useState("Todos");
   const [comms, setComms] = useState<CommunicationPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [internalLoading, setInternalLoading] = useState(true);
+
+  const loading = externalLoading !== undefined ? externalLoading : internalLoading;
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | string | null>(null);
 
   const fetchComunicados = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+    if (!silent) setInternalLoading(true);
     // Buscamos o comunicado e os dados do autor (usuários) em uma única tacada
     const { data, error } = await supabase
       .from("comunicados")
@@ -250,7 +246,7 @@ export function CommunicationSection({ userProfile }: { userProfile?: any }) {
         likedBy: c.liked_by || [],
       })));
     }
-    setLoading(false);
+    setInternalLoading(false);
   }, []);
 
   useEffect(() => {
@@ -402,17 +398,27 @@ export function CommunicationSection({ userProfile }: { userProfile?: any }) {
 
       <div className="pb-3 border-b border-border mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-1">
-          {categories.map((cat) => (
-            <button key={cat} onClick={() => setActiveCategory(cat)} className={cn("px-4 py-1.5 text-xs font-bold rounded-md transition-all", activeCategory === cat ? "bg-slate-100 text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50")}>{cat}</button>
-          ))}
+          {loading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-7 w-16 bg-slate-100 rounded-md animate-pulse" />
+            ))
+          ) : (
+            categories.map((cat) => (
+              <button key={cat} onClick={() => setActiveCategory(cat)} className={cn("px-4 py-1.5 text-xs font-bold rounded-md transition-all", activeCategory === cat ? "bg-slate-100 text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50")}>{cat}</button>
+            ))
+          )}
         </div>
-        <Button onClick={() => { setEditingId(null); setNewPost({ title: "", content: "", category: "Empresa", image: "" }); setIsModalOpen(true); }} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md h-9 px-4 text-[11px] font-bold shadow-sm group">
-          <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" /> NOVO COMUNICADO
-        </Button>
+        {loading ? (
+          <div className="h-9 w-40 bg-slate-100 rounded-md animate-pulse shadow-sm" />
+        ) : (
+          <Button onClick={() => { setEditingId(null); setNewPost({ title: "", content: "", category: "Empresa", image: "" }); setIsModalOpen(true); }} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md h-9 px-4 text-[11px] font-bold shadow-sm group">
+            <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" /> NOVO COMUNICADO
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-4">
-        {loading && [1, 2, 3].map((i) => (
+        {loading && Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="bg-white border border-slate-100 rounded-2xl overflow-hidden flex flex-col sm:flex-row h-auto sm:min-h-[220px] animate-pulse">
             <div className="w-full sm:w-64 bg-slate-200 shrink-0" />
             <div className="flex-1 p-8 space-y-4">

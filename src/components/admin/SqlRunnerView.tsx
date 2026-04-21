@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, memo, useCallback, useRef } from "react";
 import {
-  Database, Play, Trash2, Table as TableIcon, ChevronRight, ChevronDown,
+  Database, Play, Trash2, Table as TableIcon, ChevronRight,
   Grid3X3, FileCode, Search, HardDrive, RefreshCw, AlertCircle, Copy, 
-  Check, XCircle, Sparkles, Bot, X
+  Check, XCircle, Sparkles, Bot, X, ArrowUpDown, ChevronUp, ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiAdminSQL, apiAdminSchema } from "@/lib/api";
@@ -86,7 +86,7 @@ const ObjectBrowser = memo(({ schema, onSelectTable }: { schema: any, onSelectTa
 });
 
 // COMPONENTE PARA A GRADE DE RESULTADOS (MEMOIZADO)
-const ResultsGrid = memo(({ results, error }: { results: any[], error: string | null }) => {
+const ResultsGrid = memo(({ results, error, loading }: { results: any[], error: string | null, loading: boolean }) => {
   const [filter, setFilter] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const columns = useMemo(() => results.length > 0 ? Object.keys(results[0]) : [], [results]);
@@ -97,12 +97,6 @@ const ResultsGrid = memo(({ results, error }: { results: any[], error: string | 
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const copyColumn = (col: string) => {
-    const values = results.map(r => String(r[col] ?? "")).filter(v => v !== "");
-    navigator.clipboard.writeText(values.join(", "));
-    setCopiedId(`header-${col}`);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
 
     const copyTop5AsSQL = () => {
       const top5 = results.slice(0, 5);
@@ -130,13 +124,43 @@ const ResultsGrid = memo(({ results, error }: { results: any[], error: string | 
       setTimeout(() => setCopiedId(null), 2000);
     };
 
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: '', direction: null });
+
+  const handleSort = (key: string) => {
+    setSortConfig(current => {
+      if (current.key === key) {
+        if (current.direction === 'asc') return { key, direction: 'desc' };
+        return { key: '', direction: null };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
   const filteredResults = useMemo(() => {
-    if (!filter) return results;
-    const term = filter.toLowerCase();
-    return results.filter(row =>
-      Object.values(row).some(val => String(val).toLowerCase().includes(term))
-    );
-  }, [results, filter]);
+    let items = results;
+    if (filter) {
+      const term = filter.toLowerCase();
+      items = results.filter(row =>
+        Object.values(row).some(val => String(val).toLowerCase().includes(term))
+      );
+    }
+
+    if (sortConfig.key && sortConfig.direction) {
+      items = [...items].sort((a, b) => {
+        const aVal = a[sortConfig.key];
+        const bVal = b[sortConfig.key];
+
+        if (aVal === bVal) return 0;
+        if (aVal === null || aVal === undefined) return 1;
+        if (bVal === null || bVal === undefined) return -1;
+
+        const res = aVal > bVal ? 1 : -1;
+        return sortConfig.direction === 'asc' ? res : -res;
+      });
+    }
+
+    return items;
+  }, [results, filter, sortConfig]);
 
   if (error) {
     return (
@@ -172,8 +196,33 @@ const ResultsGrid = memo(({ results, error }: { results: any[], error: string | 
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-white">
-        {filteredResults.length > 0 ? (
+      <div className="flex-1 overflow-auto bg-white scrollbar-hide">
+        {loading ? (
+          <table className="w-full border-separate border-spacing-0 animate-pulse">
+            <thead>
+              <tr className="bg-slate-50/50">
+                <th className="w-16 h-8 border-b border-r border-slate-100" />
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <th key={i} className="px-4 py-2 border-b border-r border-slate-100">
+                    <div className="h-2 bg-slate-200 rounded w-16" />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <tr key={i}>
+                  <td className="w-16 h-8 border-r border-slate-50 bg-slate-50/30" />
+                  {Array.from({ length: 12 }).map((_, j) => (
+                    <td key={j} className="px-4 py-2 border-r border-slate-50">
+                      <div className={cn("h-2 bg-slate-100 rounded", j % 3 === 0 ? "w-24" : j % 2 === 0 ? "w-16" : "w-12")} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : filteredResults.length > 0 ? (
           <table className="w-full border-separate border-spacing-0">
             <thead className="sticky top-0 z-20">
               <tr>
@@ -187,18 +236,22 @@ const ResultsGrid = memo(({ results, error }: { results: any[], error: string | 
                   </button>
                 </th>
                 {columns.map(col => (
-                  <th key={col} className="group px-4 py-2 border-b border-r border-slate-200 bg-slate-50 text-left whitespace-nowrap">
+                  <th 
+                    key={col} 
+                    className="group px-4 py-2 border-b border-r border-slate-200 bg-slate-50 text-left whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors"
+                    onClick={() => handleSort(col)}
+                  >
                     <div className="flex items-center justify-between gap-4">
                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
                         {col.toUpperCase()}
                       </span>
-                      <button
-                        onClick={() => copyColumn(col)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 rounded transition-all text-slate-400 hover:text-slate-600"
-                        title="Copiar valores da coluna"
-                      >
-                        {copiedId === `header-${col}` ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                      </button>
+                      <div className="text-slate-300">
+                        {sortConfig.key === col ? (
+                          sortConfig.direction === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-blue-500" /> : <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-20 group-hover:opacity-100" />
+                        )}
+                      </div>
                     </div>
                   </th>
                 ))}
@@ -215,17 +268,31 @@ const ResultsGrid = memo(({ results, error }: { results: any[], error: string | 
                     const isPassword = col.toUpperCase().includes("SENHA") || col.toUpperCase().includes("SENOPE");
                     const cellId = `${i}-${col}`;
 
-                    let displayValue: React.ReactNode = "";
-                    let rawValue = String(value ?? "");
+                    const smartFormat = (val: any) => {
+                      if (val === null || val === undefined || String(val).trim() === "") return <span>NULL</span>;
+                      const sVal = String(val);
+                      
+                      // Detectar ISO Date (YYYY-MM-DDTHH:mm:ss...)
+                      if (sVal.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+                        try {
+                          const d = new Date(sVal);
+                          if (isNaN(d.getTime())) return sVal;
+                          const pad = (n: number) => String(n).padStart(2, '0');
+                          const datePart = `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+                          const hasTime = !sVal.includes('T00:00:00');
+                          if (hasTime) {
+                            return `${datePart} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+                          }
+                          return datePart;
+                        } catch { return sVal; }
+                      }
 
-                    if (value === null || value === undefined || String(value).trim() === "") {
-                      displayValue = <span>NULL</span>;
-                    } else if (isPassword) {
-                      displayValue = "********";
-                      rawValue = "********";
-                    } else {
-                      displayValue = rawValue;
-                    }
+                      if (isPassword) return "********";
+                      return sVal;
+                    };
+
+                    let displayValue = smartFormat(value);
+                    let rawValue = String(value ?? "");
 
                     return (
                       <td
@@ -455,7 +522,7 @@ export function SqlRunnerView() {
           >
 
             <div className="flex-1 overflow-hidden">
-              <ResultsGrid results={results} error={error} />
+              <ResultsGrid results={results} error={error} loading={loading} />
             </div>
 
             {/* STATUS BAR */}

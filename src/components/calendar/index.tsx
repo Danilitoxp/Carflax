@@ -18,7 +18,6 @@ import { EventsView } from "./Eventos/EventsView";
 import { VacationsView } from "./Ferias/VacationsView";
 import { VacationModal } from "./Ferias/VacationModal";
 import { Button } from "@/components/ui/button";
-import { TinyLoader } from "@/components/ui/TinyLoader";
 
 interface CalendarEvent {
   id: number;
@@ -335,38 +334,53 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
         newEvent={newEvent} 
         setNewEvent={setNewEvent} 
       />
-      <div className="flex-1 overflow-y-auto px-6 pt-4 pb-4 flex flex-col min-h-0 scrollbar-hide">
+      <div className="flex-1 overflow-hidden px-6 pt-4 pb-2 flex flex-col min-h-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/60 shrink-0">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
-              <button onClick={handlePrevMonth} className="p-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-blue-600"><ChevronLeft className="w-4 h-4" /></button>
-              <div className="px-3 py-1 text-xs font-black text-slate-900 uppercase tracking-tighter border-x border-slate-100 min-w-[120px] text-center">{monthNames[month]} <span className="text-blue-600">{year}</span></div>
-              <button onClick={handleNextMonth} className="p-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-blue-600"><ChevronRight className="w-4 h-4" /></button>
-            </div>
+            {loading ? (
+              <div className="h-9 w-48 bg-slate-100 rounded-lg animate-pulse" />
+            ) : (
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
+                <button onClick={handlePrevMonth} className="p-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-blue-600"><ChevronLeft className="w-4 h-4" /></button>
+                <div className="px-3 py-1 text-xs font-black text-slate-900 uppercase tracking-tighter border-x border-slate-100 min-w-[120px] text-center">{monthNames[month]} <span className="text-blue-600">{year}</span></div>
+                <button onClick={handleNextMonth} className="p-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-blue-600"><ChevronRight className="w-4 h-4" /></button>
+              </div>
+            )}
+            
             {viewMode === "events" && (
               <div className="flex items-center gap-1">
-                {[
-                  { id: "holiday", icon: Flag, label: "Feriados", color: "amber" },
-                  { id: "meeting", icon: Users, label: "Reuniões", color: "violet" },
-                  { id: "finance", icon: DollarSign, label: "Contas", color: "emerald" },
-                  { id: "important", icon: AlertCircle, label: "Urgente", color: "red" },
-                  { id: "celebration", icon: Trophy, label: "Metas", color: "pink" },
-                  { id: "birthday", icon: Gift, label: "Níver", color: "rose" },
-                  { id: "star", icon: Star, label: "Jubileu", color: "amber" },
-                ].map(f => (
-                  <button key={f.id} onClick={() => toggleFilter(f.id)} className={cn("px-3 py-1.5 rounded-md transition-all text-[10px] font-bold uppercase tracking-widest flex items-center gap-2", activeFilters.length === 1 && activeFilters.includes(f.id) ? "bg-slate-100 text-slate-900 shadow-sm" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600")}>
-                    <f.icon className="w-3.5 h-3.5" />
-                    {activeFilters.length === 1 && activeFilters.includes(f.id) && f.label}
-                  </button>
-                ))}
+                {loading ? (
+                  Array.from({ length: 7 }).map((_, i) => (
+                    <div key={i} className="h-8 w-12 bg-slate-50 rounded-md animate-pulse" />
+                  ))
+                ) : (
+                  [
+                    { id: "holiday", icon: Flag, label: "Feriados", color: "amber" },
+                    { id: "meeting", icon: Users, label: "Reuniões", color: "violet" },
+                    { id: "finance", icon: DollarSign, label: "Contas", color: "emerald" },
+                    { id: "important", icon: AlertCircle, label: "Urgente", color: "red" },
+                    { id: "celebration", icon: Trophy, label: "Metas", color: "pink" },
+                    { id: "birthday", icon: Gift, label: "Níver", color: "rose" },
+                    { id: "star", icon: Star, label: "Jubileu", color: "amber" },
+                  ].map(f => (
+                    <button key={f.id} onClick={() => toggleFilter(f.id)} className={cn("px-3 py-1.5 rounded-md transition-all text-[10px] font-bold uppercase tracking-widest flex items-center gap-2", activeFilters.length === 1 && activeFilters.includes(f.id) ? "bg-slate-100 text-slate-900 shadow-sm" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600")}>
+                      <f.icon className="w-3.5 h-3.5" />
+                      {activeFilters.length === 1 && activeFilters.includes(f.id) && f.label}
+                    </button>
+                  ))
+                )}
               </div>
             )}
           </div>
           <div className="flex items-center gap-3">
-            {viewMode === "vacations" && (
-              <Button onClick={() => { setEditingVacation(null); setIsVacationModalOpen(true); }} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 uppercase tracking-wider group">
-                <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" /> LANÇAR FÉRIAS
-              </Button>
+            {loading ? (
+               <div className="h-9 w-32 bg-slate-100 rounded-md animate-pulse" />
+            ) : (
+              viewMode === "vacations" && (
+                <Button onClick={() => { setEditingVacation(null); setIsVacationModalOpen(true); }} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 uppercase tracking-wider group">
+                  <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" /> LANÇAR FÉRIAS
+                </Button>
+              )
             )}
           </div>
         </div>
@@ -379,30 +393,44 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
           employees={employees}
           vacations={vacations}
         />
-        <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-0 relative mt-3">
-          {loading && (
-            <div className="absolute inset-0 z-[30] bg-white/40 backdrop-blur-[1px] flex items-center justify-center">
-              <TinyLoader size="sm" />
-            </div>
-          )}
-          
+        <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-0 relative mt-3 h-full">
           <div className="grid grid-cols-7 bg-slate-50/50 border-b border-slate-100">
             {daysOfWeek.map((day) => (
               <div key={day} className="py-2.5 text-center"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</span></div>
             ))}
           </div>
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden h-full">
             <div className="grid grid-cols-7 h-full w-full" style={{ gridTemplateRows: `repeat(6, 1fr)` }}>
               {allSlots.map((day, idx) => {
+                if (loading) {
+                  return (
+                    <div key={idx} className="border-r border-b border-slate-50 p-2 animate-pulse space-y-1.5 opacity-60 bg-white">
+                      <div className="h-2 w-3 bg-slate-100 rounded" />
+                      <div className="space-y-1">
+                        {idx % 3 === 0 && <div className="h-3 w-full bg-slate-50 rounded" />}
+                        {idx % 5 === 0 && <div className="h-3 w-3/4 bg-slate-50 rounded" />}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const isToday = day === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear();
                 const dayDate = day ? new Date(year, month, day) : null;
                 const isLastCol = (idx + 1) % 7 === 0;
                 const isLastRow = idx >= 35;
-                const isFirstCol = idx % 7 === 0;
-                const neighborLeftHasNoDay = idx > 0 && allSlots[idx - 1] === null;
-                const neighborTopHasNoDay = idx >= 7 && allSlots[idx - 7] === null;
+                
                 return (
-                  <div key={idx} onClick={() => handleDayClick(day)} className={cn("relative group transition-all duration-300 cursor-pointer flex flex-col p-2 min-h-0 overflow-hidden", day ? (isToday ? "bg-blue-300 shadow-lg shadow-blue-500/20 z-10" : "bg-white") : "bg-transparent", day && !isLastCol && "border-r border-slate-100", day && !isLastRow && "border-b border-slate-100", day && (isFirstCol || neighborLeftHasNoDay) && "border-l border-slate-100", day && (idx < 7 || neighborTopHasNoDay) && "border-t border-slate-100", viewMode === "events" && day && "hover:bg-slate-50/50")}>
+                  <div 
+                    key={idx} 
+                    onClick={() => handleDayClick(day)} 
+                    className={cn(
+                      "relative group transition-all duration-300 cursor-pointer flex flex-col p-2 min-h-0 overflow-hidden bg-white",
+                      !isLastCol && "border-r border-slate-100", 
+                      !isLastRow && "border-b border-slate-100", 
+                      viewMode === "events" && day && "hover:bg-slate-50/50",
+                      day && isToday && "bg-blue-300 shadow-lg shadow-blue-500/20 z-10"
+                    )}
+                  >
                     {day && (
                       <>
                         <div className="flex justify-between items-start mb-1 relative z-20"><span className={cn("text-xs font-black transition-all leading-none", isToday ? "text-white" : "text-slate-300 group-hover:text-slate-500")}>{day}</span>{isToday && <div className="flex flex-col items-center"><div className="w-1 h-1 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" /></div>}</div>

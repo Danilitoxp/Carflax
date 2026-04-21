@@ -1,14 +1,14 @@
 import { HeroBanner } from "./HeroBanner";
 import { CommunicationSection } from "./CommunicationSection";
 
-export function GeralView({ userProfile }: { userProfile?: any }) {
-
+export function GeralView({ userProfile, loading }: { userProfile?: any, loading?: boolean }) {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[#F8FAFC]">
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6 scrollbar-hide">
-        <HeroBanner />
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 scrollbar-hide">
+        <HeroBanner loading={loading} />
+        
         <div className="space-y-6">
-          <CommunicationSection userProfile={userProfile} />
+          <CommunicationSection userProfile={userProfile} loading={loading} />
         </div>
       </div>
     </div>

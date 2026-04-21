@@ -215,23 +215,35 @@ export function LigacoesView() {
 
       {/* Stats - Tiny Style */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {stats.map((stat, i) => (
-          <div key={i} className="bg-white border border-slate-100 rounded-xl p-4 flex items-center justify-between shadow-sm">
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</span>
-              <span className="text-xl font-black text-slate-900 tracking-tighter">{stat.value}</span>
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white border border-slate-100 rounded-xl p-4 flex items-center justify-between shadow-sm animate-pulse">
+              <div className="flex flex-col gap-2">
+                <div className="h-2 w-12 bg-slate-100 rounded" />
+                <div className="h-5 w-8 bg-slate-50 rounded" />
+              </div>
+              <div className="w-8 h-8 bg-slate-50 rounded-lg" />
             </div>
-            <div className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center",
-              stat.color === "emerald" ? "bg-emerald-50 text-emerald-500" :
-              stat.color === "blue" ? "bg-blue-50 text-blue-500" :
-              stat.color === "rose" ? "bg-rose-50 text-rose-500" :
-              "bg-slate-50 text-slate-500"
-            )}>
-              <stat.icon className="w-4 h-4" />
+          ))
+        ) : (
+          stats.map((stat, i) => (
+            <div key={i} className="bg-white border border-slate-100 rounded-xl p-4 flex items-center justify-between shadow-sm">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</span>
+                <span className="text-xl font-black text-slate-900 tracking-tighter">{stat.value}</span>
+              </div>
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center",
+                stat.color === "emerald" ? "bg-emerald-50 text-emerald-500" :
+                stat.color === "blue" ? "bg-blue-50 text-blue-500" :
+                stat.color === "rose" ? "bg-rose-50 text-rose-500" :
+                "bg-slate-50 text-slate-500"
+              )}>
+                <stat.icon className="w-4 h-4" />
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       <div className="bg-white border border-slate-100 rounded-2xl shadow-sm flex flex-col overflow-hidden">
@@ -248,34 +260,67 @@ export function LigacoesView() {
                 className="w-full pl-8 pr-4 py-1.5 bg-slate-50/50 border border-slate-100 rounded-lg text-[11px] font-bold text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/5 transition-all h-8"
               />
             </div>
-            <button className="flex items-center gap-2 px-3 h-8 bg-white border border-slate-100 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">
-              <Filter className="w-3 h-3" />
-              Filtros
-            </button>
+            {!loading && (
+              <button className="flex items-center gap-2 px-3 h-8 bg-white border border-slate-100 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">
+                <Filter className="w-3 h-3" />
+                Filtros
+              </button>
+            )}
           </div>
         </div>
 
         {/* Table - High Density */}
         <div className="overflow-x-auto min-h-[300px]">
-          {loading ? (
-            <div className="py-20 flex flex-col items-center justify-center">
-              <Loader2 className="w-6 h-6 text-slate-900 animate-spin mb-3" />
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sincronizando...</span>
-            </div>
-          ) : (
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50/30">
-                  <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Cliente</th>
-                  <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Responsável</th>
-                  <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Data</th>
-                  <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center">Duração</th>
-                  <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Status</th>
-                  <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center">Ações</th>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50/30">
+                <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Cliente</th>
+                <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Responsável</th>
+                <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Data</th>
+                <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center">Duração</th>
+                <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Status</th>
+                <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {loading ? (
+                Array.from({ length: 20 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-3">
+                      <div className="space-y-1.5">
+                        <div className="h-3 w-32 bg-slate-100 rounded" />
+                        <div className="h-2 w-20 bg-slate-50 rounded" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-slate-50" />
+                        <div className="h-3 w-20 bg-slate-100 rounded" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-3">
+                      <div className="space-y-1.5">
+                        <div className="h-3 w-16 bg-slate-100 rounded" />
+                        <div className="h-2 w-12 bg-slate-50 rounded" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-3 text-center">
+                      <div className="flex justify-center"><div className="h-3 w-10 bg-slate-50 rounded" /></div>
+                    </td>
+                    <td className="px-6 py-3">
+                      <div className="h-5 w-20 bg-slate-100 rounded text-transparent">status</div>
+                    </td>
+                    <td className="px-6 py-3 text-center">
+                      <div className="flex justify-center"><div className="w-7 h-7 bg-slate-50 rounded-lg" /></div>
+                    </td>
+                  </tr>
+                ))
+              ) : filteredCalls.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-20 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhuma ligação encontrada</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filteredCalls.map((call) => (
+              ) : (
+                filteredCalls.map((call) => (
                   <tr key={call.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-3">
                       <div className="flex flex-col">
@@ -297,7 +342,7 @@ export function LigacoesView() {
                         <span className="text-[9px] font-bold text-slate-400 uppercase">{String(call.timestamp).split(',')[1]}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-3">
+                    <td className="px-6 py-3 text-center">
                       <div className="flex items-center justify-center gap-1.5 grayscale opacity-60">
                         <Clock className="w-3 h-3" />
                         <span className="text-[11px] font-black">{call.duration}</span>
@@ -321,7 +366,7 @@ export function LigacoesView() {
                       </div>
                     </td>
                     <td className="px-6 py-3 text-center">
-                      <div className="flex items-center justify-center">
+                      <div className="flex items-center justify-center text-center">
                         <button 
                           onClick={() => setSelectedCall(call)}
                           className="w-7 h-7 flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-400 rounded-lg hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all active:scale-90"
@@ -331,10 +376,10 @@ export function LigacoesView() {
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

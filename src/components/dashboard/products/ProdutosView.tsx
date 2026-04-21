@@ -144,13 +144,6 @@ export function ProdutosView() {
 
       {/* PRODUCTS TABLE CONTAINER */}
       <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col relative">
-        {/* ABSOLUTE CENTER LOADING */}
-        {loading && (
-          <div className="absolute inset-0 z-20 bg-white/60 backdrop-blur-[2px] flex items-center justify-center">
-            <TinyLoader />
-          </div>
-        )}
-
         <div 
           className="flex-1 overflow-y-auto scrollbar-hide"
           onScroll={handleScroll}
@@ -169,46 +162,61 @@ export function ProdutosView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {visibleProducts.map((p: Product, i) => (
-                <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="py-3 px-6 text-[10px] font-bold text-slate-400">{p.cod}</td>
-                  <td className="py-3 px-6">
-                    <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight line-clamp-1">{p.desc}</span>
-                  </td>
-                  <td className="py-3 px-6">
-                    <span className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-tight">
-                      {p.brand}
-                    </span>
-                  </td>
-                  <td className="py-3 px-6 text-right">
-                    <span className={cn(
-                      "text-[11px] font-black tracking-tighter",
-                      p.stock > 10 ? "text-slate-900" : p.stock > 0 ? "text-amber-600" : "text-rose-500"
-                    )}>
-                      {p.stock.toFixed(3)}
-                    </span>
-                  </td>
-                  <td className="py-3 px-6 text-right">
-                    <span className="text-[11px] font-black text-emerald-600 tracking-tighter">
-                      R$ {p.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </td>
-                  <td className="py-3 px-6 text-right">
-                    <span className="text-[11px] font-black text-slate-900 tracking-tighter">
-                      R$ {p.credit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              
-              {!loading && visibleCount < filteredProducts.length && (
-                <tr>
-                  <td colSpan={6} className="py-6">
-                    <div className="flex justify-center w-full">
-                      <TinyLoader size="sm" />
-                    </div>
-                  </td>
-                </tr>
+              {loading ? (
+                Array.from({ length: 12 }).map((_, i) => (
+                  <tr key={`skeleton-${i}`} className="animate-pulse">
+                    <td className="py-4 px-6"><div className="h-2 w-10 bg-slate-100 rounded" /></td>
+                    <td className="py-4 px-6"><div className="h-2 w-full max-w-[250px] bg-slate-100 rounded" /></td>
+                    <td className="py-4 px-6"><div className="h-5 w-16 bg-slate-50 rounded-lg" /></td>
+                    <td className="py-4 px-6 text-right"><div className="h-2 w-12 bg-slate-100 rounded ml-auto" /></td>
+                    <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-slate-50 rounded ml-auto" /></td>
+                    <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-slate-100 rounded ml-auto" /></td>
+                  </tr>
+                ))
+              ) : (
+                <>
+                  {visibleProducts.map((p: Product, i) => (
+                    <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="py-3 px-6 text-[10px] font-bold text-slate-400">{p.cod}</td>
+                      <td className="py-3 px-6">
+                        <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight line-clamp-1">{p.desc}</span>
+                      </td>
+                      <td className="py-3 px-6">
+                        <span className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-tight">
+                          {p.brand}
+                        </span>
+                      </td>
+                      <td className="py-3 px-6 text-right">
+                        <span className={cn(
+                          "text-[11px] font-black tracking-tighter",
+                          p.stock > 10 ? "text-slate-900" : p.stock > 0 ? "text-amber-600" : "text-rose-500"
+                        )}>
+                          {p.stock.toFixed(3)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-6 text-right">
+                        <span className="text-[11px] font-black text-emerald-600 tracking-tighter">
+                          R$ {p.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                      <td className="py-3 px-6 text-right">
+                        <span className="text-[11px] font-black text-slate-900 tracking-tighter">
+                          R$ {p.credit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  
+                  {visibleCount < filteredProducts.length && (
+                    <tr>
+                      <td colSpan={6} className="py-6">
+                        <div className="flex justify-center w-full">
+                          <TinyLoader size="sm" />
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               )}
             </tbody>
           </table>
