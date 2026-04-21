@@ -157,7 +157,7 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
       <div className="flex-1 p-6 flex flex-col min-w-0">
         <div className="flex justify-between items-start gap-4 mb-2">
           <div className="flex items-center gap-3">
-             <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 uppercase tracking-widest">{data.category}</span>
+             <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 uppercase tracking-widest">{data.category}</span>
              <span className="text-xs text-slate-500 dark:text-slate-500 font-bold">{data.date}</span>
           </div>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
@@ -175,16 +175,16 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
 
         <div className="mt-auto flex items-center justify-between pt-4 border-t border-border">
           <div className="flex items-center gap-6">
-             <button 
+             <button
                 onClick={handleLike}
                 className={cn(
-                  "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-4 py-2 rounded-xl border", 
-                  interaction === "like" 
-                    ? "bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-600/20" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary border-transparent"
+                  "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-3 py-1.5 rounded-xl",
+                  interaction === "like"
+                    ? "bg-blue-600 dark:bg-blue-500/20 text-white dark:text-blue-400 shadow-lg shadow-blue-600/20 dark:shadow-none"
+                    : "text-slate-400 dark:text-muted-foreground hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary"
                 )}
              >
-               <ThumbsUp className={cn("w-4 h-4", interaction === "like" && "fill-current")} />
+               <ThumbsUp className={cn("w-4 h-4", interaction === "like" && "fill-white dark:fill-current")} />
                {likes}
              </button>
               <div className="flex items-center -space-x-2">
@@ -406,14 +406,14 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
             ))
           ) : (
             categories.map((cat) => (
-              <button 
-                key={cat} 
-                onClick={() => setActiveCategory(cat)} 
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
                 className={cn(
-                  "px-4 py-1.5 text-xs font-bold rounded-xl transition-all uppercase tracking-widest border", 
-                  activeCategory === cat 
-                    ? "bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-600/20 shadow-sm" 
-                    : "text-slate-500 dark:text-slate-400 hover:text-foreground hover:bg-secondary/50 border-transparent"
+                  "px-4 py-1.5 text-xs font-bold rounded-md transition-all",
+                  activeCategory === cat
+                    ? "bg-slate-100 dark:bg-blue-500/20 text-slate-900 dark:text-blue-400 shadow-sm"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary/50"
                 )}
               >
                 {cat}

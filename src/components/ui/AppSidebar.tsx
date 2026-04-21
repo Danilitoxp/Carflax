@@ -162,10 +162,16 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                 />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[10px] font-bold text-foreground dark:text-slate-200 truncate uppercase">
+                <span className={cn(
+                  "text-[10px] font-black truncate uppercase",
+                  theme === "dark" ? "text-white" : "text-black"
+                )}>
                   {userProfile?.name || "Carregando..."}
                 </span>
-                <span className="text-[9px] font-medium text-muted-foreground dark:text-slate-500 uppercase tracking-widest leading-none mt-1">
+                <span className={cn(
+                  "text-[9px] font-medium uppercase tracking-widest leading-none mt-1",
+                  theme === "dark" ? "text-slate-400" : "text-slate-500"
+                )}>
                   {userProfile?.role || "Membro"}
                 </span>
               </div>
