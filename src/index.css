@@ -57,6 +57,9 @@
     --sql-function: #7c3aed;  /* violet-700 */
     --sql-string:   #b45309;  /* amber-700 */
     --sql-number:   #047857;  /* emerald-700 */
+    
+    --gradient-color: #2563eb;
+    --sparkles-color: #2563eb;
   }
 
   .dark {
@@ -85,6 +88,9 @@
     --sql-function: #c084fc;  /* purple-400 */
     --sql-string:   #fbbf24;  /* amber-400 */
     --sql-number:   #34d399;  /* emerald-400 */
+    
+    --gradient-color: #1d4ed8;
+    --sparkles-color: #ffffff;
   }
 }
 
