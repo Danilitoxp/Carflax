@@ -246,7 +246,7 @@ function DashboardContent({
   return (
     <div className="h-screen bg-background font-sans transition-colors duration-300 overflow-hidden flex relative">
       <AppSidebar
-        userProfile={userProfile}
+        userProfile={userProfile || undefined}
         activeItem={activeItem}
         onActiveItemChange={handleActiveItemChange}
         isCollapsed={isSidebarCollapsed}
