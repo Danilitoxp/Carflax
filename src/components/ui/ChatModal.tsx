@@ -156,18 +156,20 @@ export function ChatModal({
       }
     });
 
-    // Realtime para este documento (Filtragem manual interna para maior confiabilidade)
+    // Realtime para este documento (Filtragem manual estabilizada)
+    const cleanDoc = documento.replace("#", "").trim();
     const channel = supabase
-      .channel(`chat_doc_${documento.replace("#", "")}_${Date.now()}`)
+      .channel(`chat_room_${cleanDoc}`) // Nome estável
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' }, 
         (payload) => {
           const newMsg = payload.new as CrmConversa;
           
-          // Filtro manual: só aceita se for para este documento
-          if (newMsg.documento !== documento) return;
+          const msgDoc = (newMsg.documento || "").replace("#", "").trim();
+          if (msgDoc !== cleanDoc) return;
 
           setConversas((prev) => {
-            if (prev.find(m => m.id === newMsg.id)) return prev;
+            const exists = prev.some(m => m.id === newMsg.id || (m.timestamp === newMsg.timestamp && m.obs === newMsg.obs));
+            if (exists) return prev;
             return [...prev, newMsg];
           });
           
