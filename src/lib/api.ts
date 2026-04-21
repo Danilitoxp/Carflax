@@ -11,7 +11,9 @@ const API_CAMPAIGN = isLocal
 
 
 async function get<T>(path: string, params?: Record<string, string>, base: string = API_BASE): Promise<T> {
-  const url = new URL(`${base}${path}`);
+  // Se base for um caminho relativo, usamos o origin do navegador
+  const baseUrl = base.startsWith("http") ? base : window.location.origin + base;
+  const url = new URL(`${baseUrl}${path}`);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
