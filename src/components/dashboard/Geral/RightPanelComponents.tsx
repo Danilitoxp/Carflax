@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 import { useState, useEffect } from "react";
 import { apiDashboardGeral, type VendedorResumo, apiEntregasConcluidas, apiCampanhaMetas } from "@/lib/api";
+import { calculateMonthlyWinner } from "@/lib/highlights_automation";
 import { supabase } from "@/lib/supabase";
 
 interface UserProfileLite {
@@ -276,7 +277,20 @@ export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: bo
           return;
         }
 
-        // 2. Lógica Automática Híbrida
+        // 2. Automação: Calcula e Salva na destaque_do_mes se não existir
+        const winner = await calculateMonthlyWinner(mesanoISO); 
+        if (winner) {
+           setEmployee({
+             name: winner.name,
+             role: winner.role || "Destaque",
+             department: winner.department,
+             achievement: winner.motivo,
+             avatar: winner.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${winner.name}`
+           });
+           return;
+        }
+
+        // 3. Lógica Automática Híbrida (Fallback Visual)
         const sectors = ["Comercial", "Logística", "Social"];
         const focusSector = sectors[currentMonthNum % sectors.length];
 

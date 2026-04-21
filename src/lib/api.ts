@@ -6,7 +6,7 @@ const API_BASE =
 
 const API_CAMPAIGN = "https://marketing-gestao-de-tempo.velbav.easypanel.host";
 
-console.log("[API] BASE:", API_BASE);
+
 
 async function get<T>(path: string, params?: Record<string, string>, base: string = API_BASE): Promise<T> {
   const url = new URL(`${base}${path}`);
@@ -243,5 +243,54 @@ export const apiAdminSQL = (query: string, signal?: AbortSignal) =>
   post<SqlResponse>("/api/admin/sql", { query, secret: "carflax_admin_2026" }, { signal });
 export const apiAdminSchema = () => get<{ success: boolean, dbName: string, tables: { name: string, type: string }[] }>("/api/admin/sql/schema");
 export const apiHealth = () => get<{ status: string }>("/api/health");
+
+// ── Secullum Ponto Web (Integração Externa) ──────────────────────────────────
+// Swagger: https://pontowebintegracaoexterna.secullum.com.br/docs/index.html
+
+export interface SecullumTotalizadores {
+  totalHorasTrabalhadas: string;
+  totalHorasExtras: string;
+  totalHorasFaltas: string;
+  totalHorasAtrasos: string;
+  totalDiasTrabalhados: number;
+  totalFaltasDias: number;
+}
+
+export interface SecullumResponse {
+  funcionarioNome: string;
+  funcionarioCpf: string;
+  totalizadores: SecullumTotalizadores;
+}
+
+/** 
+ * Busca totais de assiduidade no Secullum para um período.
+ * Requer secullumidbancoselecionado no header e Token Bearer.
+ */
+export const apiSecullumTotais = async (params: {
+  dataInicial: string;
+  dataFinal: string;
+  funcionarioCpf?: string;
+  token: string;
+  idBanco: string;
+}): Promise<SecullumResponse[]> => {
+  const url = "https://pontowebintegracaoexterna.secullum.com.br/api/IntegracaoExterna/Calcular/SomenteTotais";
+  
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${params.token}`,
+      "secullumidbancoselecionado": params.idBanco
+    },
+    body: JSON.stringify({
+      dataInicial: params.dataInicial,
+      dataFinal: params.dataFinal,
+      funcionarioCpf: params.funcionarioCpf
+    })
+  });
+
+  if (!res.ok) throw new Error(`Secullum API ${res.status}`);
+  return res.json();
+};
 
 export { API_BASE };
