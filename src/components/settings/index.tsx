@@ -41,22 +41,22 @@ function BannersTab() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 pb-6 border-b border-slate-50">
+      <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 pb-6 border-b border-slate-50 dark:border-white/5">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
-              <ImageIcon className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-100 dark:border-blue-500/20">
+              <ImageIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none mb-2">Banners da Home</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Altere as imagens e efeitos de transição</p>
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-2">Banners da Home</h4>
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Altere as imagens e efeitos de transição</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
+          <div className="flex items-center gap-4 bg-slate-50 dark:bg-white/5 px-4 py-3 rounded-xl border border-slate-100 dark:border-white/10">
             <div className="flex items-center gap-2">
-              <Sparkles className={cn("w-4 h-4", transitionEnabled ? "text-blue-600" : "text-slate-300")} />
-              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest leading-none">Efeito Transição</span>
+              <Sparkles className={cn("w-4 h-4", transitionEnabled ? "text-blue-600 dark:text-blue-400" : "text-slate-300 dark:text-slate-700")} />
+              <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest leading-none">Efeito Transição</span>
             </div>
             <Toggle checked={transitionEnabled} onChange={setTransitionEnabled} />
           </div>
@@ -64,21 +64,21 @@ function BannersTab() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {banners.map((b) => (
-            <div key={b.id} className="group relative bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden hover:border-blue-300 transition-all duration-300">
-              <div className="aspect-[3/1] bg-slate-200 relative overflow-hidden">
+            <div key={b.id} className="group relative bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden hover:border-blue-300 dark:hover:border-blue-500/50 transition-all duration-300">
+              <div className="aspect-[3/1] bg-slate-200 dark:bg-slate-800 relative overflow-hidden">
                 <img src={b.url} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                 <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Button className="bg-white text-slate-900 hover:bg-slate-100 h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest">
+                  <Button className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800 h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest border-none">
                     SUBSTITUIR IMAGEM
                   </Button>
                 </div>
               </div>
               <div className="p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">{b.title}</p>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Dimensões: {b.dims}</p>
+                  <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight">{b.title}</p>
+                  <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">Dimensões: {b.dims}</p>
                 </div>
-                <Button className="w-8 h-8 rounded-lg bg-white border border-slate-200 p-0 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all">
+                <Button className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 p-0 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-100 transition-all">
                   <ImageIcon className="w-4 h-4" />
                 </Button>
               </div>
@@ -86,11 +86,11 @@ function BannersTab() {
           ))}
 
           {/* ADD NEW CARD */}
-          <button className="aspect-[3/1] md:aspect-auto flex flex-col items-center justify-center gap-3 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-300 transition-all group">
-            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-slate-200 shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all">
+          <button className="aspect-[3/1] md:aspect-auto flex flex-col items-center justify-center gap-3 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-white/[0.02] hover:bg-blue-50/30 dark:hover:bg-blue-500/5 hover:border-blue-300 dark:hover:border-blue-500/30 transition-all group">
+            <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-white/10 shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all">
               <Plus className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
             </div>
-            <span className="text-[10px] font-black text-slate-400 group-hover:text-blue-600 uppercase tracking-widest">Adicionar Banner</span>
+            <span className="text-[10px] font-black text-slate-400 dark:text-slate-600 group-hover:text-blue-600 uppercase tracking-widest">Adicionar Banner</span>
           </button>
         </div>
       </div>
@@ -115,7 +115,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       onClick={() => onChange(!checked)}
       className={cn(
         "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out",
-        checked ? "bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]" : "bg-slate-200"
+        checked ? "bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]" : "bg-slate-200 dark:bg-slate-800"
       )}
     >
       <span
@@ -149,15 +149,15 @@ function SettingsInput({
 }) {
   return (
     <div className="space-y-1.5 px-0.5">
-      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 opacity-80">{label}</label>
+      <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1 opacity-80">{label}</label>
       <div className="relative group">
-        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 dark:text-slate-600 group-focus-within:text-blue-500 transition-colors" />
         <input
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all placeholder:text-slate-300 shadow-sm"
+          className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700 shadow-sm"
         />
       </div>
     </div>
@@ -183,15 +183,15 @@ function PasswordField({
   const [show, setShow] = useState(false);
   return (
     <div className="space-y-2">
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
+      <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">{label}</label>
       <div className="relative group">
-        <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+        <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 dark:text-slate-600 group-focus-within:text-blue-500 transition-colors" />
         <input
           type={show ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-11 pr-11 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all placeholder:text-slate-300 shadow-sm"
+          className="w-full pl-11 pr-11 py-3 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700 shadow-sm"
         />
         <button
           type="button"
@@ -214,7 +214,7 @@ function PasswordField({
               )}
             />
           ))}
-          <span className="text-[9px] font-black text-slate-400 tracking-tighter ml-1 uppercase">
+          <span className="text-[9px] font-black text-slate-400 dark:text-slate-600 tracking-tighter ml-1 uppercase">
             {strength <= 1 ? "Fraca" : strength === 2 ? "Média" : strength === 3 ? "Boa" : "Forte"}
           </span>
         </div>
@@ -256,11 +256,11 @@ function ProfileTab() {
   return (
     <div className="max-w-[1000px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* SEÇÃO 1: PERFIL (HEADER) */}
-      <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 md:p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
+      <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-[#E5E7EB] dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
         <div className="flex flex-col md:flex-row items-center gap-8">
           {/* Avatar e Ação de Foto */}
           <div className="relative group shrink-0">
-            <div className="w-28 h-28 rounded-2xl border-2 border-slate-100 shadow-sm overflow-hidden bg-slate-50 flex items-center justify-center transition-all group-hover:shadow-md">
+            <div className="w-28 h-28 rounded-2xl border-2 border-slate-100 dark:border-white/10 shadow-sm overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center transition-all group-hover:shadow-md">
               <img
                 src="https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo&backgroundColor=0053FC"
                 className="w-full h-full object-cover transition-transform group-hover:scale-105"
@@ -268,32 +268,32 @@ function ProfileTab() {
               />
             </div>
             {/* Badge de Verificado */}
-            <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-1.5 rounded-lg shadow-lg border-2 border-white">
+            <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-1.5 rounded-lg shadow-lg border-2 border-white dark:border-slate-900">
               <CheckCircle2 className="w-4 h-4" strokeWidth={3} />
             </div>
           </div>
 
           <div className="flex-1 text-center md:text-left space-y-3">
             <div className="space-y-1">
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-none uppercase">
                 {form.nome}
               </h3>
               <div className="flex flex-wrap gap-2 justify-center md:justify-start items-center">
-                <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md uppercase tracking-wider">
+                <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2.5 py-1 rounded-md uppercase tracking-wider">
                   {form.cargo}
                 </span>
-                <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                <div className="w-1.5 h-1.5 rounded-full bg-slate-200 dark:bg-white/10" />
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                   SÃO PAULO - MATRIZ
                 </span>
               </div>
             </div>
-            <p className="text-xs font-medium text-slate-500 leading-relaxed max-w-xl">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
               Identificador interno verificado. Seu acesso de Administrador permite gerenciar todos os módulos do sistema Carflax com total autonomia.
             </p>
             
             <div className="flex justify-center md:justify-start pt-1">
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 cursor-pointer hover:bg-slate-100 transition-all shadow-sm active:scale-95">
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] font-bold text-slate-600 dark:text-slate-400 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all shadow-sm active:scale-95">
                 <Camera className="w-3.5 h-3.5" />
                 ALTERAR FOTO
                 <input type="file" className="hidden" />
@@ -304,13 +304,13 @@ function ProfileTab() {
       </div>
 
       {/* SEÇÃO 2: DADOS PESSOAIS */}
-      <div className="bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col">
+      <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-[#E5E7EB] dark:border-white/10 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col">
         {/* Card Header com Título */}
-        <div className="px-6 py-5 border-b border-slate-50 bg-slate-50/30 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
+        <div className="px-6 py-5 border-b border-slate-50 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.02] flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
             <User className="w-4 h-4" />
           </div>
-          <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Informações pessoais</h4>
+          <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">Informações pessoais</h4>
         </div>
 
         {/* Card Content (Grid de Inputs) */}
@@ -345,8 +345,8 @@ function ProfileTab() {
           </div>
 
           {/* Action Footer dentro do card */}
-          <div className="pt-8 border-t border-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-[10px] font-bold text-slate-400 max-w-[300px] text-center md:text-left">
+          <div className="pt-8 border-t border-slate-50 dark:border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-600 max-w-[300px] text-center md:text-left">
               Mantenha seus dados atualizados para facilitar a comunicação interna.
             </p>
             <Button
@@ -425,25 +425,25 @@ function NotificationsTab() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
       {notifSections.map(({ key, icon: Icon, title, desc, items, color }) => (
-        <div key={key} className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-sm">
-          <div className="p-5 border-b border-slate-50 bg-slate-50/30 flex items-center gap-4">
+        <div key={key} className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden flex flex-col shadow-sm">
+          <div className="p-5 border-b border-slate-50 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.02] flex items-center gap-4">
             <div className={cn(
               "w-10 h-10 rounded-xl flex items-center justify-center",
-              color === 'rose' ? "bg-rose-50 text-rose-600" :
-                color === 'blue' ? "bg-blue-50 text-blue-600" :
-                  "bg-amber-50 text-amber-600"
+              color === 'rose' ? "bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400" :
+                color === 'blue' ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400" :
+                  "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
             )}>
               <Icon className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight leading-none mb-1">{title}</p>
-              <p className="text-[10px] text-slate-400 font-bold">{desc}</p>
+              <p className="text-[11px] font-black text-slate-800 dark:text-white uppercase tracking-tight leading-none mb-1">{title}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{desc}</p>
             </div>
           </div>
           <div className="flex-1 p-5 space-y-4">
             {items.map((item) => (
               <div key={item.key} className="flex items-center justify-between group">
-                <span className="text-[11px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{item.label}</span>
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{item.label}</span>
                 <Toggle checked={state[key][item.key]} onChange={() => toggle(key, item.key)} />
               </div>
             ))}
@@ -487,19 +487,19 @@ function SecurityTab() {
     <div className="max-w-[1000px] mx-auto animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
         {/* Pass Change Card - Centralizado/Destaque */}
-        <div className="md:col-start-3 md:col-span-8 bg-white border border-[#E5E7EB] rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col">
-          <div className="flex items-center gap-4 mb-8 pb-4 border-b border-slate-50">
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
-              <Lock className="w-6 h-6 text-blue-600" />
+        <div className="md:col-start-3 md:col-span-8 bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-[#E5E7EB] dark:border-white/10 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col">
+          <div className="flex items-center gap-4 mb-8 pb-4 border-b border-slate-50 dark:border-white/5">
+            <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-100 dark:border-blue-500/20">
+              <Lock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight">Segurança da Conta</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gerencie seu acesso e senha</p>
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Segurança da Conta</h4>
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest mt-1">Gerencie seu acesso e senha</p>
             </div>
           </div>
 
           <div className="space-y-6 flex-1">
-            <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Alterar Senha de Acesso</h5>
+            <h5 className="text-[11px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em] mb-4">Alterar Senha de Acesso</h5>
             
             <PasswordField label="Senha Atual" value={pw.current} onChange={(v) => setPw({ ...pw, current: v })} placeholder="••••••••" />
             <PasswordField label="Nova Senha" value={pw.next} onChange={(v) => setPw({ ...pw, next: v })} placeholder="Mínimo 8 caracteres" strength={strength} />
@@ -513,8 +513,8 @@ function SecurityTab() {
             )}
           </div>
 
-          <div className="mt-10 pt-6 border-t border-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-[10px] font-bold text-slate-400 max-w-[300px] text-center md:text-left leading-relaxed">
+          <div className="mt-10 pt-6 border-t border-slate-50 dark:border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-600 max-w-[300px] text-center md:text-left leading-relaxed">
               Recomendamos o uso de senhas fortes com números e símbolos.
             </p>
             <Button
@@ -559,14 +559,14 @@ function AppearanceTab() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Theme Cards */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+      <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
         <div className="flex items-center gap-4 mb-8">
-          <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
-            <Palette className="w-6 h-6 text-blue-600" />
+          <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-100 dark:border-blue-500/20">
+            <Palette className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none mb-2">Tema & Interface</h4>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Escolha sua experiência visual</p>
+            <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-2">Tema & Interface</h4>
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Escolha sua experiência visual</p>
           </div>
         </div>
 
@@ -582,8 +582,8 @@ function AppearanceTab() {
               className={cn(
                 "relative flex flex-col items-center gap-4 p-8 rounded-2xl border-2 transition-all group",
                 theme === key
-                  ? "border-blue-600 bg-blue-50/20 shadow-lg shadow-blue-600/10"
-                  : "border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50"
+                  ? "border-blue-600 bg-blue-50/20 dark:bg-blue-500/10 shadow-lg shadow-blue-600/10"
+                  : "border-slate-100 dark:border-white/5 bg-white dark:bg-slate-900/30 hover:border-slate-200 dark:hover:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5"
               )}
             >
               {theme === key && (
@@ -597,10 +597,10 @@ function AppearanceTab() {
                 <Icon className="w-8 h-8" />
               </div>
               <div className="text-center">
-                <span className={cn("text-[11px] font-black uppercase tracking-widest block", theme === key ? "text-blue-600" : "text-slate-400")}>
+                <span className={cn("text-[11px] font-black uppercase tracking-widest block", theme === key ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-600")}>
                   {label}
                 </span>
-                <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase opacity-60">Modo {key}</p>
+                <p className="text-[9px] font-bold text-slate-400 dark:text-slate-600 mt-1 uppercase opacity-60">Modo {key}</p>
               </div>
             </button>
           ))}
@@ -608,7 +608,7 @@ function AppearanceTab() {
       </div>
 
       {/* Save Area */}
-      <div className="flex justify-end pt-4 pb-2 border-t border-slate-50">
+      <div className="flex justify-end pt-4 pb-2 border-t border-slate-50 dark:border-white/5">
         <Button
           onClick={handleSave}
           className={cn(
@@ -677,14 +677,14 @@ function OrcamentosTab() {
 
   return (
     <div className="max-w-[800px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-50">
-          <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
-            <FileBadge className="w-6 h-6 text-blue-600" />
+      <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-50 dark:border-white/5">
+          <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-100 dark:border-blue-500/20">
+            <FileBadge className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none mb-2">Centralizador de Mensagens</h4>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+            <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-2">Centralizador de Mensagens</h4>
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
               Defina qual usuário receberá todas as comunicações e observações internas originadas na tela de orçamentos.
             </p>
           </div>
@@ -692,13 +692,13 @@ function OrcamentosTab() {
 
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Usuário Centralizador</label>
+            <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Usuário Centralizador</label>
             <div className="relative group">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 dark:text-slate-600 group-focus-within:text-blue-500 transition-colors" />
               <select
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
-                className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-600/50 focus:bg-white transition-all appearance-none"
+                className="w-full pl-11 pr-4 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:bg-white dark:focus:bg-slate-800 transition-all appearance-none"
               >
                 <option value="">Nenhum usuário selecionado</option>
                 {users.map(u => (
@@ -711,16 +711,16 @@ function OrcamentosTab() {
             </div>
           </div>
 
-          <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl flex items-start gap-3">
-            <Sparkles className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-            <p className="text-[10px] font-medium text-blue-800 leading-relaxed uppercase tracking-tight">
+          <div className="p-4 bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-500/20 rounded-xl flex items-start gap-3">
+            <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+            <p className="text-[10px] font-medium text-blue-800 dark:text-blue-200 leading-relaxed uppercase tracking-tight">
               Este usuário será notificado automaticamente sempre que houver novas mensagens ou alterações de status críticas que exijam supervisão centralizada.
             </p>
           </div>
         </div>
 
-        <div className="mt-10 pt-6 border-t border-slate-50 flex items-center justify-between">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Configuração Global</p>
+        <div className="mt-10 pt-6 border-t border-slate-50 dark:border-white/5 flex items-center justify-between">
+          <p className="text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest">Configuração Global</p>
           <Button
             onClick={handleSave}
             disabled={saving}
@@ -742,10 +742,8 @@ function OrcamentosTab() {
 ───────────────────────────────────────────── */
 export function SettingsSection({ externalTab }: SettingsSectionProps) {
   const [activeTab, setActiveTab] = useState("profile");
-  const [prevExternalTab, setPrevExternalTab] = useState(externalTab);
 
-  if (externalTab !== prevExternalTab) {
-    setPrevExternalTab(externalTab);
+  useEffect(() => {
     if (externalTab) {
       const tabMap: Record<string, string> = {
         "Meu Perfil": "profile",
@@ -756,17 +754,18 @@ export function SettingsSection({ externalTab }: SettingsSectionProps) {
         "Banners": "banners",
         "Configurações": "profile",
       };
-      if (tabMap[externalTab]) {
-        setActiveTab(tabMap[externalTab]);
+      const target = tabMap[externalTab];
+      if (target && target !== activeTab) {
+        setActiveTab(target);
       }
     }
-  }
+  }, [externalTab]);
 
   return (
-    <div className="h-full flex flex-col bg-[#F8FAFC] pt-4">
+    <div className="h-full flex flex-col bg-[#F8FAFC] dark:bg-slate-950">
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-10 scrollbar-hide">
-        <div className="max-w-6xl mx-auto">
+      <div className="flex-1 overflow-y-auto px-6 md:px-10 py-10 scrollbar-hide">
+        <div className="max-w-[1200px] mx-auto">
           {activeTab === "profile" && <ProfileTab />}
           {activeTab === "orcamentos" && <OrcamentosTab />}
           {activeTab === "notifications" && <NotificationsTab />}
