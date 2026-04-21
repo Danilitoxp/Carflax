@@ -51,7 +51,9 @@ function DashboardContent({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
-  const [activeItem, setActiveItem] = useState("Geral");
+  const [activeItem, setActiveItem] = useState(() => {
+    return localStorage.getItem("carflax-active-section") || "Geral";
+  });
   const [isSugestaoModalOpen, setIsSugestaoModalOpen] = useState(false);
 
   // ── Sincronização Global do Chat ───────────────────────────────────────
@@ -92,6 +94,7 @@ function DashboardContent({
       setIsSugestaoModalOpen(true);
     } else {
       setActiveItem(item);
+      localStorage.setItem("carflax-active-section", item);
     }
   };
 

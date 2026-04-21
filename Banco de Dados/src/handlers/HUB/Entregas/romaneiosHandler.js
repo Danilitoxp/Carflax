@@ -15,8 +15,8 @@ exports.listarRomaneiosHoje = async (req, res) => {
                 GER_CEPCON AS CEP,
                 GER_DTENTR AS DATA_ENTREGA
             FROM VW_ROMANEIOS
-            WHERE DATE(GER_DTENTR) = CURDATE()
-            ORDER BY GER_NUMDOC;
+            WHERE DATE(GER_DTENTR) >= DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY)
+            ORDER BY GER_DTENTR DESC, GER_NUMDOC;
         `;
 
         const [rows] = await pool.query(sql);

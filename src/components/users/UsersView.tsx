@@ -21,7 +21,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "vendedor" | "logistica" | "coletor";
+  role: string;
   status: "ativo" | "suspenso";
   avatar: string;
   lastLogin: string;
@@ -49,7 +49,7 @@ export function UsersView() {
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
-    role: "vendedor" as User["role"],
+    role: "vendedor",
     company: "Carflax" as User["company"],
     department: "Comercial",
     avatar: "",
@@ -526,7 +526,14 @@ export function UsersView() {
 
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cód. Operador</label>
-                  <input type="text" maxLength={3} value={newUser.operatorCode} onChange={(e) => setNewUser({ ...newUser, operatorCode: e.target.value.replace(/\D/g, "") })} placeholder="000" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all text-center" />
+                  <input 
+                    type="text" 
+                    maxLength={newUser.role === "Motorista" ? 5 : 3} 
+                    value={newUser.operatorCode} 
+                    onChange={(e) => setNewUser({ ...newUser, operatorCode: e.target.value.replace(/\D/g, "") })} 
+                    placeholder={newUser.role === "Motorista" ? "00000" : "000"} 
+                    className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all text-center" 
+                  />
                 </div>
 
                 <div className="space-y-1.5">

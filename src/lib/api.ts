@@ -14,11 +14,12 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
   return res.json();
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    ...options
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
   return res.json();
@@ -163,10 +164,10 @@ export interface DetalhesEntregaResponse {
 }
 
 export const apiEntregasRomaneios = () => 
-  get<{ success: boolean; data: EntregaResumo[] }>("/api/entregas/romaneios");
+  get<{ success: boolean; data: EntregaResumo[]; error?: string }>("/api/entregas/romaneios");
 
 export const apiEntregasConcluidas = () => 
-  get<{ success: boolean; data: EntregaResumo[] }>("/api/entregas/concluidas");
+  get<{ success: boolean; data: EntregaResumo[]; error?: string }>("/api/entregas/concluidas");
 
 export const apiEntregasDetalhes = (nf: string) => 
   get<DetalhesEntregaResponse>(`/api/entregas/detalhes/${nf}`);
@@ -229,7 +230,15 @@ export const apiDashboardProdutos = (codigo?: string) =>
 export const apiFornecedores = () => get("/api/fornecedores");
 export const apiProdutos = () => get("/api/produtos");
 export const apiClientes = () => get("/api/clientes");
-export const apiAdminSQL = (query: string) => post("/api/admin/sql", { query, secret: "carflax_admin_2026" });
+export interface SqlResponse {
+  success: boolean;
+  data?: any[];
+  error?: string;
+}
+
+export const apiAdminSQL = (query: string, signal?: AbortSignal) => 
+  post<SqlResponse>("/api/admin/sql", { query, secret: "carflax_admin_2026" }, { signal });
+export const apiAdminSchema = () => get<{ success: boolean, dbName: string, tables: { name: string, type: string }[] }>("/api/admin/sql/schema");
 export const apiHealth = () => get<{ status: string }>("/api/health");
 
 export { API_BASE };

@@ -72,9 +72,36 @@ export function TinyDropdown({
         setIsOpen(false);
       }
     }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!isOpen) return;
+
+      // Se for uma letra ou número
+      if (event.key.length === 1) {
+        const char = event.key.toLowerCase();
+        const found = options.find(o => {
+          const label = typeof o === 'string' ? o : o.label;
+          return label.toLowerCase().startsWith(char);
+        });
+
+        if (found) {
+          const val = typeof found === 'string' ? found : found.value;
+          onChange(val);
+          // Opcional: manter aberto ou fechar. Vou manter aberto para o usuário ver o que selecionou.
+        }
+      }
+
+      if (event.key === "Escape") setIsOpen(false);
+      if (event.key === "Enter") setIsOpen(false);
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, options, onChange]);
 
   return (
     <div className={cn("relative", className)} ref={dropdownRef}>

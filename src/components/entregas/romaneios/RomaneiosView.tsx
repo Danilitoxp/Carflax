@@ -5,15 +5,14 @@ import {
   CheckCircle2,
   Plus,
   Clock,
-  RefreshCw,
   Link2,
   ChevronRight,
   User as UserIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
-import { apiEntregasRomaneios, apiMotoristas, apiEntregasDetalhes } from "@/lib/api";
-import type { EntregaResumo } from "@/lib/api";
+import { apiMotoristas, apiEntregasDetalhes } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export interface Delivery {
   id: string;
@@ -29,7 +28,6 @@ export interface Delivery {
 
 export function RomaneiosView() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
-  const [loading, setLoading] = useState(true);
   const [motoristas, setMotoristas] = useState<{ COD: string; NOME: string }[]>([]);
   const [selectedMotorista, setSelectedMotorista] = useState("");
   const [nfInput, setNfInput] = useState("");
@@ -40,38 +38,30 @@ export function RomaneiosView() {
 
   const fetchData = async () => {
     try {
-      setLoading(true);
-      const [entregasRes, motoristasRes] = await Promise.all([
-        apiEntregasRomaneios(),
-        apiMotoristas()
-      ]);
-
-      if (entregasRes.success) {
-        const mapped = entregasRes.data.map((e: EntregaResumo) => ({
-          id: e.NF,
-          nf: e.NF,
-          client: e.CLIENTE,
-          address: `${e.ENDERECO}, ${e.BAIRRO} - ${e.CIDADE}`,
-          status: "pending" as const,
-          value: "R$ 0,00", // Valor não vem na VW_ROMANEIOS por padrão em Gestão-de-Tempo
-        }));
-        setDeliveries(mapped);
-      }
+      const motoristasRes = await apiMotoristas();
 
       if (motoristasRes.success) {
         setMotoristas(motoristasRes.motoristas);
       }
+
+      // Buscar NFs excluídas hoje no Supabase para manter a tela limpa
+      const { data: excluidos } = await supabase
+        .from("romaneios_excluidos")
+        .select("nf")
+        .eq("data", new Date().toISOString().split("T")[0]);
+
+      if (excluidos) {
+        const nfsExcluidas = new Set(excluidos.map(e => e.nf));
+        setDeliveries(prev => prev.filter(d => !nfsExcluidas.has(d.nf)));
+      }
     } catch (error) {
       console.error("Erro ao buscar entregas:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleLancar = async () => {
     if (!nfInput) return;
     try {
-      setLoading(true);
       const res = await apiEntregasDetalhes(nfInput);
       
       if (res.success && res.data) {
@@ -99,8 +89,23 @@ export function RomaneiosView() {
     } catch (error) {
       console.error("Erro ao lançar NF:", error);
       alert("Erro ao conectar com o servidor.");
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const handleDeleteDelivery = async (id: string, nf: string) => {
+    if (!confirm(`Deseja remover a NF ${nf} do romaneio de hoje?`)) return;
+    
+    try {
+      // Salvar a exclusão no Supabase para persistir
+      await supabase
+        .from("romaneios_excluidos")
+        .insert([{ nf: nf, data: new Date().toISOString().split("T")[0] }]);
+      
+      setDeliveries(prev => prev.filter(d => d.id !== id));
+    } catch (error) {
+      console.error("Erro ao persistir exclusão:", error);
+      // Mesmo se der erro no banco, remove da tela pro usuário
+      setDeliveries(prev => prev.filter(d => d.id !== id));
     }
   };
 
@@ -124,13 +129,7 @@ export function RomaneiosView() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button 
-              onClick={fetchData}
-              className="h-8 px-3 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-slate-600 uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
-            >
-              <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
-              {loading ? "Carregando..." : "Importar de Hoje"}
-            </button>
+            {/* Botão de limpeza removido */}
           </div>
         </div>
 
@@ -182,27 +181,38 @@ export function RomaneiosView() {
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
             <div className="p-4 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="relative">
-                  <img
-                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=Nicholas"
-                    className="w-10 h-10 rounded-xl border border-slate-200 shadow-sm object-cover"
-                    alt="Motorista"
-                  />
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center shadow-sm">
-                    <CheckCircle2 className="w-2.5 h-2.5 text-white" />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <h4 className="text-[12px] font-black text-slate-900 uppercase tracking-tight">Status da Frota</h4>
-                    <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100 text-[8px] font-black tracking-widest uppercase">
-                      {deliveries.length} ENTREGAS HOJE
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Monitorando movimentações do dia</span>
-                  </div>
-                </div>
+                {(() => {
+                  const motoristaAtivo = motoristas.find(m => m.COD === selectedMotorista);
+                  return (
+                    <>
+                      <div className="relative">
+                        <img
+                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${motoristaAtivo?.NOME || "geral"}`}
+                          className="w-10 h-10 rounded-xl border border-slate-200 shadow-sm object-cover bg-white"
+                          alt="Motorista"
+                        />
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center shadow-sm">
+                          <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                        </div>
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h4 className="text-[12px] font-black text-slate-900 uppercase tracking-tight leading-none">
+                            {motoristaAtivo ? `ROMANEIO: ${motoristaAtivo.NOME}` : "STATUS DA FROTA"}
+                          </h4>
+                          <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100 text-[8px] font-black tracking-widest uppercase">
+                            {deliveries.length} ENTREGAS HOJE
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
+                            {motoristaAtivo ? `MOTORISTA CÓD: ${motoristaAtivo.COD}` : "Monitorando movimentações do dia"}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="flex items-center gap-2">
@@ -270,7 +280,11 @@ export function RomaneiosView() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-1.5 transition-all">
-                          <button className="p-1.5 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500" title="Excluir">
+                          <button 
+                            onClick={() => handleDeleteDelivery(delivery.id, delivery.nf)}
+                            className="p-1.5 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500" 
+                            title="Excluir"
+                          >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
