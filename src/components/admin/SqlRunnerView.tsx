@@ -464,7 +464,7 @@ export function SqlRunnerView() {
 
         <div className="flex-1 flex flex-col overflow-hidden bg-card">
           {/* EDITOR CONTAINER */}
-          <div className="flex-1 relative bg-[#09090B] overflow-hidden font-mono text-[13px]">
+          <div className="flex-1 relative bg-card dark:bg-[#09090B] overflow-hidden font-mono text-[13px]">
             {(() => {
               const highlightSql = (code: string) => {
                 if (!code) return "";
@@ -477,10 +477,10 @@ export function SqlRunnerView() {
                   .replace(/</g, "&lt;")
                   .replace(/>/g, "&gt;")
                   .replace(regex, (match, g1, g2, g3, g4) => {
-                    if (g1) return `<span class="text-blue-400 font-black">${match}</span>`;
-                    if (g2) return `<span class="text-purple-400 font-bold">${match}</span>`;
-                    if (g3) return `<span class="text-amber-400">${match}</span>`;
-                    if (g4) return `<span class="text-emerald-400">${match}</span>`;
+                    if (g1) return `<span style="color:var(--sql-keyword)" class="font-black">${match}</span>`;
+                    if (g2) return `<span style="color:var(--sql-function)" class="font-bold">${match}</span>`;
+                    if (g3) return `<span style="color:var(--sql-string)">${match}</span>`;
+                    if (g4) return `<span style="color:var(--sql-number)">${match}</span>`;
                     return match;
                   });
               };
@@ -489,7 +489,7 @@ export function SqlRunnerView() {
                 <>
                   <div 
                     id="sql-highlight"
-                    className="absolute inset-0 p-6 pointer-events-none whitespace-pre-wrap break-words overflow-auto scrollbar-hide text-foreground/90 font-bold tracking-tight"
+                    className="absolute inset-0 p-6 pointer-events-none whitespace-pre-wrap break-words overflow-auto scrollbar-hide text-foreground/80 font-bold tracking-tight"
                     dangerouslySetInnerHTML={{ __html: highlightSql(query) + "\n" }}
                   />
                   <textarea 

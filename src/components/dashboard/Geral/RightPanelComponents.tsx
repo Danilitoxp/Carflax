@@ -22,7 +22,8 @@ import {
 import { cn } from "@/lib/utils";
 
 import { useState, useEffect } from "react";
-import { apiDashboardGeral, type VendedorResumo } from "@/lib/api";
+import { apiDashboardGeral, type VendedorResumo, apiEntregasConcluidas, apiCampanhaMetas } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 interface UserProfileLite {
   operator_code?: string;
@@ -242,28 +243,116 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   );
 }
 
-export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
+export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: boolean }) {
   const [likes, setLikes] = useState<{name: string, avatar: string}[]>([]);
+  const [employee, setEmployee] = useState<{ name: string; role: string; department: string; achievement: string; avatar: string } | null>(null);
+  const [internalLoading, setInternalLoading] = useState(true);
+
+  const loading = externalLoading !== undefined ? externalLoading : internalLoading;
   
   useEffect(() => {
-    async function fetchLikes() {
+    async function fetchHighlight() {
       try {
-        const { data, error } = await supabase
-          .from("usuarios")
-          .select("name, avatar")
-          .limit(5);
+        setInternalLoading(true);
+        const now = new Date();
+        const mesanoISO = now.toISOString().slice(0, 7); // '2026-04'
+        const currentMonthNum = now.getMonth();
+
+        // 1. Tenta buscar destaque oficial do banco (Supabase)
+        const { data: official } = await supabase
+          .from("destaque_do_mes")
+          .select("*, usuarios(name, avatar, department, role)")
+          .eq("mesano", mesanoISO)
+          .maybeSingle();
+
+        if (official && official.usuarios) {
+          setEmployee({
+            name: official.usuarios.name,
+            role: official.usuarios.role || official.setor,
+            department: official.usuarios.department || official.setor,
+            achievement: official.motivo_conquista,
+            avatar: official.usuarios.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${official.usuarios.name}`
+          });
+          return;
+        }
+
+        // 2. Lógica Automática Híbrida
+        const sectors = ["Comercial", "Logística", "Social"];
+        const focusSector = sectors[currentMonthNum % sectors.length];
+
+        if (focusSector === "Comercial") {
+          try {
+            const sellersData = await apiCampanhaMetas(mesanoISO.replace("-", ""));
+            const topSeller = (sellersData.resumo || [])
+              .filter(v => Number(v.FATURAMENTO) > 0)
+              .sort((a, b) => Number(b.FATURAMENTO) - Number(a.FATURAMENTO))[0];
+
+            if (topSeller) {
+              setEmployee({
+                name: topSeller.NOME_VENDEDOR,
+                role: "Consultor de Vendas",
+                department: "Comercial",
+                achievement: `Líder de faturamento do mês, atingindo R$ ${Number(topSeller.FATURAMENTO).toLocaleString("pt-BR")}.`,
+                avatar: topSeller.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${topSeller.COD_VENDEDOR}`
+              });
+              return;
+            }
+          } catch (err) {
+            console.warn("Fallback: Falha na API comercial, tentando social...", err);
+          }
+        } else if (focusSector === "Logística") {
+          try {
+            const deliveries = await apiEntregasConcluidas();
+            if (deliveries.success && deliveries.data.length > 0) {
+              const driver = deliveries.data[0];
+              setEmployee({
+                name: "Equipe de Logística",
+                role: "Operacional",
+                department: "Expedição",
+                achievement: `Eficiência recorde na entrega NF ${driver.NF}, garantindo prazos e satisfação do cliente.`,
+                avatar: `https://api.dicebear.com/7.x/shapes/svg?seed=logistics`
+              });
+              return;
+            }
+          } catch (err) {
+            console.warn("Fallback: Falha na API logística, tentando social...", err);
+          }
+        } 
         
-        if (!error && data) {
-          setLikes(data.filter(u => u.avatar || u.name));
+        // Social/Geral Fallback (Sempre funciona como última opção)
+        const { data: users } = await supabase.from("usuarios").select("name, avatar, department, role").limit(20);
+        if (users && users.length > 0) {
+          const u = users[currentMonthNum % users.length];
+          setEmployee({
+            name: u.name,
+            role: u.role || "Especialista",
+            department: u.department || "Carflax",
+            achievement: "Exemplo de proatividade e colaboração intersetorial durante este mês.",
+            avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`
+          });
         }
       } catch (err) {
-        console.error("Erro social proof:", err);
+        console.error("Erro destaque fatal:", err);
+      } finally {
+        setInternalLoading(false);
       }
     }
+
+    async function fetchLikes() {
+      try {
+        const { data } = await supabase.from("usuarios").select("name, avatar").limit(5);
+        if (data) setLikes(data.filter(u => u.avatar || u.name));
+      } catch (err) { console.error(err); }
+    }
+
+    fetchHighlight();
     fetchLikes();
   }, []);
 
-  if (loading) {
+  const getLikeAvatar = (avatar: string, name: string) => 
+    avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || 'user')}`;
+
+  if (loading || !employee) {
     return (
       <div className="flex-1 flex flex-col min-h-[380px] bg-card border border-border rounded-2xl shadow-sm overflow-hidden animate-pulse">
         <div className="h-28 bg-slate-100 dark:bg-slate-800 shrink-0" />
@@ -282,17 +371,6 @@ export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
     );
   }
 
-  const employee = {
-    name: "Danilo Oliveira",
-    role: "Analista de TI",
-    department: "Marketing / TI",
-    achievement: "Superou todas as metas de implementação do mês com inovação e proatividade constante na plataforma.",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo"
-  };
-
-  const getLikeAvatar = (avatar: string, name: string) => 
-    avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || 'user')}`;
-
 
   return (
     <div className="flex-1 flex flex-col min-h-[380px] bg-card border border-border rounded-2xl shadow-sm overflow-hidden group transition-all duration-500 hover:shadow-xl hover:shadow-blue-900/5 hover:border-blue-200">
@@ -301,14 +379,7 @@ export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "linear-gradient(30deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(150deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(30deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(150deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(60deg, #999 25%, transparent 25.5%, transparent 75%, #999 75%, #999), linear-gradient(60deg, #999 25%, transparent 25.5%, transparent 75%, #999 75%, #999)", backgroundSize: "80px 140px" }} />
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16" />
         
-        <div className="relative z-10 flex flex-col items-center">
-          <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center mb-2 border border-white/20">
-            <Trophy className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-[9px] font-black text-white uppercase tracking-[0.4em] leading-none opacity-80">
-            Destaque do Mês
-          </span>
-        </div>
+
       </div>
 
       {/* Main Content Area */}
@@ -338,7 +409,7 @@ export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
         </div>
 
         {/* Achievement Quote - Fills space */}
-        <div className="flex-1 w-full bg-slate-50 dark:bg-secondary/30 rounded-2xl p-4 border border-slate-100 dark:border-border flex flex-col relative overflow-hidden group/quote">
+        <div className="flex-1 w-full bg-slate-50/50 dark:bg-secondary/30 backdrop-blur-md rounded-2xl p-4 border border-slate-100 dark:border-border flex flex-col relative overflow-hidden group/quote">
           <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50/50 rounded-full blur-2xl -mr-8 -mt-8" />
           
           <div className="flex items-start gap-2 mb-2 relative z-10">
@@ -349,12 +420,10 @@ export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
           <p className="text-[11px] font-bold text-slate-700 dark:text-muted-foreground leading-relaxed italic relative z-10">
             "{employee.achievement}"
           </p>
-
-          <QuoteIcon className="absolute bottom-2 right-4 w-12 h-12 text-slate-200 dark:text-slate-800/40 transform rotate-180 pointer-events-none" />
         </div>
 
         {/* Bottom Metadata & Social Proof */}
-        <div className="w-full pt-4 mt-auto border-t border-slate-50 flex items-center justify-between">
+        <div className="w-full pt-4 mt-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             {likes.length > 0 ? (
               <div className="flex -space-x-2">
@@ -394,16 +463,7 @@ export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
   );
 }
 
-// Minimal Quote Icon for the card
-function QuoteIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-      <path d="M14.017 21L14.017 18C14.017 16.8954 14.9124 16 16.017 16H19.017C19.5693 16 20.017 15.5523 20.017 15V9C20.017 8.44772 19.5693 8 19.017 8H15.017C14.4647 8 14.017 8.44772 14.017 9V12C14.017 12.5523 13.5693 13 13.017 13H11.017L11.017 21H14.017ZM5.017 21L5.017 18C5.017 16.8954 5.91243 16 7.017 16H10.017C10.5693 16 11.017 15.5523 11.017 15V9C11.017 8.44772 10.5693 8 10.017 8H6.017C5.46472 8 5.017 8.44772 5.017 9V12C5.017 12.5523 4.56935 13 4.017 13H2.017L2.017 21H5.017Z" />
-    </svg>
-  );
-}
 
-import { supabase } from "@/lib/supabase";
 
 export function WeatherTrafficCard() {
   const [weather] = useState({ temp: 24, condition: "Partly Cloudy", city: "São Paulo" });

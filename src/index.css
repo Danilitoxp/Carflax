@@ -51,6 +51,12 @@
     --input: 220 13% 91%;
     --ring: 221 83% 53%;
     --radius: 0.5rem; /* ERPs usually have smaller radius */
+
+    /* SQL Editor syntax colors - Light Mode */
+    --sql-keyword: #1d4ed8;   /* blue-700 */
+    --sql-function: #7c3aed;  /* violet-700 */
+    --sql-string:   #b45309;  /* amber-700 */
+    --sql-number:   #047857;  /* emerald-700 */
   }
 
   .dark {
@@ -73,6 +79,12 @@
     --border: 217.2 32.6% 12%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+
+    /* SQL Editor syntax colors - Dark Mode */
+    --sql-keyword: #60a5fa;   /* blue-400 */
+    --sql-function: #c084fc;  /* purple-400 */
+    --sql-string:   #fbbf24;  /* amber-400 */
+    --sql-number:   #34d399;  /* emerald-400 */
   }
 }
 
