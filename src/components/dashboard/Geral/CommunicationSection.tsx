@@ -132,8 +132,8 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
   };
 
   return (
-    <div className="bg-white border border-border rounded-2xl overflow-hidden flex flex-col sm:flex-row transition-all duration-300 hover:shadow-lg h-auto sm:min-h-[220px] group">
-      <div className="w-full sm:w-64 bg-slate-100 shrink-0 border-b sm:border-b-0 sm:border-r border-border overflow-hidden relative min-h-[160px]">
+    <div className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col sm:flex-row transition-all duration-300 hover:shadow-lg h-auto sm:min-h-[220px] group">
+      <div className="w-full sm:w-64 bg-slate-100 dark:bg-slate-800/50 shrink-0 border-b sm:border-b-0 sm:border-r border-border overflow-hidden relative min-h-[160px]">
         {!imageLoaded && (
           <div className="absolute inset-0 bg-slate-200 animate-pulse flex items-center justify-center">
             <div className="w-10 h-10 border-4 border-slate-300 border-t-slate-400 rounded-full animate-spin" />
@@ -157,47 +157,49 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
       <div className="flex-1 p-6 flex flex-col min-w-0">
         <div className="flex justify-between items-start gap-4 mb-2">
           <div className="flex items-center gap-3">
-             <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-blue-50 text-blue-600 uppercase tracking-widest">{data.category}</span>
-             <span className="text-xs text-slate-400 font-bold">{data.date}</span>
+             <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 uppercase tracking-widest">{data.category}</span>
+             <span className="text-xs text-slate-500 dark:text-slate-500 font-bold">{data.date}</span>
           </div>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-            <button onClick={handleShare} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Compartilhar">
+            <button onClick={handleShare} className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all" title="Compartilhar">
               <Share2 className="w-4 h-4" />
             </button>
-            <button onClick={() => onEdit(data)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Editar">
+            <button onClick={() => onEdit(data)} className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all" title="Editar">
               <Edit2 className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        <h3 className="text-lg font-black text-slate-900 tracking-tight mb-2 group-hover:text-blue-600 transition-colors uppercase">{data.title}</h3>
-        <p className="text-sm text-slate-500 leading-relaxed line-clamp-3 mb-4 font-medium">{data.content}</p>
+        <h3 className="text-lg font-black text-foreground tracking-tight mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase">{data.title}</h3>
+        <p className="text-sm text-slate-600 dark:text-muted-foreground leading-relaxed line-clamp-3 mb-4 font-medium">{data.content}</p>
 
-        <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-50">
+        <div className="mt-auto flex items-center justify-between pt-4 border-t border-border">
           <div className="flex items-center gap-6">
-             <button
-               onClick={handleLike}
-               className={cn(
-                 "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-3 py-1.5 rounded-xl", 
-                 interaction === "like" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
-               )}
+             <button 
+                onClick={handleLike}
+                className={cn(
+                  "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-4 py-2 rounded-xl border", 
+                  interaction === "like" 
+                    ? "bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-600/20" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary border-transparent"
+                )}
              >
-               <ThumbsUp className={cn("w-4 h-4", interaction === "like" && "fill-white")} />
+               <ThumbsUp className={cn("w-4 h-4", interaction === "like" && "fill-current")} />
                {likes}
              </button>
               <div className="flex items-center -space-x-2">
                 {likersAvatars.map((url, i) => (
-                  <div key={i} className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-slate-100 ring-1 ring-slate-100 shadow-sm transition-transform hover:scale-110 hover:z-10">
+                  <div key={i} className="w-8 h-8 rounded-full border-2 border-card overflow-hidden bg-slate-100 dark:bg-slate-800 ring-1 ring-border shadow-sm transition-transform hover:scale-110 hover:z-10">
                     <img src={url} className="w-full h-full object-cover" alt="liker" />
                   </div>
                 ))}
               </div>
           </div>
-          <div className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+          <div className="flex items-center gap-3 bg-secondary/50 px-3 py-1.5 rounded-xl border border-border">
              <img src={data.authorAvatar} className="w-7 h-7 rounded-full shadow-sm object-cover" alt={data.author} />
              <div className="flex flex-col leading-none text-left">
-               <span className="text-[10px] font-black text-slate-900 uppercase tracking-tighter truncate max-w-[80px]">{data.author}</span>
-               <span className="text-[9px] font-bold text-slate-400 uppercase">Autor</span>
+               <span className="text-[10px] font-black text-foreground uppercase tracking-tighter truncate max-w-[80px]">{data.author}</span>
+               <span className="text-[9px] font-bold text-slate-500 dark:text-muted-foreground uppercase">Autor</span>
              </div>
           </div>
         </div>
@@ -336,11 +338,11 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
   return (
     <div className="flex flex-col relative">
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-sm bg-slate-900/10">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-sm bg-black/40">
           <div className="fixed inset-0" onClick={() => !saving && setIsModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
-            <div className="w-full md:w-80 bg-slate-50 p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-100 shrink-0">
-               <div className="w-40 h-40 md:w-56 md:h-56 rounded-2xl border-4 border-white shadow-xl overflow-hidden mb-6 group relative bg-white flex items-center justify-center">
+          <div className="relative bg-card w-full max-w-4xl rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+            <div className="w-full md:w-80 bg-secondary/30 dark:bg-slate-800/50 p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-border shrink-0">
+               <div className="w-40 h-40 md:w-56 md:h-56 rounded-2xl border-4 border-card shadow-xl overflow-hidden mb-6 group relative bg-card flex items-center justify-center">
                   <img src={newPost.image || "https://api.dicebear.com/7.x/shapes/svg?seed=placeholder"} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="Preview" />
                   <label className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer backdrop-blur-[2px]">
                     <ImageIcon className="w-8 h-8 text-white mb-2" />
@@ -351,28 +353,28 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
                <Button variant="outline" onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()} disabled={saving} className="font-bold text-xs h-10 px-6 rounded-xl">SELECIONAR FOTO</Button>
             </div>
 
-            <div className="flex-1 flex flex-col min-w-0 bg-white">
-              <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">{editingId ? "EDITAR COMUNICADO" : "NOVO COMUNICADO"}</h2>
-                {!saving && <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors">✕</button>}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="p-8 border-b border-border flex items-center justify-between">
+                <h2 className="text-xl font-black text-foreground tracking-tight uppercase">{editingId ? "EDITAR COMUNICADO" : "NOVO COMUNICADO"}</h2>
+                {!saving && <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-secondary/50 rounded-xl text-muted-foreground transition-colors">✕</button>}
               </div>
               <div className="p-8 overflow-y-auto space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assunto do Post</label>
-                    <input type="text" value={newPost.title} onChange={(e) => setNewPost({ ...newPost, title: e.target.value })} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Título impactante..." disabled={saving} />
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Assunto do Post</label>
+                    <input type="text" value={newPost.title} onChange={(e) => setNewPost({ ...newPost, title: e.target.value })} className="w-full px-4 py-3 bg-secondary/20 border border-border rounded-xl text-sm font-bold text-foreground outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-muted-foreground/30" placeholder="Título impactante..." disabled={saving} />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoria de Filtro</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Categoria de Filtro</label>
                     <TinyDropdown value={newPost.category} options={categories.filter(c => c !== "Todos")} onChange={(val) => setNewPost({ ...newPost, category: val })} icon={Tag} variant="blue" className="w-full" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Conteúdo do Comunicado</label>
-                  <textarea value={newPost.content} onChange={(e) => setNewPost({ ...newPost, content: e.target.value })} rows={6} className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 outline-none focus:ring-1 focus:ring-blue-500 resize-none" placeholder="O que você quer contar para a equipe?" disabled={saving} />
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Conteúdo do Comunicado</label>
+                  <textarea value={newPost.content} onChange={(e) => setNewPost({ ...newPost, content: e.target.value })} rows={6} className="w-full p-4 bg-secondary/20 border border-border rounded-xl text-sm font-medium text-foreground outline-none focus:ring-1 focus:ring-blue-500 resize-none placeholder:text-muted-foreground/30" placeholder="O que você quer contar para a equipe?" disabled={saving} />
                 </div>
               </div>
-              <div className="p-8 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
+              <div className="p-8 bg-secondary/50 border-t border-border flex items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3">
                   {editingId && (
                     <Button 
@@ -400,16 +402,27 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
         <div className="flex items-center gap-1">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-7 w-16 bg-slate-100 rounded-md animate-pulse" />
+              <div key={i} className="h-7 w-16 bg-secondary dark:bg-slate-800/80 rounded-md animate-pulse" />
             ))
           ) : (
             categories.map((cat) => (
-              <button key={cat} onClick={() => setActiveCategory(cat)} className={cn("px-4 py-1.5 text-xs font-bold rounded-md transition-all", activeCategory === cat ? "bg-slate-100 text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50")}>{cat}</button>
+              <button 
+                key={cat} 
+                onClick={() => setActiveCategory(cat)} 
+                className={cn(
+                  "px-4 py-1.5 text-xs font-bold rounded-xl transition-all uppercase tracking-widest border", 
+                  activeCategory === cat 
+                    ? "bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-600/20 shadow-sm" 
+                    : "text-slate-500 dark:text-slate-400 hover:text-foreground hover:bg-secondary/50 border-transparent"
+                )}
+              >
+                {cat}
+              </button>
             ))
           )}
         </div>
         {loading ? (
-          <div className="h-9 w-40 bg-slate-100 rounded-md animate-pulse shadow-sm" />
+          <div className="h-9 w-40 bg-secondary dark:bg-slate-800/80 rounded-md animate-pulse shadow-sm" />
         ) : (
           <Button onClick={() => { setEditingId(null); setNewPost({ title: "", content: "", category: "Empresa", image: "" }); setIsModalOpen(true); }} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md h-9 px-4 text-[11px] font-bold shadow-sm group">
             <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" /> NOVO COMUNICADO
@@ -419,22 +432,22 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
 
       <div className="flex flex-col gap-4">
         {loading && Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-white border border-slate-100 rounded-2xl overflow-hidden flex flex-col sm:flex-row h-auto sm:min-h-[220px] animate-pulse">
-            <div className="w-full sm:w-64 bg-slate-200 shrink-0" />
+          <div key={i} className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col sm:flex-row h-auto sm:min-h-[220px] animate-pulse">
+            <div className="w-full sm:w-64 bg-secondary dark:bg-slate-800/50 shrink-0" />
             <div className="flex-1 p-8 space-y-4">
               <div className="flex gap-3">
-                <div className="h-6 w-20 bg-slate-100 rounded-lg" />
-                <div className="h-6 w-24 bg-slate-100 rounded-lg" />
+                <div className="h-6 w-20 bg-secondary dark:bg-slate-800 rounded-lg" />
+                <div className="h-6 w-24 bg-secondary dark:bg-slate-800 rounded-lg" />
               </div>
-              <div className="h-8 w-3/4 bg-slate-200 rounded-xl" />
+              <div className="h-8 w-3/4 bg-secondary dark:bg-slate-800/50 rounded-xl" />
               <div className="space-y-2">
-                <div className="h-4 w-full bg-slate-100 rounded-md" />
-                <div className="h-4 w-full bg-slate-100 rounded-md" />
-                <div className="h-4 w-2/3 bg-slate-100 rounded-md" />
+                <div className="h-4 w-full bg-secondary dark:bg-slate-800 rounded-md" />
+                <div className="h-4 w-full bg-secondary dark:bg-slate-800 rounded-md" />
+                <div className="h-4 w-2/3 bg-secondary dark:bg-slate-800 rounded-md" />
               </div>
-              <div className="pt-4 border-t border-slate-50 flex justify-between items-center">
-                <div className="h-8 w-24 bg-slate-100 rounded-xl" />
-                <div className="h-10 w-32 bg-slate-100 rounded-xl" />
+              <div className="pt-4 border-t border-border flex justify-between items-center">
+                <div className="h-8 w-24 bg-secondary dark:bg-slate-800 rounded-xl" />
+                <div className="h-10 w-32 bg-secondary dark:bg-slate-800 rounded-xl" />
               </div>
             </div>
           </div>

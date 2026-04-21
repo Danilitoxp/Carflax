@@ -31,17 +31,17 @@ export function EventsView({ day, month, year, events, activeFilters, onEventCli
 
   const getEventStyles = (type: string) => {
     switch (type) {
-      case "birthday": return "bg-rose-50/80 text-rose-600 border-rose-100/50 hover:bg-rose-100 transition-colors";
-      case "star": return "bg-amber-50/80 text-amber-600 border-amber-100/50 hover:bg-amber-100";
-      case "holiday": return "bg-orange-100/80 text-orange-700 border-orange-200 hover:bg-orange-200 shadow-sm";
-      case "education": return "bg-indigo-50/80 text-indigo-600 border-indigo-100/50 hover:bg-indigo-100";
-      case "meeting": return "bg-violet-50/80 text-violet-600 border-violet-100/50 hover:bg-violet-100";
-      case "celebration": return "bg-pink-50/80 text-pink-600 border-pink-100/50 hover:bg-pink-100";
-      case "finance": return "bg-emerald-50/80 text-emerald-600 border-emerald-100/50 hover:bg-emerald-100";
-      case "important": return "bg-red-50/80 text-red-600 border-red-200/50 hover:bg-red-100";
-      case "launch": return "bg-cyan-50/80 text-cyan-600 border-cyan-100/50 hover:bg-cyan-100";
-      case "video": return "bg-blue-50/80 text-blue-600 border-blue-100/50 hover:bg-blue-100";
-      default: return "bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100";
+      case "birthday": return "bg-rose-50/80 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-200/50 dark:border-rose-500/30 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors";
+      case "star": return "bg-amber-50/80 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-200/50 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/20";
+      case "holiday": return "bg-orange-100/80 dark:bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/30 hover:bg-orange-200 dark:hover:bg-orange-500/20 shadow-sm";
+      case "education": return "bg-indigo-50/80 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-200/50 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-500/20";
+      case "meeting": return "bg-violet-50/80 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-200/50 dark:border-violet-500/30 hover:bg-violet-100 dark:hover:bg-violet-500/20";
+      case "celebration": return "bg-pink-50/80 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-200/50 dark:border-pink-500/30 hover:bg-pink-100 dark:hover:bg-pink-500/20";
+      case "finance": return "bg-emerald-50/80 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-500/20";
+      case "important": return "bg-red-50/80 dark:bg-red-500/15 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-500/30 hover:bg-red-100 dark:hover:bg-red-500/20";
+      case "launch": return "bg-cyan-50/80 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-200/50 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-500/20";
+      case "video": return "bg-blue-50/80 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/30 hover:bg-blue-100 dark:hover:bg-blue-500/20";
+      default: return "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700";
     }
   };
 

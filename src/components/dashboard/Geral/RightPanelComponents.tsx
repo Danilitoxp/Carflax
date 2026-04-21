@@ -116,22 +116,22 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
 
   if (loading) {
     return (
-      <div className="bg-white border border-border rounded-xl p-5 shadow-sm space-y-8 animate-pulse">
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-8 animate-pulse">
         <div className="flex justify-center flex-col items-center gap-3">
-          <div className="w-24 h-24 rounded-full bg-slate-100" />
-          <div className="h-3 w-20 bg-slate-100 rounded" />
+          <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800" />
+          <div className="h-3 w-20 bg-slate-100 dark:bg-slate-800 rounded" />
         </div>
         <div className="space-y-3">
-          <div className="h-2 w-full bg-slate-100 rounded" />
-          <div className="h-10 w-full bg-slate-50 rounded-xl" />
+          <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded" />
+          <div className="h-10 w-full bg-secondary/50 dark:bg-slate-800/50 rounded-xl" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="flex gap-2">
-              <div className="w-8 h-8 bg-slate-50 rounded-lg" />
+              <div className="w-8 h-8 bg-secondary/50 dark:bg-slate-800/50 rounded-lg" />
               <div className="space-y-2 flex-1">
-                <div className="h-1.5 w-1/2 bg-slate-100 rounded" />
-                <div className="h-2 w-3/4 bg-slate-50 rounded" />
+                <div className="h-1.5 w-1/2 bg-slate-100 dark:bg-slate-800 rounded" />
+                <div className="h-2 w-3/4 bg-secondary/30 dark:bg-slate-800/30 rounded" />
               </div>
             </div>
           ))}
@@ -146,7 +146,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
 
   return (
     <div className={cn(
-      "bg-white border border-border rounded-xl shadow-sm flex flex-col",
+      "bg-card border border-border rounded-xl shadow-sm flex flex-col",
       isCompact ? "p-4" : "p-5"
     )}>
       {/* 1. HEADER (Limpado) */}
@@ -168,7 +168,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
               stroke="currentColor"
               strokeWidth="8"
               fill="transparent"
-              className="text-slate-100"
+              className="text-secondary dark:text-slate-800"
             />
             <circle
               cx="50"
@@ -182,28 +182,28 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
               fill="transparent"
               className={cn(
                 "transition-all duration-1000 ease-out",
-                percentageVsEquilibrio >= 100 ? "text-blue-600" : "text-rose-500"
+                percentageVsEquilibrio >= 100 ? "text-blue-600 dark:text-blue-500" : "text-rose-500"
               )}
             />
           </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+          <div className="absolute inset-0 flex flex-col items-center justify-center leading-none text-center">
             <span className={cn(
               "text-2xl font-black tracking-tighter",
-              percentageVsEquilibrio >= 100 ? "text-slate-900" : "text-rose-600"
+              percentageVsEquilibrio >= 100 ? "text-foreground" : "text-rose-600"
             )}>
               {percentageVsEquilibrio.toFixed(0)}%
             </span>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Equilíbrio</span>
+            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Equilíbrio</span>
           </div>
         </div>
       </div>
 
       {/* 4. VALOR VENDIDO (MAIS DISCRETO) */}
       <div className="mb-4 flex flex-col items-center text-center">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 font-sans">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 font-sans">
           Total Vendido Hoje
         </p>
-        <h3 className="text-2xl font-black text-slate-900 tracking-tighter mb-1.5">
+        <h3 className="text-2xl font-black text-foreground tracking-tighter mb-1.5">
           {formatBRL(data?.TOTAL_VENDIDO_HOJE || 0)}
         </h3>
       </div>
@@ -211,12 +211,12 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
       {/* Progress Bar (Meta) */}
       <div className="mb-8 px-2">
         <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
-          <span className="text-blue-600">Meta</span>
-          <span className="text-slate-900">{((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100).toFixed(1)}%</span>
+          <span className="text-blue-600 dark:text-blue-500">Meta</span>
+          <span className="text-foreground">{((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100).toFixed(1)}%</span>
         </div>
-        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
+        <div className="h-2 w-full bg-secondary dark:bg-slate-800 rounded-full overflow-hidden border border-border">
           <div
-            className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(37,99,235,0.4)]"
+            className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(37,99,235,0.4)]"
             style={{ width: `${Math.min(((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100), 100)}%` }}
           />
         </div>
@@ -226,12 +226,12 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
       <div className="grid grid-cols-2 gap-x-6 gap-y-5">
         {metrics.map((m, i) => (
           <div key={i} className="flex items-start gap-3 group">
-            <div className="mt-0.5 p-1.5 bg-slate-50 border border-slate-100 rounded-lg shrink-0 transition-colors group-hover:bg-white group-hover:border-slate-200">
-              <m.icon className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+            <div className="mt-0.5 p-1.5 bg-secondary/50 dark:bg-slate-800/50 border border-border rounded-lg shrink-0 transition-colors group-hover:bg-card group-hover:border-slate-400/20">
+              <m.icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate mb-0.5">{m.label}</span>
-              <span className={cn("text-xs font-black tracking-tight", m.valueColor)}>
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider truncate mb-0.5">{m.label}</span>
+              <span className={cn("text-xs font-black tracking-tight", m.valueColor.includes('slate-900') ? 'text-foreground' : m.valueColor)}>
                 {m.value}
               </span>
             </div>
@@ -265,18 +265,18 @@ export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col min-h-[380px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-pulse">
-        <div className="h-28 bg-slate-100 shrink-0" />
+      <div className="flex-1 flex flex-col min-h-[380px] bg-card border border-border rounded-2xl shadow-sm overflow-hidden animate-pulse">
+        <div className="h-28 bg-slate-100 dark:bg-slate-800 shrink-0" />
         <div className="flex-1 flex flex-col items-center px-6 -mt-12 relative z-10 pb-6 space-y-6">
-           <div className="w-24 h-24 rounded-3xl bg-white p-1.5 shadow-xl">
-             <div className="w-full h-full rounded-2xl bg-slate-50" />
+           <div className="w-24 h-24 rounded-3xl bg-card p-1.5 shadow-xl">
+             <div className="w-full h-full rounded-2xl bg-secondary/50 dark:bg-slate-800/50" />
            </div>
            <div className="text-center space-y-2 w-full">
-              <div className="h-4 w-3/4 bg-slate-100 rounded mx-auto" />
-              <div className="h-3 w-1/2 bg-slate-50 rounded mx-auto" />
+              <div className="h-4 w-3/4 bg-slate-100 dark:bg-slate-800 rounded mx-auto" />
+              <div className="h-3 w-1/2 bg-secondary/30 dark:bg-slate-800/30 rounded mx-auto" />
            </div>
-           <div className="flex-1 w-full bg-slate-50 rounded-2xl" />
-           <div className="w-full h-10 bg-slate-50 rounded-xl" />
+           <div className="flex-1 w-full bg-secondary/10 dark:bg-slate-800/20 rounded-2xl" />
+           <div className="w-full h-10 bg-secondary/30 dark:bg-slate-800/30 rounded-xl" />
         </div>
       </div>
     );
@@ -295,7 +295,7 @@ export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
 
 
   return (
-    <div className="flex-1 flex flex-col min-h-[380px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden group transition-all duration-500 hover:shadow-xl hover:shadow-blue-900/5 hover:border-blue-200">
+    <div className="flex-1 flex flex-col min-h-[380px] bg-card border border-border rounded-2xl shadow-sm overflow-hidden group transition-all duration-500 hover:shadow-xl hover:shadow-blue-900/5 hover:border-blue-200">
       {/* Header Banner - Carflax Blue */}
       <div className="h-28 bg-gradient-to-br from-blue-700 to-blue-600 relative overflow-hidden flex items-center justify-center shrink-0">
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "linear-gradient(30deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(150deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(30deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(150deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(60deg, #999 25%, transparent 25.5%, transparent 75%, #999 75%, #999), linear-gradient(60deg, #999 25%, transparent 25.5%, transparent 75%, #999 75%, #999)", backgroundSize: "80px 140px" }} />
@@ -315,30 +315,30 @@ export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
       <div className="flex-1 flex flex-col items-center px-6 -mt-12 relative z-10 pb-6">
         {/* Avatar Spotlight */}
         <div className="relative mb-4 group-hover:scale-105 transition-transform duration-500">
-          <div className="w-24 h-24 rounded-3xl bg-white p-1.5 shadow-xl shadow-blue-900/10 border border-slate-100 overflow-hidden">
-            <div className="w-full h-full rounded-2xl overflow-hidden bg-slate-50 border border-slate-50">
+          <div className="w-24 h-24 rounded-3xl bg-card p-1.5 shadow-xl shadow-blue-950/20 border border-border overflow-hidden">
+            <div className="w-full h-full rounded-2xl overflow-hidden bg-secondary dark:bg-slate-800 border border-border">
               <img src={employee.avatar} className="w-full h-full object-cover" alt={employee.name} />
             </div>
           </div>
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-amber-500 rounded-lg flex items-center justify-center border-2 border-white shadow-lg">
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-amber-500 rounded-lg flex items-center justify-center border-2 border-card shadow-lg">
             <Star className="w-3 h-3 text-white fill-current" />
           </div>
         </div>
 
         {/* Info Block */}
         <div className="text-center w-full mb-6">
-          <h4 className="text-lg font-black text-slate-900 uppercase tracking-tighter leading-tight mb-1">
+          <h4 className="text-lg font-black text-foreground uppercase tracking-tighter leading-tight mb-1">
             {employee.name}
           </h4>
           <div className="flex items-center justify-center gap-2">
-            <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-[9px] font-bold uppercase tracking-widest border border-blue-100/30">
+            <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-[9px] font-bold uppercase tracking-widest border border-blue-100/30">
               {employee.role}
             </span>
           </div>
         </div>
 
         {/* Achievement Quote - Fills space */}
-        <div className="flex-1 w-full bg-slate-50/50 rounded-2xl p-4 border border-slate-100/50 flex flex-col relative overflow-hidden group/quote">
+        <div className="flex-1 w-full bg-slate-50 dark:bg-secondary/30 rounded-2xl p-4 border border-slate-100 dark:border-border flex flex-col relative overflow-hidden group/quote">
           <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50/50 rounded-full blur-2xl -mr-8 -mt-8" />
           
           <div className="flex items-start gap-2 mb-2 relative z-10">
@@ -346,11 +346,11 @@ export function EmployeeOfMonthCard({ loading }: { loading?: boolean }) {
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Motivo do Prêmio</span>
           </div>
           
-          <p className="text-[11px] font-bold text-slate-600 leading-relaxed italic relative z-10">
+          <p className="text-[11px] font-bold text-slate-700 dark:text-muted-foreground leading-relaxed italic relative z-10">
             "{employee.achievement}"
           </p>
 
-          <QuoteIcon className="absolute bottom-2 right-4 w-12 h-12 text-blue-100 opacity-20 transform rotate-180" />
+          <QuoteIcon className="absolute bottom-2 right-4 w-12 h-12 text-slate-200 dark:text-slate-800/40 transform rotate-180 pointer-events-none" />
         </div>
 
         {/* Bottom Metadata & Social Proof */}
@@ -409,12 +409,12 @@ export function WeatherTrafficCard() {
   const [weather] = useState({ temp: 24, condition: "Partly Cloudy", city: "São Paulo" });
   
   return (
-    <div className="bg-white border border-border rounded-xl p-5 shadow-sm flex flex-col gap-4 overflow-hidden relative group cursor-pointer">
+    <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col gap-4 overflow-hidden relative group cursor-pointer">
       {/* Background Gradient Effect */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-700 opacity-50" />
+      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 dark:bg-blue-900/20 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-700 opacity-50" />
       
       <div className="flex items-center justify-between relative z-10">
-        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">
           Clima e Trânsito
         </h4>
         <Sun className="w-3.5 h-3.5 text-amber-500" />
@@ -422,25 +422,25 @@ export function WeatherTrafficCard() {
 
       <div className="flex items-center gap-4 relative z-10">
         <div className="flex flex-col">
-          <span className="text-3xl font-black text-slate-900 tracking-tighter leading-none">{weather.temp}°C</span>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">{weather.city}</span>
+          <span className="text-3xl font-black text-foreground tracking-tighter leading-none">{weather.temp}°C</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1.5">{weather.city}</span>
         </div>
-        <div className="h-8 w-px bg-slate-100 hidden sm:block" />
+        <div className="h-8 w-px bg-border hidden sm:block" />
         <div className="flex flex-col">
-          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tight">Céu Limpo</span>
-          <span className="text-[10px] font-medium text-slate-400 mt-0.5">Sem previsão de chuva</span>
+          <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-tight">Céu Limpo</span>
+          <span className="text-[10px] font-medium text-muted-foreground mt-0.5">Sem previsão de chuva</span>
         </div>
       </div>
 
-      <div className="pt-3 border-t border-slate-50 flex flex-col gap-2 relative z-10">
+      <div className="pt-3 border-t border-border flex flex-col gap-2 relative z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
-            <span className="text-[10px] font-bold text-slate-600 uppercase">Trânsito Fluindo</span>
+            <span className="text-[10px] font-bold text-foreground uppercase">Trânsito Fluindo</span>
           </div>
-          <span className="text-[9px] font-medium text-slate-400">Normal</span>
+          <span className="text-[9px] font-medium text-muted-foreground">Normal</span>
         </div>
-        <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+        <div className="w-full h-1 bg-secondary dark:bg-slate-800 rounded-full overflow-hidden">
           <div className="w-3/4 h-full bg-emerald-500 rounded-full" />
         </div>
       </div>
@@ -476,20 +476,20 @@ export function ActiveVacationsCard({ loading: externalLoading }: { loading?: bo
   }, []);
 
   return (
-    <div className="bg-white border border-border rounded-xl p-5 shadow-sm flex flex-col min-h-[140px]">
+    <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col min-h-[140px]">
       <div className="flex items-center justify-between mb-4">
-        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">
           Em Férias Agora
         </h4>
-        <Plane className="w-3.5 h-3.5 text-blue-600 opacity-50" />
+        <Plane className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 opacity-50" />
       </div>
 
       {loading ? (
         <div className="flex gap-3 animate-pulse">
           {[1, 2, 3].map(i => (
             <div key={i} className="flex flex-col items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-slate-100" />
-              <div className="h-1.5 w-8 bg-slate-50 rounded" />
+              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800" />
+              <div className="h-1.5 w-8 bg-secondary/50 dark:bg-slate-800/50 rounded" />
             </div>
           ))}
         </div>
@@ -497,20 +497,20 @@ export function ActiveVacationsCard({ loading: externalLoading }: { loading?: bo
         <div className="flex flex-wrap gap-3">
           {vacations.map((v, i) => (
             <div key={i} className="flex flex-col items-center gap-1.5 group cursor-pointer">
-              <div className="w-10 h-10 rounded-full border-2 border-blue-100 p-0.5 transition-transform group-hover:scale-110">
+              <div className="w-10 h-10 rounded-full border-2 border-blue-100 dark:border-blue-900/50 p-0.5 transition-transform group-hover:scale-110">
                 <img 
                   src={v.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${v.name}`} 
                   alt={v.name} 
                   className="w-full h-full rounded-full object-cover" 
                 />
               </div>
-              <span className="text-[9px] font-bold text-slate-600 truncate max-w-[50px]">{v.name.split(' ')[0]}</span>
+              <span className="text-[9px] font-bold text-muted-foreground truncate max-w-[50px]">{v.name.split(' ')[0]}</span>
             </div>
           ))}
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center py-4 text-center">
-          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Toda equipe ativa</span>
+        <div className="flex-1 flex flex-col items-center justify-center py-4 text-center opacity-40">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Toda equipe ativa</span>
         </div>
       )}
     </div>
@@ -562,12 +562,12 @@ export function UpcomingEventsCard({ loading: externalLoading }: { loading?: boo
 
   const getTypeStyle = (type: string) => {
     switch (type) {
-      case "meeting": return { icon: Users, color: "text-violet-600", bg: "bg-violet-50" };
-      case "important": return { icon: AlertCircle, color: "text-rose-600", bg: "bg-rose-50" };
-      case "finance": return { icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" };
-      case "holiday": return { icon: Flag, color: "text-amber-600", bg: "bg-amber-50" };
-      case "celebration": return { icon: Trophy, color: "text-pink-600", bg: "bg-pink-50" };
-      default: return { icon: Calendar, color: "text-blue-600", bg: "bg-blue-50" };
+      case "meeting": return { icon: Users, color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-900/30" };
+      case "important": return { icon: AlertCircle, color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-50 dark:bg-rose-900/30" };
+      case "finance": return { icon: DollarSign, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/30" };
+      case "holiday": return { icon: Flag, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/30" };
+      case "celebration": return { icon: Trophy, color: "text-pink-600 dark:text-pink-400", bg: "bg-pink-50 dark:bg-pink-900/30" };
+      default: return { icon: Calendar, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/30" };
     }
   };
 
@@ -581,17 +581,17 @@ export function UpcomingEventsCard({ loading: externalLoading }: { loading?: boo
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col group min-h-[160px]">
+    <div className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col group min-h-[160px]">
       {!loading && (
         <div className="flex items-center justify-between mb-5 shrink-0">
           <div className="flex flex-col">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">
+            <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none mb-1">
               Agenda
             </h4>
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Próximos Eventos</h3>
+            <h3 className="text-sm font-black text-foreground uppercase tracking-tight">Próximos Eventos</h3>
           </div>
-          <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100/50">
-            <Calendar className="w-4 h-4 text-blue-600" />
+          <div className="w-8 h-8 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center border border-border">
+            <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           </div>
         </div>
       )}
@@ -601,10 +601,10 @@ export function UpcomingEventsCard({ loading: externalLoading }: { loading?: boo
           <div className="space-y-4 animate-pulse">
             {[1, 2].map(i => (
               <div key={i} className="flex gap-4">
-                <div className="w-8 h-8 bg-slate-100 rounded-xl" />
+                <div className="w-8 h-8 bg-slate-100 dark:bg-slate-800 rounded-xl" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-2 w-3/4 bg-slate-100 rounded" />
-                  <div className="h-1.5 w-1/4 bg-slate-50 rounded" />
+                  <div className="h-2 w-3/4 bg-slate-100 dark:bg-slate-800 rounded" />
+                  <div className="h-1.5 w-1/4 bg-secondary/50 dark:bg-slate-800/50 rounded" />
                 </div>
               </div>
             ))}
@@ -623,15 +623,15 @@ export function UpcomingEventsCard({ loading: externalLoading }: { loading?: boo
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                       <p className="text-xs font-black text-slate-800 uppercase tracking-tight truncate flex-1 group-hover/item:text-blue-600 transition-colors">
+                       <p className="text-xs font-black text-foreground uppercase tracking-tight truncate flex-1 group-hover/item:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {ev.title}
                       </p>
                       {isFirst && daysDiff >= 0 && (
                         <span className={cn(
                           "ml-2 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md shrink-0 border",
-                          daysDiff === 0 ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                          daysDiff === 1 ? "bg-amber-50 text-amber-600 border-amber-100" :
-                          "bg-blue-50 text-blue-600 border-blue-100"
+                          daysDiff === 0 ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/50" :
+                          daysDiff === 1 ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/50" :
+                          "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/50"
                         )}>
                           {daysDiff === 0 ? "HOJE" :
                            daysDiff === 1 ? "AMANHÃ" : 
@@ -639,7 +639,7 @@ export function UpcomingEventsCard({ loading: externalLoading }: { loading?: boo
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
                       {ev.day.toString().padStart(2, '0')}/{ev.month.toString().padStart(2, '0')}
                     </p>
                   </div>
@@ -649,10 +649,10 @@ export function UpcomingEventsCard({ loading: externalLoading }: { loading?: boo
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center py-8 text-center opacity-40">
-            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mb-3">
-               <Calendar className="w-6 h-6 text-slate-300" />
+            <div className="w-12 h-12 bg-secondary/50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center mb-3">
+               <Calendar className="w-6 h-6 text-muted-foreground" />
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Sem eventos próximos</p>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Sem eventos próximos</p>
           </div>
         )}
       </div>
@@ -711,17 +711,17 @@ export function BirthdayList({ loading: externalLoading }: { loading?: boolean }
   }, []);
 
   return (
-    <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col overflow-hidden group min-h-[160px]">
+    <div className="flex-1 bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col overflow-hidden group min-h-[160px]">
       {!loading && (
         <div className="flex items-center justify-between mb-5 shrink-0">
           <div className="flex flex-col">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">
+            <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none mb-1">
               Social
             </h4>
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Aniversariantes</h3>
+            <h3 className="text-sm font-black text-foreground uppercase tracking-tight">Aniversariantes</h3>
           </div>
-          <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100/50">
-            <Gift className="w-4 h-4 text-blue-600" />
+          <div className="w-8 h-8 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center border border-border">
+            <Gift className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           </div>
         </div>
       )}
@@ -731,10 +731,10 @@ export function BirthdayList({ loading: externalLoading }: { loading?: boolean }
           <div className="space-y-4 animate-pulse">
             {[1, 2, 3].map(i => (
               <div key={i} className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-100" />
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-2 w-1/2 bg-slate-100 rounded" />
-                  <div className="h-1.5 w-1/3 bg-slate-50 rounded" />
+                  <div className="h-2 w-1/2 bg-slate-100 dark:bg-slate-800 rounded" />
+                  <div className="h-1.5 w-1/3 bg-secondary/50 dark:bg-slate-800/50 rounded" />
                 </div>
               </div>
             ))}
@@ -749,7 +749,7 @@ export function BirthdayList({ loading: externalLoading }: { loading?: boolean }
               return (
                 <div key={i} className="flex items-center gap-3 group/item cursor-pointer">
                   <div className="relative shrink-0 pt-1 pr-1">
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 overflow-hidden p-0.5 group-hover/item:border-blue-200 transition-colors">
+                    <div className="w-10 h-10 rounded-xl bg-secondary/50 dark:bg-slate-800/50 border border-border overflow-hidden p-0.5 group-hover/item:border-blue-200 transition-colors">
                       <img 
                         src={bd.img || `https://api.dicebear.com/7.x/avataaars/svg?seed=${bd.name}`} 
                         alt={bd.name} 
@@ -758,24 +758,24 @@ export function BirthdayList({ loading: externalLoading }: { loading?: boolean }
                     </div>
                     {/* Only show ping for today or upcoming */}
                     {!isPast && (
-                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-600 rounded-full border-2 border-white flex items-center justify-center">
+                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-600 rounded-full border-2 border-card flex items-center justify-center">
                         <div className={cn("w-1 h-1 bg-white rounded-full", isToday && "animate-ping")} />
                       </div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-black text-slate-800 uppercase tracking-tight truncate group-hover/item:text-blue-600 transition-colors">
+                    <p className="text-xs font-black text-foreground uppercase tracking-tight truncate group-hover/item:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {bd.name}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{bd.date}</span>
-                      <span className="w-1 h-1 rounded-full bg-slate-200" />
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{bd.date}</span>
+                      <span className="w-1 h-1 rounded-full bg-secondary/50" />
                       {isToday ? (
-                        <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">Hoje!</span>
+                        <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-md">Hoje!</span>
                       ) : isPast ? (
-                        <span className="text-[9px] font-medium text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-md">Já foi</span>
+                        <span className="text-[9px] font-medium text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded-md">Já foi</span>
                       ) : (
-                        <span className="text-[9px] font-medium text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded-md">Próximo</span>
+                        <span className="text-[9px] font-medium text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-md">Próximo</span>
                       )}
                     </div>
                   </div>
@@ -785,10 +785,10 @@ export function BirthdayList({ loading: externalLoading }: { loading?: boolean }
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center py-10 text-center opacity-40">
-            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mb-3">
-               <Gift className="w-6 h-6 text-slate-300" />
+            <div className="w-12 h-12 bg-secondary/50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center mb-3">
+               <Gift className="w-6 h-6 text-muted-foreground" />
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Nenhum Aniversariante</p>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Nenhum Aniversariante</p>
           </div>
         )}
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Users, LayoutGrid, UserPlus, UserMinus } from "lucide-react";
+import { LayoutGrid, UserPlus, UserMinus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { 
   ReactFlow, 
@@ -40,7 +40,7 @@ function getAvatarSrc(avatar: string, name: string) {
 }
 
 function CustomOrgNode({ data }: NodeProps<Node<OrgNodeData>>) {
-  const { title, level, color, description, employees } = data;
+    const { title, level, color, description, employees } = data;
   const isLevelD = level === 'D';
   
   const displayEmployees = employees.length > 0 ? employees : [{
@@ -60,14 +60,14 @@ function CustomOrgNode({ data }: NodeProps<Node<OrgNodeData>>) {
         <Handle type="target" position={Position.Top} className="opacity-0" />
         <div className="relative">
           <div className={cn("absolute inset-0 rounded-full blur-md opacity-20 group-hover:opacity-40 transition-opacity", color)} />
-          <div className="relative w-14 h-14 rounded-full border-4 border-white shadow-lg overflow-hidden z-10">
+          <div className="relative w-14 h-14 rounded-full border-4 border-border shadow-lg overflow-hidden z-10 bg-card">
             <img src={getAvatarSrc(employees[0]?.avatar || '', employees[0]?.name || title)} alt={title} className="w-full h-full object-cover" />
           </div>
-          <div className={cn("absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white z-20", color)} />
+          <div className={cn("absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-border z-20", color)} />
         </div>
         <div className="text-center w-[120px]">
-          <p className="text-[10px] font-black uppercase text-slate-800 tracking-tight leading-none truncate">{mainTitle}</p>
-          <p className="text-[8px] font-medium text-slate-400 mt-0.5">{subTitle}</p>
+          <p className="text-[10px] font-black uppercase text-foreground/90 tracking-tight leading-none truncate">{mainTitle}</p>
+          <p className="text-[8px] font-medium text-muted-foreground mt-1">{subTitle}</p>
         </div>
         <Handle type="source" position={Position.Bottom} className="opacity-0" />
       </div>
@@ -86,16 +86,16 @@ function CustomOrgNode({ data }: NodeProps<Node<OrgNodeData>>) {
     C: "bg-amber-500",
   };
 
-  return (
+    return (
     <div className="flex flex-col items-center group p-4">
-      <Handle type="target" position={Position.Top} className="!bg-slate-200" />
+      <Handle type="target" position={Position.Top} className="!bg-secondary border-none" />
       
       {level !== 'B' && (
-        <div className="relative z-20 -mb-7 flex -space-x-4">
+        <div className="relative z-20 -mb-10 flex -space-x-4">
           {displayEmployees.slice(0, 2).map((emp) => (
             <div key={emp.id} className="relative">
-              <div className="absolute inset-0 rounded-full bg-white/50 blur-xl group-hover:bg-white/80 transition-all duration-500" />
-              <div className="relative w-16 h-16 rounded-full border-4 border-white shadow-xl overflow-hidden ring-1 ring-slate-100">
+              <div className={cn("absolute inset-0 rounded-full blur-xl transition-all duration-500 group-hover:opacity-100 opacity-50", badgeColors[level === 'A' ? 'A' : 'C'])} />
+              <div className="relative w-20 h-20 rounded-full border-4 border-card shadow-2xl overflow-hidden ring-1 ring-border bg-background">
                 <img src={getAvatarSrc(emp.avatar, emp.name)} alt={title} className="w-full h-full object-cover" />
               </div>
             </div>
@@ -104,30 +104,30 @@ function CustomOrgNode({ data }: NodeProps<Node<OrgNodeData>>) {
       )}
 
       <div className={cn(
-        "relative w-[220px] bg-white rounded-3xl shadow-2xl shadow-slate-200/50 p-6 pt-10 border-l-[6px] transition-all duration-300 group-hover:shadow-blue-500/10 group-hover:border-l-[8px]",
+        "relative w-[230px] bg-card/80 backdrop-blur-md rounded-3xl shadow-2xl border border-border border-l-[6px] p-6 pt-12 transition-all duration-300 group-hover:shadow-blue-500/10 group-hover:border-l-[10px]",
         // @ts-ignore
         levelColors[level] || "border-slate-300"
       )}>
         <div className={cn(
-          "absolute top-4 right-0 px-3 py-1 flex items-center gap-1.5 rounded-l-full shadow-sm shadow-black/5",
+          "absolute top-4 right-0 px-3 py-1 flex items-center gap-1.5 rounded-l-full shadow-lg bg-blue-600/20",
           // @ts-ignore
           badgeColors[level]
         )}>
-           <span className="text-[7px] font-black text-white/90 uppercase tracking-widest">Level {level}</span>
+           <span className="text-[7px] font-black text-white uppercase tracking-widest">Level {level}</span>
         </div>
 
         <div className="text-left space-y-1.5">
-          <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-tight leading-tight">
+          <h3 className="text-[11px] font-black text-foreground uppercase tracking-tight leading-tight">
             {mainTitle}
           </h3>
-          <p className="text-[8px] font-bold text-slate-400 leading-relaxed line-clamp-2">
+          <p className="text-[8px] font-bold text-muted-foreground leading-relaxed line-clamp-2 uppercase tracking-widest opacity-60">
             {subTitle}
           </p>
         </div>
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-slate-100 rounded-t-full group-hover:bg-blue-100 transition-colors" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-secondary rounded-t-full group-hover:bg-blue-500 transition-colors" />
       </div>
       
-      <Handle type="source" position={Position.Bottom} className="!bg-slate-200" />
+      <Handle type="source" position={Position.Bottom} className="!bg-secondary border-none" />
     </div>
   );
 }
@@ -381,36 +381,22 @@ export function OrgChartView() {
   const filteredUsers = allUsers.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#fdfdfd] overflow-hidden relative">
-      <Panel position="top-left" className="m-8">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 rotate-3">
-            <Users className="w-6 h-6 text-white -rotate-3" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">Organograma</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">React Flow Engine v12</p>
-            </div>
-          </div>
-        </div>
-      </Panel>
+    <div className="flex-1 flex flex-col h-full bg-background overflow-hidden relative select-none">
 
       <Panel position="top-right" className="m-8">
         <div className="flex items-center gap-3">
             <button 
                 onClick={loadChart}
                 disabled={saving}
-                className="px-6 py-3 bg-white border border-slate-200 text-slate-900 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-sm hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                className="px-6 py-3 bg-secondary/50 backdrop-blur-md border border-border text-foreground rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-sm hover:bg-secondary transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
             >
-                <LayoutGrid className="w-4 h-4 text-slate-400" />
+                <LayoutGrid className="w-4 h-4 text-blue-500" />
                 Auto-alinhar Árvore
             </button>
             <button 
                 onClick={handleCreateRoot}
                 disabled={saving}
-                className="px-6 py-3 bg-white border border-slate-200 text-slate-900 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-sm hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50"
+                className="px-6 py-3 bg-secondary/50 backdrop-blur-md border border-border text-foreground rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-sm hover:bg-secondary transition-all active:scale-95 disabled:opacity-50"
             >
                 + Novo Diretor
             </button>
@@ -418,8 +404,8 @@ export function OrgChartView() {
                 onClick={saveToSupabase}
                 disabled={saving}
                 className={cn(
-                    "px-6 py-3 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2",
-                    saving ? "animate-pulse" : "hover:bg-slate-800"
+                    "px-6 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-blue-600/10 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2",
+                    saving ? "animate-pulse" : "hover:bg-blue-700"
                 )}
             >
                 {saving ? "Processando..." : "Salvar Atribuições"}
@@ -441,34 +427,38 @@ export function OrgChartView() {
         maxZoom={1.5}
         snapToGrid={true}
         snapGrid={[20, 20]}
+        proOptions={{ hideAttribution: true }}
       >
-        <Background gap={20} color="#e5e7eb" variant={undefined} />
-        <Controls showInteractive={false} className="border-slate-200 shadow-xl overflow-hidden rounded-xl" />
+        <Background gap={20} color="#1e293b" variant={undefined} style={{ opacity: 0.5 }} />
+        <Controls 
+          showInteractive={false} 
+          className="!bg-card/80 !backdrop-blur-md !border-border !shadow-2xl overflow-hidden !rounded-2xl [&_button]:!bg-transparent [&_button]:!border-border [&_svg]:!fill-foreground/50 [&_button:hover]:!bg-secondary/50" 
+        />
       </ReactFlow>
 
       {/* Editor Drawer */}
       {selectedNode && (
-        <div className="absolute top-0 right-0 w-80 h-full bg-white shadow-2xl z-[100] border-l border-slate-100 flex flex-col animate-in slide-in-from-right duration-300">
-           <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="absolute top-0 right-0 w-80 h-full bg-card/90 backdrop-blur-xl z-[100] border-l border-border flex flex-col animate-in slide-in-from-right duration-300">
+           <div className="p-6 border-b border-border flex items-center justify-between bg-secondary/20">
               <div>
-                <h3 className="text-sm font-black text-slate-900 uppercase">{selectedNode.title}</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase">{selectedNode.department}</p>
+                <h3 className="text-sm font-black text-foreground uppercase tracking-tight">{selectedNode.title}</h3>
+                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-0.5">{selectedNode.department}</p>
               </div>
-              <button onClick={() => setSelectedNode(null)} className="w-8 h-8 rounded-full hover:bg-white flex items-center justify-center text-slate-400 shadow-sm border border-slate-100">✕</button>
+              <button onClick={() => setSelectedNode(null)} className="w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center text-muted-foreground shadow-sm border border-border transition-all">✕</button>
            </div>
 
-           <div className="flex-1 overflow-y-auto overflow-x-hidden">
+           <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
                 {/* 1. Structure Actions */}
-                <div className="p-6 border-b border-slate-100 space-y-6">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Estrutura de Organização</p>
+                <div className="p-6 border-b border-border space-y-6">
+                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Estrutura de Organização</p>
                     
                     <div className="space-y-4">
                         <div className="space-y-1.5">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Nome (Setor ou Cargo)</label>
+                            <label className="text-[9px] font-black text-muted-foreground uppercase ml-1 opacity-50">Nome (Setor ou Cargo)</label>
                             <input 
                                 type="text" 
-                                placeholder="Ex: Financeiro ou Vendedor..." 
-                                className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Ex: FINANCEIRO ou VENDEDOR..." 
+                                className="w-full px-4 py-3 bg-secondary/40 border border-border rounded-xl text-xs font-bold text-foreground outline-none focus:border-blue-500/50 transition-all"
                                 value={newTitle}
                                 onChange={e => setNewTitle(e.target.value)}
                             />
@@ -478,14 +468,14 @@ export function OrgChartView() {
                             <button 
                                 onClick={() => handleAddNode('setor')}
                                 disabled={!newTitle || saving}
-                                className="py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-lg shadow-emerald-500/20"
+                                className="py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-lg shadow-emerald-500/10"
                             >
                                 + Novo Setor
                             </button>
                             <button 
                                 onClick={() => handleAddNode('cargo')}
                                 disabled={!newTitle || saving}
-                                className="py-3 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-amber-600 disabled:opacity-50 transition-all shadow-lg shadow-amber-500/20"
+                                className="py-3 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-amber-600 disabled:opacity-50 transition-all shadow-lg shadow-amber-500/10"
                             >
                                 + Novo Cargo
                             </button>
@@ -495,14 +485,14 @@ export function OrgChartView() {
                              <button 
                                 onClick={handleRenameNode}
                                 disabled={!newTitle || saving}
-                                className="flex-1 py-2 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase"
+                                className="flex-1 py-3 bg-foreground text-background rounded-xl text-[9px] font-black uppercase tracking-widest hover:opacity-90 transition-all"
                             >
                                 Renomear Selecionado
                             </button>
                             <button 
                                 onClick={handleDeleteNode}
                                 disabled={saving}
-                                className="px-4 py-2 border-2 border-red-50 text-red-500 rounded-xl text-[9px] font-black uppercase hover:bg-red-50"
+                                className="px-4 py-3 border border-red-500/20 text-red-500 rounded-xl text-[9px] font-black uppercase hover:bg-red-500/10 transition-all"
                             >
                                 Excluir
                             </button>
@@ -512,11 +502,11 @@ export function OrgChartView() {
 
                 {/* 2. Employee Assignment */}
                 <div className="p-6 space-y-4">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Vincular Colaboradores</p>
+                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none">Vincular Colaboradores</p>
                     <input 
                         type="text" 
-                        placeholder="Pesquisar..." 
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
+                        placeholder="PESQUISAR..." 
+                        className="w-full px-4 py-2 bg-secondary/40 border border-border rounded-xl text-xs font-bold text-foreground outline-none focus:border-blue-500/50 transition-all"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
@@ -524,21 +514,21 @@ export function OrgChartView() {
                         {filteredUsers.map(user => {
                             const isAssigned = employees.find(e => e.id === user.id)?.role === selectedNode.title;
                             return (
-                                <div key={user.id} className={cn("p-2 rounded-xl border flex items-center justify-between group transition-all", isAssigned ? "bg-blue-50 border-blue-100" : "bg-white border-slate-100 hover:border-slate-200 shadow-sm")}>
+                                <div key={user.id} className={cn("p-2 rounded-xl border flex items-center justify-between group transition-all", isAssigned ? "bg-blue-500/10 border-blue-500/30" : "bg-card border-border hover:border-blue-500/20 shadow-sm")}>
                                     <div className="flex items-center gap-2">
                                         <div className="relative">
-                                            <img src={getAvatarSrc(user.avatar, user.name)} className="w-8 h-8 rounded-full shadow-sm border border-white" />
-                                            {isAssigned && <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" />}
+                                            <img src={getAvatarSrc(user.avatar, user.name)} className="w-8 h-8 rounded-xl shadow-sm border border-border bg-card" />
+                                            {isAssigned && <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-background" />}
                                         </div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-slate-800 leading-none">{user.name}</p>
-                                            <p className="text-[8px] text-slate-400 mt-1 font-bold uppercase">{user.role || 'Sem cargo'}</p>
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] font-black text-foreground leading-none truncate w-[160px] uppercase tracking-tight">{user.name}</p>
+                                            <p className="text-[8px] text-muted-foreground mt-1 font-bold uppercase tracking-tighter truncate opacity-50">{user.role || 'Sem cargo'}</p>
                                         </div>
                                     </div>
                                     {isAssigned ? (
                                         <button 
                                             onClick={() => handleUnassign(user)} 
-                                            className="w-7 h-7 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                                            className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm"
                                             title="Remover do cargo"
                                         >
                                             <UserMinus className="w-3.5 h-3.5" />
@@ -546,7 +536,7 @@ export function OrgChartView() {
                                     ) : (
                                         <button 
                                             onClick={() => handleAssign(user)} 
-                                            className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                                            className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center hover:bg-blue-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all shadow-sm"
                                             title="Vincular ao cargo"
                                         >
                                             <UserPlus className="w-3.5 h-3.5" />
@@ -562,17 +552,17 @@ export function OrgChartView() {
       )}
 
       <Panel position="bottom-right" className="m-8">
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl border border-slate-100 p-4 shadow-xl shadow-black/5 space-y-3">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 mb-2">Engenharia de Conexão</p>
+        <div className="bg-card/80 backdrop-blur-md rounded-3xl border border-border p-5 shadow-2xl space-y-4">
+          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] border-b border-border pb-3 mb-1">Engenharia de Conexão</p>
           {[
             { l: 'A', t: 'Diretoria Executiva', c: 'bg-blue-600' },
             { l: 'B', t: 'Departamentos', c: 'bg-emerald-600' },
             { l: 'C', t: 'Gestão e Supervisão', c: 'bg-amber-500' },
             { l: 'D', t: 'Corpo Operacional', c: 'bg-orange-600' },
           ].map(item => (
-            <div key={item.l} className="flex items-center gap-3">
-               <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black text-white", item.c)}>{item.l}</div>
-               <span className="text-[10px] font-bold text-slate-600">{item.t}</span>
+            <div key={item.l} className="flex items-center gap-4 group">
+               <div className={cn("w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black text-white shadow-lg shadow-black/20 group-hover:scale-110 transition-transform", item.c)}>{item.l}</div>
+               <span className="text-[10px] font-black text-foreground/70 uppercase tracking-tight">{item.t}</span>
             </div>
           ))}
         </div>

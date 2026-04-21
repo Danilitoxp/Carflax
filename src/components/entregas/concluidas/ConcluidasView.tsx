@@ -125,13 +125,13 @@ export function ConcluidasView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col gap-4 pt-0 pb-6 px-0 overflow-hidden bg-[#F8FAFC]">
+    <div className="flex-1 flex flex-col gap-4 pt-0 pb-6 px-0 overflow-hidden bg-background">
       {/* COMPACT TOOLBAR */}
-      <div className="flex flex-col gap-3 shrink-0">
+      <div className="flex flex-col gap-3 shrink-0 px-1">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none">Entregas Concluídas</h2>
-            <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center gap-2">
+            <h2 className="text-xl font-black text-foreground uppercase tracking-tight leading-none">Entregas Concluídas</h2>
+            <p className="text-muted-foreground text-[9px] font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center gap-2">
               <CheckCircle2 className="w-3 h-3 text-emerald-500" />
               Histórico Agrupado por Romaneios Finalizados
             </p>
@@ -139,7 +139,7 @@ export function ConcluidasView() {
 
           <button 
             onClick={fetchData}
-            className="h-8 px-3 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
+            className="h-8 px-3 bg-secondary/50 border border-border text-foreground rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-secondary transition-all flex items-center gap-2 shadow-sm active:scale-95"
           >
             <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
             {loading ? "Carregando..." : "Atualizar"}
@@ -149,31 +149,31 @@ export function ConcluidasView() {
         {/* SEARCH & FILTERS */}
         <div className="flex flex-col md:flex-row items-center gap-2">
           <div className="flex-1 w-full relative group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
             <input
               type="text"
               placeholder="Pesquisar Romaneio, NF, Motorista ou Cliente..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-[11px] font-bold text-slate-700 placeholder:text-slate-300 outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all"
+              className="w-full bg-secondary/40 border border-border rounded-xl pl-10 pr-4 py-2.5 text-[11px] font-bold text-foreground placeholder:text-muted-foreground/30 outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all"
             />
           </div>
 
           <div className="relative shrink-0">
             <button
               onClick={() => setIsDateMenuOpen(!isDateMenuOpen)}
-              className="flex items-center justify-between gap-3 h-10 px-4 rounded-xl bg-white border border-slate-200 text-[10px] font-black text-slate-500 hover:border-blue-200 transition-all min-w-[200px]"
+              className="flex items-center justify-between gap-3 h-10 px-4 rounded-xl bg-secondary/40 border border-border text-[10px] font-black text-muted-foreground hover:border-blue-500/30 transition-all min-w-[200px]"
             >
               <div className="flex items-center gap-2">
                 <Calendar className="w-3.5 h-3.5 text-blue-500" />
                 <span className="uppercase tracking-tight">{selectedPeriod}</span>
               </div>
-              <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform", isDateMenuOpen && "rotate-180")} />
+              <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground/50 transition-transform", isDateMenuOpen && "rotate-180")} />
             </button>
 
             {isDateMenuOpen && (
               <div className="absolute top-full right-0 mt-2 z-[100] animate-in fade-in zoom-in-95 duration-200">
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl p-1 overflow-hidden">
+                <div className="bg-card border border-border rounded-2xl shadow-2xl p-1 overflow-hidden">
                   <MiniCalendar
                     mode="range"
                     onSelectRange={handleRangeSelect}
@@ -192,23 +192,23 @@ export function ConcluidasView() {
         {loading ? (
           <div className="space-y-4">
             {[1, 2].map(i => (
-              <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 animate-pulse">
+              <div key={i} className="bg-card border border-border rounded-xl p-4 animate-pulse">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-slate-100" />
+                    <div className="w-8 h-8 rounded-lg bg-secondary" />
                     <div className="space-y-2">
-                      <div className="h-3 w-32 bg-slate-100 rounded" />
-                      <div className="h-2 w-16 bg-slate-50 rounded" />
+                      <div className="h-3 w-32 bg-secondary/50 rounded" />
+                      <div className="h-2 w-16 bg-secondary/30 rounded" />
                     </div>
                   </div>
-                  <div className="h-3 w-20 bg-slate-100 rounded" />
+                  <div className="h-3 w-20 bg-secondary/50 rounded" />
                 </div>
-                <div className="space-y-2 border-t border-slate-50 pt-4">
+                <div className="space-y-2 border-t border-border pt-4">
                   {[1, 2].map(j => (
                     <div key={j} className="flex items-center justify-between py-2">
-                      <div className="h-2 w-1/4 bg-slate-50 rounded" />
-                      <div className="h-2 w-1/3 bg-slate-50 rounded" />
-                      <div className="h-2 w-12 bg-slate-50 rounded" />
+                      <div className="h-2 w-1/4 bg-secondary/20 rounded" />
+                      <div className="h-2 w-1/3 bg-secondary/20 rounded" />
+                      <div className="h-2 w-12 bg-secondary/20 rounded" />
                     </div>
                   ))}
                 </div>
@@ -217,41 +217,41 @@ export function ConcluidasView() {
           </div>
         ) : filteredRomaneios.length > 0 ? (
           filteredRomaneios.map((rom) => (
-            <div key={rom.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            <div key={rom.id} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:border-blue-500/20 transition-all">
               {/* Romaneio Header Group */}
-              <div className="p-3 px-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+              <div className="p-3 px-4 bg-secondary/30 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-6">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center border border-blue-100/50">
-                      <Truck className="w-4 h-4 text-blue-600" />
+                    <div className="w-7 h-7 rounded-lg bg-blue-600/10 dark:bg-blue-500/20 flex items-center justify-center border border-blue-600/10">
+                      <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[11px] font-black text-slate-900 tracking-tighter uppercase leading-none">{rom.id}</span>
-                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{rom.date}</span>
+                      <span className="text-[11px] font-black text-foreground tracking-tighter uppercase leading-none">{rom.id}</span>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{rom.date}</span>
                     </div>
                   </div>
 
-                  <div className="h-6 w-px bg-slate-200" />
+                  <div className="h-6 w-px bg-border" />
 
                   <div className="flex items-center gap-2">
-                    <UserIcon className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-tight">{rom.driver}</span>
+                    <UserIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-[10px] font-black text-foreground/70 uppercase tracking-tight">{rom.driver}</span>
                   </div>
 
-                  <div className="h-6 w-px bg-slate-200" />
+                  <div className="h-6 w-px bg-border" />
 
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Entregas:</span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[9px] font-black">{rom.deliveredCount}</span>
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Entregas:</span>
+                    <span className="px-2 py-0.5 rounded-full bg-secondary text-foreground text-[9px] font-black">{rom.deliveredCount}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none block mb-0.5">Total Romaneio</span>
-                    <span className="text-[11px] font-black text-emerald-600 tracking-tighter leading-none">{rom.totalValue}</span>
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none block mb-0.5">Total Romaneio</span>
+                    <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 tracking-tighter leading-none">{rom.totalValue}</span>
                   </div>
-                  <button className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 transition-all">
+                  <button className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground transition-all">
                     <Download className="w-4 h-4" />
                   </button>
                 </div>
@@ -260,29 +260,29 @@ export function ConcluidasView() {
               {/* Nested Table for Deliveries */}
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-white">
-                    <th className="py-2.5 px-6 text-[8px] font-black text-slate-300 uppercase tracking-widest">NF</th>
-                    <th className="py-2.5 px-6 text-[8px] font-black text-slate-300 uppercase tracking-widest">Destinatário / Endereço</th>
-                    <th className="py-2.5 px-6 text-[8px] font-black text-slate-300 uppercase tracking-widest">Concluída</th>
-                    <th className="py-2.5 px-6 text-[8px] font-black text-slate-300 uppercase tracking-widest text-right">Valor Parcial</th>
-                    <th className="py-2.5 px-6 text-[8px] font-black text-slate-300 uppercase tracking-widest text-center">Docs</th>
+                  <tr className="bg-secondary/10">
+                    <th className="py-2.5 px-6 text-[8px] font-black text-muted-foreground/50 uppercase tracking-widest">NF</th>
+                    <th className="py-2.5 px-6 text-[8px] font-black text-muted-foreground/50 uppercase tracking-widest">Destinatário / Endereço</th>
+                    <th className="py-2.5 px-6 text-[8px] font-black text-muted-foreground/50 uppercase tracking-widest">Concluída</th>
+                    <th className="py-2.5 px-6 text-[8px] font-black text-muted-foreground/50 uppercase tracking-widest text-right">Valor Parcial</th>
+                    <th className="py-2.5 px-6 text-[8px] font-black text-muted-foreground/50 uppercase tracking-widest text-center">Docs</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-border">
                   {rom.deliveries.map((delivery) => (
-                    <tr key={delivery.id} className="hover:bg-slate-50/30 transition-colors group">
+                    <tr key={delivery.id} className="hover:bg-secondary/40 transition-colors group">
                       <td className="py-2.5 px-6">
-                        <span className="text-[10px] font-black text-slate-600 tracking-tighter">#{delivery.nf}</span>
+                        <span className="text-[10px] font-black text-muted-foreground tracking-tighter">#{delivery.nf}</span>
                       </td>
                       <td className="py-2.5 px-6">
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-slate-800 uppercase tracking-tight leading-none mb-0.5">{delivery.client}</span>
-                          <span className="text-[8px] font-bold text-slate-400 truncate max-w-[400px] uppercase tracking-tighter opacity-70 group-hover:opacity-100 transition-opacity">
+                          <span className="text-[10px] font-black text-foreground uppercase tracking-tight leading-none mb-0.5">{delivery.client}</span>
+                          <span className="text-[8px] font-bold text-muted-foreground truncate max-w-[400px] uppercase tracking-tighter opacity-70 group-hover:opacity-100 transition-opacity">
                             {delivery.address}
                           </span>
                           {delivery.instrucoes && (
-                            <div className="flex items-center gap-1.5 mt-1.5 p-1 px-2 bg-amber-50 border border-amber-100/50 rounded-md self-start">
-                              <span className="text-[7.5px] font-black text-amber-600 uppercase tracking-widest italic">{delivery.instrucoes}</span>
+                            <div className="flex items-center gap-1.5 mt-1.5 p-1 px-2 bg-amber-500/10 border border-amber-500/20 rounded-md self-start">
+                              <span className="text-[7.5px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest italic">{delivery.instrucoes}</span>
                             </div>
                           )}
                         </div>
@@ -290,14 +290,14 @@ export function ConcluidasView() {
                       <td className="py-2.5 px-6">
                         <div className="flex items-center gap-1.5">
                           <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{delivery.time}</span>
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{delivery.time}</span>
                         </div>
                       </td>
                       <td className="py-2.5 px-6 text-right">
-                        <span className="text-[10px] font-black text-emerald-600 tracking-tighter">{delivery.value}</span>
+                        <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 tracking-tighter">{delivery.value}</span>
                       </td>
                       <td className="py-2.5 px-6 text-center">
-                        <button className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all scale-90">
+                        <button className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-blue-500 transition-all scale-90">
                           <FileText className="w-3.5 h-3.5" />
                         </button>
                       </td>
@@ -308,9 +308,9 @@ export function ConcluidasView() {
             </div>
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center py-20 bg-white border border-slate-200 rounded-xl opacity-40">
-            <Search className="w-10 h-10 text-slate-300 mb-3" />
-            <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+          <div className="flex flex-col items-center justify-center py-20 bg-card/30 border border-border rounded-xl opacity-40">
+            <Search className="w-10 h-10 text-muted-foreground/30 mb-3" />
+            <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">
               {loading ? "Carregando histórico..." : "Nenhum romaneio concluído encontrado"}
             </span>
           </div>

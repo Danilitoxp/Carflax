@@ -88,14 +88,14 @@ export function ProdutosView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col gap-4 pt-4 pb-6 px-6 overflow-hidden h-full max-h-screen bg-[#F8FAFC]">
+    <div className="flex-1 flex flex-col gap-4 pt-4 pb-6 px-6 overflow-hidden h-full max-h-screen bg-background">
       {/* TINY TOOLBAR */}
       <div className="flex flex-col gap-3 shrink-0">
         
         {/* SEARCH & FILTERS */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex-1 min-w-[200px] relative group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
             <input
               type="text"
               placeholder="Pesquisar por código ou descrição..."
@@ -104,7 +104,7 @@ export function ProdutosView() {
                 setSearchTerm(e.target.value);
                 setVisibleCount(50); // Reset count on search
               }}
-              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all placeholder:text-slate-300 shadow-sm"
+              className="w-full bg-card border border-border rounded-xl pl-10 pr-4 py-2.5 text-[11px] font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/30 shadow-sm"
             />
           </div>
 
@@ -120,7 +120,7 @@ export function ProdutosView() {
             placeholder="Todas as Marcas"
           />
 
-          <div className="flex bg-white rounded-xl border border-slate-200 p-1 shadow-sm">
+          <div className="flex bg-card rounded-xl border border-border p-1 shadow-sm">
             {["TODOS", "COM ESTOQUE", "SEM ESTOQUE"].map((s) => (
               <button
                 key={s}
@@ -129,10 +129,10 @@ export function ProdutosView() {
                   setVisibleCount(50); // Reset count on stock filter
                 }}
                 className={cn(
-                  "px-3 py-1.5 text-[9px] font-black uppercase tracking-tight rounded-lg transition-all",
+                  "px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all border",
                   filterStock === s
-                    ? "bg-slate-900 text-white shadow-lg shadow-slate-900/10"
-                    : "text-slate-400 hover:text-slate-600"
+                    ? "bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-600/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 border-transparent"
                 )}
               >
                 {s}
@@ -143,64 +143,64 @@ export function ProdutosView() {
       </div>
 
       {/* PRODUCTS TABLE CONTAINER */}
-      <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col relative">
+      <div className="flex-1 bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col relative">
         <div 
           className="flex-1 overflow-y-auto scrollbar-hide"
           onScroll={handleScroll}
         >
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-100">
+            <thead className="sticky top-0 z-10 bg-secondary/50 backdrop-blur-md border-b border-border">
               <tr>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                  <div className="flex items-center gap-2">CÓDIGO <ArrowUpDown className="w-3 h-3" /></div>
+                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                  <div className="flex items-center gap-2">CÓDIGO <ArrowUpDown className="w-3 h-3 text-blue-500" /></div>
                 </th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">DESCRIÇÃO</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">MARCA</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">ESTOQUE</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">DÉBITO</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">CRÉDITO 3X</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">DESCRIÇÃO</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">MARCA</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">ESTOQUE</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">DÉBITO</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">CRÉDITO 3X</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-border">
               {loading ? (
-                Array.from({ length: 12 }).map((_, i) => (
+                Array.from({ length: 15 }).map((_, i) => (
                   <tr key={`skeleton-${i}`} className="animate-pulse">
-                    <td className="py-4 px-6"><div className="h-2 w-10 bg-slate-100 rounded" /></td>
-                    <td className="py-4 px-6"><div className="h-2 w-full max-w-[250px] bg-slate-100 rounded" /></td>
-                    <td className="py-4 px-6"><div className="h-5 w-16 bg-slate-50 rounded-lg" /></td>
-                    <td className="py-4 px-6 text-right"><div className="h-2 w-12 bg-slate-100 rounded ml-auto" /></td>
-                    <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-slate-50 rounded ml-auto" /></td>
-                    <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-slate-100 rounded ml-auto" /></td>
+                    <td className="py-4 px-6"><div className="h-2 w-10 bg-secondary rounded" /></td>
+                    <td className="py-4 px-6"><div className="h-2 w-full max-w-[250px] bg-secondary rounded" /></td>
+                    <td className="py-4 px-6"><div className="h-5 w-16 bg-secondary/50 rounded-lg mx-auto" /></td>
+                    <td className="py-4 px-6 text-right"><div className="h-2 w-12 bg-secondary rounded ml-auto" /></td>
+                    <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-secondary/50 rounded ml-auto" /></td>
+                    <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-secondary rounded ml-auto" /></td>
                   </tr>
                 ))
               ) : (
                 <>
                   {visibleProducts.map((p: Product, i) => (
-                    <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="py-3 px-6 text-[10px] font-bold text-slate-400">{p.cod}</td>
+                    <tr key={i} className="hover:bg-secondary/20 transition-colors group">
+                      <td className="py-3 px-6 text-[10px] font-bold text-muted-foreground">{p.cod}</td>
                       <td className="py-3 px-6">
-                        <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight line-clamp-1">{p.desc}</span>
+                        <span className="text-[11px] font-black text-foreground uppercase tracking-tight line-clamp-1">{p.desc}</span>
                       </td>
-                      <td className="py-3 px-6">
-                        <span className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-tight">
+                      <td className="py-3 px-6 text-center">
+                        <span className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 uppercase tracking-tight">
                           {p.brand}
                         </span>
                       </td>
                       <td className="py-3 px-6 text-right">
                         <span className={cn(
                           "text-[11px] font-black tracking-tighter",
-                          p.stock > 10 ? "text-slate-900" : p.stock > 0 ? "text-amber-600" : "text-rose-500"
+                          p.stock > 10 ? "text-foreground" : p.stock > 0 ? "text-amber-500" : "text-rose-500"
                         )}>
                           {p.stock.toFixed(3)}
                         </span>
                       </td>
                       <td className="py-3 px-6 text-right">
-                        <span className="text-[11px] font-black text-emerald-600 tracking-tighter">
+                        <span className="text-[11px] font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">
                           R$ {p.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
                       <td className="py-3 px-6 text-right">
-                        <span className="text-[11px] font-black text-slate-900 tracking-tighter">
+                        <span className="text-[11px] font-black text-foreground tracking-tighter">
                           R$ {p.credit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </td>

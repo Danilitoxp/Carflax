@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 export function HeroBanner({ loading }: { loading?: boolean }) {
   return (
-    <div className="relative overflow-hidden rounded-xl w-full bg-white border border-border shadow-sm p-8 flex flex-col md:flex-row items-center gap-8 group min-h-[180px]">
+    <div className="relative overflow-hidden rounded-xl w-full bg-card border border-border shadow-sm p-8 flex flex-col md:flex-row items-center gap-8 group min-h-[180px]">
       {/* Decorative Icons Background - Better Distribution */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {!loading && (
@@ -27,18 +27,18 @@ export function HeroBanner({ loading }: { loading?: boolean }) {
       <div className="flex-1 space-y-3 text-center md:text-left relative z-10 w-full">
         {loading ? (
           <div className="animate-pulse space-y-4">
-             <div className="h-10 w-48 bg-slate-100 rounded-lg" />
+             <div className="h-10 w-48 bg-slate-100 dark:bg-slate-800 rounded-lg" />
              <div className="space-y-2">
-               <div className="h-3 w-full max-w-xl bg-slate-100 rounded" />
-               <div className="h-3 w-4/5 max-w-xl bg-slate-100 rounded" />
+               <div className="h-3 w-full max-w-xl bg-slate-100 dark:bg-slate-800 rounded" />
+               <div className="h-3 w-4/5 max-w-xl bg-slate-100 dark:bg-slate-800 rounded" />
              </div>
           </div>
         ) : (
           <>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-tight uppercase">
-              Carflax <span className="text-blue-600">HUB</span>
+            <h1 className="text-3xl font-black text-foreground tracking-tight leading-tight uppercase">
+              Carflax <span className="text-blue-600 dark:text-blue-500">HUB</span>
             </h1>
-            <p className="text-sm text-slate-500 max-w-xl leading-relaxed font-bold uppercase opacity-60">
+            <p className="text-sm text-slate-500 dark:text-muted-foreground max-w-xl leading-relaxed font-bold uppercase">
               Sua produtividade em um só lugar. Tenha acesso ágil a metas e indicadores diários de performance.
             </p>
           </>
@@ -47,8 +47,8 @@ export function HeroBanner({ loading }: { loading?: boolean }) {
       
       <div className="shrink-0 hidden lg:block">
         <div className={cn(
-          "relative w-40 h-40 rounded-2xl flex items-center justify-center border border-blue-100/50 shadow-inner overflow-hidden",
-          loading ? "bg-slate-50 animate-pulse" : "bg-gradient-to-br from-blue-50 to-indigo-50 group/rocket"
+          "relative w-40 h-40 rounded-2xl flex items-center justify-center border border-blue-100/50 dark:border-blue-900/30 shadow-inner overflow-hidden",
+          loading ? "bg-slate-50 dark:bg-slate-800/50 animate-pulse" : "bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/30 group/rocket"
         )}>
            {!loading && (
              <>

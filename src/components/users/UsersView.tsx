@@ -265,10 +265,10 @@ export function UsersView() {
 
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case "admin": return "bg-blue-50 text-blue-600 border-blue-100";
-      case "vendedor": return "bg-emerald-50 text-emerald-600 border-emerald-100";
-      case "logistica": return "bg-amber-50 text-amber-600 border-amber-100";
-      default: return "bg-slate-50 text-slate-500 border-slate-100";
+      case "admin": return "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/50";
+      case "vendedor": return "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/50";
+      case "logistica": return "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/50";
+      default: return "bg-secondary/50 dark:bg-slate-800/50 text-muted-foreground border-border";
     }
   };
 
@@ -288,13 +288,13 @@ export function UsersView() {
   );
 
   return (
-    <div className="flex-1 flex flex-col gap-4 pb-6 overflow-hidden bg-[#F8FAFC]">
+    <div className="flex-1 flex flex-col gap-4 pb-6 overflow-hidden bg-background">
       {/* TINY TOOLBAR */}
       <div className="flex flex-col gap-3 shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none">Gestão de Equipe</h2>
-            <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center gap-2">
+            <h2 className="text-xl font-black text-foreground uppercase tracking-tight leading-none">Gestão de Equipe</h2>
+            <p className="text-muted-foreground text-[9px] font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center gap-2">
               <UserCog className="w-3 h-3 text-blue-500" />
               Controle de Acessos por Empresa e Setor
             </p>
@@ -319,13 +319,13 @@ export function UsersView() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Search */}
           <div className="flex-1 min-w-[200px] relative group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
             <input
               type="text"
               placeholder="Pesquisar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all placeholder:text-slate-300 shadow-sm"
+              className="w-full bg-card border border-border rounded-xl pl-10 pr-4 py-2.5 text-[11px] font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/50 shadow-sm"
             />
           </div>
 
@@ -359,51 +359,51 @@ export function UsersView() {
       </div>
 
       {/* USERS TABLE */}
-      <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+      <div className="flex-1 bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col">
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-100">
+            <thead className="sticky top-0 z-10 bg-secondary/50 backdrop-blur-md border-b border-border">
               <tr>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">Colaborador</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">Empresa / Setor</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">Cargo</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest">Colaborador</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest">Empresa / Setor</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest">Cargo</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest">Status</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-border">
               {loading && (
                 <>
                   {Array.from({ length: 15 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
                       <td className="py-3 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-slate-100" />
+                          <div className="w-9 h-9 rounded-xl bg-secondary/50" />
                           <div className="space-y-2">
-                            <div className="h-2 w-24 bg-slate-100 rounded" />
-                            <div className="h-2 w-32 bg-slate-50 rounded" />
+                            <div className="h-2 w-24 bg-secondary/50 rounded" />
+                            <div className="h-2 w-32 bg-secondary/20 rounded" />
                           </div>
                         </div>
                       </td>
                       <td className="py-3 px-6">
                         <div className="space-y-2">
-                          <div className="h-2 w-20 bg-slate-100 rounded" />
-                          <div className="h-2 w-16 bg-slate-50 rounded" />
+                          <div className="h-2 w-20 bg-secondary/50 rounded" />
+                          <div className="h-2 w-16 bg-secondary/20 rounded" />
                         </div>
                       </td>
                       <td className="py-3 px-6">
-                        <div className="h-5 w-16 bg-slate-100 rounded-lg" />
+                        <div className="h-5 w-16 bg-secondary/50 rounded-lg" />
                       </td>
                       <td className="py-3 px-6">
                         <div className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-100" />
-                          <div className="h-2 w-12 bg-slate-50 rounded" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-secondary/50" />
+                          <div className="h-2 w-12 bg-secondary/20 rounded" />
                         </div>
                       </td>
                       <td className="py-3 px-6 text-right">
                         <div className="flex justify-end gap-2">
-                          <div className="w-7 h-7 bg-slate-50 rounded-lg" />
-                          <div className="w-7 h-7 bg-slate-50 rounded-lg" />
+                          <div className="w-7 h-7 bg-secondary/20 rounded-lg" />
+                          <div className="w-7 h-7 bg-secondary/20 rounded-lg" />
                         </div>
                       </td>
                     </tr>
@@ -411,13 +411,13 @@ export function UsersView() {
                 </>
               )}
               {!loading && filteredUsers.length === 0 && (
-                <tr><td colSpan={5} className="py-12 text-center text-slate-400 text-sm">Nenhum usuário encontrado.</td></tr>
+                <tr><td colSpan={5} className="py-12 text-center text-muted-foreground text-[10px] font-black uppercase tracking-widest">Nenhum usuário encontrado.</td></tr>
               )}
               {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
+                <tr key={user.id} className="hover:bg-secondary/20 transition-colors group">
                   <td className="py-3 px-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 relative shrink-0 flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-xl overflow-hidden bg-secondary border border-border relative shrink-0 flex items-center justify-center">
                         <img
                           src={getAvatarSrc(user.avatar, user.name)}
                           alt={user.name}
@@ -431,15 +431,15 @@ export function UsersView() {
                         />
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight leading-none truncate">{user.name}</span>
-                        <span className="text-[9px] font-bold text-slate-400 truncate mt-0.5">{user.email}</span>
+                        <span className="text-[11px] font-black text-foreground uppercase tracking-tight leading-none truncate">{user.name}</span>
+                        <span className="text-[9px] font-bold text-muted-foreground truncate mt-0.5">{user.email}</span>
                       </div>
                     </div>
                   </td>
                   <td className="py-3 px-6">
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-slate-700 uppercase leading-none">{user.company}</span>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mt-1">{user.department}</span>
+                      <span className="text-[10px] font-black text-foreground/80 uppercase leading-none tracking-tight">{user.company}</span>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter mt-1">{user.department}</span>
                     </div>
                   </td>
                   <td className="py-3 px-6">
@@ -453,15 +453,15 @@ export function UsersView() {
                   <td className="py-3 px-6">
                     <div className="flex items-center gap-2">
                       <div className={cn("w-1.5 h-1.5 rounded-full", user.status === "ativo" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-rose-500")} />
-                      <span className={cn("text-[9px] font-black uppercase tracking-widest", user.status === "ativo" ? "text-emerald-600" : "text-rose-500")}>
+                      <span className={cn("text-[9px] font-black uppercase tracking-widest", user.status === "ativo" ? "text-emerald-500" : "text-rose-500")}>
                         {user.status}
                       </span>
                     </div>
                   </td>
                   <td className="py-3 px-6 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => handleEditClick(user)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => handleDeleteUser(user.id)} className="p-2 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleEditClick(user)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-blue-500 transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleDeleteUser(user.id)} className="p-2 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </td>
                 </tr>
@@ -474,26 +474,26 @@ export function UsersView() {
       {/* MODAL REDESIGNED WITH COMPANY & DEPT */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div onClick={() => setIsAddModalOpen(false)} className="fixed inset-0 bg-slate-900/10 backdrop-blur-sm" />
-          <div className="relative w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div onClick={() => setIsAddModalOpen(false)} className="fixed inset-0 bg-background/80 backdrop-blur-sm" />
+          <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100"><UserPlus className="w-4 h-4 text-blue-600" /></div>
+                <div className="w-9 h-9 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center border border-blue-100 dark:border-blue-900/50"><UserPlus className="w-4 h-4 text-blue-600 dark:text-blue-400" /></div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">{editingUser ? "Editar Perfil" : "Nova Conta"}</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Vínculo Corporativo e Permissões</p>
+                  <h3 className="text-sm font-black text-foreground uppercase tracking-tight">{editingUser ? "Editar Perfil" : "Nova Conta"}</h3>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Vínculo Corporativo e Permissões</p>
                 </div>
               </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-all"><X className="w-4 h-4" /></button>
+              <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-secondary rounded-xl text-muted-foreground transition-all"><X className="w-4 h-4" /></button>
             </div>
 
             <div className="p-8 overflow-y-auto scrollbar-hide flex flex-col gap-6">
               {/* Profile Photo Section */}
               <div className="flex flex-col items-center gap-4 py-2">
                 <div className="relative group">
-                  <div className="w-24 h-24 rounded-2xl border-4 border-slate-50 shadow-xl overflow-hidden bg-slate-50 flex items-center justify-center transition-transform duration-500 group-hover:scale-105 relative">
+                  <div className="w-24 h-24 rounded-2xl border-4 border-secondary shadow-xl overflow-hidden bg-secondary/50 flex items-center justify-center transition-transform duration-500 group-hover:scale-105 relative">
                     <>
-                      {avatarLoading && <div className="absolute inset-0 bg-slate-200 animate-pulse z-10" />}
+                      {avatarLoading && <div className="absolute inset-0 bg-secondary animate-pulse z-10" />}
                       <img
                         src={getAvatarSrc(newUser.avatar, newUser.name || "user")} alt="Avatar"
                         onLoad={() => setAvatarLoading(false)}
@@ -509,18 +509,18 @@ export function UsersView() {
                   </div>
                 </div>
                 <div className="text-center mt-2">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Foto de Perfil</p>
+                   <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Foto de Perfil</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
-                  <input type="text" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value.toUpperCase() })} placeholder="DANILO OLIVEIRA" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all uppercase" />
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Nome Completo</label>
+                  <input type="text" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value.toUpperCase() })} placeholder="DANILO OLIVEIRA" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all uppercase placeholder:text-muted-foreground/30" />
                 </div>
                 <div className="col-span-2 space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail Corporativo</label>
-                  <input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="email@carflax.com" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all" />
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">E-mail Corporativo</label>
+                  <input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="email@carflax.com" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/30" />
                 </div>
 
                 <div className="space-y-1.5">
@@ -560,33 +560,33 @@ export function UsersView() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cód. Operador</label>
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Cód. Operador</label>
                   <input 
                     type="text" 
                     maxLength={newUser.role === "Motorista" ? 5 : 3} 
                     value={newUser.operatorCode} 
                     onChange={(e) => setNewUser({ ...newUser, operatorCode: e.target.value.replace(/\D/g, "") })} 
                     placeholder={newUser.role === "Motorista" ? "00000" : "000"} 
-                    className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all text-center" 
+                    className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all text-center placeholder:text-muted-foreground/30" 
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data de Nascimento</label>
-                  <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={(newUser as any).birthDate} onChange={(e) => setNewUser({ ...newUser, birthDate: applyDateMask(e.target.value) } as any)} className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all" />
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Data de Nascimento</label>
+                  <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={(newUser as any).birthDate} onChange={(e) => setNewUser({ ...newUser, birthDate: applyDateMask(e.target.value) } as any)} className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/30" />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data de Admissão</label>
-                  <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={(newUser as any).admissionDate} onChange={(e) => setNewUser({ ...newUser, admissionDate: applyDateMask(e.target.value) } as any)} className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all" />
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Data de Admissão</label>
+                  <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={(newUser as any).admissionDate} onChange={(e) => setNewUser({ ...newUser, admissionDate: applyDateMask(e.target.value) } as any)} className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/30" />
                 </div>
               </div>
 
               {/* Permissions Section */}
               <div className="space-y-3 pt-2">
                 <div className="flex items-center gap-2 mb-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Módulos do Sistema</span>
+                  <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-[10px] font-black text-foreground uppercase tracking-widest">Módulos do Sistema</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-1 scrollbar-hide">
                   {availableModules.map((module) => {
@@ -595,8 +595,8 @@ export function UsersView() {
                       <div key={module} onClick={() => {
                         const updated = hasAccess ? newUser.permissions.filter(p => p !== module) : [...newUser.permissions, module];
                         setNewUser({ ...newUser, permissions: updated });
-                      }} className={cn("flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer", hasAccess ? "bg-blue-50/40 border-blue-100" : "bg-white border-slate-100")}>
-                        <span className={cn("text-[9px] font-black uppercase tracking-tight", hasAccess ? "text-slate-900" : "text-slate-300")}>{module}</span>
+                      }} className={cn("flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer", hasAccess ? "bg-blue-500/10 border-blue-600/30" : "bg-secondary/20 border-border")}>
+                        <span className={cn("text-[9px] font-black uppercase tracking-tight", hasAccess ? "text-blue-400" : "text-muted-foreground/40")}>{module}</span>
                         <Switch enabled={hasAccess} onChange={() => { }} />
                       </div>
                     );
@@ -605,8 +605,8 @@ export function UsersView() {
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-100 flex gap-2">
-              <button onClick={() => setIsAddModalOpen(false)} disabled={saving} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50">Cancelar</button>
+            <div className="p-4 border-t border-border flex gap-2">
+              <button onClick={() => setIsAddModalOpen(false)} disabled={saving} className="flex-1 py-3 bg-secondary text-muted-foreground rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-secondary/70 transition-all disabled:opacity-50">Cancelar</button>
               <button onClick={handleSaveUser} disabled={saving} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/10 disabled:opacity-70 flex items-center justify-center gap-2">
                 {saving && <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/></svg>}
                 {saving ? "Salvando..." : editingUser ? "Salvar" : "Criar"}

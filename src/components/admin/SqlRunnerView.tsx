@@ -26,54 +26,54 @@ const ObjectBrowser = memo(({ schema, onSelectTable }: { schema: any, onSelectTa
   );
 
   return (
-    <div className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 font-sans">
-      <div className="h-8 bg-slate-50 border-b border-slate-200 flex items-center px-3 justify-between">
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Object Browser</span>
+    <div className="w-64 bg-card/50 backdrop-blur-md border-r border-border flex flex-col shrink-0 font-sans">
+      <div className="h-8 bg-secondary/80 border-b border-border flex items-center px-4 justify-between">
+        <span className="text-[10px] font-black text-foreground/50 uppercase tracking-widest">Object Browser</span>
       </div>
 
-      <div className="p-2 border-b border-slate-100">
+      <div className="p-3 border-b border-border">
         <div className="relative">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-300" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/50" />
           <input
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filtrar..."
-            className="w-full h-7 pl-7 pr-2 bg-slate-50 border border-slate-200 rounded text-[11px] font-medium text-slate-600 outline-none focus:border-blue-200 uppercase"
+            placeholder="Filtrar Tabelas / Views..."
+            className="w-full h-8 pl-8 pr-2 bg-secondary/40 border border-border rounded-lg text-[11px] font-bold text-foreground outline-none focus:border-blue-500/50 uppercase placeholder:text-muted-foreground/20 transition-all font-mono"
           />
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-2 scrollbar-hide">
         <div className="space-y-1">
-          <div onClick={() => setExpandedDb(!expandedDb)} className="flex items-center gap-1.5 p-1 rounded hover:bg-blue-50 cursor-pointer group">
-            {expandedDb ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+          <div onClick={() => setExpandedDb(!expandedDb)} className="flex items-center gap-1.5 p-1.5 rounded-lg hover:bg-secondary cursor-pointer group transition-all">
+            {expandedDb ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
             <Database className="w-4 h-4 text-amber-500" />
-            <span className="text-[12px] font-bold text-slate-700 uppercase">{schema?.dbName || "DATABASE"}</span>
+            <span className="text-[11px] font-black text-foreground uppercase tracking-tighter">{schema?.dbName || "DATABASE"}</span>
           </div>
 
           {expandedDb && (
             <div className="pl-4 space-y-1">
               {/* TABLES */}
-              <div onClick={() => setExpandedTables(!expandedTables)} className="flex items-center gap-1.5 p-1 rounded hover:bg-slate-50 cursor-pointer text-slate-500">
-                {expandedTables ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                <span className="text-[11px] font-black uppercase tracking-widest">Tables ({filteredTables.length})</span>
+              <div onClick={() => setExpandedTables(!expandedTables)} className="flex items-center gap-1.5 p-1.5 rounded-lg hover:bg-secondary/40 cursor-pointer text-muted-foreground transition-all">
+                {expandedTables ? <ChevronDown className="w-3 h-3 opacity-30" /> : <ChevronRight className="w-3 h-3 opacity-30" />}
+                <span className="text-[10px] font-black uppercase tracking-widest">Tabelas ({filteredTables.length})</span>
               </div>
               {expandedTables && filteredTables.map((table: any) => (
-                <div key={table.name} className="flex items-center gap-2 pl-4 p-1 rounded hover:bg-blue-50 cursor-pointer text-slate-600 group" onClick={() => onSelectTable(table.name)}>
-                  <TableIcon className="w-3.5 h-3.5 text-blue-400 opacity-60" />
+                <div key={table.name} className="flex items-center gap-2 pl-4 p-1.5 rounded-lg hover:bg-blue-500/10 cursor-pointer text-foreground/80 group transition-all" onClick={() => onSelectTable(table.name)}>
+                  <TableIcon className="w-3.5 h-3.5 text-blue-500 opacity-40 group-hover:opacity-100" />
                   <span className="text-[11px] font-bold truncate uppercase">{table.name}</span>
                 </div>
               ))}
 
               {/* VIEWS */}
-              <div onClick={() => setExpandedViews(!expandedViews)} className="flex items-center gap-1.5 p-1 rounded hover:bg-slate-50 cursor-pointer text-slate-500 mt-2">
-                {expandedViews ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                <span className="text-[11px] font-black uppercase tracking-widest">Views ({filteredViews.length})</span>
+              <div onClick={() => setExpandedViews(!expandedViews)} className="flex items-center gap-1.5 p-1.5 rounded-lg hover:bg-secondary/40 cursor-pointer text-muted-foreground mt-2 transition-all">
+                {expandedViews ? <ChevronDown className="w-3 h-3 opacity-30" /> : <ChevronRight className="w-3 h-3 opacity-30" />}
+                <span className="text-[10px] font-black uppercase tracking-widest">Views ({filteredViews.length})</span>
               </div>
               {expandedViews && filteredViews.map((view: any) => (
-                <div key={view.name} className="flex items-center gap-2 pl-4 p-1 rounded hover:bg-indigo-50 cursor-pointer text-slate-600 group" onClick={() => onSelectTable(view.name)}>
-                  <TableIcon className="w-3.5 h-3.5 text-indigo-500 opacity-70" />
+                <div key={view.name} className="flex items-center gap-2 pl-4 p-1.5 rounded-lg hover:bg-indigo-500/10 cursor-pointer text-foreground/80 group transition-all" onClick={() => onSelectTable(view.name)}>
+                  <TableIcon className="w-3.5 h-3.5 text-indigo-500 opacity-50 group-hover:opacity-100" />
                   <span className="text-[11px] font-bold truncate uppercase">{view.name}</span>
                 </div>
               ))}
@@ -164,11 +164,11 @@ const ResultsGrid = memo(({ results, error, loading }: { results: any[], error: 
 
   if (error) {
     return (
-      <div className="p-10 flex flex-col items-center gap-4 text-center">
+      <div className="p-10 flex flex-col items-center gap-4 text-center bg-card">
         <AlertCircle className="w-12 h-12 text-red-400" />
         <div>
-          <h5 className="text-[12px] font-black text-slate-900 uppercase tracking-tight mb-2">Erro de Execução</h5>
-          <p className="text-[10px] font-bold text-red-500 font-mono max-w-lg">{error}</p>
+          <h5 className="text-[12px] font-black text-foreground uppercase tracking-tight mb-2">Erro de Execução</h5>
+          <p className="text-[10px] font-bold text-red-500 font-mono max-w-lg bg-red-950/20 p-4 rounded-xl border border-red-900/20">{error}</p>
         </div>
       </div>
     );
@@ -177,45 +177,45 @@ const ResultsGrid = memo(({ results, error, loading }: { results: any[], error: 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* LOCAL GRID FILTER */}
-      <div className="h-8 bg-slate-100 border-b border-slate-200 flex items-center px-2 justify-between">
-        <div className="h-full px-4 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-white text-blue-600 border-t-2 border-t-blue-500 shadow-sm shrink-0">
-          <Grid3X3 className="w-3 h-3" />
+      <div className="h-9 bg-secondary/80 backdrop-blur-sm border-b border-border flex items-center px-4 justify-between">
+        <div className="h-full px-4 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 bg-card text-blue-500 border-t-2 border-t-blue-500 shadow-sm shrink-0">
+          <Grid3X3 className="w-3.5 h-3.5" />
           Result Area
         </div>
         <div className="flex-1 max-w-xs px-2">
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
             <input
               type="text"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="Pesquisar nestes resultados..."
-              className="w-full h-6 pl-7 pr-2 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-600 placeholder:font-normal outline-none focus:border-blue-300 transition-all uppercase"
+              className="w-full h-6 pl-7 pr-2 bg-background border border-border rounded text-[10px] font-bold text-foreground placeholder:text-muted-foreground/30 outline-none focus:border-blue-500/30 transition-all uppercase"
             />
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-white scrollbar-hide">
+      <div className="flex-1 overflow-auto bg-card scrollbar-hide">
         {loading ? (
           <table className="w-full border-separate border-spacing-0 animate-pulse">
             <thead>
-              <tr className="bg-slate-50/50">
-                <th className="w-16 h-8 border-b border-r border-slate-100" />
+              <tr className="bg-secondary/30">
+                <th className="w-16 h-8 border-b border-r border-border" />
                 {Array.from({ length: 12 }).map((_, i) => (
-                  <th key={i} className="px-4 py-2 border-b border-r border-slate-100">
-                    <div className="h-2 bg-slate-200 rounded w-16" />
+                  <th key={i} className="px-4 py-2 border-b border-r border-border">
+                    <div className="h-2 bg-secondary rounded w-16" />
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-border">
               {Array.from({ length: 15 }).map((_, i) => (
                 <tr key={i}>
-                  <td className="w-16 h-8 border-r border-slate-50 bg-slate-50/30" />
+                  <td className="w-16 h-8 border-r border-border bg-secondary/10" />
                   {Array.from({ length: 12 }).map((_, j) => (
-                    <td key={j} className="px-4 py-2 border-r border-slate-50">
-                      <div className={cn("h-2 bg-slate-100 rounded", j % 3 === 0 ? "w-24" : j % 2 === 0 ? "w-16" : "w-12")} />
+                    <td key={j} className="px-4 py-2 border-r border-border">
+                      <div className={cn("h-2 bg-secondary/50 rounded", j % 3 === 0 ? "w-24" : j % 2 === 0 ? "w-16" : "w-12")} />
                     </td>
                   ))}
                 </tr>
@@ -226,11 +226,11 @@ const ResultsGrid = memo(({ results, error, loading }: { results: any[], error: 
           <table className="w-full border-separate border-spacing-0">
             <thead className="sticky top-0 z-20">
               <tr>
-                <th className="w-16 border-b border-r border-slate-200 bg-slate-50 relative group/expand">
+                <th className="w-16 border-b border-r border-border bg-secondary relative group/expand">
                   <button 
                     onClick={copyTop5AsSQL}
                     title="Copiar TOP 5 como INSERT SQL"
-                    className="absolute inset-0 flex items-center justify-center hover:bg-blue-600 transition-colors text-slate-300 hover:text-white"
+                    className="absolute inset-0 flex items-center justify-center hover:bg-blue-600 transition-colors text-muted-foreground hover:text-white"
                   >
                     {copiedId === "top5-sql" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </button>
@@ -238,14 +238,14 @@ const ResultsGrid = memo(({ results, error, loading }: { results: any[], error: 
                 {columns.map(col => (
                   <th 
                     key={col} 
-                    className="group px-4 py-2 border-b border-r border-slate-200 bg-slate-50 text-left whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors"
+                    className="group px-4 py-2 border-b border-r border-border bg-secondary text-left whitespace-nowrap cursor-pointer hover:bg-secondary/80 transition-colors"
                     onClick={() => handleSort(col)}
                   >
                     <div className="flex items-center justify-between gap-4">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter">
                         {col.toUpperCase()}
                       </span>
-                      <div className="text-slate-300">
+                      <div className="text-muted-foreground/30">
                         {sortConfig.key === col ? (
                           sortConfig.direction === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-blue-500" /> : <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
                         ) : (
@@ -257,10 +257,10 @@ const ResultsGrid = memo(({ results, error, loading }: { results: any[], error: 
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border/30">
               {filteredResults.slice(0, 500).map((row, i) => (
-                <tr key={i} className="hover:bg-blue-50/30 group">
-                <td className="w-16 text-[10px] text-right pr-4 text-slate-400 border-r border-slate-100 bg-slate-50/50 font-medium tracking-tighter">
+                <tr key={i} className="hover:bg-blue-900/10 group">
+                <td className="w-16 text-[10px] text-right pr-4 text-muted-foreground border-r border-border bg-secondary/30 font-medium tracking-tighter">
                   {i + 1}
                 </td>
                   {columns.map(col => {
@@ -295,18 +295,18 @@ const ResultsGrid = memo(({ results, error, loading }: { results: any[], error: 
                     let rawValue = String(value ?? "");
 
                     return (
-                      <td
+                        <td
                         key={col}
                         onClick={() => handleCopy(rawValue, cellId)}
                         className={cn(
-                          "px-4 py-2 text-[11px] border-r border-slate-100 whitespace-nowrap min-w-[100px] text-slate-600 cursor-pointer hover:bg-white transition-colors relative group/cell",
+                          "px-4 py-2 text-[11px] border-r border-border/50 whitespace-nowrap min-w-[100px] text-foreground/70 cursor-pointer hover:bg-secondary/30 transition-colors relative group/cell",
                           isPassword && "font-mono opacity-40 text-[9px]"
                         )}
                       >
                         <div className="flex items-center justify-between gap-2 overflow-hidden">
                           <span className="truncate">{displayValue}</span>
                           <div className="opacity-0 group-hover/cell:opacity-100 shrink-0">
-                            {copiedId === cellId ? <Check className="w-2.5 h-2.5 text-emerald-500" /> : <Copy className="w-2.5 h-2.5 text-slate-300" />}
+                            {copiedId === cellId ? <Check className="w-2.5 h-2.5 text-emerald-500" /> : <Copy className="w-2.5 h-2.5 text-muted-foreground/30" />}
                           </div>
                         </div>
                       </td>
@@ -317,9 +317,9 @@ const ResultsGrid = memo(({ results, error, loading }: { results: any[], error: 
             </tbody>
           </table>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center opacity-30">
-            <Grid3X3 className="w-12 h-12 text-slate-300 mb-2" />
-            <p className="text-[10px] font-black uppercase tracking-widest">No results found for "{filter}"</p>
+          <div className="h-full flex flex-col items-center justify-center opacity-10">
+            <Database className="w-12 h-12 text-muted-foreground mb-2" />
+            <p className="text-[10px] font-black uppercase tracking-widest">No results found</p>
           </div>
         )}
       </div>
@@ -417,42 +417,42 @@ export function SqlRunnerView() {
   }, [resize, stopResizing]);
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F3F4F6] overflow-hidden rounded-tl-2xl border-t border-l border-slate-200 font-sans select-none">
+    <div className="flex-1 flex flex-col bg-background overflow-hidden rounded-tl-2xl border-t border-l border-border font-sans select-none">
 
       {/* TOOLBAR */}
-      <div className="h-10 bg-white border-b border-slate-200 flex items-center px-1 gap-1">
-        <button className="p-1.5 hover:bg-slate-100 rounded" title="Nova Query" onClick={() => setQuery("")}>
-          <FileCode className="w-4 h-4 text-blue-500" />
+      <div className="h-10 bg-card border-b border-border flex items-center px-1 gap-1">
+        <button className="p-1.5 hover:bg-secondary rounded" title="Nova Query" onClick={() => setQuery("")}>
+          <FileCode className="w-4 h-4 text-blue-400" />
         </button>
-        <div className="w-px h-6 bg-slate-200 mx-1" />
+        <div className="w-px h-6 bg-border mx-1" />
         <button
           onClick={handleRun}
           disabled={loading}
-          className="flex items-center gap-2 px-3 py-1 hover:bg-emerald-50 rounded text-emerald-600 font-black text-[11px] transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-1 hover:bg-emerald-900/30 rounded text-emerald-400 font-black text-[11px] transition-all disabled:opacity-50"
         >
-          {loading ? <div className="w-3.5 h-3.5 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+          {loading ? <div className="w-3.5 h-3.5 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
           EXECUTE (F9)
         </button>
         <button
           onClick={handleStop}
           disabled={!loading}
-          className="flex items-center gap-2 px-3 py-1 hover:bg-red-50 rounded text-red-500 font-black text-[11px] transition-all disabled:opacity-30"
+          className="flex items-center gap-2 px-3 py-1 hover:bg-red-900/30 rounded text-red-500 font-black text-[11px] transition-all disabled:opacity-30"
           title="Parar Pesquisa"
         >
           <XCircle className="w-3.5 h-3.5" />
           STOP
         </button>
-        <div className="w-px h-6 bg-slate-200 mx-1" />
-        <button className="p-1.5 hover:bg-slate-100 rounded" title="Limpar" onClick={() => setQuery("")}>
+        <div className="w-px h-6 bg-border mx-1" />
+        <button className="p-1.5 hover:bg-secondary rounded" title="Limpar" onClick={() => setQuery("")}>
           <Trash2 className="w-4 h-4 text-red-400" />
         </button>
-        <button className="p-1.5 hover:bg-slate-100 rounded" onClick={fetchSchema} title="Recarregar Schema">
-          <RefreshCw className={cn("w-4 h-4", loading && "animate-spin text-blue-500")} />
+        <button className="p-1.5 hover:bg-secondary rounded" onClick={fetchSchema} title="Recarregar Schema">
+          <RefreshCw className={cn("w-4 h-4", loading && "animate-spin text-blue-400")} />
         </button>
         <div className="flex-1" />
         <button 
           onClick={() => setIsAiOpen(true)}
-          className="flex items-center gap-2 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded text-white font-black text-[11px] transition-all shadow-sm shadow-indigo-200 group mr-2"
+          className="flex items-center gap-2 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white font-black text-[11px] transition-all shadow-lg shadow-indigo-600/30 group mr-2 active:scale-95"
         >
           <Sparkles className="w-3.5 h-3.5 group-hover:animate-pulse" />
           DANILO AI
@@ -462,9 +462,9 @@ export function SqlRunnerView() {
       <div className="flex-1 flex overflow-hidden">
         <ObjectBrowser schema={schema} onSelectTable={handleSelectTable} />
 
-        <div className="flex-1 flex flex-col overflow-hidden bg-white">
+        <div className="flex-1 flex flex-col overflow-hidden bg-card">
           {/* EDITOR CONTAINER */}
-          <div className="flex-1 relative bg-[#FAFAFA] overflow-hidden font-mono text-[13px]">
+          <div className="flex-1 relative bg-[#09090B] overflow-hidden font-mono text-[13px]">
             {(() => {
               const highlightSql = (code: string) => {
                 if (!code) return "";
@@ -477,10 +477,10 @@ export function SqlRunnerView() {
                   .replace(/</g, "&lt;")
                   .replace(/>/g, "&gt;")
                   .replace(regex, (match, g1, g2, g3, g4) => {
-                    if (g1) return `<span class="text-blue-600 font-black">${match}</span>`;
-                    if (g2) return `<span class="text-purple-600 font-bold">${match}</span>`;
-                    if (g3) return `<span class="text-amber-600">${match}</span>`;
-                    if (g4) return `<span class="text-emerald-600">${match}</span>`;
+                    if (g1) return `<span class="text-blue-400 font-black">${match}</span>`;
+                    if (g2) return `<span class="text-purple-400 font-bold">${match}</span>`;
+                    if (g3) return `<span class="text-amber-400">${match}</span>`;
+                    if (g4) return `<span class="text-emerald-400">${match}</span>`;
                     return match;
                   });
               };
@@ -489,7 +489,7 @@ export function SqlRunnerView() {
                 <>
                   <div 
                     id="sql-highlight"
-                    className="absolute inset-0 p-6 pointer-events-none whitespace-pre-wrap break-words overflow-auto scrollbar-hide text-slate-800"
+                    className="absolute inset-0 p-6 pointer-events-none whitespace-pre-wrap break-words overflow-auto scrollbar-hide text-foreground/90 font-bold tracking-tight"
                     dangerouslySetInnerHTML={{ __html: highlightSql(query) + "\n" }}
                   />
                   <textarea 
@@ -501,7 +501,7 @@ export function SqlRunnerView() {
                     }}
                     onKeyDown={handleKeyDown}
                     spellCheck={false}
-                    className="absolute inset-0 w-full h-full p-6 bg-transparent text-transparent caret-slate-900 leading-relaxed outline-none resize-none overflow-auto scrollbar-hide"
+                    className="absolute inset-0 w-full h-full p-6 bg-transparent text-transparent caret-blue-400 leading-relaxed outline-none resize-none overflow-auto scrollbar-hide"
                     placeholder="DIGITE SUA QUERY SQL AQUI... (F9 PARA EXECUTAR)"
                   />
                 </>
@@ -511,14 +511,14 @@ export function SqlRunnerView() {
 
           {/* RESIZER BAR */}
           <div
-            className="h-1 bg-slate-200 hover:bg-blue-400 cursor-row-resize transition-colors"
+            className="h-1 bg-border hover:bg-blue-500/50 cursor-row-resize transition-colors"
             onMouseDown={startResizing}
           />
 
           {/* RESULTS AREA */}
           <div
             style={{ height: resultsHeight }}
-            className="flex flex-col overflow-hidden bg-white"
+            className="flex flex-col overflow-hidden bg-card"
           >
 
             <div className="flex-1 overflow-hidden">
@@ -526,14 +526,14 @@ export function SqlRunnerView() {
             </div>
 
             {/* STATUS BAR */}
-            <div className="h-6 bg-slate-50 border-t border-slate-200 px-3 flex items-center justify-between text-[10px] font-bold text-slate-500 font-mono">
+            <div className="h-6 bg-secondary/50 border-t border-border px-3 flex items-center justify-between text-[10px] font-bold text-muted-foreground font-mono">
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1 uppercase"><HardDrive className="w-3 h-3" /> {schema?.dbName || "DATABASE"}</span>
               </div>
               <div className="flex items-center gap-4">
                 <span>ROWS: {results.length} {results.length === 500 && "(LIMIT)"}</span>
                 <span className="text-[9px] text-amber-500 uppercase tracking-tighter">Auto-Limit 500 active</span>
-                <span className="text-emerald-600 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> READY</span>
+                <span className="text-emerald-500 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> READY</span>
               </div>
             </div>
           </div>
@@ -619,9 +619,9 @@ const SqlAiAssistant = ({ isOpen, onClose, setQuery, onExecute }: { isOpen: bool
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl shadow-indigo-200/50 overflow-hidden border border-indigo-100 animate-in zoom-in-95 duration-200">
-        <div className="bg-indigo-600 p-4 flex items-center justify-between text-white">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
+      <div className="w-full max-w-lg bg-card border border-border rounded-3xl shadow-2xl shadow-indigo-900/40 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="bg-indigo-600/90 backdrop-blur-sm p-5 flex items-center justify-between text-white">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
               <Bot className="w-5 h-5 text-white" />
@@ -638,14 +638,14 @@ const SqlAiAssistant = ({ isOpen, onClose, setQuery, onExecute }: { isOpen: bool
 
         <div className="p-6">
           <div className="mb-6">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">O que você deseja buscar?</label>
+            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2 block">O que você deseja buscar?</label>
             <div className="relative">
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 autoFocus
                 placeholder="Ex: 'Quero ver as vendas de cada vendedor' ou 'Quais entregas estão pendentes em Curitiba?'"
-                className="w-full h-32 p-4 bg-slate-50 border-2 border-slate-100 rounded-xl text-[13px] text-slate-700 outline-none focus:border-indigo-500 transition-all resize-none font-medium"
+                className="w-full h-32 p-4 bg-secondary/30 border border-border rounded-xl text-[13px] text-foreground outline-none focus:border-indigo-500/50 transition-all resize-none font-medium placeholder:text-muted-foreground/20"
               />
               <div className="absolute bottom-3 right-3 flex gap-2">
                 <button
@@ -670,25 +670,25 @@ const SqlAiAssistant = ({ isOpen, onClose, setQuery, onExecute }: { isOpen: bool
           </div>
 
           <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Sugestões Rápidas:</span>
+            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-3">Sugestões Rápidas:</span>
             <div className="space-y-2">
               {DB_KNOWLEDGE.commonQueries.map((q, idx) => (
                 <button
                   key={idx}
                   onClick={() => { setPrompt(q.label); }}
-                  className="w-full text-left p-3 hover:bg-indigo-50 rounded-lg border border-transparent hover:border-indigo-100 transition-all flex items-center justify-between group"
+                  className="w-full text-left p-3 hover:bg-secondary/50 rounded-lg border border-transparent hover:border-border transition-all flex items-center justify-between group"
                 >
-                  <span className="text-[12px] font-bold text-slate-600">{q.label}</span>
-                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                  <span className="text-[12px] font-bold text-foreground/70">{q.label}</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-indigo-400 transition-colors" />
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="bg-slate-50 p-4 border-t border-slate-100 flex items-center gap-2">
-          <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-[10px] font-bold text-slate-500 uppercase">A IA analisa tabelas como VW_ROMANEIOS, CADITE e VW_CONTAS_A_RECEBER.</span>
+        <div className="bg-secondary/20 p-4 border-t border-border flex items-center gap-2">
+          <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">A IA analisa tabelas como VW_ROMANEIOS, CADITE e VW_CONTAS_A_RECEBER.</span>
         </div>
       </div>
     </div>

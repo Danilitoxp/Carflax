@@ -260,44 +260,44 @@ export function RomaneiosView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col gap-4 pb-6 px-0 overflow-hidden bg-[#F8FAFC]">
+    <div className="flex-1 flex flex-col gap-4 pb-6 px-0 overflow-hidden bg-background">
       <div className="flex flex-col gap-3 shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none">Romaneios Diários</h2>
-            <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center gap-2">
+            <h2 className="text-xl font-black text-foreground uppercase tracking-tight leading-none">Romaneios Diários</h2>
+            <p className="text-muted-foreground text-[9px] font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center gap-2">
               <span className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
               Monitoramento de Entregas em Tempo Real
             </p>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-1.5 flex items-center gap-2 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-1.5 flex items-center gap-2 shadow-sm">
           <div className="flex-1 flex items-center gap-2 px-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center border border-blue-100/50">
-              <Plus className="w-4 h-4 text-blue-600" />
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center border border-blue-100 dark:border-blue-900/50">
+              <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
             <input
               type="text"
               value={nfInput}
               onChange={(e) => setNfInput(e.target.value)}
               placeholder="Digite o número da NF para lançar..."
-              className="flex-1 bg-transparent border-none text-[11px] font-bold text-slate-700 placeholder:text-slate-300 outline-none"
+              className="flex-1 bg-transparent border-none text-[11px] font-bold text-foreground placeholder:text-muted-foreground/30 outline-none"
             />
           </div>
 
-          <div className="w-px h-6 bg-slate-100" />
+          <div className="w-px h-6 bg-border" />
 
           <div className="flex-1 flex items-center gap-2 px-2">
-            <UserIcon className="w-3.5 h-3.5 text-slate-400" />
+            <UserIcon className="w-3.5 h-3.5 text-muted-foreground" />
             <select 
               value={selectedMotorista}
               onChange={(e) => setSelectedMotorista(e.target.value)}
-              className="flex-1 bg-transparent border-none text-[11px] font-black text-slate-500 outline-none cursor-pointer appearance-none uppercase tracking-tight"
+              className="flex-1 bg-transparent border-none text-[11px] font-black text-muted-foreground outline-none cursor-pointer appearance-none uppercase tracking-tight"
             >
-              <option value="">Selecionar Motorista</option>
+              <option value="" className="bg-card">Selecionar Motorista</option>
               {motoristas.map(m => (
-                <option key={m.COD} value={m.COD}>{m.NOME}</option>
+                <option key={m.COD} value={m.COD} className="bg-card">{m.NOME}</option>
               ))}
             </select>
           </div>
@@ -316,28 +316,28 @@ export function RomaneiosView() {
       <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4">
         {loading ? (
           <div className="space-y-3">
-            <div className="bg-white border border-slate-200 rounded-xl p-4 animate-pulse">
+            <div className="bg-card border border-border rounded-xl p-4 animate-pulse">
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-slate-100" />
+                <div className="w-10 h-10 rounded-xl bg-secondary dark:bg-slate-800" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-3 w-1/4 bg-slate-100 rounded" />
-                  <div className="h-2 w-1/6 bg-slate-50 rounded" />
+                  <div className="h-3 w-1/4 bg-secondary dark:bg-slate-800 rounded" />
+                  <div className="h-2 w-1/6 bg-secondary/50 dark:bg-slate-800/50 rounded" />
                 </div>
               </div>
-              <div className="space-y-2 border-t border-slate-50 pt-4">
+              <div className="space-y-2 border-t border-border pt-4">
                 {[1, 2, 3].map(i => (
                   <div key={i} className="flex items-center justify-between py-2">
-                    <div className="h-2 w-1/3 bg-slate-50 rounded" />
-                    <div className="h-2 w-1/4 bg-slate-50 rounded" />
-                    <div className="h-2 w-16 bg-slate-50 rounded" />
+                    <div className="h-2 w-1/3 bg-secondary/30 dark:bg-slate-800/30 rounded" />
+                    <div className="h-2 w-1/4 bg-secondary/30 dark:bg-slate-800/30 rounded" />
+                    <div className="h-2 w-16 bg-secondary/30 dark:bg-slate-800/30 rounded" />
                   </div>
                 ))}
               </div>
             </div>
           </div>
         ) : deliveries.length > 0 ? (
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-border bg-secondary/20 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 {(() => {
                   const motoristaAtivo = motoristas.find(m => m.COD === selectedMotorista);
@@ -355,7 +355,7 @@ export function RomaneiosView() {
                       </div>
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <h4 className="text-[12px] font-black text-slate-900 uppercase tracking-tight leading-none flex items-center gap-2">
+                          <h4 className="text-[12px] font-black text-foreground uppercase tracking-tight leading-none flex items-center gap-2">
                             {selectedMotorista 
                               ? (motoristaAtivo ? motoristaAtivo.NOME : "STATUS DA FROTA")
                               : (deliveries[0]?.driverName ? deliveries[0].driverName : "STATUS DA FROTA")
@@ -365,13 +365,13 @@ export function RomaneiosView() {
                               const formattedDate = `${dateParts[2]}${dateParts[1]}${dateParts[0]}`;
                               const sequence = String(deliveries[0]?.romNumber || 0).padStart(3, '0');
                               return (
-                                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100 text-[9px] font-black tracking-tight">
+                                <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 text-[9px] font-black tracking-tight">
                                   RM-{formattedDate}-{sequence}
                                 </span>
                               );
                             })()}
                           </h4>
-                          <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100 text-[8px] font-black tracking-widest uppercase">
+                          <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50 text-[8px] font-black tracking-widest uppercase">
                             {deliveries.length} ENTREGAS HOJE
                           </span>
                         </div>
@@ -392,7 +392,7 @@ export function RomaneiosView() {
               <div className="flex items-center gap-2">
                 <button 
                   onClick={handleCopyLink}
-                  className="h-8 px-3 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
+                  className="h-8 px-3 bg-card border border-border text-muted-foreground rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-secondary transition-all flex items-center gap-2 shadow-sm active:scale-95"
                 >
                   <Link2 className="w-3.5 h-3.5" />
                   Copiar Link Motorista
@@ -407,57 +407,57 @@ export function RomaneiosView() {
             <div className="p-1">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="py-2.5 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                    <th className="py-2.5 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">NF</th>
-                    <th className="py-2.5 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Cliente / Endereço</th>
-                    <th className="py-2.5 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Valor</th>
-                    <th className="py-2.5 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Ações</th>
+                  <tr className="border-b border-border">
+                    <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
+                    <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">NF</th>
+                    <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Cliente / Endereço</th>
+                    <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-right">Valor</th>
+                    <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-center">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-border/50">
                   {deliveries.map((delivery) => (
-                    <tr key={delivery.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr key={delivery.id} className="hover:bg-secondary/20 transition-colors group">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           {delivery.status === "completed" ? (
-                            <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center border border-emerald-100/50">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            <div className="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center border border-emerald-100/50">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                             </div>
                           ) : (
-                            <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center border border-amber-100/50">
-                              <Clock className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                            <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center border border-amber-100/50">
+                              <Clock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 animate-pulse" />
                             </div>
                           )}
                           <span className={cn(
                             "text-[9px] font-black uppercase tracking-widest",
-                            delivery.status === "completed" ? "text-emerald-600" : "text-amber-600"
+                            delivery.status === "completed" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
                           )}>
                             {delivery.status === "completed" ? delivery.time : "AGUARD."}
                           </span>
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <span className="text-[11px] font-black text-slate-700 tracking-tighter">#{delivery.nf}</span>
+                        <span className="text-[11px] font-black text-foreground tracking-tighter">#{delivery.nf}</span>
                       </td>
                       <td className="py-3 px-4 max-w-[400px]">
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight leading-none mb-0.5">{delivery.client}</span>
+                            <span className="text-[11px] font-black text-foreground uppercase tracking-tight leading-none mb-0.5">{delivery.client}</span>
                             {!selectedMotorista && delivery.driverName && (
-                              <span className="text-[8px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-bold uppercase tracking-tighter">
+                              <span className="text-[8px] px-1.5 py-0.5 rounded bg-secondary dark:bg-slate-800 text-muted-foreground font-bold uppercase tracking-tighter">
                                 {delivery.driverName.split(' ')[0]} {delivery.driverCode ? `[${delivery.driverCode}]` : ""}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 opacity-60">
-                            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="text-[9px] font-bold text-slate-500 uppercase truncate tracking-tight">{delivery.address}</span>
+                            <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase truncate tracking-tight">{delivery.address}</span>
                           </div>
                           {delivery.instrucoes && (
-                            <div className="flex items-center gap-1.5 mt-1.5 p-1 px-2 bg-amber-50 border border-amber-100/50 rounded-md self-start">
-                              <Navigation className="w-2.5 h-2.5 text-amber-500" />
-                              <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest italic">{delivery.instrucoes}</span>
+                            <div className="flex items-center gap-1.5 mt-1.5 p-1 px-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-100/50 dark:border-amber-900/50 rounded-md self-start">
+                              <Navigation className="w-2.5 h-2.5 text-amber-500 dark:text-amber-400" />
+                              <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest italic">{delivery.instrucoes}</span>
                             </div>
                           )}
                         </div>
@@ -490,12 +490,12 @@ export function RomaneiosView() {
             </div>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center">
-            <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-4">
-              <Navigation className="w-6 h-6 text-slate-300" />
+          <div className="bg-card border border-border border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center">
+            <div className="w-12 h-12 rounded-full bg-secondary/50 flex items-center justify-center mb-4">
+              <Navigation className="w-6 h-6 text-muted-foreground" />
             </div>
-            <h3 className="text-[14px] font-black text-slate-900 uppercase">Nenhum Romaneio Ativo</h3>
-            <p className="text-[11px] font-bold text-slate-400 max-w-[200px] mt-1 uppercase">Lance uma NF acima para iniciar o monitoramento de entregas.</p>
+            <h3 className="text-[14px] font-black text-foreground uppercase">Nenhum Romaneio Ativo</h3>
+            <p className="text-[11px] font-bold text-muted-foreground max-w-[200px] mt-1 uppercase">Lance uma NF acima para iniciar o monitoramento de entregas.</p>
           </div>
         )}
       </div>
@@ -541,18 +541,18 @@ function ItemsModal({ nf, onClose }: { nf: string | null, onClose: () => void })
   if (!nf) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <div className="bg-card w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] border border-border">
+        <div className="p-6 border-b border-border flex items-center justify-between bg-card">
           <div>
-            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none">Itens da NF #{nf}</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 flex items-center gap-2">
+            <h3 className="text-xl font-black text-foreground uppercase tracking-tight leading-none">Itens da NF #{nf}</h3>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-2 flex items-center gap-2">
               <Package className="w-3 h-3 text-blue-500" />
               Detalhamento de produtos e quantidades
             </p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
-            <X className="w-5 h-5 text-slate-400" />
+          <button onClick={onClose} className="p-2 hover:bg-secondary rounded-xl transition-all">
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
 
@@ -565,20 +565,20 @@ function ItemsModal({ nf, onClose }: { nf: string | null, onClose: () => void })
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="py-2.5 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Cód.</th>
-                  <th className="py-2.5 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Produto</th>
-                  <th className="py-2.5 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Qtd.</th>
-                  <th className="py-2.5 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Preço</th>
+                <tr className="border-b border-border">
+                  <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Cód.</th>
+                  <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Produto</th>
+                  <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-center">Qtd.</th>
+                  <th className="py-2.5 px-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-right">Preço</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-border/50">
                 {items.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="py-3 px-4 text-[11px] font-bold text-slate-400 font-mono italic">{item.CODIGO}</td>
-                    <td className="py-3 px-4 text-[11px] font-black text-slate-700 uppercase tracking-tight">{item.DESCRICAO}</td>
-                    <td className="py-3 px-4 text-[11px] font-black text-blue-600 text-center">{Number(item.QTD).toFixed(0)}</td>
-                    <td className="py-3 px-4 text-[11px] font-bold text-slate-600 text-right">
+                  <tr key={idx} className="hover:bg-secondary/20 transition-colors group">
+                    <td className="py-3 px-4 text-[11px] font-bold text-muted-foreground font-mono italic">{item.CODIGO}</td>
+                    <td className="py-3 px-4 text-[11px] font-black text-foreground uppercase tracking-tight">{item.DESCRICAO}</td>
+                    <td className="py-3 px-4 text-[11px] font-black text-blue-600 dark:text-blue-400 text-center">{Number(item.QTD).toFixed(0)}</td>
+                    <td className="py-3 px-4 text-[11px] font-bold text-foreground/80 text-right">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(item.PRECO || 0))}
                     </td>
                   </tr>

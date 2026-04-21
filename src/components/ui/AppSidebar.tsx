@@ -133,7 +133,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 h-screen bg-white border-r border-border flex flex-col z-50 transition-all duration-300",
+        "fixed left-0 top-0 h-screen bg-card border-r border-border flex flex-col z-50 transition-all duration-300",
         isCollapsed ? "w-20" : "w-64",
         "lg:translate-x-0",
         isMobileOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"
@@ -162,10 +162,10 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                 />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[10px] font-bold text-foreground truncate uppercase">
+                <span className="text-[10px] font-bold text-foreground dark:text-slate-200 truncate uppercase">
                   {userProfile?.name || "Carregando..."}
                 </span>
-                <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-widest leading-none mt-1">
+                <span className="text-[9px] font-medium text-muted-foreground dark:text-slate-500 uppercase tracking-widest leading-none mt-1">
                   {userProfile?.role || "Membro"}
                 </span>
               </div>
@@ -225,8 +225,8 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                     className={cn(
                       "flex items-center transition-all duration-200 group cursor-pointer relative py-2 rounded-lg",
                       isActive && !item.isDropdown
-                        ? "bg-primary/5 text-primary"
-                        : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground",
+                        ? "bg-primary/5 text-primary dark:bg-primary/10"
+                        : "hover:bg-secondary/80 dark:hover:bg-slate-800/50 text-muted-foreground hover:text-foreground dark:hover:text-slate-200",
                       isCollapsed ? "justify-center h-11 px-0" : "gap-3 px-3",
                     )}
                   >
@@ -279,8 +279,8 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                             className={cn(
                               "text-[11px] font-bold py-2 px-3 rounded-md cursor-pointer transition-all flex items-center gap-3",
                               activeItem === sub.label
-                                ? "bg-primary/5 text-primary"
-                                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
+                                ? "bg-primary/5 text-primary dark:bg-primary/10"
+                                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-slate-800/50 dark:hover:text-slate-200",
                             )}
                           >
                             <div className={cn(
@@ -338,8 +338,8 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                     className={cn(
                       "flex items-center rounded-lg transition-all duration-200 group cursor-pointer",
                       isActive && !item.isDropdown 
-                        ? "bg-primary/5 text-primary" 
-                        : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground",
+                        ? "bg-primary/5 text-primary dark:bg-primary/10" 
+                        : "hover:bg-secondary/80 dark:hover:bg-slate-800/50 text-muted-foreground hover:text-foreground dark:hover:text-slate-200",
                       isCollapsed
                         ? "justify-center h-11 px-0"
                         : "gap-3 px-3 py-2",
@@ -392,8 +392,8 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                             className={cn(
                               "text-[11px] font-bold py-2 px-3 rounded-md cursor-pointer transition-all flex items-center gap-3",
                               activeItem === sub.label
-                                ? "bg-primary/5 text-primary"
-                                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
+                                ? "bg-primary/5 text-primary dark:bg-primary/10"
+                                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-slate-800/50 dark:hover:text-slate-200",
                             )}
                           >
                              <div className={cn(
@@ -447,7 +447,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
         <div className="flex items-center gap-3 px-2 py-2">
            <button 
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-secondary transition-all"
+              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-secondary dark:hover:bg-slate-800/50 transition-all font-bold"
               title="Mudar Tema"
            >
               {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

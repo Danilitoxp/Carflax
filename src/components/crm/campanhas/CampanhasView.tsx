@@ -80,8 +80,8 @@ export function CampanhasView() {
         ]);
 
         if (campanhasRes.error) console.error("Campanhas erro:", campanhasRes.error);
-        if (premioRes.error) console.error("Premio erro:", premioRes.error);
-
+        if (premioRes.error) console.error("Premio Mes erro:", premioRes.error);
+        
         const campanhasData = campanhasRes.data;
         const premioData = premioRes.data;
 
@@ -126,8 +126,8 @@ export function CampanhasView() {
     const anoAtual = now.getFullYear();
     const mesano = `${String(mes).padStart(2, "0")}${ano}`;
 
-    const [{ data: premio }, { data: proximos }] = await Promise.all([
-      supabase.from("premio_mes").select("*").eq("mes", mes).eq("ano", ano).single(),
+    const [{ data: premio, error: errP }, { data: proximos }] = await Promise.all([
+      supabase.from("premio_mes").select("*").eq("mes", mes).eq("ano", ano).maybeSingle(),
       supabase.from("premio_mes")
         .select("*")
         .or(`ano.gt.${anoAtual},and(ano.eq.${anoAtual},mes.gt.${mesAtual})`)
@@ -135,6 +135,7 @@ export function CampanhasView() {
         .limit(6),
     ]);
 
+    if (errP) console.error("[Campanhas] Erro ao buscar prêmio:", errP);
     if (premio) setPremioAtual(premio);
     setProximosPremios(proximos || []);
     setLoadingPremio(false);
@@ -142,7 +143,21 @@ export function CampanhasView() {
     // Busca elegíveis na API do ERP (≥97% da meta)
     try {
       const elig = await apiElegiveisParaSorteio(mesano);
-      setElegiveis(elig);
+      
+      if (elig && elig.length > 0) {
+        const { data: userAvatars } = await supabase
+          .from("usuarios")
+          .select("avatar, operator_code")
+          .in("operator_code", elig.map(v => v.COD_VENDEDOR));
+        
+        const mappedElig = elig.map(v => ({
+          ...v,
+          avatar: userAvatars?.find(u => u.operator_code === v.COD_VENDEDOR)?.avatar
+        }));
+        setElegiveis(mappedElig);
+      } else {
+        setElegiveis(elig || []);
+      }
     } catch (err) {
       console.error("[Campanhas] Erro ao buscar elegíveis:", err);
       setErroApi(true);
@@ -274,8 +289,30 @@ export function CampanhasView() {
 
   const confirmarExclusao = async () => {
     if (confirmDeleteId === null) return;
-    const { error } = await supabase.from("campanhas").delete().eq("id", confirmDeleteId);
-    if (error) { console.error("[Campanhas] Erro ao excluir:", error); alert(`Erro ao excluir: ${error.message}`); return; }
+    
+    const idToDelete = isNaN(Number(confirmDeleteId)) ? confirmDeleteId : Number(confirmDeleteId);
+    console.log("[Campanhas] Tentando excluir ID:", idToDelete, "Tipo:", typeof idToDelete);
+    
+    // Tentamos deletar e pedimos o retorno do que foi deletado
+    const { data, error } = await supabase
+      .from("campanhas")
+      .delete()
+      .eq("id", idToDelete)
+      .select();
+
+    if (error) { 
+      console.error("[Campanhas] Erro Supabase:", error); 
+      alert(`Erro ao excluir: ${error.message}`); 
+      return; 
+    }
+
+    if (!data || data.length === 0) {
+      // Se não deletou no banco, não vamos tirar da tela para não enganar o usuário
+      alert("Aviso: A campanha não pôde ser removida do servidor. Verifique suas permissões.");
+      setConfirmDeleteId(null);
+      return;
+    }
+
     setCampaigns((prev) => prev.filter((c) => c.id !== confirmDeleteId));
     setConfirmDeleteId(null);
   };
@@ -286,7 +323,7 @@ export function CampanhasView() {
   const isMesAtual = mesSelecionado.mes === mesAtual && mesSelecionado.ano === anoAtual;
 
   return (
-    <div className="h-full flex flex-col pt-4 px-6 pb-2 overflow-hidden bg-[#F8FAFC]">
+    <div className="h-full flex flex-col pt-4 px-6 pb-2 overflow-hidden bg-background">
       <style>{`
         @keyframes border-trace {
           0%, 100% { clip-path: inset(0 0 98% 0); }
@@ -298,16 +335,16 @@ export function CampanhasView() {
       `}</style>
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
+      <div className="flex items-center justify-between mb-6 shrink-0 bg-secondary/20 p-4 rounded-3xl border border-border/40">
         <div>
-          <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Campanhas</h2>
-          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Programas de Incentivo e Vendas</p>
+          <h2 className="text-2xl font-black text-foreground uppercase tracking-tight">Campanhas Ativas</h2>
+          <p className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em] mt-1 opacity-70">Programas de Incentivo e Vendas Digitais</p>
         </div>
         <button
           onClick={abrirNovaCampanha}
-          className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 uppercase tracking-wider active:scale-[0.98]"
+          className="h-10 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[11px] font-black transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2 uppercase tracking-widest active:scale-95"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-4 h-4" />
           Nova Campanha
         </button>
       </div>
@@ -319,45 +356,45 @@ export function CampanhasView() {
           {/* Card Prêmio do Mês — sempre visível, abre modal */}
           <div
             onClick={abrirModalPremio}
-            className="aspect-[4/5] rounded-xl p-4 flex flex-col border border-blue-200/50 transition-all duration-300 cursor-pointer group relative overflow-hidden bg-white shadow-xl shadow-blue-600/5 hover:shadow-md hover:border-blue-300"
+            className="aspect-[4/5] rounded-[32px] p-6 flex flex-col border border-blue-500/30 transition-all duration-500 cursor-pointer group relative overflow-hidden bg-card/60 backdrop-blur-xl shadow-2xl shadow-blue-600/10 hover:shadow-blue-500/20 hover:scale-[1.02]"
           >
             <div className="absolute inset-0 z-0 pointer-events-none">
-              <div className="absolute inset-0 border-2 border-blue-600 rounded-xl animate-border-trace opacity-60" />
+              <div className="absolute inset-0 border-2 border-blue-500 rounded-[32px] animate-border-trace opacity-40 shadow-[0_0_15px_rgba(59,130,246,0.2)]" />
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-3 relative z-10">
+            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 relative z-10">
               {premioCard?.imagem ? (
-                <img src={premioCard.imagem} alt={premioCard.nome} className="w-20 h-20 object-contain group-hover:scale-110 transition-transform duration-500" />
+                <img src={premioCard.imagem} alt={premioCard.nome} className="w-24 h-24 object-contain group-hover:scale-125 transition-transform duration-700 drop-shadow-[0_10px_20px_rgba(59,130,246,0.3)]" />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform duration-500">
-                  <Trophy className="w-8 h-8 text-white" />
+                <div className="w-20 h-20 rounded-[28px] bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center shadow-2xl shadow-blue-600/40 group-hover:scale-110 transition-all duration-700 group-hover:rotate-6">
+                  <Trophy className="w-10 h-10 text-white" />
                 </div>
               )}
-              <div className="space-y-1">
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Prêmio do Mês</p>
-                <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight line-clamp-3">
-                  {premioCard?.nome ?? "Ver Prêmio"}
+              <div className="space-y-1.5">
+                <p className="text-[9px] font-black text-blue-500 uppercase tracking-[0.2em] opacity-80">Prêmio Especial</p>
+                <h3 className="text-[12px] font-black text-foreground tracking-tight leading-tight line-clamp-3 uppercase">
+                  {premioCard?.nome ?? "Consultar Prêmio"}
                 </h3>
                 {premioCard?.valor && (
-                  <p className="text-[13px] font-black text-blue-600">
+                  <p className="text-lg font-black text-blue-500 tracking-tighter">
                     R$ {Number(premioCard.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 )}
               </div>
-              <div className="px-3 py-1 rounded-full bg-blue-50 border border-blue-100 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
-                <span className="text-[8px] font-black text-blue-600 tracking-[0.2em] uppercase">★ Bata a meta</span>
+              <div className="px-4 py-1.5 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center gap-2 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
+                <span className="text-[9px] font-black tracking-[0.1em] uppercase">Meta Ativa</span>
               </div>
             </div>
           </div>
 
           {/* Skeletons enquanto carrega */}
           {loadingCampaigns && Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="aspect-[4/5] rounded-xl border border-slate-200 bg-white overflow-hidden animate-pulse">
-              <div className="h-3/5 bg-slate-100 m-3 rounded-lg" />
+            <div key={i} className="aspect-[4/5] rounded-xl border border-border/60 bg-card overflow-hidden animate-pulse">
+              <div className="h-3/5 bg-secondary/60 m-3 rounded-lg" />
               <div className="px-4 space-y-2">
-                <div className="h-2.5 bg-slate-100 rounded w-3/4" />
-                <div className="h-2 bg-slate-100 rounded w-1/2" />
-                <div className="h-4 bg-slate-100 rounded w-1/4 mt-1" />
+                <div className="h-2.5 bg-secondary/60 rounded w-3/4" />
+                <div className="h-2 bg-secondary/60 rounded w-1/2" />
+                <div className="h-4 bg-secondary/60 rounded w-1/4 mt-1" />
               </div>
             </div>
           ))}
@@ -367,25 +404,25 @@ export function CampanhasView() {
             <div
               key={camp.id}
               onClick={() => abrirRankingCampanha(camp)}
-              className="aspect-[4/5] rounded-xl p-4 flex flex-col border border-slate-200 transition-all duration-300 cursor-pointer group relative overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-300"
+              className="aspect-[4/5] rounded-[32px] p-6 flex flex-col border border-border/40 transition-all duration-500 cursor-pointer group relative overflow-hidden bg-card/40 backdrop-blur-md shadow-lg hover:shadow-2xl hover:border-blue-500/30 hover:scale-[1.02]"
             >
               {/* Ações editar/excluir */}
-              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 z-10">
                 <button
                   onClick={(e) => abrirEdicao(camp, e)}
-                  className="p-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-400 hover:text-blue-600 hover:border-blue-300 transition-all"
+                  className="w-8 h-8 bg-card border border-border rounded-xl shadow-lg text-muted-foreground hover:text-blue-500 hover:border-blue-500/50 flex items-center justify-center transition-all bg-secondary/50"
                 >
-                  <Pencil className="w-3 h-3" />
+                  <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(camp.id); }}
-                  className="p-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-400 hover:text-red-500 hover:border-red-200 transition-all"
+                  className="w-8 h-8 bg-card border border-border rounded-xl shadow-lg text-muted-foreground hover:text-rose-500 hover:border-rose-500/50 flex items-center justify-center transition-all bg-secondary/50"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              <div className="flex-1 bg-slate-50 rounded-lg p-4 flex items-center justify-center border border-slate-100 mb-3 transition-colors group-hover:bg-blue-50/50 relative overflow-hidden">
+              <div className="flex-1 bg-secondary/30 rounded-[24px] p-6 flex items-center justify-center border border-border/20 mb-4 transition-all group-hover:bg-blue-500/5 group-hover:rotate-1 relative overflow-hidden group-hover:border-blue-500/20">
                 <img
                   src={camp.logo}
                   alt={camp.name}
@@ -394,20 +431,20 @@ export function CampanhasView() {
                     const skeleton = e.currentTarget.parentElement?.querySelector(".img-skeleton") as HTMLElement;
                     if (skeleton) skeleton.style.display = "none";
                   }}
-                  style={{ opacity: 0, transition: "opacity 0.3s", position: "relative", zIndex: 1 }}
-                  className="max-h-12 w-auto object-contain group-hover:scale-110 transition-transform duration-500"
+                  style={{ opacity: 0, transition: "all 0.5s", position: "relative", zIndex: 1 }}
+                  className="max-h-16 w-auto object-contain group-hover:scale-125 transition-all duration-700 grayscale group-hover:grayscale-0 contrast-125 group-hover:contrast-100"
                 />
-                <div className="img-skeleton absolute inset-0 bg-slate-100 animate-pulse rounded-lg" />
+                <div className="img-skeleton absolute inset-0 bg-secondary/20 animate-pulse rounded-lg" />
               </div>
-              <div className="space-y-1.5">
-                <h3 className="text-[10px] font-black text-slate-900 truncate uppercase tracking-tight">{camp.name}</h3>
-                <p className="text-[8px] font-bold text-slate-400 tracking-widest leading-none">{camp.date}</p>
-                <div className="pt-0.5">
+              <div className="space-y-2">
+                <h3 className="text-[11px] font-black text-foreground truncate uppercase tracking-tight group-hover:text-blue-500 transition-colors">{camp.name}</h3>
+                <p className="text-[9px] font-bold text-muted-foreground tracking-widest leading-none border-l-2 border-blue-500/30 pl-2">{camp.date}</p>
+                <div className="pt-1">
                   <span className={cn(
-                    "inline-flex px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest border",
-                    camp.status === "ativa" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                    camp.status === "futura" ? "bg-blue-50 text-blue-600 border-blue-100" :
-                    "bg-slate-50 text-slate-400 border-slate-200"
+                    "inline-flex px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-all",
+                    camp.status === "ativa" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]" :
+                    camp.status === "futura" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
+                    "bg-secondary/40 text-muted-foreground border-border opacity-50"
                   )}>
                     {camp.status}
                   </span>
@@ -420,81 +457,88 @@ export function CampanhasView() {
 
       {/* ── MODAL PRÊMIO DO MÊS ── */}
       {isPremioModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="fixed inset-0" onClick={() => setIsPremioModalOpen(false)} />
-          <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsPremioModalOpen(false)} />
+          <div className="relative w-full max-w-2xl bg-card border border-border/50 rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] z-10 animate-in zoom-in-95 duration-300">
 
             {/* Header */}
-            <div className="px-6 py-4 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
-                  <Trophy className="w-4 h-4 text-blue-600" />
+            <div className="px-8 py-6 flex items-center justify-between border-b border-border/40 bg-secondary/30 shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-600 rounded-[18px] flex items-center justify-center shadow-lg shadow-blue-600/20 rotate-3">
+                  <Trophy className="w-6 h-6 text-white -rotate-3" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Prêmio do Mês</h2>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Bata a meta • Concorra ao sorteio</p>
+                  <h2 className="text-[15px] font-black text-foreground uppercase tracking-tight">Vantagens & Prêmios</h2>
+                  <p className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em] opacity-70">Bata a meta • Concorra ao sorteio</p>
                 </div>
               </div>
-              <button onClick={() => setIsPremioModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all">
-                <X className="w-4 h-4" />
+              <button onClick={() => setIsPremioModalOpen(false)} className="w-10 h-10 rounded-2xl bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-white hover:bg-rose-500 transition-all active:scale-90">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-hide">
+            <div className="flex-1 overflow-y-auto scrollbar-hide p-4">
 
               {/* Seletor de Mês */}
-              <div className="px-6 pt-5 pb-3 flex items-center justify-center gap-4">
-                <button onClick={() => navegarMes(-1)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-all text-slate-400 hover:text-blue-600">
-                  <ChevronLeft className="w-4 h-4" />
+              <div className="px-6 pt-2 pb-6 flex items-center justify-center gap-6">
+                <button onClick={() => navegarMes(-1)} className="w-8 h-8 flex items-center justify-center bg-secondary border border-border rounded-xl transition-all text-muted-foreground hover:text-blue-500 hover:border-blue-500/50">
+                  <ChevronLeft className="w-5 h-5" />
                 </button>
-                <div className="text-center">
-                  <span className="text-sm font-black text-slate-800 uppercase tracking-tight">
+                <div className="text-center min-w-[140px]">
+                  <span className="text-[13px] font-black text-foreground uppercase tracking-[0.1em]">
                     {MESES[mesSelecionado.mes - 1]} {mesSelecionado.ano}
                   </span>
                   {isMesAtual && (
-                    <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[9px] font-black text-blue-600 uppercase tracking-wider">Mês atual</span>
+                    <div className="mt-1">
+                      <span className="px-3 py-1 rounded-full bg-blue-600/20 border border-blue-500/20 text-[9px] font-black text-blue-500 uppercase tracking-widest">Atendimento Ativo</span>
+                    </div>
                   )}
                 </div>
-                <button onClick={() => navegarMes(+1)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-all text-slate-400 hover:text-blue-600">
-                  <ChevronRight className="w-4 h-4" />
+                <button onClick={() => navegarMes(+1)} className="w-8 h-8 flex items-center justify-center bg-secondary border border-border rounded-xl transition-all text-muted-foreground hover:text-blue-500 hover:border-blue-500/50">
+                  <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
-
-              {/* Prêmio do Mês Selecionado */}
-              <div className="px-6 pb-5">
+ 
+               {/* Prêmio do Mês Selecionado */}
+               <div className="px-6 pb-5">
                 {loadingPremio ? (
-                  <div className="bg-slate-50 rounded-xl p-6 flex items-center justify-center h-40">
+                  <div className="bg-secondary/40 rounded-xl p-6 flex items-center justify-center h-40">
                     <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : premioAtual ? (
-                  <div className="bg-gradient-to-br from-blue-50 to-slate-50 border border-blue-100 rounded-xl p-5 flex gap-5 items-center relative overflow-hidden">
-                    <div className="absolute inset-0 border-2 border-blue-200 rounded-xl animate-border-trace opacity-30 pointer-events-none" />
+                  <div className="bg-card/40 backdrop-blur-xl border border-blue-500/20 rounded-[32px] p-8 flex gap-8 items-center relative overflow-hidden group shadow-2xl shadow-blue-900/10">
+                    <div className="absolute inset-0 border-2 border-blue-500 rounded-[32px] animate-border-trace opacity-20 pointer-events-none group-hover:opacity-40 transition-opacity" />
                     {premioAtual.imagem ? (
-                      <img src={premioAtual.imagem} alt={premioAtual.nome} className="w-28 h-28 object-contain shrink-0 rounded-lg bg-white border border-slate-100 p-2" />
+                      <div className="w-32 h-32 shrink-0 rounded-2xl bg-white p-3 shadow-2xl group-hover:scale-105 transition-transform duration-500">
+                        <img src={premioAtual.imagem} alt={premioAtual.nome} className="w-full h-full object-contain" />
+                      </div>
                     ) : (
-                      <div className="w-28 h-28 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                        <Gift className="w-10 h-10 text-blue-400" />
+                      <div className="w-32 h-32 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                        <Gift className="w-12 h-12 text-blue-500" />
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1">
-                        {MESES[premioAtual.mes - 1]} {premioAtual.ano}
-                      </p>
-                      <h3 className="text-sm font-black text-slate-800 leading-tight mb-1">{premioAtual.nome}</h3>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-3 py-1 rounded-lg bg-blue-600 text-white text-[9px] font-black uppercase tracking-[0.2em]">
+                          {MESES[premioAtual.mes - 1]} {premioAtual.ano}
+                        </span>
+                      </div>
+                      <h3 className="text-xl font-black text-foreground leading-tight uppercase tracking-tight">{premioAtual.nome}</h3>
                       {premioAtual.descricao && (
-                        <p className="text-[11px] text-slate-500 leading-snug line-clamp-3 mb-2">{premioAtual.descricao}</p>
+                        <p className="text-[11px] text-muted-foreground/80 leading-relaxed line-clamp-3 font-medium">{premioAtual.descricao}</p>
                       )}
-                      {premioAtual.valor && (
-                        <p className="text-lg font-black text-blue-600">
+                      <div className="pt-2 flex items-baseline gap-2">
+                        <span className="text-[10px] font-black text-blue-500 uppercase">Preço Estimado</span>
+                        <p className="text-3xl font-black text-blue-500 tracking-tighter">
                           R$ {Number(premioAtual.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                         </p>
-                      )}
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-center gap-2">
+                  <div className="bg-secondary/40 border border-dashed border-border/60 rounded-xl p-8 flex flex-col items-center justify-center text-center gap-2">
                     <Gift className="w-8 h-8 text-slate-300" />
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nenhum prêmio definido para este mês</p>
+                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Nenhum prêmio definido para este mês</p>
                   </div>
                 )}
               </div>
@@ -503,8 +547,8 @@ export function CampanhasView() {
               <div className="px-6 pb-5">
                 <div className="flex items-center gap-2 mb-3">
                   <Star className="w-3.5 h-3.5 text-amber-500" />
-                  <h4 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Vendedores Elegíveis</h4>
-                  <span className="text-[9px] font-bold text-slate-400">≥ 97% da meta</span>
+                  <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Vendedores Elegíveis</h4>
+                  <span className="text-[9px] font-bold text-muted-foreground/50">≥ 97% da meta</span>
                   {elegiveis && !loadingElegiveis && (
                     <span className="ml-auto text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">
                       {elegiveis.length} elegíveis
@@ -515,34 +559,41 @@ export function CampanhasView() {
                 {loadingElegiveis ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {[1,2,3].map(i => (
-                      <div key={i} className="bg-slate-100 rounded-xl h-20 animate-pulse" />
+                      <div key={i} className="bg-secondary/60 rounded-xl h-20 animate-pulse" />
                     ))}
                   </div>
                 ) : erroApi ? (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3 animate-pulse">
                     <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
-                    <p className="text-[11px] text-amber-700 font-semibold">API não disponível. Verifique se o servidor ERP está rodando.</p>
+                    <p className="text-[11px] text-amber-500/90 font-black uppercase tracking-tight">Sincronização ERP: API offline ou servidor não respondendo.</p>
                   </div>
                 ) : elegiveis && elegiveis.length === 0 ? (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-center">
-                    <p className="text-[11px] font-bold text-slate-400">Nenhum vendedor atingiu 97% da meta neste mês ainda.</p>
+                  <div className="bg-secondary/40 border border-border/60 rounded-xl p-5 text-center">
+                    <p className="text-[11px] font-bold text-muted-foreground">Nenhum vendedor atingiu 97% da meta neste mês ainda.</p>
                   </div>
                 ) : elegiveis && elegiveis.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {elegiveis.map((v) => {
-                      const pct = parseFloat(v.PERC_META_BATIDA);
-                      const borderColor = pct >= 100 ? "border-emerald-400" : "border-amber-400";
-                      const pctColor = pct >= 100 ? "text-emerald-600" : "text-amber-600";
-                      return (
-                        <div key={v.COD_VENDEDOR} className={cn("bg-white border-2 rounded-xl p-3 flex flex-col items-center text-center gap-1", borderColor)}>
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 flex items-center justify-center text-white text-xs font-black">
-                            {v.NOME_VENDEDOR.split(" ").map(n => n[0]).slice(0,2).join("")}
+                      {elegiveis.map((v) => {
+                        const pct = parseFloat(v.PERC_META_BATIDA);
+                        const borderColor = pct >= 100 ? "border-emerald-500/40" : "border-amber-500/40";
+                        const pctColor = pct >= 100 ? "text-emerald-500" : "text-amber-500";
+                        
+                        return (
+                          <div key={v.COD_VENDEDOR} className={cn("bg-card/40 backdrop-blur-md border-2 rounded-2xl p-3 flex flex-col items-center text-center gap-1 group hover:bg-card/60 transition-all shadow-lg", borderColor)}>
+                            <div className="w-12 h-12 rounded-full border-2 border-slate-700/50 shadow-xl overflow-hidden mb-1 flex items-center justify-center bg-blue-600/20 shrink-0">
+                              {v.avatar ? (
+                                <img src={v.avatar} alt={v.NOME_VENDEDOR} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-white text-[10px] font-black uppercase">
+                                  {v.NOME_VENDEDOR.split(" ").map(n => n[0]).slice(0,2).join("")}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[9px] font-black text-foreground uppercase leading-tight line-clamp-1">{v.NOME_VENDEDOR}</p>
+                            <p className={cn("text-[11px] font-black", pctColor)}>{pct.toFixed(1)}%</p>
                           </div>
-                          <p className="text-[10px] font-black text-slate-800 leading-tight line-clamp-2">{v.NOME_VENDEDOR}</p>
-                          <p className={cn("text-[11px] font-black", pctColor)}>{pct.toFixed(1)}%</p>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 ) : null}
               </div>
@@ -551,27 +602,27 @@ export function CampanhasView() {
               {proximosPremios.length > 0 && (
                 <div className="px-6 pb-6">
                   <div className="flex items-center gap-2 mb-3">
-                    <Gift className="w-3.5 h-3.5 text-slate-400" />
-                    <h4 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Próximos Prêmios</h4>
+                    <Gift className="w-3.5 h-3.5 text-muted-foreground" />
+                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Próximos Prêmios</h4>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {proximosPremios.map((p) => (
                       <div
                         key={p.id}
                         onClick={() => { setMesSelecionado({ mes: p.mes, ano: p.ano }); carregarPremio(p.mes, p.ano); }}
-                        className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-blue-300 hover:bg-blue-50/50 transition-all group"
+                        className="bg-secondary/40 border border-border/60 rounded-xl p-3 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-blue-300 hover:bg-blue-50/50 transition-all group"
                       >
                         {p.imagem ? (
                           <img src={p.imagem} alt={p.nome} className="w-12 h-12 object-contain group-hover:scale-110 transition-transform" />
                         ) : (
-                          <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-lg bg-secondary/60 flex items-center justify-center">
                             <Gift className="w-5 h-5 text-slate-300" />
                           </div>
                         )}
                         <div>
                           <p className="text-[9px] font-black text-blue-500 uppercase tracking-wider">{MESES[p.mes - 1].slice(0,3)} {p.ano}</p>
-                          <p className="text-[10px] font-bold text-slate-700 leading-tight line-clamp-2">{p.nome}</p>
-                          {p.valor && <p className="text-[10px] font-black text-blue-600 mt-0.5">R$ {Number(p.valor).toLocaleString("pt-BR")}</p>}
+                          <p className="text-[10px] font-black text-foreground leading-tight line-clamp-2 uppercase">{p.nome}</p>
+                          {p.valor && <p className="text-[10px] font-black text-blue-500/80 mt-0.5">R$ {Number(p.valor).toLocaleString("pt-BR")}</p>}
                         </div>
                       </div>
                     ))}
@@ -586,59 +637,62 @@ export function CampanhasView() {
 
       {/* ── MODAL RANKING CAMPANHA ── */}
       {selectedCampaign && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="fixed inset-0" onClick={() => setSelectedCampaign(null)} />
-          <div className="relative w-full max-w-4xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-8 py-6 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
-                  <Target className="w-5 h-5 text-blue-600" />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setSelectedCampaign(null)} />
+          <div className="relative w-full max-w-4xl bg-card border border-border/50 rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] z-10 animate-in zoom-in-95 duration-300">
+            <div className="px-10 py-8 flex items-center justify-between border-b border-border/40 bg-secondary/30 shrink-0">
+              <div className="flex items-center gap-5">
+                <div className="w-12 h-12 bg-blue-600 rounded-[18px] flex items-center justify-center shadow-lg shadow-blue-600/30">
+                  <Target className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Ranking da Campanha</h2>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">{selectedCampaign.name} • {selectedCampaign.description}</p>
+                  <h2 className="text-[17px] font-black text-foreground uppercase tracking-tight">Ranking de Performance</h2>
+                  <p className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.3em] mt-1 opacity-70">{selectedCampaign.name} • MONITORAMENTO REAL-TIME</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedCampaign(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all">
-                <X className="w-5 h-5" />
+              <button onClick={() => setSelectedCampaign(null)} className="w-12 h-12 rounded-2xl bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-white hover:bg-rose-500 transition-all active:scale-95">
+                <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+            <div className="flex-1 overflow-y-auto p-8 scrollbar-hide bg-background/40">
               {loadingRanking ? (
                 <div className="space-y-2">
-                  {[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-slate-100 rounded-lg animate-pulse" />)}
+                  {[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-secondary/60 rounded-lg animate-pulse" />)}
                 </div>
               ) : rankingCampanha.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 text-center h-40">
                   <AlertCircle className="w-8 h-8 text-slate-200" />
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                     {erroApi ? "API não disponível" : "Nenhum dado de faturamento encontrado para este fornecedor"}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <div className="grid grid-cols-12 px-4 mb-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                  <div className="grid grid-cols-12 px-4 mb-2 text-[9px] font-black text-muted-foreground uppercase tracking-widest">
                     <div className="col-span-1">Pos</div>
                     <div className="col-span-7">Vendedor</div>
                     <div className="col-span-2 text-right">Qtd</div>
                     <div className="col-span-2 text-right">Faturado</div>
                   </div>
                   {rankingCampanha.map((v, i) => (
-                    <div key={v.COD_VENDEDOR} className="grid grid-cols-12 items-center bg-white hover:bg-slate-50 px-4 py-2.5 rounded-lg border border-slate-100 transition-all">
+                    <div key={v.COD_VENDEDOR} className="grid grid-cols-12 items-center bg-card/60 hover:bg-secondary/40 px-6 py-4 rounded-3xl border border-border/40 transition-all group mb-2 hover:border-blue-500/30">
                       <div className="col-span-1">
                         <div className={cn(
-                          "w-6 h-6 rounded flex items-center justify-center text-[10px] font-black",
-                          i === 0 ? "bg-amber-400 text-amber-900" : i === 1 ? "bg-slate-200 text-slate-600" : i === 2 ? "bg-orange-100 text-orange-600" : "bg-slate-50 text-slate-400"
+                          "w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-black shadow-lg",
+                          i === 0 ? "bg-amber-400 text-amber-950 rotate-3 scale-110 shadow-amber-400/20 border-2 border-white/20" : 
+                          i === 1 ? "bg-slate-300 text-foreground shadow-slate-300/20" : 
+                          i === 2 ? "bg-orange-300 text-orange-950 shadow-orange-300/20" : 
+                          "bg-secondary/50 text-muted-foreground border border-border/40"
                         )}>{i + 1}</div>
                       </div>
-                      <div className="col-span-7 pl-2">
-                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">{v.NOME_VENDEDOR}</span>
+                      <div className="col-span-7 pl-4">
+                        <span className="text-[12px] font-black text-foreground uppercase tracking-tight group-hover:text-blue-500 transition-colors">{v.NOME_VENDEDOR}</span>
                       </div>
                       <div className="col-span-2 text-right">
-                        <span className="text-[10px] font-semibold text-slate-500">{v.QTD_VENDAS}</span>
+                        <span className="text-[11px] font-bold text-muted-foreground opacity-60 uppercase">{v.QTD_VENDAS} VDS</span>
                       </div>
                       <div className="col-span-2 text-right">
-                        <span className="text-[11px] font-black text-emerald-600">
+                        <span className="text-[13px] font-black text-emerald-500 tabular-nums">
                           {parseFloat(v.FATURADO).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}
                         </span>
                       </div>
@@ -647,7 +701,7 @@ export function CampanhasView() {
                 </div>
               )}
             </div>
-            <div className="p-6 border-t border-slate-100 bg-white shrink-0">
+            <div className="p-6 border-t border-border/40 bg-card shrink-0">
               <button onClick={() => setSelectedCampaign(null)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98]">
                 Fechar
               </button>
@@ -662,35 +716,35 @@ export function CampanhasView() {
         const onClose = () => isEdit ? setEditingCampaign(null) : setIsNewCampaignModalOpen(false);
         const onSave = () => isEdit ? salvarEdicao() : salvarNovaCampanha();
         return (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-            <div className="fixed inset-0" onClick={onClose} />
-            <div className="relative w-full max-w-[480px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
-              <div className="px-8 py-6 flex items-center justify-between border-b border-slate-100 shrink-0">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose} />
+            <div className="relative w-full max-w-[480px] bg-card border border-border/60 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+              <div className="px-8 py-6 flex items-center justify-between border-b border-border/40 shrink-0">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
                     {isEdit ? <Pencil className="w-5 h-5 text-blue-600" /> : <Plus className="w-5 h-5 text-blue-600" />}
                   </div>
                   <div>
-                    <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">{isEdit ? "Editar Campanha" : "Nova Campanha"}</h2>
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">{isEdit ? editingCampaign.name : "Cadastro de Incentivo"}</p>
+                    <h2 className="text-lg font-black text-foreground uppercase tracking-tight">{isEdit ? "Editar Campanha" : "Nova Campanha"}</h2>
+                    <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mt-0.5">{isEdit ? editingCampaign.name : "Cadastro de Incentivo"}</p>
                   </div>
                 </div>
-                <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"><X className="w-5 h-5" /></button>
+                <button onClick={onClose} className="p-2 text-muted-foreground hover:text-slate-600 hover:bg-secondary/40 rounded-lg transition-all"><X className="w-5 h-5" /></button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 space-y-5 scrollbar-hide">
                 {/* Imagem */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Logo / Imagem</label>
-                  <label className="flex flex-col items-center justify-center gap-2 w-full h-32 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all relative overflow-hidden">
+                  <label className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-wider ml-1">Logo / Imagem</label>
+                  <label className="flex flex-col items-center justify-center gap-2 w-full h-32 bg-secondary/40 border-2 border-dashed border-border/60 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all relative overflow-hidden">
                     {imagePreview ? (
                       <img src={imagePreview} alt="preview" className="absolute inset-0 w-full h-full object-contain p-3" />
                     ) : (
                       <>
-                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                          <Plus className="w-4 h-4 text-slate-400" />
+                        <div className="w-8 h-8 rounded-full bg-secondary/60 flex items-center justify-center">
+                          <Plus className="w-4 h-4 text-muted-foreground" />
                         </div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Clique para enviar imagem</span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Clique para enviar imagem</span>
                         <span className="text-[9px] text-slate-300">JPG, PNG, SVG</span>
                       </>
                     )}
@@ -705,17 +759,17 @@ export function CampanhasView() {
 
                 {/* Nome */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Nome da Campanha <span className="text-red-400">*</span></label>
-                  <input type="text" value={formData.name} onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Campanha IVM – Abril 2026" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all" />
+                  <label className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-wider ml-1">Nome da Campanha <span className="text-red-400">*</span></label>
+                  <input type="text" value={formData.name} onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Campanha IVM – Abril 2026" className="w-full bg-secondary/40 border border-border/60 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all" />
                 </div>
 
                 {/* Fornecedor */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Fornecedor</label>
+                  <label className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-wider ml-1">Fornecedor</label>
                   <select
                     value={formData.fornecedor}
                     onChange={(e) => setFormData(f => ({ ...f, fornecedor: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all appearance-none"
+                    className="w-full bg-secondary/40 border border-border/60 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all appearance-none"
                   >
                     <option value="">Selecionar fornecedor...</option>
                     {fornecedores.map(f => <option key={f} value={f}>{f}</option>)}
@@ -725,17 +779,17 @@ export function CampanhasView() {
                 {/* Período */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Início</label>
-                    <input type="date" value={formData.data_ini} onChange={(e) => setFormData(f => ({ ...f, data_ini: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50" />
+                    <label className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-wider ml-1">Início</label>
+                    <input type="date" value={formData.data_ini} onChange={(e) => setFormData(f => ({ ...f, data_ini: e.target.value }))} className="w-full bg-secondary/40 border border-border/60 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Término</label>
-                    <input type="date" value={formData.data_fim} onChange={(e) => setFormData(f => ({ ...f, data_fim: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50" />
+                    <label className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-wider ml-1">Término</label>
+                    <input type="date" value={formData.data_fim} onChange={(e) => setFormData(f => ({ ...f, data_fim: e.target.value }))} className="w-full bg-secondary/40 border border-border/60 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50" />
                   </div>
                 </div>
               </div>
 
-              <div className="p-8 border-t border-slate-100 shrink-0">
+              <div className="p-8 border-t border-border/40 shrink-0">
                 <button onClick={onSave} disabled={savingCampaign || !formData.name.trim()} className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/10">
                   {savingCampaign ? "Salvando..." : isEdit ? "Salvar Alterações" : "Criar Campanha"}
                 </button>
@@ -749,17 +803,17 @@ export function CampanhasView() {
       {confirmDeleteId !== null && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
           <div className="fixed inset-0" onClick={() => setConfirmDeleteId(null)} />
-          <div className="relative w-full max-w-sm bg-white border border-slate-200 rounded-2xl shadow-2xl p-8 flex flex-col items-center text-center gap-4">
+          <div className="relative w-full max-w-sm bg-card border border-border/60 rounded-2xl shadow-2xl p-8 flex flex-col items-center text-center gap-4">
             <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center border border-red-100">
               <Trash2 className="w-5 h-5 text-red-500" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Excluir campanha?</h3>
-              <p className="text-[11px] text-slate-400 mt-1">Esta ação não pode ser desfeita.</p>
+              <h3 className="text-sm font-black text-foreground uppercase tracking-tight">Excluir campanha?</h3>
+              <p className="text-[11px] text-muted-foreground mt-1">Esta ação não pode ser desfeita.</p>
             </div>
             <div className="flex gap-3 w-full">
-              <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase tracking-widest transition-all">Cancelar</button>
-              <button onClick={confirmarExclusao} className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all">Excluir</button>
+              <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-3 bg-secondary hover:bg-secondary/80 text-muted-foreground rounded-xl font-black text-xs uppercase tracking-widest transition-all">Cancelar</button>
+              <button onClick={confirmarExclusao} className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-rose-600/20">Excluir</button>
             </div>
           </div>
         </div>

@@ -4,10 +4,12 @@ const API_BASE =
     : import.meta.env.VITE_API_URL ||
       "https://marketing-carflax.velbav.easypanel.host";
 
+const API_CAMPAIGN = "https://marketing-gestao-de-tempo.velbav.easypanel.host";
+
 console.log("[API] BASE:", API_BASE);
 
-async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
-  const url = new URL(`${API_BASE}${path}`);
+async function get<T>(path: string, params?: Record<string, string>, base: string = API_BASE): Promise<T> {
+  const url = new URL(`${base}${path}`);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
@@ -82,6 +84,7 @@ export interface MetaVendedor {
   META_VENDEDOR: string;
   FATURAMENTO: string;
   PERC_META_BATIDA: string;
+  avatar?: string;
 }
 
 export interface CampanhaMetasResponse {
@@ -90,7 +93,7 @@ export interface CampanhaMetasResponse {
 }
 
 export const apiCampanhaMetas = (mesano: string) =>
-  get<CampanhaMetasResponse>("/api/campanha-metas", { mesano });
+  get<CampanhaMetasResponse>("/api/campanha-metas", { mesano }, API_CAMPAIGN);
 
 /** Retorna apenas vendedores com ≥ 97% da meta (regra do gestao-de-tempo) */
 export const apiElegiveisParaSorteio = async (mesano: string): Promise<MetaVendedor[]> => {
@@ -121,7 +124,7 @@ export interface TrimestralResponse {
 }
 
 export const apiCampanhaMetasTrimestral = (mesano: string) =>
-  get<TrimestralResponse>("/api/campanha-metas-trimestral", { mesano });
+  get<TrimestralResponse>("/api/campanha-metas-trimestral", { mesano }, API_CAMPAIGN);
 
 // ── Ranking de Campanha ───────────────────────────────────────────────────────
 

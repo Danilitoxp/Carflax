@@ -13,6 +13,7 @@ import {
   Handshake,
   XCircle,
   Download,
+  Tag
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -123,25 +124,25 @@ interface RowProps {
 
 const OrcamentoRow = memo(({ item, onOpenItems, onOpenStatus, onOpenChat }: RowProps) => {
   return (
-    <tr className="hover:bg-slate-50/50 transition-colors group">
+    <tr className="hover:bg-secondary/50 transition-colors group">
       <td className="px-6 py-4">
-        <span className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
+        <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
           {item.id.replace("-OR", "")}
         </span>
       </td>
-      <td className="px-6 py-4"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{item.seller}</span></td>
-      <td className="px-6 py-4"><span className="text-[11px] font-black text-slate-800 uppercase tracking-tighter transition-colors group-hover:text-blue-600">{item.client}</span></td>
+      <td className="px-6 py-4"><span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">{item.seller}</span></td>
+      <td className="px-6 py-4"><span className="text-[11px] font-black text-foreground uppercase tracking-tighter transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400">{item.client}</span></td>
       <td className="px-6 py-4">
         <div className="flex items-baseline gap-2">
-          <span className="text-[10px] font-bold text-slate-600 whitespace-nowrap">{item.date}</span>
+          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">{item.date}</span>
           <span className="text-[9px] font-medium text-slate-400">{item.time}</span>
         </div>
       </td>
-      <td className="px-6 py-4"><span className="text-[11px] font-black text-emerald-600 whitespace-nowrap">{item.total}</span></td>
+      <td className="px-6 py-4"><span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{item.total}</span></td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-          <span className="text-[11px] font-black text-slate-700">{item.markup}</span>
+          <span className="text-[11px] font-black text-foreground">{item.markup}</span>
         </div>
       </td>
       <td className="px-6 py-4">
@@ -152,16 +153,16 @@ const OrcamentoRow = memo(({ item, onOpenItems, onOpenStatus, onOpenChat }: RowP
               if (item.status !== "VENDA" && item.status !== "PERDIDO") onOpenStatus(item);
             }}
             className={cn(
-              "inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold tracking-tight transition-all",
-              item.status !== "VENDA" && item.status !== "PERDIDO" ? "cursor-pointer hover:brightness-110 active:scale-95" : "cursor-default opacity-80",
-              item.status === "VENDA" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
-              item.status === "EMITIDO" ? "bg-slate-50 text-slate-600 border border-slate-100" :
-              item.status === "ENVIADO" ? "bg-blue-50 text-blue-600 border border-blue-100" :
-              item.status === "NEGOCIAÇÃO" ? "bg-amber-50 text-amber-600 border border-amber-100" :
-              item.status === "LIB. CRÉDITO" ? "bg-orange-50 text-orange-600 border border-orange-100" :
-              item.status === "AGUARD. PEDIDO" ? "bg-indigo-50 text-indigo-600 border border-indigo-100" :
-              item.status === "PERDIDO" ? "bg-rose-50 text-rose-600 border border-rose-100" :
-              "bg-slate-50 text-slate-500 border border-slate-100"
+              "inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black tracking-tighter transition-all border",
+              item.status !== "VENDA" && item.status !== "PERDIDO" ? "cursor-pointer hover:brightness-110 active:scale-95 shadow-sm" : "cursor-default opacity-80",
+              item.status === "VENDA" ? "bg-emerald-600/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-600/20" :
+              item.status === "EMITIDO" ? "bg-slate-500/10 dark:bg-slate-400/10 text-slate-600 dark:text-slate-400 border-slate-500/20" :
+              item.status === "ENVIADO" ? "bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-600/20" :
+              item.status === "NEGOCIAÇÃO" ? "bg-amber-600/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-600/20" :
+              item.status === "LIB. CRÉDITO" ? "bg-orange-600/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-600/20" :
+              item.status === "AGUARD. PEDIDO" ? "bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-600/20" :
+              item.status === "PERDIDO" ? "bg-rose-600/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-600/20" :
+              "bg-secondary text-muted-foreground border-border"
             )}
           >
             {item.status}
@@ -187,17 +188,17 @@ const OrcamentoRow = memo(({ item, onOpenItems, onOpenStatus, onOpenChat }: RowP
         </div>
       </td>
       <td className="px-6 py-4 text-right">
-        <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => onOpenItems(item)}
-            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
+            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-all"
             title="Ver Itens"
           >
             <Package className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => onOpenChat(item)}
-            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
+            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-all"
             title="Conversas / Observações"
           >
             <MessageSquare className="w-3.5 h-3.5" />
@@ -544,19 +545,19 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const maxReasonCount = Math.max(...reasonEntries.map((e) => e[1]), 1);
 
   return (
-    <div className="h-full flex flex-col pt-4 px-6 pb-2 overflow-y-auto scrollbar-hide">
+    <div className="h-full flex flex-col pt-4 px-6 pb-2 overflow-y-auto scrollbar-hide bg-background">
       {/* Header & Filters */}
       <div className="flex flex-col lg:flex-row gap-4 items-center justify-between shrink-0 mb-4 px-1">
         <div className="flex flex-col sm:flex-row gap-2 items-center w-full lg:w-auto flex-1 flex-wrap">
           {/* Search */}
           <div className="flex-1 min-w-[200px] relative group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
             <input
               type="text"
-              placeholder="Pesquisar..."
+              placeholder="Pesquisar orçamento..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-600/50 transition-all placeholder:text-slate-300 shadow-sm"
+              className="w-full bg-secondary/30 dark:bg-card border border-border rounded-xl pl-10 pr-4 py-2.5 text-[11px] font-bold text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/50 shadow-sm"
             />
           </div>
 
@@ -566,13 +567,15 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
               onClick={() => setIsDateModalOpen(!isDateModalOpen)}
               className={cn(
                 "h-10 px-4 rounded-xl border text-[10px] font-black uppercase tracking-tight flex items-center gap-2 transition-all outline-none",
-                startDate ? "bg-blue-50 border-blue-200 text-blue-600 shadow-sm" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 shadow-sm",
-                isDateModalOpen && "ring-4 ring-slate-900/5 border-slate-300"
+                startDate 
+                  ? "bg-blue-600/10 dark:bg-blue-500/20 border-blue-600/20 text-blue-600 dark:text-blue-400 shadow-sm" 
+                  : "bg-card border-border text-muted-foreground hover:border-slate-300 dark:hover:border-slate-700 shadow-sm",
+                isDateModalOpen && "ring-4 ring-blue-500/5 border-blue-500/50"
               )}
             >
-              <Calendar className="w-3.5 h-3.5 opacity-40" />
-              <span>{dateLabel}</span>
-              <ChevronDown className={cn("w-3 h-3 transition-transform duration-300 opacity-40", isDateModalOpen && "rotate-180")} />
+              <Calendar className="w-3.5 h-3.5 opacity-40 shrink-0" />
+              <span className="truncate max-w-[200px]">{dateLabel}</span>
+              <ChevronDown className={cn("w-3 h-3 transition-transform duration-300 opacity-40 shrink-0", isDateModalOpen && "rotate-180")} />
             </button>
             {isDateModalOpen && (
               <>
@@ -592,10 +595,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleExportCSV}
-            className="w-10 h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition-all active:scale-95 shadow-sm flex items-center justify-center"
+            className="w-10 h-10 bg-card border border-border hover:bg-secondary text-muted-foreground rounded-xl transition-all active:scale-95 shadow-sm flex items-center justify-center group"
             title="Exportar CSV"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-4 h-4 group-hover:text-blue-600 transition-colors" />
           </button>
         </div>
       </div>
@@ -605,17 +608,17 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       {/* INSIGHTS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 shrink-0">
         {/* Distribuição por Status */}
-        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Distribuição por Status</h3>
+        <div className="lg:col-span-4 bg-card border border-border rounded-xl p-4 shadow-sm">
+          <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">Distribuição por Status</h3>
           <div className="space-y-3">
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="space-y-1 animate-pulse">
                   <div className="flex justify-between">
-                    <div className="h-2 w-16 bg-slate-100 rounded" />
-                    <div className="h-2 w-4 bg-slate-50 rounded" />
+                    <div className="h-2 w-16 bg-secondary dark:bg-slate-800 rounded" />
+                    <div className="h-2 w-4 bg-secondary dark:bg-slate-800 rounded" />
                   </div>
-                  <div className="h-1 w-full bg-slate-50 rounded-full" />
+                  <div className="h-1 w-full bg-secondary dark:bg-slate-800 rounded-full" />
                 </div>
               ))
             ) : (
@@ -623,11 +626,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                 const val = insights.statusCounts[s.key] || 0;
                 return (
                   <div key={i} className="space-y-1">
-                    <div className="flex justify-between items-center text-[9px] font-bold text-slate-500">
+                    <div className="flex justify-between items-center text-[9px] font-bold text-muted-foreground">
                       <span className="uppercase tracking-tight truncate pr-2">{s.label}</span>
-                      <span className="text-slate-900">{val}</span>
+                      <span className="text-foreground">{val}</span>
                     </div>
-                    <div className="h-1 bg-slate-50 rounded-full overflow-hidden">
+                    <div className="h-1 bg-secondary dark:bg-slate-800 rounded-full overflow-hidden">
                       <div className={cn("h-full rounded-full", s.color)} style={{ width: `${(val / maxStatusCount) * 100}%` }} />
                     </div>
                   </div>
@@ -638,17 +641,17 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         </div>
 
         {/* Motivos de Perda */}
-        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Motivos de Perda</h3>
+        <div className="lg:col-span-4 bg-card border border-border rounded-xl p-4 shadow-sm">
+          <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">Motivos de Perda</h3>
           <div className="space-y-3.5">
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="space-y-1 animate-pulse">
                   <div className="flex justify-between">
-                    <div className="h-2 w-24 bg-slate-100 rounded" />
-                    <div className="h-2 w-4 bg-slate-50 rounded" />
+                    <div className="h-2 w-24 bg-secondary dark:bg-slate-800 rounded" />
+                    <div className="h-2 w-4 bg-secondary dark:bg-slate-800 rounded" />
                   </div>
-                  <div className="h-2.5 w-full bg-slate-50 rounded-sm" />
+                  <div className="h-2.5 w-full bg-secondary dark:bg-slate-800 rounded-sm" />
                 </div>
               ))
             ) : reasonEntries.length === 0 ? (
@@ -656,11 +659,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
             ) : (
               reasonEntries.map(([label, count], i) => (
                 <div key={i} className="space-y-1">
-                  <div className="flex justify-between items-center text-[9px] font-bold text-slate-500">
+                  <div className="flex justify-between items-center text-[9px] font-bold text-muted-foreground">
                     <span className="uppercase tracking-tight truncate pr-2">{label}</span>
-                    <span className="text-slate-900">{count}</span>
+                    <span className="text-foreground">{count}</span>
                   </div>
-                  <div className="h-2.5 bg-slate-50 rounded-sm overflow-hidden border border-slate-100/50">
+                  <div className="h-2.5 bg-secondary dark:bg-slate-800 rounded-sm overflow-hidden border border-border/50">
                     <div className="h-full rounded-r-sm bg-rose-500 transition-all duration-700" style={{ width: `${(count / maxReasonCount) * 100}%` }} />
                   </div>
                 </div>
@@ -670,27 +673,27 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         </div>
 
         {/* Resumo Geral */}
-        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Resumo Geral</h3>
+        <div className="lg:col-span-4 bg-card border border-border rounded-xl p-4 shadow-sm">
+          <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">Resumo Geral</h3>
           <div className="space-y-4">
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex justify-between items-center border-b border-slate-50 pb-2 animate-pulse">
-                  <div className="h-2 w-20 bg-slate-100 rounded" />
-                  <div className="h-3 w-24 bg-slate-50 rounded" />
+                <div key={i} className="flex justify-between items-center border-b border-border/50 pb-2 animate-pulse">
+                  <div className="h-2 w-20 bg-secondary dark:bg-slate-800 rounded" />
+                  <div className="h-3 w-24 bg-secondary dark:bg-slate-800 rounded" />
                 </div>
               ))
             ) : (
               [
-                { label: "Valor em Pipeline", value: insights.pipeline.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), color: "text-emerald-600" },
-                { label: "Qtde. Orçamentos", value: String(insights.total), color: "text-slate-900" },
-                { label: "Vendas Fechadas", value: String(insights.vendas), color: "text-slate-900" },
-                { label: "Perdidos", value: String(insights.perdidos), color: "text-rose-500" },
-                { label: "Conv. por Qtde.", value: `${insights.convQtd}%`, color: "text-emerald-600", trend: "up" },
+                { label: "Valor em Pipeline", value: insights.pipeline.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), color: "text-emerald-600 dark:text-emerald-400" },
+                { label: "Qtde. Orçamentos", value: String(insights.total), color: "text-foreground" },
+                { label: "Vendas Fechadas", value: String(insights.vendas), color: "text-foreground" },
+                { label: "Perdidos", value: String(insights.perdidos), color: "text-rose-500 dark:text-rose-400" },
+                { label: "Conv. por Qtde.", value: `${insights.convQtd}%`, color: "text-emerald-600 dark:text-emerald-400", trend: "up" },
               ].map((r, i) => (
-                <div key={i} className="flex flex-col border-b border-slate-50 pb-2 last:border-0 last:pb-0">
+                <div key={i} className="flex flex-col border-b border-border pb-2 last:border-0 last:pb-0">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{r.label}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{r.label}</span>
                     <div className="flex items-center gap-1.5">
                       <span className={cn("text-[12px] font-black", r.color)}>{r.value}</span>
                       {r.trend === "up" && <span className="text-[10px] text-emerald-500 animate-pulse">↗</span>}
@@ -704,11 +707,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       </div>
 
       {/* Table */}
-      <div className="flex-1 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-0">
+      <div className="flex-1 bg-card border border-border rounded-xl overflow-hidden shadow-sm flex flex-col min-h-0">
           <div className="flex-1 overflow-x-auto overflow-y-auto scrollbar-hide">
             <table className="w-full text-left border-collapse min-w-[1000px]">
               <thead className="sticky top-0 z-20">
-                <tr className="bg-slate-50/50 border-b border-slate-100 backdrop-blur-md">
+                <tr className="bg-secondary/80 border-b border-border backdrop-blur-md">
                   {[
                     { id: "id", label: "Orçamento" },
                     { id: "seller", label: "Vendedor" },
@@ -721,10 +724,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     <th
                       key={col.id}
                       onClick={() => !loading && requestSort(col.id)}
-                      className={cn("px-6 py-3 text-[9px] font-black uppercase tracking-[0.1em] transition-colors text-slate-400 group/th", col.id === "status" && "text-center", !loading && "cursor-pointer hover:bg-slate-100/50")}
+                      className={cn("px-6 py-3 text-[9px] font-black uppercase tracking-[0.1em] transition-colors text-muted-foreground group/th", col.id === "status" && "text-center", !loading && "cursor-pointer hover:bg-secondary/40")}
                     >
                       <div className={cn("flex items-center gap-2", col.id === "status" && "justify-center")}>
-                        <span className={cn(sortConfig.key === col.id ? "text-blue-600" : "text-slate-400 group-hover/th:text-slate-600")}>{col.label}</span>
+                        <span className={cn(sortConfig.key === col.id ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 group-hover/th:text-foreground")}>{col.label}</span>
                         {!loading && getSortIcon(col.id)}
                       </div>
                     </th>
@@ -732,18 +735,18 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                   <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.1em] text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {loading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      <td className="px-6 py-4"><div className="h-3 w-12 bg-slate-100 rounded" /></td>
-                      <td className="px-6 py-4"><div className="h-3 w-24 bg-slate-50 rounded" /></td>
-                      <td className="px-6 py-4"><div className="h-3 w-48 bg-slate-100 rounded" /></td>
-                      <td className="px-6 py-4"><div className="h-3 w-20 bg-slate-50 rounded" /></td>
-                      <td className="px-6 py-4"><div className="h-3 w-24 bg-emerald-50 rounded" /></td>
-                      <td className="px-6 py-4"><div className="h-3 w-12 bg-slate-50 rounded" /></td>
-                      <td className="px-6 py-4"><div className="flex justify-center"><div className="h-5 w-16 bg-slate-100 rounded-full" /></div></td>
-                      <td className="px-6 py-4"><div className="flex justify-end gap-2"><div className="h-6 w-6 bg-slate-50 rounded" /><div className="h-6 w-6 bg-slate-50 rounded" /></div></td>
+                      <td className="px-6 py-4"><div className="h-3 w-12 bg-secondary dark:bg-slate-800 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-24 bg-secondary dark:bg-slate-800/50 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-48 bg-secondary dark:bg-slate-800 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-20 bg-secondary dark:bg-slate-800/50 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-24 bg-emerald-500/10 dark:bg-emerald-500/10 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-12 bg-secondary dark:bg-slate-800/50 rounded" /></td>
+                      <td className="px-6 py-4"><div className="flex justify-center"><div className="h-5 w-16 bg-secondary dark:bg-slate-800 rounded-full" /></div></td>
+                      <td className="px-6 py-4"><div className="flex justify-end gap-2"><div className="h-6 w-6 bg-secondary dark:bg-slate-800/50 rounded" /><div className="h-6 w-6 bg-secondary dark:bg-slate-800/50 rounded" /></div></td>
                     </tr>
                   ))
                 ) : filteredAndSortedItems.length === 0 ? (
@@ -786,27 +789,27 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       {isItemsModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-sm">
           <div className="fixed inset-0" onClick={() => setIsItemsModalOpen(false)} />
-          <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 pb-4 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
+          <div className="relative w-full max-w-4xl bg-card rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 pb-4 flex items-center justify-between border-b border-border bg-card shrink-0">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center border border-amber-100">
-                  <Package className="w-5 h-5 text-amber-600" />
+                <div className="w-10 h-10 bg-blue-600/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center border border-blue-600/10">
+                  <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">Itens do Orçamento</h2>
+                  <h2 className="text-lg font-black text-foreground uppercase tracking-tight leading-none">Itens do Orçamento</h2>
                   {selectedItem && (
                     <div className="mt-1 flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-secondary px-2 py-0.5 rounded border border-border">
                         #{selectedItem.id.replace("-OR", "")}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate max-w-[200px]">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter truncate max-w-[200px]">
                         {selectedItem.client}
                       </span>
                     </div>
                   )}
                 </div>
               </div>
-              <button onClick={() => setIsItemsModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all">
+              <button onClick={() => setIsItemsModalOpen(false)} className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-all">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -815,18 +818,18 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                 <div className="flex items-center justify-center py-12 text-[11px] text-slate-400 font-bold">Nenhum item encontrado</div>
               ) : (
                 <table className="w-full text-[11px]">
-                  <thead className="sticky top-0 bg-slate-50 border-b border-slate-100">
+                  <thead className="sticky top-0 bg-secondary/80 backdrop-blur-md border-b border-border">
                     <tr>
-                      <th className="px-4 py-3 text-left font-black text-slate-400 uppercase tracking-wider w-16">Cód.</th>
-                      <th className="px-4 py-3 text-left font-black text-slate-400 uppercase tracking-wider">Descrição</th>
-                      <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-16">Qtd</th>
-                      <th className="px-4 py-3 text-center font-black text-slate-400 uppercase tracking-wider w-12">UN</th>
-                      <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-28">Val. Unit</th>
-                      <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-28">Margem</th>
-                      <th className="px-4 py-3 text-right font-black text-slate-400 uppercase tracking-wider w-28">Total</th>
+                      <th className="px-4 py-3 text-left font-black text-muted-foreground uppercase tracking-wider w-16">Cód.</th>
+                      <th className="px-4 py-3 text-left font-black text-muted-foreground uppercase tracking-wider">Descrição</th>
+                      <th className="px-4 py-3 text-right font-black text-muted-foreground uppercase tracking-wider w-16">Qtd</th>
+                      <th className="px-4 py-3 text-center font-black text-muted-foreground uppercase tracking-wider w-12">UN</th>
+                      <th className="px-4 py-3 text-right font-black text-muted-foreground uppercase tracking-wider w-28">Val. Unit</th>
+                      <th className="px-4 py-3 text-right font-black text-muted-foreground uppercase tracking-wider w-28">Margem</th>
+                      <th className="px-4 py-3 text-right font-black text-muted-foreground uppercase tracking-wider w-28">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
+                  <tbody className="divide-y divide-border">
                     {itens.map((it, i) => {
                       const qtd = parseFloat(String(it.QUANTIDADE)) || 0;
                       const valuni = parseFloat(String(it.PRECO_UNITARIO)) || 0;
@@ -834,21 +837,21 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       const total = qtd * valuni;
                       const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
                       return (
-                        <tr key={i} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3 text-slate-400 font-mono">{it.COD_PRODUTO}</td>
-                          <td className="px-4 py-3 text-slate-700 font-semibold" title={it.PRODUTO}>{it.PRODUTO}</td>
-                          <td className="px-4 py-3 text-right text-slate-600 font-bold">{qtd.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-center text-slate-400 font-bold">{it.UN || "UN"}</td>
-                          <td className="px-4 py-3 text-right text-slate-600 font-bold">{fmt(valuni)}</td>
+                        <tr key={i} className="hover:bg-secondary/40 transition-colors">
+                          <td className="px-4 py-3 text-muted-foreground font-mono">{it.COD_PRODUTO}</td>
+                          <td className="px-4 py-3 text-foreground font-bold" title={it.PRODUTO}>{it.PRODUTO}</td>
+                          <td className="px-4 py-3 text-right text-foreground font-black">{qtd.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-center text-muted-foreground font-bold">{it.UN || "UN"}</td>
+                          <td className="px-4 py-3 text-right text-foreground font-bold">{fmt(valuni)}</td>
                           <td className={cn("px-4 py-3 text-right font-bold", mkp >= 30 ? "text-emerald-500" : "text-amber-500")}>
                             {mkp.toFixed(1)}%
                           </td>
-                          <td className="px-4 py-3 text-right font-black text-emerald-600">{fmt(total)}</td>
+                          <td className="px-4 py-3 text-right font-black text-emerald-600 dark:text-emerald-400">{fmt(total)}</td>
                         </tr>
                       );
                     })}
                   </tbody>
-                  <tfoot className="border-t-2 border-slate-200 bg-slate-50">
+                  <tfoot className="border-t-2 border-border bg-secondary/50">
                     <tr>
                       <td colSpan={6} className="px-4 py-3 text-right text-[10px] font-black text-slate-500 uppercase tracking-wider">Total do Orçamento</td>
                       <td className="px-4 py-3 text-right font-black text-emerald-600">
@@ -860,8 +863,8 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                 </table>
               )}
             </div>
-            <div className="p-6 border-t border-slate-100 bg-white shrink-0">
-              <button onClick={() => setIsItemsModalOpen(false)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/10">
+            <div className="p-6 border-t border-border bg-secondary/50 shrink-0">
+              <button onClick={() => setIsItemsModalOpen(false)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20">
                 Fechar
               </button>
             </div>
@@ -873,8 +876,8 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-sm">
           <div className="fixed inset-0" onClick={() => setIsStatusModalOpen(false)} />
-          <div className="relative w-full max-w-lg bg-white rounded-2xl p-8 shadow-2xl border border-slate-200 overflow-hidden">
-            <button onClick={() => setIsStatusModalOpen(false)} className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all">
+          <div className="relative w-full max-w-lg bg-card rounded-2xl p-8 shadow-2xl border border-border overflow-hidden">
+            <button onClick={() => setIsStatusModalOpen(false)} className="absolute top-6 right-6 p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-all">
               <X className="w-5 h-5" />
             </button>
 
@@ -882,33 +885,33 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
               {statusStep === "selection" ? (
                 <>
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
-                      <ChevronsUpDown className="w-6 h-6 text-blue-600" />
+                    <div className="w-12 h-12 bg-blue-600/10 dark:bg-blue-500/20 rounded-xl flex items-center justify-center border border-blue-600/10">
+                      <ChevronsUpDown className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Alterar Status</h3>
-                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Fluxo de Vendas</p>
+                      <h3 className="text-xl font-black text-foreground uppercase tracking-tight">Alterar Status</h3>
+                      <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mt-0.5">Fluxo de Vendas</p>
                     </div>
                   </div>
                   {selectedItem && (
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Orçamento Selecionado</p>
-                      <p className="text-sm font-black text-slate-900 tracking-tighter">{selectedItem.id.replace("-OR", "")} — {selectedItem.client}</p>
+                    <div className="p-4 rounded-xl bg-secondary/40 border border-border">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider mb-1">Orçamento Selecionado</p>
+                      <p className="text-sm font-black text-foreground tracking-tighter">{selectedItem.id.replace("-OR", "")} — {selectedItem.client}</p>
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { label: "Emitido", color: "text-slate-600", dot: "bg-slate-600", next: null },
-                      { label: "Enviado", color: "text-blue-600", dot: "bg-blue-600", next: "enviado" },
-                      { label: "Negociação", color: "text-amber-600", dot: "bg-amber-600", next: "negociacao" },
-                      { label: "Lib. Crédito", color: "text-orange-600", dot: "bg-orange-600", next: null },
-                      { label: "Aguard. Pedido", color: "text-indigo-600", dot: "bg-indigo-600", next: null },
-                      { label: "Perdido", color: "text-rose-600", dot: "bg-rose-600", next: "perdido" },
+                      { label: "Emitido", color: "text-slate-600 dark:text-slate-400", dot: "bg-slate-600 dark:bg-slate-400", next: null },
+                      { label: "Enviado", color: "text-blue-600 dark:text-blue-400", dot: "bg-blue-600 dark:bg-blue-400", next: "enviado" },
+                      { label: "Negociação", color: "text-amber-600 dark:text-amber-400", dot: "bg-amber-600 dark:bg-amber-400", next: "negociacao" },
+                      { label: "Lib. Crédito", color: "text-orange-600 dark:text-orange-400", dot: "bg-orange-600 dark:bg-orange-400", next: null },
+                      { label: "Aguard. Pedido", color: "text-indigo-600 dark:text-indigo-400", dot: "bg-indigo-600 dark:bg-indigo-400", next: null },
+                      { label: "Perdido", color: "text-rose-600 dark:text-rose-400", dot: "bg-rose-600 dark:bg-rose-400", next: "perdido" },
                     ].map((btn, i) => (
                       <button
                         key={i}
-                        onClick={() => btn.next ? setStatusStep(btn.next as "enviado" | "negociacao" | "perdido") : handleUpdateStatus(btn.label.toUpperCase())}
-                        className="flex items-center gap-3 py-3 px-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/80 transition-all text-left"
+                        onClick={() => btn.next ? setStatusStep(btn.next as any) : handleUpdateStatus(btn.label.toUpperCase())}
+                        className="flex items-center gap-3 py-3 px-4 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/80 transition-all text-left"
                       >
                         <div className={cn("w-2 h-2 rounded-full", btn.dot)} />
                         <span className={cn("text-[11px] font-bold uppercase tracking-tight", btn.color)}>{btn.label}</span>
@@ -919,22 +922,22 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
               ) : statusStep === "enviado" ? (
                 <div className="space-y-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
-                      <Send className="w-5 h-5 text-blue-600" />
+                    <div className="w-12 h-12 bg-blue-600/10 dark:bg-blue-500/20 rounded-xl flex items-center justify-center border border-blue-600/10">
+                      <Send className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Status: Enviado</h3>
-                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Registro de Contato</p>
+                      <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">Status: Enviado</h3>
+                      <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mt-0.5">Registro de Contato</p>
                     </div>
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Data de Retorno</label>
-                      <input type="text" placeholder="dd/mm/aaaa" value={statusData} onChange={(e) => { handleDateMask(e); setStatusData(e.target.value); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all" />
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Data de Retorno</label>
+                      <input type="text" placeholder="dd/mm/aaaa" value={statusData} onChange={(e) => { handleDateMask(e); setStatusData(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all placeholder:text-muted-foreground/30" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Observação</label>
-                      <textarea placeholder="Ex: Cliente solicitou retorno na segunda..." rows={4} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all resize-none" />
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Observação</label>
+                      <textarea placeholder="Ex: Cliente solicitou retorno na segunda..." rows={4} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all resize-none placeholder:text-muted-foreground/30" />
                     </div>
                     <button onClick={() => {
                       // Converte dd/mm/aaaa → ISO para salvar no banco
@@ -952,36 +955,36 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
               ) : statusStep === "negociacao" ? (
                 <div className="space-y-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center border border-amber-100">
-                      <Handshake className="w-6 h-6 text-amber-600" />
+                    <div className="w-12 h-12 bg-amber-500/10 dark:bg-amber-500/20 rounded-xl flex items-center justify-center border border-amber-500/10">
+                      <Handshake className="w-6 h-6 text-amber-600 dark:text-amber-400" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Negociação</h3>
-                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Dados da Proposta</p>
+                      <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">Negociação</h3>
+                      <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mt-0.5">Dados da Proposta</p>
                     </div>
                   </div>
                   <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Endereço da Obra *</label>
-                      <input type="text" placeholder="Logradouro, número, bairro..." value={statusEnderecoObra} onChange={(e) => setStatusEnderecoObra(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-amber-600/50 focus:ring-4 focus:ring-amber-600/5 transition-all" />
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Endereço da Obra *</label>
+                      <input type="text" placeholder="Logradouro, número, bairro..." value={statusEnderecoObra} onChange={(e) => setStatusEnderecoObra(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 focus:ring-4 focus:ring-amber-600/5 transition-all placeholder:text-muted-foreground/30" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Prev. Fechamento *</label>
-                        <input type="text" placeholder="dd/mm/aaaa" value={statusFechamento} onChange={(e) => { handleDateMask(e); setStatusFechamento(e.target.value); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-amber-600/50" />
+                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Fechamento *</label>
+                        <input type="text" placeholder="dd/mm/aaaa" value={statusFechamento} onChange={(e) => { handleDateMask(e); setStatusFechamento(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50" />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Prev. Entrega *</label>
-                        <input type="text" placeholder="dd/mm/aaaa" value={statusEntrega} onChange={(e) => { handleDateMask(e); setStatusEntrega(e.target.value); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-amber-600/50" />
+                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Entrega *</label>
+                        <input type="text" placeholder="dd/mm/aaaa" value={statusEntrega} onChange={(e) => { handleDateMask(e); setStatusEntrega(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50" />
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Observações</label>
-                      <textarea placeholder="Detalhes da negociação..." rows={3} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none resize-none" />
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Observações</label>
+                      <textarea placeholder="Detalhes da negociação..." rows={3} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none resize-none placeholder:text-muted-foreground/30" />
                     </div>
                     <button
                       onClick={() => handleUpdateStatus("NEGOCIAÇÃO", { endereco_obra: statusEnderecoObra, fechamento_previsto: statusFechamento, entrega_prevista: statusEntrega })}
-                      className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-500/10 active:scale-[0.98] transition-all"
+                      className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all"
                     >
                       Salvar Negociação
                     </button>
@@ -990,31 +993,34 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
               ) : (
                 <div className="space-y-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center border border-rose-100">
-                      <XCircle className="w-6 h-6 text-rose-600" />
+                    <div className="w-12 h-12 bg-rose-500/10 dark:bg-rose-500/20 rounded-xl flex items-center justify-center border border-rose-500/10">
+                      <XCircle className="w-6 h-6 text-rose-600 dark:text-rose-400" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Status: Perdido</h3>
-                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Motivo da Perda</p>
+                      <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">Status: Perdido</h3>
+                      <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mt-0.5">Motivo da Perda</p>
                     </div>
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Selecione o Motivo *</label>
-                      <select value={statusMotivoPerdido} onChange={(e) => setStatusMotivoPerdido(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none appearance-none cursor-pointer">
-                        <option value="">Selecione o motivo...</option>
-                        {["Preço Alto", "Falta de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas"].map((m) => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Selecione o Motivo *</label>
+                      <TinyDropdown 
+                        value={statusMotivoPerdido} 
+                        options={["Preço Alto", "Falta de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas"]} 
+                        onChange={(val) => setStatusMotivoPerdido(val)} 
+                        icon={Tag} 
+                        variant="slate" 
+                        placeholder="Selecione o motivo..."
+                        className="w-full" 
+                      />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Observação Adicional</label>
-                      <textarea placeholder="Explique por que o negócio não avançou..." rows={4} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none resize-none" />
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Observação Adicional</label>
+                      <textarea placeholder="Explique por que o negócio não avançou..." rows={4} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/5 transition-all resize-none placeholder:text-muted-foreground/50" />
                     </div>
                     <button
                       onClick={() => handleUpdateStatus("PERDIDO", { motivo_perda: statusMotivoPerdido })}
-                      className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-600/10 active:scale-[0.98] transition-all"
+                      className="w-full h-14 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-500/20 active:scale-[0.98] transition-all"
                     >
                       Confirmar Perda
                     </button>

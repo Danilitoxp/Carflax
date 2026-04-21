@@ -323,7 +323,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
   const daysOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-[#F8FAFC]">
+    <div className="flex flex-col h-full overflow-hidden bg-background">
       <EventModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
@@ -335,15 +335,15 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
         setNewEvent={setNewEvent} 
       />
       <div className="flex-1 overflow-hidden px-6 pt-4 pb-2 flex flex-col min-h-0">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/60 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border shrink-0">
           <div className="flex items-center gap-4">
             {loading ? (
-              <div className="h-9 w-48 bg-slate-100 rounded-lg animate-pulse" />
+              <div className="h-9 w-48 bg-secondary rounded-lg animate-pulse" />
             ) : (
-              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
-                <button onClick={handlePrevMonth} className="p-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-blue-600"><ChevronLeft className="w-4 h-4" /></button>
-                <div className="px-3 py-1 text-xs font-black text-slate-900 uppercase tracking-tighter border-x border-slate-100 min-w-[120px] text-center">{monthNames[month]} <span className="text-blue-600">{year}</span></div>
-                <button onClick={handleNextMonth} className="p-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-blue-600"><ChevronRight className="w-4 h-4" /></button>
+              <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-0.5 shadow-sm">
+                <button onClick={handlePrevMonth} className="p-1.5 hover:bg-secondary rounded-md transition-all text-muted-foreground hover:text-blue-600"><ChevronLeft className="w-4 h-4" /></button>
+                <div className="px-3 py-1 text-xs font-black text-foreground uppercase tracking-tighter border-x border-border min-w-[120px] text-center">{monthNames[month]} <span className="text-blue-600 dark:text-blue-500">{year}</span></div>
+                <button onClick={handleNextMonth} className="p-1.5 hover:bg-secondary rounded-md transition-all text-muted-foreground hover:text-blue-600"><ChevronRight className="w-4 h-4" /></button>
               </div>
             )}
             
@@ -351,7 +351,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
               <div className="flex items-center gap-1">
                 {loading ? (
                   Array.from({ length: 7 }).map((_, i) => (
-                    <div key={i} className="h-8 w-12 bg-slate-50 rounded-md animate-pulse" />
+                    <div key={i} className="h-8 w-12 bg-secondary rounded-md animate-pulse" />
                   ))
                 ) : (
                   [
@@ -363,8 +363,17 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
                     { id: "birthday", icon: Gift, label: "Níver", color: "rose" },
                     { id: "star", icon: Star, label: "Jubileu", color: "amber" },
                   ].map(f => (
-                    <button key={f.id} onClick={() => toggleFilter(f.id)} className={cn("px-3 py-1.5 rounded-md transition-all text-[10px] font-bold uppercase tracking-widest flex items-center gap-2", activeFilters.length === 1 && activeFilters.includes(f.id) ? "bg-slate-100 text-slate-900 shadow-sm" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600")}>
-                      <f.icon className="w-3.5 h-3.5" />
+                    <button 
+                      key={f.id} 
+                      onClick={() => toggleFilter(f.id)} 
+                      className={cn(
+                        "px-3 py-1.5 rounded-md transition-all text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 border", 
+                        activeFilters.length === 1 && activeFilters.includes(f.id) 
+                          ? "bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-600/20 shadow-sm" 
+                          : "text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent"
+                      )}
+                    >
+                      <f.icon className={cn("w-3.5 h-3.5", activeFilters.length === 1 && activeFilters.includes(f.id) ? "opacity-100" : "opacity-40")} />
                       {activeFilters.length === 1 && activeFilters.includes(f.id) && f.label}
                     </button>
                   ))
@@ -374,7 +383,7 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
           </div>
           <div className="flex items-center gap-3">
             {loading ? (
-               <div className="h-9 w-32 bg-slate-100 rounded-md animate-pulse" />
+               <div className="h-9 w-32 bg-secondary rounded-md animate-pulse" />
             ) : (
               viewMode === "vacations" && (
                 <Button onClick={() => { setEditingVacation(null); setIsVacationModalOpen(true); }} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 uppercase tracking-wider group">
@@ -393,10 +402,10 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
           employees={employees}
           vacations={vacations}
         />
-        <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-0 relative mt-3 h-full">
-          <div className="grid grid-cols-7 bg-slate-50/50 border-b border-slate-100">
+        <div className="flex-1 bg-card border border-border rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-0 relative mt-3 h-full">
+          <div className="grid grid-cols-7 bg-secondary/30 border-b border-border">
             {daysOfWeek.map((day) => (
-              <div key={day} className="py-2.5 text-center"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</span></div>
+              <div key={day} className="py-2.5 text-center"><span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">{day}</span></div>
             ))}
           </div>
           <div className="flex-1 min-h-0 overflow-hidden h-full">
@@ -404,11 +413,11 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
               {allSlots.map((day, idx) => {
                 if (loading) {
                   return (
-                    <div key={idx} className="border-r border-b border-slate-50 p-2 animate-pulse space-y-1.5 opacity-60 bg-white">
-                      <div className="h-2 w-3 bg-slate-100 rounded" />
+                    <div key={idx} className="border-r border-b border-border p-2 animate-pulse space-y-1.5 opacity-60 bg-transparent">
+                      <div className="h-2 w-3 bg-secondary rounded" />
                       <div className="space-y-1">
-                        {idx % 3 === 0 && <div className="h-3 w-full bg-slate-50 rounded" />}
-                        {idx % 5 === 0 && <div className="h-3 w-3/4 bg-slate-50 rounded" />}
+                        {idx % 3 === 0 && <div className="h-3 w-full bg-secondary/50 rounded" />}
+                        {idx % 5 === 0 && <div className="h-3 w-3/4 bg-secondary/50 rounded" />}
                       </div>
                     </div>
                   );
@@ -424,16 +433,24 @@ export function CalendarSection({ activeTab }: CalendarSectionProps) {
                     key={idx} 
                     onClick={() => handleDayClick(day)} 
                     className={cn(
-                      "relative group transition-all duration-300 cursor-pointer flex flex-col p-2 min-h-0 overflow-hidden bg-white",
-                      !isLastCol && "border-r border-slate-100", 
-                      !isLastRow && "border-b border-slate-100", 
-                      viewMode === "events" && day && "hover:bg-slate-50/50",
-                      day && isToday && "bg-blue-300 shadow-lg shadow-blue-500/20 z-10"
+                      "relative group transition-all duration-300 cursor-pointer flex flex-col p-2 min-h-0 overflow-hidden bg-transparent",
+                      !isLastCol && "border-r border-border", 
+                      !isLastRow && "border-b border-border", 
+                      viewMode === "events" && day && "hover:bg-secondary/40",
+                      day && isToday && "bg-blue-600/10 dark:bg-blue-500/20 z-10"
                     )}
                   >
                     {day && (
                       <>
-                        <div className="flex justify-between items-start mb-1 relative z-20"><span className={cn("text-xs font-black transition-all leading-none", isToday ? "text-white" : "text-slate-300 group-hover:text-slate-500")}>{day}</span>{isToday && <div className="flex flex-col items-center"><div className="w-1 h-1 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" /></div>}</div>
+                        <div className="flex justify-between items-start mb-1 relative z-20">
+                          <span className={cn(
+                            "text-xs font-black transition-all leading-none", 
+                            isToday ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 group-hover:text-blue-600"
+                          )}>
+                            {day}
+                          </span>
+                          {isToday && <div className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />}
+                        </div>
                         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">{viewMode === "events" ? <EventsView day={day} month={month} year={year} events={events} activeFilters={activeFilters} onEventClick={handleEventClick} /> : <VacationsView dayDate={dayDate} vacations={vacations} onVacationClick={handleVacationClick} />}</div>
                       </>
                     )}
