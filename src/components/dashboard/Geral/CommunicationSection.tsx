@@ -110,7 +110,7 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
           newLikedBy.push(currentUserId);
         }
       } else {
-        newLikedBy = newLikedBy.filter(id => id !== currentUserId);
+        newLikedBy = newLikedBy.filter((id: string) => id !== currentUserId);
       }
       
       // 2. Persistir no banco

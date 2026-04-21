@@ -160,7 +160,7 @@ function DashboardContent({
             doc: newMsg.documento,
             title: isSystem ? `Aviso: #${newMsg.documento}` : `Mensagem de ${newMsg.enviado_por_nome}`,
             sellerName: newMsg.enviado_por_nome,
-            sellerCode: null
+            sellerCode: undefined
           });
           try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play().catch(()=>{}); } catch(e){}
         }
@@ -180,7 +180,7 @@ function DashboardContent({
         const { data: unread } = await supabase
           .from("crm_conversas")
           .select("*")
-          .eq("destino", userProfile.id)
+          .eq("destino", userProfile?.id)
           .eq("lida", false)
           .order("timestamp", { ascending: false })
           .limit(1);
@@ -192,7 +192,7 @@ function DashboardContent({
             doc: unread[0].documento,
             title: isSystem ? `Aviso: #${unread[0].documento}` : unread[0].enviado_por_nome,
             sellerName: unread[0].enviado_por_nome,
-            sellerCode: null
+            sellerCode: undefined
           });
         }
         initialCheckPerformed.current = true;
@@ -341,7 +341,7 @@ function DashboardContent({
             </button>
             <div className="flex-1 flex flex-col gap-4 pb-0 overflow-y-auto scrollbar-hide">
               {isComercial ? (
-                <SalesMetricsCard userProfile={userProfile} data={vendedorMetrics} loading={geralLoading} />
+                <SalesMetricsCard userProfile={userProfile || undefined} data={vendedorMetrics || undefined} loading={geralLoading} />
               ) : (
                 <>
                   <EmployeeOfMonthCard loading={geralLoading} />
@@ -366,7 +366,7 @@ function DashboardContent({
           documento={globalChat?.doc || ""}
           empresa="001"
           title={globalChat?.title || ""}
-          userProfile={userProfile}
+          userProfile={userProfile || undefined}
           sellerName={globalChat?.sellerName}
           sellerCode={globalChat?.sellerCode}
           itemsInitial={globalChat?.items}

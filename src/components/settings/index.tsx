@@ -253,7 +253,7 @@ function getStrength(pw: string): number {
    MEU PERFIL - REDESIGN ESTRUTURADO
    Foco em cards, hierarquia e organização
 ───────────────────────────────────────────── */
-function ProfileTab({ userProfile }: { userProfile?: any }) {
+function ProfileTab() {
   const [form, setForm] = useState({
     nome: "",
     email: "",
@@ -642,7 +642,7 @@ function AppearanceTab() {
 /* ─────────────────────────────────────────────
    ORÇAMENTOS - CONFIGURAÇÕES
 ───────────────────────────────────────────── */
-function OrcamentosTab({ userProfile }: { userProfile?: any }) {
+function OrcamentosTab() {
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -780,8 +780,8 @@ export function SettingsSection({ externalTab, userProfile }: SettingsSectionPro
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto px-6 md:px-10 py-10 scrollbar-hide">
         <div className="max-w-[1200px] mx-auto">
-          {activeTab === "profile" && <ProfileTab userProfile={userProfile} />}
-          {activeTab === "orcamentos" && <OrcamentosTab userProfile={userProfile} />}
+          {activeTab === "profile" && <ProfileTab />}
+          {activeTab === "orcamentos" && <OrcamentosTab />}
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "security" && <SecurityTab />}
           {activeTab === "appearance" && <AppearanceTab />}

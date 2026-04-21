@@ -144,8 +144,8 @@ import { useNotification } from "@/components/ui/NotificationProvider";
 
 export function OrgChartView() {
   const { showNotification } = useNotification();
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [allUsers, setAllUsers] = useState<Employee[]>([]);
   const [selectedNode, setSelectedNode] = useState<{id: string, databaseId: string, title: string, department: string, level: string} | null>(null);

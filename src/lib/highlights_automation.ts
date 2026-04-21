@@ -8,7 +8,7 @@ import { apiDashboardGeral } from "./api";
  * 2. Pontualidade (Secullum): Zero atrasos = Bônus
  * 3. Logística: Entregas realizadas
  */
-export async function calculateMonthlyWinner(mesano: string) {
+export async function calculateMonthlyWinner(_mesano: string) {
   try {
     // 1. Buscar Dados de Vendas no Dashboard Geral (Unificando com o painel de vendas)
     const sellers = await apiDashboardGeral();

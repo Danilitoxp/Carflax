@@ -263,7 +263,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: any }) {
           status: "pending",
           value: formattedValue,
           instrucoes: e.OBS || "",
-          romaneio_id: romId,
+          romaneio_id: romId || undefined,
           driverName: driverName,
           driverCode: selectedMotorista || "geral",
           romNumber: romNumValue,
