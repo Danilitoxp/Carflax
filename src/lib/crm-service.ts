@@ -109,12 +109,17 @@ export async function getConversas(documento: string): Promise<CrmConversa[]> {
 }
 
 export async function addConversa(conversa: Omit<CrmConversa, "id">): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from("crm_conversas")
     .insert({
       ...conversa,
       timestamp: conversa.timestamp ?? new Date().toISOString(),
     });
+
+  if (error) {
+    console.error("[CRM] erro ao adicionar conversa:", error.message, error.details);
+    throw error;
+  }
 }
 
 // ─── Migração Firebase → Supabase (completa) ──────────────────────────────────

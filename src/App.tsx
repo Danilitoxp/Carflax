@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { ThemeProvider } from "@/context/theme-provider";
 import { AppSidebar } from "@/components/ui/AppSidebar";
@@ -76,30 +76,128 @@ function DashboardContent({
     }
   }, [activeItem, userProfile?.permissions]);
 
-  // ── Sincronização Global do Chat ───────────────────────────────────────
-  const [globalChat, setGlobalChat] = useState<{ open: boolean; doc: string; title: string } | null>(null);
+  // ── Sincronização Global do Chat (Realtime) ───────────────────────────
+  const [globalChat, setGlobalChat] = useState<{ 
+    open: boolean; 
+    doc: string; 
+    title: string;
+    sellerName?: string;
+    sellerCode?: string;
+  } | null>(() => {
+    // Restaurar estado do chat do localStorage ao iniciar
+    const saved = localStorage.getItem("carflax_global_chat");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  // Salvar estado do chat sempre que ele mudar
+  useEffect(() => {
+    if (globalChat) {
+      localStorage.setItem("carflax_global_chat", JSON.stringify(globalChat));
+    } else {
+      localStorage.removeItem("carflax_global_chat");
+    }
+  }, [globalChat]);
+
+  const [isCentralizer, setIsCentralizer] = useState(false);
+  const initialCheckPerformed = useRef(false);
+
+  // 1. Cache Global de Usuários (Preload similar ao CRM Legado)
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    
+    async function preloadUsers() {
+      try {
+        const { data } = await supabase.from("usuarios").select("id, name, avatar");
+        if (data) {
+          const cache: any = {};
+          data.forEach(u => cache[u.id] = u);
+          (window as any)._carflaxUserCache = cache;
+          console.log("[CRM] Cache de usuários carregado:", Object.keys(cache).length);
+        }
+      } catch (e) {
+        console.error("[CRM] Falha ao carregar cache de usuários:", e);
+      }
+    }
+    
+    preloadUsers();
+  }, [userProfile?.id]);
+
+  // 2. Realtime e Verificação Inicial
+  const isCentRef = useRef(false);
 
   useEffect(() => {
     if (!userProfile?.id) return;
 
-    const channel = supabase
-      .channel('global_crm')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' }, 
-        (payload) => {
-          const newMsg = payload.new as { destino: string; enviado_por: string; documento: string };
-          if (newMsg.destino === userProfile.id && newMsg.enviado_por !== userProfile.id) {
-            setGlobalChat({ 
-              open: true, 
-              doc: newMsg.documento, 
-              title: newMsg.documento.includes("-OR") ? "Alerta de Orçamento" : "Nova Mensagem" 
-            });
-          }
+    // 1. Setup do Canal IMEDIATO e Síncrono para evitar erro de "subscribe()"
+    const channel = supabase.channel(`global_crm_${userProfile.id}_${Date.now()}`);
+    
+    channel
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' }, (payload) => {
+        const newMsg = payload.new as any;
+        if (newMsg.enviado_por === userProfile?.id) return;
+
+        // USA O REF para saber se é centralizador sem depender do escopo async
+        const isForMe = newMsg.destino === userProfile?.id || (isCentRef.current && newMsg.destino === "todos");
+        
+        if (isForMe) {
+          const isSystem = newMsg.enviado_por_nome?.toUpperCase() === "SISTEMA";
+          setGlobalChat({
+            open: true,
+            doc: newMsg.documento,
+            title: isSystem ? `Aviso: #${newMsg.documento}` : `Mensagem de ${newMsg.enviado_por_nome}`,
+            sellerName: newMsg.enviado_por_nome,
+            sellerCode: null
+          });
+          try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play().catch(()=>{}); } catch(e){}
+        }
       })
       .subscribe();
 
+    // 2. Lógica Async (Verificações paralelas)
+    async function initSession() {
+      // Resolver se é Centralizador e atualizar Ref e State
+      const { data: config } = await supabase.from("crm_config").select("value").eq("key", "centralizer_user_id").maybeSingle();
+      const isCent = config?.value === userProfile?.id;
+      isCentRef.current = isCent;
+      setIsCentralizer(isCent);
+
+      // Verificação Inicial (Apenas uma vez)
+      if (!initialCheckPerformed.current) {
+        const { data: unread } = await supabase
+          .from("crm_conversas")
+          .select("*")
+          .eq("destino", userProfile.id)
+          .eq("lida", false)
+          .order("timestamp", { ascending: false })
+          .limit(1);
+        
+        if (unread && unread.length > 0) {
+          const isSystem = unread[0].enviado_por_nome?.toUpperCase() === "SISTEMA";
+          setGlobalChat({
+            open: true,
+            doc: unread[0].documento,
+            title: isSystem ? `Aviso: #${unread[0].documento}` : unread[0].enviado_por_nome,
+            sellerName: unread[0].enviado_por_nome,
+            sellerCode: null
+          });
+        }
+        initialCheckPerformed.current = true;
+      }
+    }
+
+    initSession();
+
     const handleOpenChat = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail) setGlobalChat({ open: true, doc: detail.doc, title: detail.title });
+      if (detail) {
+        setGlobalChat({ 
+          open: true, 
+          doc: detail.doc, 
+          title: detail.title?.toUpperCase() === "SISTEMA" ? `Aviso: #${detail.doc}` : detail.title,
+          sellerName: detail.sellerName,
+          sellerCode: detail.sellerCode
+        });
+      }
     };
     window.addEventListener('open-crm-chat', handleOpenChat);
 
@@ -254,6 +352,9 @@ function DashboardContent({
           empresa="001"
           title={globalChat?.title || ""}
           userProfile={userProfile}
+          sellerName={globalChat?.sellerName}
+          sellerCode={globalChat?.sellerCode}
+          amICentralizer={isCentralizer}
         />
     </div>
   );

@@ -47,6 +47,7 @@ export interface Orcamento {
   lembreteData?: string;
   empresa?: string;
   items: CrmItem[];
+  sellerCode?: string;
 }
 
 
@@ -104,7 +105,8 @@ function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
       markupValue: avgMarkup,
       lossReason: r.MOTIVO_CANCELAMENTO !== "SEM MOTIVO" ? r.MOTIVO_CANCELAMENTO : undefined,
       empresa: r.EMPRESA,
-      items: products
+      items: products,
+      sellerCode: r.COD_VENDEDOR
     };
   });
 }
@@ -772,7 +774,12 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       }}
                       onOpenChat={(o) => {
                         window.dispatchEvent(new CustomEvent('open-crm-chat', { 
-                          detail: { doc: o.id, title: o.client } 
+                          detail: { 
+                            doc: o.id, 
+                            title: o.client,
+                            sellerName: o.seller,
+                            sellerCode: o.sellerCode
+                          } 
                         }));
                       }}
                     />
