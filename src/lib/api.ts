@@ -1,10 +1,12 @@
-const API_BASE =
-  typeof window !== "undefined" && (window as Window & { __API_ORIGIN__?: string }).__API_ORIGIN__
-    ? (window as Window & { __API_ORIGIN__?: string }).__API_ORIGIN__
-    : import.meta.env.VITE_API_URL ||
-      "https://marketing-carflax.velbav.easypanel.host";
+const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
-const API_CAMPAIGN = "https://marketing-gestao-de-tempo.velbav.easypanel.host";
+const API_BASE = isLocal 
+  ? "https://marketing-carflax.velbav.easypanel.host"
+  : "/api-marketing";
+
+const API_CAMPAIGN = isLocal
+  ? "https://marketing-gestao-de-tempo.velbav.easypanel.host"
+  : "/api-campaign";
 
 
 
