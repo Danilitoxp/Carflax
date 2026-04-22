@@ -76,11 +76,10 @@ function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
     const id = r.ORCAMENTO;
     const total = parseFloat(r.VALOR_TOTAL_ORCAMENTO) || 0;
     
-    // Calcular markup médio do orçamento baseado nos produtos
     const products = r.PRODUTOS || [];
-    const avgMarkup = products.length > 0 
-      ? products.reduce((acc, p) => acc + (parseFloat(String(p.MARKUP_PERCENTUAL)) || 0), 0) / products.length
-      : 0;
+    const totalVenda = products.reduce((acc, p) => acc + (parseFloat(String(p.QUANTIDADE)) || 0) * (parseFloat(String(p.PRECO_UNITARIO)) || 0), 0);
+    const totalCusto = products.reduce((acc, p) => acc + (parseFloat(String(p.QUANTIDADE)) || 0) * (parseFloat(String(p.CUSTO_UNITARIO)) || 0), 0);
+    const avgMarkup = totalCusto > 0 ? ((totalVenda / totalCusto) - 1) * 100 : 0;
 
     const dateStr = r.DATA_ORCAMENTO || "";
     const dateBR = dateStr.length >= 10
