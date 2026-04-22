@@ -237,6 +237,7 @@ export const apiDashboardProdutos = (codigo?: string) =>
 export const apiFornecedores = () => get("/api/fornecedores");
 export const apiProdutos = () => get("/api/produtos");
 export const apiClientes = () => get("/api/clientes");
+export const apiClientesFrv = (vendedor?: string) => get("/api/crm/clientes-frv", vendedor ? { vendedor } : {});
 export interface SqlResponse {
   success: boolean;
   data?: unknown[];

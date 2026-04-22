@@ -69,6 +69,7 @@ const menuItems: MenuItem[] = [
     isDropdown: true,
     subItems: [
       { label: "Orçamentos", icon: FileBadge },
+      { label: "Clientes", icon: Users },
       { label: "Ligações", icon: PhoneCall },
       { label: "Campanhas", icon: Megaphone },
       { label: "Relatórios", icon: FileBarChart },
@@ -154,7 +155,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const vendedorStandard = [
       "Geral", "Produtos", "Dashboard", 
       "Calendário", "Eventos", "Férias", 
-      "CRM", "Orçamentos", "Ligações", "Campanhas", "Relatórios", "Coletor", 
+      "CRM", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", 
       "Logística", "Romaneios", "Concluídas", "Entregas", 
       "Produtos", "Estoque", "Preços", "Eventos", "Férias"
     ];

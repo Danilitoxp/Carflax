@@ -88,7 +88,7 @@ export function UsersView() {
 
   const availableModules = [
     "Geral", "Produtos", "Eventos", "Férias",
-    "Orçamentos", "Ligações", "Campanhas", "Relatórios", "Coletor", "Romaneios",
+    "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", "Romaneios",
     "Concluídas", "Usuários", "DB Admin", "Sugestões",
     "Gerenciar Comunicados", "Gerenciar Férias", "Gerenciar Banners", "Gerenciar Calendário",
     "Lançar Entrega",

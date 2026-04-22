@@ -4,6 +4,7 @@ import { CampanhasView } from "./campanhas/CampanhasView";
 import { OrcamentosView } from "./orcamentos/OrcamentosView";
 import { RelatoriosView } from "./relatorios/RelatoriosView";
 import { LigacoesView } from "@/components/crm/ligacoes/LigacoesView";
+import { ClientesFRVView } from "./clientes/ClientesFRVView";
 import { cn } from "@/lib/utils";
 
 interface CrmSectionProps {
@@ -24,6 +25,8 @@ export function CrmSection({ activeTab, userProfile }: CrmSectionProps) {
             </div>
           ) : activeTab === "Produtos" ? (
             <ProdutosView />
+          ) : activeTab === "Clientes" ? (
+            <ClientesFRVView />
           ) : activeTab === "Campanhas" ? (
             <div className="h-full overflow-y-auto scrollbar-hide">
               <CampanhasView userProfile={userProfile} />

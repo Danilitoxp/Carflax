@@ -77,8 +77,7 @@ function DashboardContent({
     const isVendedorRole = role === "VENDEDOR";
     const sellerAllowedItems = [
       "Geral", "Produtos", "Calendário", "Eventos", "Férias", 
-      "Orçamentos", "Campanhas", "Relatórios", "Coletor", "Painel Coletor",
-      "Entregas", "Romaneios", "Concluídas", 
+      "CRM", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", "Logística", "Romaneios", "Concluídas", "Entregas", 
       "Sugestões", "Meu Perfil", "Notificações", "Segurança", "Aparência"
     ];
 
@@ -315,7 +314,7 @@ function DashboardContent({
 
   const isDashboardView = ["Geral", "Performance", "Campanhas", "Dashboard", "Orçamentos", "Ligações"].includes(activeItem);
   const isSettingsView = ["Configurações", "Meu Perfil", "Config. Orçamentos", "Notificações", "Segurança", "Aparência", "Banners"].includes(activeItem);
-  const isCrmView = ["Orçamentos", "CRM", "Produtos", "Campanhas", "Ligações", "Relatórios"].includes(activeItem);
+  const isCrmView = ["Orçamentos", "CRM", "Produtos", "Clientes", "Campanhas", "Ligações", "Relatórios"].includes(activeItem);
   const isComercial = 
     userProfile?.department === "Comercial" || 
     userProfile?.department === "Vendas" ||
