@@ -99,27 +99,16 @@ function DashboardContent({
   }, [activeItem, userProfile?.permissions, userProfile?.role]);
 
   // ── Sincronização Global do Chat (Realtime) ───────────────────────────
-  const [globalChat, setGlobalChat] = useState<{ 
-    open: boolean; 
-    doc: string; 
+  // Chat Multijanelas
+  interface ActiveChat {
+    id: number;
+    doc: string;
     title: string;
     sellerName?: string;
     sellerCode?: string;
     items?: CrmItem[];
-  } | null>(() => {
-    // Restaurar estado do chat do localStorage ao iniciar
-    const saved = localStorage.getItem("carflax_global_chat");
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  // Salvar estado do chat sempre que ele mudar
-  useEffect(() => {
-    if (globalChat) {
-      localStorage.setItem("carflax_global_chat", JSON.stringify(globalChat));
-    } else {
-      localStorage.removeItem("carflax_global_chat");
-    }
-  }, [globalChat]);
+  }
+  const [activeChats, setActiveChats] = useState<ActiveChat[]>([]);
 
   const [isCentralizer, setIsCentralizer] = useState(false);
   const initialCheckPerformed = useRef(false);
@@ -166,7 +155,6 @@ function DashboardContent({
         const isCent = config?.value === userProfile?.id;
         isCentRef.current = isCent;
         setIsCentralizer(isCent);
-        console.log(`[CRM] Identidade resolvida: ${isCent ? "CENTRALIZADOR" : "VENDEDOR"}`);
       } catch (e) {
         console.error("[CRM] Erro ao resolver identidade:", e);
       }
@@ -187,16 +175,19 @@ function DashboardContent({
         const isForMe = newMsg.destino === userProfile?.id || (isCentRef.current && newMsg.destino === "todos");
         
         if (isForMe) {
-          console.log("[CRM] Nova mensagem detectada para este usuário!");
           const isSystem = newMsg.enviado_por_nome?.toUpperCase() === "SISTEMA";
           const title = isSystem ? `Aviso: #${newMsg.documento}` : `Mensagem de ${newMsg.enviado_por_nome}`;
           
-          setGlobalChat({
-            open: true,
-            doc: newMsg.documento,
-            title,
-            sellerName: newMsg.enviado_por_nome,
-            sellerCode: undefined
+          setActiveChats(prev => {
+            // Verifica se este chat já está aberto
+            if (prev.some(c => c.doc === newMsg.documento)) return prev;
+            return [...prev, {
+              id: Date.now(),
+              doc: newMsg.documento,
+              title,
+              sellerName: newMsg.enviado_por_nome,
+              sellerCode: undefined
+            }];
           });
 
           // Notificação Nativa
@@ -211,11 +202,7 @@ function DashboardContent({
           try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play().catch(() => {}); } catch { /* silência */ }
         }
       })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log(`[CRM] Ouvindo mensagens globais em: ${channelName}`);
-        }
-      });
+      .subscribe();
 
     // Verificação Inicial de Mensagens não lidas (Apenas uma vez ao carregar)
     if (!initialCheckPerformed.current) {
@@ -231,12 +218,15 @@ function DashboardContent({
           if (unread && unread.length > 0) {
             const msg = unread[0];
             const isSystem = msg.enviado_por_nome?.toUpperCase() === "SISTEMA";
-            setGlobalChat({
-              open: true,
-              doc: msg.documento,
-              title: isSystem ? `Aviso: #${msg.documento}` : `Mensagem pendente: ${msg.enviado_por_nome}`,
-              sellerName: msg.enviado_por_nome,
-              sellerCode: undefined
+            setActiveChats(prev => {
+              if (prev.some(c => c.doc === msg.documento)) return prev;
+              return [...prev, {
+                id: Date.now(),
+                doc: msg.documento,
+                title: isSystem ? `Aviso: #${msg.documento}` : `Mensagem pendente: ${msg.enviado_por_nome}`,
+                sellerName: msg.enviado_por_nome,
+                sellerCode: undefined
+              }];
             });
           }
         });
@@ -245,13 +235,16 @@ function DashboardContent({
     const handleOpenChat = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail) {
-        setGlobalChat({ 
-          open: true, 
-          doc: detail.doc, 
-          title: detail.title?.toUpperCase() === "SISTEMA" ? `Aviso: #${detail.doc}` : detail.title,
-          sellerName: detail.sellerName,
-          sellerCode: detail.sellerCode,
-          items: detail.items
+        setActiveChats(prev => {
+          if (prev.some(c => c.doc === detail.doc)) return prev;
+          return [...prev, {
+            id: Date.now(),
+            doc: detail.doc,
+            title: detail.title?.toUpperCase() === "SISTEMA" ? `Aviso: #${detail.doc}` : detail.title,
+            sellerName: detail.sellerName,
+            sellerCode: detail.sellerCode,
+            items: detail.items
+          }];
         });
       }
     };
@@ -401,18 +394,25 @@ function DashboardContent({
           onClose={() => setIsSugestaoModalOpen(false)} 
         />
 
-        <ChatModal
-          isOpen={globalChat?.open || false}
-          onClose={() => setGlobalChat(null)}
-          documento={globalChat?.doc || ""}
-          empresa="001"
-          title={globalChat?.title || ""}
-          userProfile={userProfile || undefined}
-          sellerName={globalChat?.sellerName}
-          sellerCode={globalChat?.sellerCode}
-          itemsInitial={globalChat?.items}
-          amICentralizer={isCentralizer}
-        />
+        {/* Chat Multijanelas */}
+        <div className="fixed bottom-0 right-0 z-[9999] flex flex-row-reverse gap-4 p-4 pointer-events-none">
+          {activeChats.map((chat) => (
+            <div key={chat.doc || chat.id} className="pointer-events-auto">
+              <ChatModal
+                isOpen={true}
+                onClose={() => setActiveChats(prev => prev.filter(c => c.doc !== chat.doc))}
+                documento={chat.doc}
+                empresa="001"
+                title={chat.title}
+                userProfile={userProfile || undefined}
+                sellerName={chat.sellerName}
+                sellerCode={chat.sellerCode}
+                itemsInitial={chat.items}
+                amICentralizer={isCentralizer}
+              />
+            </div>
+          ))}
+        </div>
     </div>
   );
 }

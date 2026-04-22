@@ -239,7 +239,7 @@ export const apiProdutos = () => get("/api/produtos");
 export const apiClientes = () => get("/api/clientes");
 export interface SqlResponse {
   success: boolean;
-  data?: any[];
+  data?: unknown[];
   error?: string;
 }
 
@@ -266,9 +266,40 @@ export interface SecullumResponse {
   totalizadores: SecullumTotalizadores;
 }
 
+const SECULLUM_AUTH_BASE = isLocal ? "/secullum-auth" : "https://autenticador.secullum.com.br";
+const SECULLUM_API_BASE = isLocal ? "/secullum-api" : "https://pontowebintegracaoexterna.secullum.com.br";
+
+/**
+ * Autentica no Secullum e retorna o Bearer Token.
+ */
+export const loginSecullum = async (usuario: string, senha: string): Promise<string> => {
+  const url = `${SECULLUM_AUTH_BASE}/Token`;
+  const body = new URLSearchParams();
+  body.append("grant_type", "password");
+  body.append("username", usuario);
+  body.append("password", senha);
+  body.append("client_id", "3");
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Accept": "application/json"
+    },
+    body: body.toString()
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    console.error("Erro Login Secullum:", errorBody);
+    throw new Error("Erro na autenticação Secullum");
+  }
+  const data = await res.json();
+  return data.access_token;
+};
+
 /** 
  * Busca totais de assiduidade no Secullum para um período.
- * Requer secullumidbancoselecionado no header e Token Bearer.
  */
 export const apiSecullumTotais = async (params: {
   dataInicial: string;
@@ -277,23 +308,29 @@ export const apiSecullumTotais = async (params: {
   token: string;
   idBanco: string;
 }): Promise<SecullumResponse[]> => {
-  const url = "https://pontowebintegracaoexterna.secullum.com.br/api/IntegracaoExterna/Calcular/SomenteTotais";
+  const url = `${SECULLUM_API_BASE}/IntegracaoExterna/Calcular/SomenteTotais`;
   
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/json; charset=utf-8",
       "Authorization": `Bearer ${params.token}`,
-      "secullumidbancoselecionado": params.idBanco
+      "secullumidbancoselecionado": params.idBanco,
+      "Accept-Language": "pt-BR",
+      "Accept": "application/json"
     },
     body: JSON.stringify({
       dataInicial: params.dataInicial,
       dataFinal: params.dataFinal,
-      funcionarioCpf: params.funcionarioCpf
+      ...(params.funcionarioCpf ? { funcionarioCpf: params.funcionarioCpf } : {})
     })
   });
 
-  if (!res.ok) throw new Error(`Secullum API ${res.status}`);
+  if (!res.ok) {
+    const errorBody = await res.text();
+    console.error(`Erro API Totais (${res.status}):`, errorBody);
+    throw new Error(`Secullum API ${res.status}`);
+  }
   return res.json();
 };
 
