@@ -111,15 +111,44 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   };
 
 
-  const calculateEquilibrio = () => {
-    if (!data) return 0;
-    const daysWorked = data.dias_trabalhados || 15;
-    const totalWorkingDays = 22; // Base de dias úteis padrão
-    const meta = typeof data.META === 'string' ? parseFloat(data.META) : data.META;
-    return (meta / totalWorkingDays) * daysWorked;
+  // Funções de auxílio para cálculo de tempo (Lógica Gestão de Tempo)
+  const getDiasUteisNoMes = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    let count = 0;
+    for (let i = 1; i <= lastDay; i++) {
+      const dayOfWeek = new Date(y, m, i).getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+    }
+    return count;
   };
 
-  const getDiasRestantes = () => 9; // Conforme screenshot (24 dias operacionais - 15 trabalhados)
+  const getDiasUteisRestantes = () => {
+    const d = new Date();
+    // Inicia a contagem a partir de amanhã (startOffset = 1 conforme Gestão de Tempo)
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    start.setDate(start.getDate() + 1);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    let count = 0;
+    for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
+      const day = dt.getDay();
+      if (day !== 0 && day !== 6) count++;
+    }
+    return count;
+  };
+
+  const calculateEquilibrio = () => {
+    if (!data) return 0;
+    const totalWorkingDays = getDiasUteisNoMes();
+    const remainingDays = getDiasUteisRestantes();
+    const daysPassed = data.dias_trabalhados ?? Math.max(0, totalWorkingDays - remainingDays);
+    const metaNum = typeof data.META === 'string' ? parseFloat(data.META) : data.META;
+    return (metaNum / totalWorkingDays) * daysPassed;
+  };
+
+  const getDiasRestantes = () => getDiasUteisRestantes();
 
   const calculateDiarioNecessario = () => {
     if (!data) return 0;
