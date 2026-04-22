@@ -369,7 +369,7 @@ function DashboardContent({
           ) : activeItem === "DB Admin" ? (
             <SqlRunnerView />
           ) : activeItem === "Geral" ? (
-            <GeralView userProfile={userProfile} loading={geralLoading} />
+            <GeralView userProfile={userProfile || undefined} loading={geralLoading} />
           ) : activeItem === "Organograma" ? (
 
             <OrgChartView />

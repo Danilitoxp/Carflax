@@ -15,9 +15,11 @@ import {
 } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { apiMotoristas, apiAdminSQL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
+
+import type { UserProfile } from "@/App";
 
 export interface Delivery {
   id: string;
@@ -37,7 +39,17 @@ export interface Delivery {
   romStatus?: string;
 }
 
-export function RomaneiosView({ userProfile }: { userProfile?: any }) {
+interface MovGerRecord {
+  NF: string;
+  CLIENTE: string;
+  ENDERECO: string;
+  BAIRRO: string;
+  CIDADE: string;
+  VALOR: string | number;
+  OBS: string;
+}
+
+export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
   const canLancar = userProfile?.permissions?.includes("Lançar Entrega") || userProfile?.role === "admin";
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [motoristas, setMotoristas] = useState<{ COD: string; NOME: string }[]>([]);
@@ -50,18 +62,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: any }) {
   
   const hoje = new Date().toISOString().split('T')[0];
 
-  useEffect(() => {
-    fetchData();
-    // Sincronização em Tempo Real de Entregas e Status de Romaneio
-    const channel = supabase
-      .channel('admin_full_sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'entregas' }, () => fetchData(true))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'romaneios' }, () => fetchData(true))
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [selectedMotorista]);
-
-  const fetchData = async (isSilent = false) => {
+  const fetchData = useCallback(async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
       const motoristasRes = await apiMotoristas();
@@ -102,7 +103,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: any }) {
             nf: d.nf,
             client: d.client,
             address: d.address,
-            status: d.status,
+            status: d.status as "pending" | "completed" | "failed",
             value: `R$ ${Number(d.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
             instrucoes: d.instructions || "",
             image: d.image,
@@ -154,7 +155,18 @@ export function RomaneiosView({ userProfile }: { userProfile?: any }) {
     } finally {
       if (!isSilent) setLoading(false);
     }
-  };
+  }, [hoje, selectedMotorista]);
+
+  useEffect(() => {
+    fetchData();
+    // Sincronização em Tempo Real de Entregas e Status de Romaneio
+    const channel = supabase
+      .channel('admin_full_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'entregas' }, () => fetchData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'romaneios' }, () => fetchData(true))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchData]);
 
   const handleReorder = async (newOrder: Delivery[]) => {
     // Atualiza o estado local imediatamente para fluidez
@@ -208,7 +220,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: any }) {
       const res = await apiAdminSQL(sql);
       
       if (res.success && res.data && res.data.length > 0) {
-        const e = res.data[0];
+        const e = res.data[0] as MovGerRecord;
         
         const formattedValue = new Intl.NumberFormat('pt-BR', {
           style: 'currency',
@@ -432,7 +444,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: any }) {
           </div>
         ) : (() => {
             const filteredDeliveries = deliveries.filter(d => {
-              const isRomCompleted = (d as any).romStatus === "concluido";
+              const isRomCompleted = d.romStatus === "concluido";
               return activeTab === "completed" ? isRomCompleted : !isRomCompleted;
             });
             
@@ -671,16 +683,20 @@ export function RomaneiosView({ userProfile }: { userProfile?: any }) {
   );
 }
 
+interface NfItem {
+  CODIGO: string;
+  DESCRICAO: string;
+  QTD: number | string;
+  PRECO: number | string;
+}
+
 // ── MODAL DE ITENS DA NF ──────────────────────────────────────────────────
 function ItemsModal({ nf, onClose }: { nf: string | null, onClose: () => void }) {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<NfItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (nf) fetchItems();
-  }, [nf]);
-
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
+    if (!nf) return;
     setLoading(true);
     try {
       const sql = `
@@ -693,13 +709,17 @@ function ItemsModal({ nf, onClose }: { nf: string | null, onClose: () => void })
         WHERE DOCUMENTO = '${nf}' OR DOCUMENTO LIKE '%${nf}'
       `;
       const res = await apiAdminSQL(sql);
-      if (res.success) setItems(res.data || []);
+      if (res.success) setItems((res.data as NfItem[]) || []);
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [nf]);
+
+  useEffect(() => {
+    if (nf) fetchItems();
+  }, [nf, fetchItems]);
 
   if (!nf) return null;
 
