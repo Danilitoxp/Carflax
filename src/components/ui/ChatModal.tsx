@@ -279,20 +279,40 @@ export function ChatModal({
 
   if (!isOpen) return null;
 
-  // Lógica de exibição no Header: Prioridade TOTAL ao humano (Vendedor/Dono do Orçamento)
-  const displayUser = amICentralizer 
-    ? { 
+  // Lógica de exibição no Header: Prioridade TOTAL ao humano (Remetente da última mensagem -> Dono do Orçamento -> Centralizador)
+  const displayUser = (() => {
+    if (conversas && conversas.length > 0) {
+      const otherMessage = [...conversas].reverse().find(m => 
+        m.enviado_por && 
+        m.enviado_por !== userProfile?.id && 
+        m.enviado_por_nome?.toUpperCase() !== "SISTEMA"
+      );
+
+      if (otherMessage && otherMessage.enviado_por_nome) {
+        return {
+          name: otherMessage.enviado_por_nome,
+          // Se tiver a foto atachada na mensagem usa, senão usa as que baixou no useEffect
+          avatar: (otherMessage as CrmConversa & { enviado_por_foto?: string }).enviado_por_foto || ownerProfile?.avatar || centralizer?.avatar || ""
+        };
+      }
+    }
+
+    if (amICentralizer) {
+      return { 
         name: (ownerProfile?.name && ownerProfile.name.toUpperCase() !== "SISTEMA" && ownerProfile.name.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? ownerProfile.name : null) || 
               (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? sellerName : null) || 
               (title.toUpperCase().includes(userProfile?.name?.toUpperCase() || "---") ? `Orçamento #${documento.replace("#", "")}` : title), 
         avatar: ownerProfile?.avatar || "" 
-      }
-    : { 
+      };
+    } else {
+      return { 
         name: (centralizer?.name) || 
               (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? sellerName : null) || 
               "Centralizador Carflax", 
         avatar: centralizer?.avatar || "" 
       };
+    }
+  })();
 
   const handleToggleItems = async () => {
     if (showItems) {
@@ -410,25 +430,93 @@ export function ChatModal({
   };
 
   const renderFormattedText = (text: string) => {
-    return text.split('\n').map((line, i) => {
-      const parts = line.split(':');
-      let coloredLine: React.ReactNode = line;
-      if (parts.length > 1) {
-        coloredLine = (
-          <>
-            <span className="text-amber-400 font-black">{parts[0]}:</span>
-            <span className="text-foreground"> {parts.slice(1).join(':')}</span>
-          </>
+    const lines = text.split('\n');
+    const result: React.ReactNode[] = [];
+    let tableRows: string[][] = [];
+
+    const flushTable = () => {
+      if (tableRows.length > 0) {
+        result.push(
+          <div key={`table-${result.length}`} className="my-3 rounded-xl border border-border/50 overflow-hidden bg-background/50 shadow-inner">
+            <table className="w-full text-left text-[10px]">
+              <thead className="bg-secondary/60 text-muted-foreground uppercase tracking-widest font-black">
+                <tr>
+                  {tableRows[0].map((h, i) => <th key={i} className={cn("px-2 py-1.5 border-b border-border/50", i > 0 && "text-center")}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {tableRows.slice(2).map((row, i) => (
+                  <tr key={i} className="hover:bg-secondary/40 transition-colors">
+                    {row.map((cell, j) => {
+                       const isRed = cell.includes('<red>');
+                       const isGreen = cell.includes('<green>');
+                       const cleanCell = cell.replace(/<\/?(red|green)>/g, '');
+                       return (
+                         <td key={j} className={cn(
+                           "px-2 py-1.5 font-semibold", 
+                           isRed ? "text-rose-500 font-black" : (isGreen ? "text-emerald-500 font-black" : "text-foreground/90"), 
+                           j === 0 ? "text-[9px] uppercase tracking-tighter" : "text-center"
+                         )}>
+                           {cleanCell}
+                         </td>
+                       );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        tableRows = [];
+      }
+    };
+
+    lines.forEach((line, index) => {
+      if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+        const cols = line.split('|').slice(1, -1).map(c => c.trim());
+        tableRows.push(cols);
+      } else {
+        flushTable();
+        
+        // Renderiza linha normal
+        const renderLine = (str: string) => {
+          // Processa <red>
+          const parts = str.split(/(<red>.*?<\/red>)/g);
+          return parts.map((part, k) => {
+            if (part.startsWith('<red>')) {
+              return <span key={k} className="text-rose-500 font-black">{part.replace(/<\/?red>/g, '')}</span>;
+            }
+            // Processa *bold*
+            const boldParts = part.split(/(\*.*?\*)/g);
+            return boldParts.map((bp, j) => {
+              if (bp.startsWith('*') && bp.endsWith('*')) {
+                return <span key={`${k}-${j}`} className="font-black text-foreground">{bp.slice(1, -1)}</span>;
+              }
+              // Processa dois pontos apenas se for a primeira palavra da linha, mantendo retrocompatibilidade
+              if (j === 0 && k === 0 && bp.includes(':') && !bp.startsWith('http')) {
+                const colonIdx = bp.indexOf(':');
+                return (
+                  <span key={`${k}-${j}-c`}>
+                    <span className="text-amber-400 font-black">{bp.slice(0, colonIdx)}:</span>
+                    <span className="text-foreground">{bp.slice(colonIdx + 1)}</span>
+                  </span>
+                );
+              }
+              return bp;
+            });
+          });
+        };
+
+        result.push(
+          <div key={index} className="mb-0.5 leading-relaxed">
+            {renderLine(line)}
+          </div>
         );
       }
-      const finalLine = String(line).split(/(\*.*?\*)/g).map((segment, j) => {
-        if (segment.startsWith('*') && segment.endsWith('*')) {
-          return <span key={j} className="font-black text-foreground">{segment.slice(1, -1)}</span>;
-        }
-        return segment;
-      });
-      return <div key={i} className="mb-1">{parts.length > 1 ? coloredLine : finalLine}</div>;
     });
+    flushTable();
+
+    return result;
   };
 
   const ChatSkeleton = () => (
@@ -577,7 +665,7 @@ export function ChatModal({
                       })()}
                     </span>
                   )}
-                  <div className={cn("p-3.5 rounded-2xl max-w-[90%] text-[11px] font-medium shadow-xl", isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40")}>
+                  <div className={cn("p-3.5 rounded-2xl max-w-full text-[11px] font-medium shadow-xl", isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40")}>
                     {renderFormattedText(msg.obs)}
                   </div>
                   <div className={cn("flex items-center gap-2", isMe(msg) ? "mr-1" : "ml-1")}>
