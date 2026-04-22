@@ -33,6 +33,22 @@ interface ClienteFRV {
   classificacao: "Vip" | "Gold" | "Standard";
 }
 
+interface Movimentacao {
+  id: string;
+  data: string;
+  tipo: "Crédito" | "Débito";
+  valor: number;
+  descricao: string;
+  status: "Concluído" | "Pendente";
+}
+
+const mockMovimentacoes: Movimentacao[] = [
+  { id: "1", data: "2026-04-22 09:30", tipo: "Crédito", valor: 5000, descricao: "Bonificação por volume de compras", status: "Concluído" },
+  { id: "2", data: "2026-04-20 14:15", tipo: "Débito", valor: 1500, descricao: "Abatimento em duplicata #45021", status: "Concluído" },
+  { id: "3", data: "2026-04-18 11:00", tipo: "Crédito", valor: 250, descricao: "Estorno de devolução parcial", status: "Concluído" },
+  { id: "4", data: "2026-04-15 16:45", tipo: "Débito", valor: 3000, descricao: "Uso de reserva para frete especial", status: "Pendente" },
+];
+
 export function ClientesFRVView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterVendedor, setFilterVendedor] = useState("Todos os Vendedores");
@@ -57,13 +73,15 @@ export function ClientesFRVView() {
   }, []);
 
   const filteredClientes = useMemo(() => {
-    return clientes.filter(c => {
-      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           c.id.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesVendedor = filterVendedor === "Todos os Vendedores" || c.vendedor === filterVendedor;
-      const matchesStatus = filterStatus === "Todos os Status" || c.status === filterStatus;
-      return matchesSearch && matchesVendedor && matchesStatus;
-    });
+    return clientes
+      .filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             c.id.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesVendedor = filterVendedor === "Todos os Vendedores" || c.vendedor === filterVendedor;
+        const matchesStatus = filterStatus === "Todos os Status" || c.status === filterStatus;
+        return matchesSearch && matchesVendedor && matchesStatus;
+      })
+      .sort((a, b) => b.saldoTotal - a.saldoTotal);
   }, [searchTerm, filterVendedor, filterStatus, clientes]);
 
   const stats = useMemo(() => {
