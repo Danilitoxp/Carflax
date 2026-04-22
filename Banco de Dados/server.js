@@ -48,7 +48,6 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/dashboard/geral', rotasGeral);
 app.use('/api/dashboard/produtos', rotasProdutos);
 app.use('/api/crm/orcamentos', rotasOrcamentos);
-app.use('/api/crm/clientes-frv', require('./src/routes/HUB/Crm/clientesFrv'));
 app.use('/api/entregas', rotasEntregas);
 app.use('/api/entregas/romaneios', rotasRomaneios);
 app.use('/api/entregas/concluidas', rotasConcluidas);

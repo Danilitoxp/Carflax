@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { 
   Search, 
   Users, 
@@ -14,22 +14,21 @@ import {
   ShieldCheck,
   Ban,
   Clock,
-  Briefcase,
-  Loader2
+  Briefcase
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
-import { apiClientesFrv } from "@/lib/api";
 
 interface ClienteFRV {
   id: string;
   name: string;
+  document: string; // CNPJ/CPF
   vendedor: string;
-  atividade?: string;
   saldoTotal: number;
   saldoLiberado: number;
   saldoBloqueado: number;
-  status: "Ativo" | "Bloqueado" | "Em Análise" | "Inativo";
+  ultimaMovimentacao: string;
+  status: "Ativo" | "Bloqueado" | "Em Análise";
   classificacao: "Vip" | "Gold" | "Standard";
 }
 
@@ -41,6 +40,69 @@ interface Movimentacao {
   descricao: string;
   status: "Concluído" | "Pendente";
 }
+
+const mockClientes: ClienteFRV[] = [
+  {
+    id: "10502",
+    name: "CONSTRUTORA ALFA LTDA",
+    document: "12.345.678/0001-90",
+    vendedor: "DANILO OLIVEIRA",
+    saldoTotal: 25450.80,
+    saldoLiberado: 20000.00,
+    saldoBloqueado: 5450.80,
+    ultimaMovimentacao: "2026-04-20",
+    status: "Ativo",
+    classificacao: "Vip"
+  },
+  {
+    id: "10588",
+    name: "MECÂNICA DO JOÃO",
+    document: "98.765.432/0001-10",
+    vendedor: "FERNANDO SILVA",
+    saldoTotal: 1200.00,
+    saldoLiberado: 1200.00,
+    saldoBloqueado: 0,
+    ultimaMovimentacao: "2026-04-15",
+    status: "Ativo",
+    classificacao: "Standard"
+  },
+  {
+    id: "11023",
+    name: "TRANSPORTADORA RÁPIDO",
+    document: "45.678.901/0001-22",
+    vendedor: "DANILO OLIVEIRA",
+    saldoTotal: 45700.00,
+    saldoLiberado: 35000.00,
+    saldoBloqueado: 10700.00,
+    ultimaMovimentacao: "2026-04-21",
+    status: "Em Análise",
+    classificacao: "Gold"
+  },
+  {
+    id: "12005",
+    name: "CONDOMÍNIO SOLARIS",
+    document: "11.222.333/0001-44",
+    vendedor: "ROBERTO SOUZA",
+    saldoTotal: 890.50,
+    saldoLiberado: 0,
+    saldoBloqueado: 890.50,
+    ultimaMovimentacao: "2026-04-10",
+    status: "Bloqueado",
+    classificacao: "Standard"
+  },
+  {
+    id: "13042",
+    name: "REDE DE POSTOS SHELL",
+    document: "55.666.777/0001-88",
+    vendedor: "DANILO OLIVEIRA",
+    saldoTotal: 125000.00,
+    saldoLiberado: 110000.00,
+    saldoBloqueado: 15000.00,
+    ultimaMovimentacao: "2026-04-22",
+    status: "Ativo",
+    classificacao: "Vip"
+  }
+];
 
 const mockMovimentacoes: Movimentacao[] = [
   { id: "1", data: "2026-04-22 09:30", tipo: "Crédito", valor: 5000, descricao: "Bonificação por volume de compras", status: "Concluído" },
@@ -54,47 +116,29 @@ export function ClientesFRVView() {
   const [filterVendedor, setFilterVendedor] = useState("Todos os Vendedores");
   const [filterStatus, setFilterStatus] = useState("Todos os Status");
   const [selectedCliente, setSelectedCliente] = useState<ClienteFRV | null>(null);
-  const [clientes, setClientes] = useState<ClienteFRV[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        const data = await apiClientesFrv();
-        setClientes(data as ClienteFRV[]);
-      } catch (error) {
-        console.error("Erro ao carregar clientes FRV:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, []);
 
   const filteredClientes = useMemo(() => {
-    return clientes
-      .filter(c => {
-        const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             c.id.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesVendedor = filterVendedor === "Todos os Vendedores" || c.vendedor === filterVendedor;
-        const matchesStatus = filterStatus === "Todos os Status" || c.status === filterStatus;
-        return matchesSearch && matchesVendedor && matchesStatus;
-      })
-      .sort((a, b) => b.saldoTotal - a.saldoTotal);
-  }, [searchTerm, filterVendedor, filterStatus, clientes]);
+    return mockClientes.filter(c => {
+      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           c.id.includes(searchTerm) || 
+                           c.document.includes(searchTerm);
+      const matchesVendedor = filterVendedor === "Todos os Vendedores" || c.vendedor === filterVendedor;
+      const matchesStatus = filterStatus === "Todos os Status" || c.status === filterStatus;
+      return matchesSearch && matchesVendedor && matchesStatus;
+    });
+  }, [searchTerm, filterVendedor, filterStatus]);
 
   const stats = useMemo(() => {
-    const total = clientes.reduce((acc, c) => acc + c.saldoTotal, 0);
-    const liberado = clientes.reduce((acc, c) => acc + c.saldoLiberado, 0);
-    const bloqueado = clientes.reduce((acc, c) => acc + c.saldoBloqueado, 0);
+    const total = mockClientes.reduce((acc, c) => acc + c.saldoTotal, 0);
+    const liberado = mockClientes.reduce((acc, c) => acc + c.saldoLiberado, 0);
+    const bloqueado = mockClientes.reduce((acc, c) => acc + c.saldoBloqueado, 0);
     return { total, liberado, bloqueado };
-  }, [clientes]);
+  }, []);
 
   const uniqueVendedores = useMemo(() => {
-    const vends = new Set(clientes.map(c => c.vendedor).filter(Boolean));
+    const vends = new Set(mockClientes.map(c => c.vendedor));
     return ["Todos os Vendedores", ...Array.from(vends)];
-  }, [clientes]);
+  }, []);
 
   return (
     <div className="h-full flex flex-col bg-background p-6 gap-6 overflow-hidden">
@@ -216,23 +260,8 @@ export function ClientesFRVView() {
                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border relative">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Carregando dados do ERP...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredClientes.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-20 text-center">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nenhum cliente encontrado</span>
-                  </td>
-                </tr>
-              ) : filteredClientes.map((cliente) => (
+            <tbody className="divide-y divide-border">
+              {filteredClientes.map((cliente) => (
                 <tr 
                   key={cliente.id} 
                   className={cn(
@@ -249,7 +278,7 @@ export function ClientesFRVView() {
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[9px] font-bold text-muted-foreground">ID: {cliente.id}</span>
                         <span className="text-[9px] font-bold text-muted-foreground/40">•</span>
-                        <span className="text-[9px] font-bold text-muted-foreground">{cliente.atividade || "CLIENTE"}</span>
+                        <span className="text-[9px] font-bold text-muted-foreground">{cliente.document}</span>
                       </div>
                     </div>
                   </td>
