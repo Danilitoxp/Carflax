@@ -11,7 +11,7 @@ interface RFMDataPoint {
   cliente_id: string;
   nome_cliente: string;
   recencia_score: number; // 1-5
-  fm_score: number; // 1-5 (average of F and M)
+  fv_score: number; // 1-5 (average of F and V)
 }
 
 interface RFMMatrixProps {
@@ -78,7 +78,7 @@ export function RFMMatrix({ data = [], onCellClick }: RFMMatrixProps) {
   const cellCounts = useMemo(() => {
     const counts: Record<string, RFMDataPoint[]> = {};
     data.forEach(item => {
-      const key = `${item.recencia_score}-${item.fm_score}`;
+      const key = `${item.recencia_score}-${item.fv_score}`;
       if (!counts[key]) counts[key] = [];
       counts[key].push(item);
     });
@@ -90,7 +90,7 @@ export function RFMMatrix({ data = [], onCellClick }: RFMMatrixProps) {
       {/* Chart Area */}
       <div className="relative flex flex-col items-center">
         <div className="absolute -left-16 top-1/2 -rotate-90 origin-center whitespace-nowrap text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-          Frequência e Valor Monetário (média)
+          Frequência e Valor (média)
         </div>
 
         <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-black text-muted-foreground uppercase tracking-widest">
@@ -158,7 +158,7 @@ export function RFMMatrix({ data = [], onCellClick }: RFMMatrixProps) {
       <div className="flex flex-col gap-4 min-w-[240px]">
         <h3 className="text-xs font-black text-foreground uppercase tracking-widest border-b border-border pb-3 mb-2 flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          Segmentação RFM
+          Segmentação RFV
         </h3>
         <div className="grid grid-cols-1 gap-1">
           {LEGEND.map((item, idx) => (

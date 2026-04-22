@@ -335,6 +335,11 @@ export const apiSecullumTotais = async (params: {
 };
 
 export { API_BASE };
-export const apiClientesFrv = async () => {
-  return get("/api/crm/clientes-frv");
+export const apiClientesFrv = async (dataInicio?: string, dataFim?: string) => {
+  const params = new URLSearchParams();
+  if (dataInicio) params.append("dataInicio", dataInicio);
+  if (dataFim) params.append("dataFim", dataFim);
+  
+  const queryString = params.toString();
+  return get(`/api/crm/clientes-frv${queryString ? `?${queryString}` : ""}`);
 };

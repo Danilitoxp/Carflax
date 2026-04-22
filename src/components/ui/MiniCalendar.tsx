@@ -115,7 +115,7 @@ export function MiniCalendar({
   }
 
   return (
-    <div className="p-3 bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-2xl w-full max-w-[240px]" onClick={(e) => e.stopPropagation()}>
+    <div className="p-3 bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-2xl w-[240px]" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between mb-3 px-1">
         <span className="text-[10px] font-black uppercase tracking-tight text-foreground">
           {months[month]} <span className="text-blue-500 dark:text-blue-400">{year}</span>

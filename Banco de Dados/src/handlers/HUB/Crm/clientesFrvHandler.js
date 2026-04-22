@@ -1,5 +1,19 @@
 async function getClientesFrv(req, res) {
   const pool = req.app.locals.pool;
+  const { dataInicio, dataFim } = req.query;
+
+  let whereClause = `
+    WHERE F.FGO_DTAENT IS NOT NULL
+      AND C.CLI_NOMCLI IS NOT NULL
+      AND C.CLI_NOMCLI NOT LIKE '%CONSUMIDOR%'
+      AND F.FGO_CODCLI NOT IN ('00011515', '00014271', '00000926', '00011857', '00005916')
+  `;
+  
+  const params = [];
+  if (dataInicio && dataFim) {
+    whereClause += ` AND F.FGO_DTAENT BETWEEN ? AND ? `;
+    params.push(dataInicio, dataFim);
+  }
 
   const query = `
     SELECT
@@ -12,9 +26,7 @@ async function getClientesFrv(req, res) {
     FROM FATGOR F
     LEFT JOIN CADCLI C
         ON C.CLI_CODCLI = F.FGO_CODCLI
-    WHERE F.FGO_DTAENT IS NOT NULL
-      AND C.CLI_NOMCLI IS NOT NULL
-      AND C.CLI_NOMCLI NOT LIKE '%CONSUMIDOR%'
+    ${whereClause}
     GROUP BY
         F.FGO_CODCLI,
         C.CLI_NOMCLI
@@ -22,7 +34,7 @@ async function getClientesFrv(req, res) {
   `;
 
   try {
-    const [rows] = await pool.query(query);
+    const [rows] = await pool.query(query, params);
     res.json(rows);
   } catch (error) {
     console.error('[ERROR] Falha ao buscar clientes FRV:', error);
