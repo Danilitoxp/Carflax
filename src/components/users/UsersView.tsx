@@ -12,7 +12,8 @@ import {
   UserCog,
   Building2,
   Briefcase,
-  Camera
+  Camera,
+  Smartphone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
@@ -31,6 +32,7 @@ interface User {
   department: string;
   birthDate?: string;
   admissionDate?: string;
+  coletorPermissions?: Record<string, boolean>;
 }
 
 export function UsersView() {
@@ -56,6 +58,7 @@ export function UsersView() {
     operatorCode: string;
     birthDate: string;
     admissionDate: string;
+    coletorPermissions: Record<string, boolean>;
     _avatarFile?: File;
   }
 
@@ -71,11 +74,21 @@ export function UsersView() {
     operatorCode: "",
     birthDate: "",
     admissionDate: "",
+    coletorPermissions: {
+      can_conferencia: false,
+      can_separacao: false,
+      can_consulta_estoque: false,
+      can_armazenamento: false,
+      can_etiquetas: false,
+      can_localizacao: false,
+      can_embalagens: false,
+      can_inventario: false
+    }
   });
 
   const availableModules = [
     "Geral", "Produtos", "Eventos", "Férias",
-    "Orçamentos", "Ligações", "Campanhas", "Relatórios", "Romaneios",
+    "Orçamentos", "Ligações", "Campanhas", "Relatórios", "Coletor", "Romaneios",
     "Concluídas", "Usuários", "DB Admin", "Sugestões",
     "Gerenciar Comunicados", "Gerenciar Férias", "Gerenciar Banners", "Gerenciar Calendário",
     "Lançar Entrega",
@@ -167,6 +180,7 @@ export function UsersView() {
           department: u.department,
           birthDate: isoToMasked(u.birth_date || ""),
           admissionDate: isoToMasked(u.admission_date || ""),
+          coletorPermissions: u.coletor_permissions || {}
         })));
       }
       setLoading(false);
@@ -197,6 +211,16 @@ export function UsersView() {
       operatorCode: user.operatorCode || "",
       birthDate: isoToMasked(user.birthDate || ""),
       admissionDate: isoToMasked(user.admissionDate || ""),
+      coletorPermissions: user.coletorPermissions || {
+        can_conferencia: false,
+        can_separacao: false,
+        can_consulta_estoque: false,
+        can_armazenamento: false,
+        can_etiquetas: false,
+        can_localizacao: false,
+        can_embalagens: false,
+        can_inventario: false
+      }
     });
     setAvatarLoading(false);
     setSaving(false);
@@ -234,6 +258,7 @@ export function UsersView() {
       operator_code: newUser.operatorCode || null,
       birth_date: maskedToISO(newUser.birthDate || "") || null,
       admission_date: maskedToISO(newUser.admissionDate || "") || null,
+      coletor_permissions: newUser.coletorPermissions
     };
 
     console.log("[Users] Salvando usuário. Payload final:", finalPayload);
@@ -251,6 +276,7 @@ export function UsersView() {
           operatorCode: newUser.operatorCode,
           birthDate: newUser.birthDate,
           admissionDate: newUser.admissionDate,
+          coletorPermissions: newUser.coletorPermissions,
         } : u));
       } else {
         const { error } = await supabase.from("usuarios").insert({ ...finalPayload, status: "ativo" });
@@ -264,6 +290,7 @@ export function UsersView() {
           company: u.company, department: u.department,
           birthDate: isoToMasked(u.birth_date || ""),
           admissionDate: isoToMasked(u.admission_date || ""),
+          coletorPermissions: u.coletor_permissions || {}
         })));
       }
       setIsAddModalOpen(false);
@@ -320,7 +347,28 @@ export function UsersView() {
           <button
             onClick={() => {
               setEditingUser(null);
-              setNewUser({ name: "", email: "", role: "vendedor", company: "Carflax", department: "Comercial", avatar: "", permissions: ["Geral"], operatorCode: "", birthDate: "", admissionDate: "" });
+              setNewUser({ 
+                name: "", 
+                email: "", 
+                role: "vendedor", 
+                company: "Carflax", 
+                department: "Comercial", 
+                avatar: "", 
+                permissions: ["Geral"], 
+                operatorCode: "", 
+                birthDate: "", 
+                admissionDate: "",
+                coletorPermissions: {
+                  can_conferencia: false,
+                  can_separacao: false,
+                  can_consulta_estoque: false,
+                  can_armazenamento: false,
+                  can_etiquetas: false,
+                  can_localizacao: false,
+                  can_embalagens: false,
+                  can_inventario: false
+                }
+              });
               setAvatarLoading(false);
               setSaving(false);
               setIsAddModalOpen(true);
@@ -615,6 +663,39 @@ export function UsersView() {
                       }} className={cn("flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer", hasAccess ? "bg-blue-500/10 border-blue-600/30" : "bg-secondary/20 border-border")}>
                         <span className={cn("text-[9px] font-black uppercase tracking-tight", hasAccess ? "text-blue-400" : "text-muted-foreground/40")}>{module}</span>
                         <Switch enabled={hasAccess} onChange={() => { }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Coletor Permissions Section */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-[10px] font-black text-foreground uppercase tracking-widest">Módulos do Coletor</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-1 scrollbar-hide">
+                  {Object.entries(newUser.coletorPermissions).map(([key, enabled]) => {
+                    const labels: Record<string, string> = {
+                      can_conferencia: "Conferência",
+                      can_separacao: "Separação",
+                      can_consulta_estoque: "Estoque",
+                      can_armazenamento: "Armazenamento",
+                      can_etiquetas: "Etiquetas",
+                      can_localizacao: "Localização",
+                      can_embalagens: "Embalagens",
+                      can_inventario: "Inventário"
+                    };
+                    return (
+                      <div key={key} onClick={() => {
+                        setNewUser({ 
+                          ...newUser, 
+                          coletorPermissions: { ...newUser.coletorPermissions, [key]: !enabled } 
+                        });
+                      }} className={cn("flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer", enabled ? "bg-emerald-500/10 border-emerald-600/30" : "bg-secondary/20 border-border")}>
+                        <span className={cn("text-[9px] font-black uppercase tracking-tight", enabled ? "text-emerald-400" : "text-muted-foreground/40")}>{labels[key] || key}</span>
+                        <Switch enabled={enabled} onChange={() => { }} />
                       </div>
                     );
                   })}

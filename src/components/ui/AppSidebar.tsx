@@ -24,7 +24,9 @@ import {
   FileText,
   CheckCircle2,
   Image,
-  Phone,
+  PhoneCall,
+  Smartphone,
+  FileBarChart,
   Database,
   type LucideIcon,
 } from "lucide-react";
@@ -67,9 +69,17 @@ const menuItems: MenuItem[] = [
     isDropdown: true,
     subItems: [
       { label: "Orçamentos", icon: FileBadge },
-      { label: "Ligações", icon: Phone },
+      { label: "Ligações", icon: PhoneCall },
       { label: "Campanhas", icon: Megaphone },
-      { label: "Relatórios", icon: BarChart3 },
+      { label: "Relatórios", icon: FileBarChart },
+    ],
+  },
+  {
+    icon: Smartphone,
+    label: "Coletor",
+    isDropdown: true,
+    subItems: [
+      { label: "Painel Coletor", icon: LayoutGrid },
     ],
   },
   {
@@ -137,16 +147,16 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     if (role.includes('ADMIN') || role.includes('GERENTE')) return true;
 
     // Itens padrão (que todos vêem)
-    const alwaysAllowed = ["Meu Perfil", "Aparência", "Notificações", "Segurança", "Relatórios"];
+    const alwaysAllowed = ["Meu Perfil", "Aparência", "Notificações", "Segurança", "Relatórios", "Coletor"];
     if (alwaysAllowed.includes(label)) return true;
 
     // Permissões específicas do VENDEDOR
     const vendedorStandard = [
       "Geral", "Produtos", "Dashboard", 
       "Calendário", "Eventos", "Férias", 
-      "CRM", "Orçamentos", "Ligações", "Campanhas", "Relatórios", 
-      "Entregas", "Romaneios", "Concluídas",
-      "Sugestões"
+      "CRM", "Orçamentos", "Ligações", "Campanhas", "Relatórios", "Coletor", 
+      "Logística", "Romaneios", "Concluídas", "Entregas", 
+      "Produtos", "Estoque", "Preços", "Eventos", "Férias"
     ];
     if (role.includes('VENDEDOR') && vendedorStandard.includes(label)) return true;
 

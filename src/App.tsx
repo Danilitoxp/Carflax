@@ -20,6 +20,7 @@ import { GeralView } from "@/components/dashboard/Geral/GeralView";
 import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SugestaoModal } from "@/components/sugestao";
+import { ColetorView } from "@/components/coletor/ColetorView";
 import { EntregasView } from "@/components/entregas";
 import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
 import { UsersView } from "@/components/users/UsersView";
@@ -76,7 +77,7 @@ function DashboardContent({
     const isVendedorRole = role === "VENDEDOR";
     const sellerAllowedItems = [
       "Geral", "Produtos", "Calendário", "Eventos", "Férias", 
-      "Orçamentos", "Campanhas", "Relatórios", 
+      "Orçamentos", "Campanhas", "Relatórios", "Coletor", "Painel Coletor",
       "Entregas", "Romaneios", "Concluídas", 
       "Sugestões", "Meu Perfil", "Notificações", "Segurança", "Aparência"
     ];
@@ -84,7 +85,7 @@ function DashboardContent({
     const isPublic = [
       "Geral", "Dashboard", "Meu Perfil", "Notificações", 
       "Segurança", "Aparência", "Organograma", "Sugestões", 
-      "Relatórios"
+      "Relatórios", "Coletor", "Painel Coletor"
     ].includes(activeItem);
 
     const hasPermission = userProfile?.permissions?.includes(activeItem) || (isVendedorRole && sellerAllowedItems.includes(activeItem));
@@ -357,6 +358,10 @@ function DashboardContent({
             <CrmSection activeTab={activeItem} userProfile={userProfile} />
           ) : ["Entregas", "Romaneios", "Concluídas"].includes(activeItem) ? (
             <EntregasView activeTab={activeItem} userProfile={userProfile} />
+          ) : ["Coletor", "Painel Coletor"].includes(activeItem) ? (
+            <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
+              <ColetorView />
+            </div>
           ) : activeItem === "Usuários" ? (
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <UsersView />
