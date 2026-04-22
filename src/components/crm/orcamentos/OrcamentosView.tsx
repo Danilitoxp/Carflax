@@ -82,9 +82,9 @@ function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
       ? products.reduce((acc, p) => acc + (parseFloat(String(p.MARKUP_PERCENTUAL)) || 0), 0) / products.length
       : 0;
 
-    const dateObj = r.DATA_ORCAMENTO ? new Date(r.DATA_ORCAMENTO) : null;
-    const dateBR = dateObj
-      ? dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+    const dateStr = r.DATA_ORCAMENTO || "";
+    const dateBR = dateStr.length >= 10
+      ? `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}/${dateStr.slice(0, 4)}`
       : "";
     const hora = String(r.HORA_ORCAMENTO || "00:00:00").slice(0, 5);
 
@@ -245,9 +245,12 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const toLocalDateStr = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
       const params: Record<string, string> = {};
-      if (startDate) params.inicio = startDate.toISOString().slice(0, 10);
-      if (endDate) params.fim = endDate.toISOString().slice(0, 10);
+      if (startDate) params.inicio = toLocalDateStr(startDate);
+      if (endDate) params.fim = toLocalDateStr(endDate);
 
       const raw = await apiCrmOrcamentos(params);
       let orcamentos = parseOrcamentos(raw);
@@ -274,18 +277,20 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           if (!crm) return o;
           return {
             ...o,
-            lossReason: crm.motivo_perda ?? o.lossReason,
+            lossReason: o.lossReason ?? crm.motivo_perda,
             lembreteData: crm.lembrete_data ?? undefined,
           };
         }
 
         if (!crm) return o;
 
-        // Para orçamentos em aberto (EMITIDO), o controle manual do CRM tem precedência
+        // Para orçamentos em aberto (EMITIDO), o CRM manual tem precedência,
+        // exceto PERDIDO que só pode vir da API
+        const crmStatus = crm.status_crm.toUpperCase();
         return {
           ...o,
-          status: crm.status_crm.toUpperCase(),
-          lossReason: crm.motivo_perda ?? o.lossReason,
+          status: crmStatus === "PERDIDO" ? o.status : crmStatus,
+          lossReason: o.lossReason ?? crm.motivo_perda,
           lembreteData: crm.lembrete_data ?? undefined,
         };
       });

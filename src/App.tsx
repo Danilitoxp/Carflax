@@ -184,7 +184,16 @@ function DashboardContent({
         
         if (isForMe) {
           const isSystem = newMsg.enviado_por_nome?.toUpperCase() === "SISTEMA";
-          const title = isSystem ? `Aviso: #${newMsg.documento}` : `Mensagem de ${newMsg.enviado_por_nome}`;
+          let resolvedSellerName = newMsg.enviado_por_nome;
+          let displayTitle = isSystem ? `Aviso: #${newMsg.documento}` : `Mensagem de ${newMsg.enviado_por_nome}`;
+
+          if (isSystem && newMsg.obs) {
+            const vMatch = newMsg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
+            if (vMatch) {
+              resolvedSellerName = vMatch[1].replace(/\*/g, "").trim();
+              displayTitle = `Divergência: ${resolvedSellerName}`;
+            }
+          }
           
           setActiveChats(prev => {
             // Verifica se este chat já está aberto
@@ -192,8 +201,8 @@ function DashboardContent({
             return [...prev, {
               id: Date.now(),
               doc: newMsg.documento,
-              title,
-              sellerName: newMsg.enviado_por_nome,
+              title: displayTitle,
+              sellerName: resolvedSellerName,
               sellerCode: undefined
             }];
           });
@@ -202,7 +211,7 @@ function DashboardContent({
           if ("Notification" in window) {
             if (Notification.permission === "granted") {
               try {
-                new Notification(title, {
+                new Notification(displayTitle, {
                   body: newMsg.obs || "Nova mensagem recebida",
                   icon: "/favicon.svg", // Certifique-se que este arquivo existe em /public
                   tag: "carflax-chat-msg",
@@ -239,13 +248,24 @@ function DashboardContent({
           if (unread && unread.length > 0) {
             const msg = unread[0];
             const isSystem = msg.enviado_por_nome?.toUpperCase() === "SISTEMA";
+            let resolvedSellerName = msg.enviado_por_nome;
+            let displayTitle = isSystem ? `Aviso: #${msg.documento}` : `Mensagem pendente: ${msg.enviado_por_nome}`;
+
+            if (isSystem && msg.obs) {
+              const vMatch = msg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
+              if (vMatch) {
+                resolvedSellerName = vMatch[1].replace(/\*/g, "").trim();
+                displayTitle = `Pendente: ${resolvedSellerName}`;
+              }
+            }
+
             setActiveChats(prev => {
               if (prev.some(c => c.doc === msg.documento)) return prev;
               return [...prev, {
                 id: Date.now(),
                 doc: msg.documento,
-                title: isSystem ? `Aviso: #${msg.documento}` : `Mensagem pendente: ${msg.enviado_por_nome}`,
-                sellerName: msg.enviado_por_nome,
+                title: displayTitle,
+                sellerName: resolvedSellerName,
                 sellerCode: undefined
               }];
             });
@@ -256,13 +276,20 @@ function DashboardContent({
     const handleOpenChat = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail) {
+        const isSystem = detail.title?.toUpperCase() === "SISTEMA" || detail.sellerName?.toUpperCase() === "SISTEMA";
+        const resolvedSellerName = detail.sellerName;
+        const displayTitle = isSystem ? `Aviso: #${detail.doc}` : detail.title;
+
+        // Se for sistema, tentamos descobrir o vendedor real se houver contexto (itens ou mensagens anteriores)
+        // No caso do open-crm-chat manual do OrcamentosView, o sellerName já vem preenchido.
+        
         setActiveChats(prev => {
           if (prev.some(c => c.doc === detail.doc)) return prev;
           return [...prev, {
             id: Date.now(),
             doc: detail.doc,
-            title: detail.title?.toUpperCase() === "SISTEMA" ? `Aviso: #${detail.doc}` : detail.title,
-            sellerName: detail.sellerName,
+            title: displayTitle,
+            sellerName: resolvedSellerName,
             sellerCode: detail.sellerCode,
             items: detail.items
           }];

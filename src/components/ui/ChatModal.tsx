@@ -241,7 +241,7 @@ export function ChatModal({
         }
       } else {
         // Se só tem mensagem de Sistema, tenta "ler" o nome do vendedor dentro do texto
-        const systemMsg = conversas.find(m => (m.enviado_por_nome?.toUpperCase() === "SISTEMA") && m.obs.includes("Vendedor:"));
+        const systemMsg = conversas.find(m => (m.enviado_por_nome?.toUpperCase() === "SISTEMA") && /vendedor:/i.test(m.obs));
         if (systemMsg) {
           const match = systemMsg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
           const extractedName = match ? match[1].replace(/\*/g, "").trim() : null;
