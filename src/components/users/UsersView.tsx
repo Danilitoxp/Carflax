@@ -45,15 +45,29 @@ export function UsersView() {
   const [filterCompany, setFilterCompany] = useState("Todas as Empresas");
   const [filterDepartment, setFilterDepartment] = useState("Todos os Setores");
 
+  interface NewUser {
+    name: string;
+    email: string;
+    role: string;
+    company: User["company"];
+    department: string;
+    avatar: string;
+    permissions: string[];
+    operatorCode: string;
+    birthDate: string;
+    admissionDate: string;
+    _avatarFile?: File;
+  }
+
   // User State for Modal
-  const [newUser, setNewUser] = useState({
+  const [newUser, setNewUser] = useState<NewUser>({
     name: "",
     email: "",
     role: "vendedor",
-    company: "Carflax" as User["company"],
+    company: "Carflax",
     department: "Comercial",
     avatar: "",
-    permissions: ["Geral"] as string[],
+    permissions: ["Geral"],
     operatorCode: "",
     birthDate: "",
     admissionDate: "",
@@ -61,7 +75,7 @@ export function UsersView() {
 
   const availableModules = [
     "Geral", "Produtos", "Eventos", "Férias",
-    "Orçamentos", "Ligações", "Campanhas", "Romaneios",
+    "Orçamentos", "Ligações", "Campanhas", "Relatórios", "Romaneios",
     "Concluídas", "Usuários", "DB Admin", "Sugestões",
     "Gerenciar Comunicados", "Gerenciar Férias", "Gerenciar Banners", "Gerenciar Calendário",
     "Lançar Entrega",
@@ -96,7 +110,7 @@ export function UsersView() {
     const file = e.target.files?.[0];
     if (!file) return;
     setAvatarLoading(true);
-    setNewUser(u => ({ ...u, avatar: URL.createObjectURL(file), _avatarFile: file } as any));
+    setNewUser(u => ({ ...u, avatar: URL.createObjectURL(file), _avatarFile: file }));
   };
 
   const roles = [
@@ -191,7 +205,7 @@ export function UsersView() {
 
   const handleSaveUser = async () => {
     setSaving(true);
-    const avatarFile = (newUser as any)._avatarFile as File | undefined;
+    const avatarFile = newUser._avatarFile;
     let avatarUrl: string | null | undefined;
 
     if (avatarFile) {
@@ -213,13 +227,13 @@ export function UsersView() {
       name: newUser.name,
       email: newUser.email,
       role: newUser.role,
-      company: (newUser as any).company,
-      department: (newUser as any).department,
+      company: newUser.company,
+      department: newUser.department,
       avatar: finalAvatar,
       permissions: newUser.permissions,
-      operator_code: (newUser as any).operatorCode || null,
-      birth_date: maskedToISO((newUser as any).birthDate || "") || null,
-      admission_date: maskedToISO((newUser as any).admissionDate || "") || null,
+      operator_code: newUser.operatorCode || null,
+      birth_date: maskedToISO(newUser.birthDate || "") || null,
+      admission_date: maskedToISO(newUser.admissionDate || "") || null,
     };
 
     console.log("[Users] Salvando usuário. Payload final:", finalPayload);
@@ -234,9 +248,9 @@ export function UsersView() {
           ...u,
           ...newUser,
           avatar: finalAvatar,
-          operatorCode: (newUser as any).operatorCode,
-          birthDate: (newUser as any).birthDate,
-          admissionDate: (newUser as any).admissionDate,
+          operatorCode: newUser.operatorCode,
+          birthDate: newUser.birthDate,
+          admissionDate: newUser.admissionDate,
         } : u));
       } else {
         const { error } = await supabase.from("usuarios").insert({ ...finalPayload, status: "ativo" });
@@ -306,7 +320,7 @@ export function UsersView() {
           <button
             onClick={() => {
               setEditingUser(null);
-              setNewUser({ name: "", email: "", role: "vendedor", company: "Carflax", department: "Comercial", avatar: "", permissions: ["Geral"], operatorCode: "", birthDate: "", admissionDate: "" } as any);
+              setNewUser({ name: "", email: "", role: "vendedor", company: "Carflax", department: "Comercial", avatar: "", permissions: ["Geral"], operatorCode: "", birthDate: "", admissionDate: "" });
               setAvatarLoading(false);
               setSaving(false);
               setIsAddModalOpen(true);
@@ -531,7 +545,7 @@ export function UsersView() {
                   <TinyDropdown
                     value={newUser.company}
                     options={companies}
-                    onChange={(val) => setNewUser({ ...newUser, company: val as any })}
+                    onChange={(val) => setNewUser({ ...newUser, company: val as User["company"] })}
                     icon={Building2}
                     variant="blue"
                     className="w-full"
@@ -555,7 +569,7 @@ export function UsersView() {
                   <TinyDropdown
                     value={newUser.role}
                     options={roles}
-                    onChange={(val) => setNewUser({ ...newUser, role: val as any })}
+                    onChange={(val) => setNewUser({ ...newUser, role: val })}
                     icon={Shield}
                     variant="emerald"
                     className="w-full"
@@ -576,12 +590,12 @@ export function UsersView() {
 
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Data de Nascimento</label>
-                  <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={(newUser as any).birthDate} onChange={(e) => setNewUser({ ...newUser, birthDate: applyDateMask(e.target.value) } as any)} className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/30" />
+                  <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={newUser.birthDate} onChange={(e) => setNewUser({ ...newUser, birthDate: applyDateMask(e.target.value) })} className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/30" />
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Data de Admissão</label>
-                  <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={(newUser as any).admissionDate} onChange={(e) => setNewUser({ ...newUser, admissionDate: applyDateMask(e.target.value) } as any)} className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/30" />
+                  <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={newUser.admissionDate} onChange={(e) => setNewUser({ ...newUser, admissionDate: applyDateMask(e.target.value) })} className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/30" />
                 </div>
               </div>
 

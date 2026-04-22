@@ -133,22 +133,22 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
 
   const isAllowed = (label: string) => {
     // Admin e Gerente vê tudo
-    const role = userProfile?.role?.toUpperCase();
-    if (role === 'ADMIN' || role === 'GERENTE') return true;
+    const role = userProfile?.role?.toUpperCase() || "";
+    if (role.includes('ADMIN') || role.includes('GERENTE')) return true;
 
-    // Itens padrão (que todos vêem por contrato social rs)
-    const alwaysAllowed = ["Meu Perfil", "Aparência", "Notificações", "Segurança"];
+    // Itens padrão (que todos vêem)
+    const alwaysAllowed = ["Meu Perfil", "Aparência", "Notificações", "Segurança", "Relatórios"];
     if (alwaysAllowed.includes(label)) return true;
 
     // Permissões específicas do VENDEDOR
     const vendedorStandard = [
       "Geral", "Produtos", "Dashboard", 
       "Calendário", "Eventos", "Férias", 
-      "CRM", "Orçamentos", "Campanhas", "Relatórios", 
+      "CRM", "Orçamentos", "Ligações", "Campanhas", "Relatórios", 
       "Entregas", "Romaneios", "Concluídas",
       "Sugestões"
     ];
-    if (role === 'VENDEDOR' && vendedorStandard.includes(label)) return true;
+    if (role.includes('VENDEDOR') && vendedorStandard.includes(label)) return true;
 
     // Permissões manuais (Database)
     return userProfile?.permissions?.includes(label);
