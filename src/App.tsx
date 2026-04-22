@@ -109,6 +109,13 @@ function DashboardContent({
     items?: CrmItem[];
   }
   const [activeChats, setActiveChats] = useState<ActiveChat[]>([]);
+  
+  // Reset de estado durante o render ao trocar de usuário (Recomendado pelo React 18+)
+  const [prevUserId, setPrevUserId] = useState(userProfile?.id);
+  if (userProfile?.id !== prevUserId) {
+    setPrevUserId(userProfile?.id);
+    setActiveChats([]);
+  }
 
   const [isCentralizer, setIsCentralizer] = useState(false);
   const initialCheckPerformed = useRef(false);

@@ -62,14 +62,20 @@ export function ChatModal({
     setItems(itemsInitial || []);
     setShowItems(false);
 
-    const userCache = (window as any)._carflaxUserCache || {};
+    interface CacheUser {
+      id: string;
+      name: string;
+      avatar?: string;
+      operator_code?: string;
+    }
+    const userCache = (window as unknown as { _carflaxUserCache: Record<string, CacheUser> })._carflaxUserCache || {};
     let resolvedImmediately = false;
 
     if (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName !== userProfile?.name) {
       const lookup = sellerName.toUpperCase().trim();
-      const match = Object.values(userCache).find((u: any) => 
+      const match = Object.values(userCache).find(u => 
         u.name?.toUpperCase() === lookup || lookup.includes(u.name?.toUpperCase())
-      ) as any;
+      );
       
       if (match && match.id !== userProfile?.id) {
         setOwnerProfile({ name: match.name, avatar: match.avatar || "" });
@@ -120,7 +126,7 @@ export function ChatModal({
         }
 
         if (vCode) {
-          const user = Object.values(userCache).find((u: any) => u.operator_code === vCode) as any;
+          const user = Object.values(userCache).find((u) => u.operator_code === vCode);
           if (user && user.id !== userProfile?.id) {
             setBudgetOwner(user.id);
             setOwnerProfile({ name: user.name, avatar: user.avatar || "" });
@@ -182,20 +188,26 @@ export function ChatModal({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isOpen, documento, userProfile?.id, itemsInitial]);
+  }, [isOpen, documento, userProfile?.id, userProfile?.name, itemsInitial, amICentralizer, sellerCode, sellerName]);
 
   // 2. Efeito de Resolução Dinâmica de Perfil baseada em Mensagens e Cache Global
   useEffect(() => {
     if (!isOpen) return;
 
     // Tentar resolver pelo Cache Global primeiro (instantâneo)
-    const userCache = (window as any)._carflaxUserCache || {};
+    interface CacheUser {
+      id: string;
+      name: string;
+      avatar?: string;
+      operator_code?: string;
+    }
+    const userCache = (window as unknown as { _carflaxUserCache: Record<string, CacheUser> })._carflaxUserCache || {};
     
     const resolveFromCache = (name: string) => {
       const lookup = name.toUpperCase().trim();
-      const match = Object.values(userCache).find((u: any) => 
+      const match = Object.values(userCache).find(u => 
         u.name?.toUpperCase() === lookup || lookup.includes(u.name?.toUpperCase())
-      ) as any;
+      );
       if (match && match.id !== userProfile?.id) {
         setOwnerProfile({ name: match.name, avatar: match.avatar || "" });
         setBudgetOwner(match.id);
@@ -218,7 +230,7 @@ export function ChatModal({
         if (user) {
           setOwnerProfile({ name: user.name, avatar: user.avatar || "" });
           if (amICentralizer) setBudgetOwner(user.id);
-          else setCentralizer(user);
+          else setCentralizer({ id: user.id, name: user.name, avatar: user.avatar || "" });
         } else {
           supabase.from("usuarios").select("id, name, avatar").eq("id", otherMessage.enviado_por).maybeSingle().then(({ data: u }) => {
             if (u && u.id !== userProfile?.id) {
@@ -249,7 +261,7 @@ export function ChatModal({
         }
       }
     }
-  }, [conversas, userProfile?.id, ownerProfile, amICentralizer, sellerName, isOpen]);
+  }, [conversas, userProfile?.id, userProfile?.name, ownerProfile, amICentralizer, sellerName, isOpen]);
 
   // Scroll automático
   useEffect(() => {
@@ -431,7 +443,7 @@ export function ChatModal({
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-end p-6 pointer-events-none">
+    <div className="pointer-events-none">
       <div className={cn(
           "w-[340px] bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 animate-in slide-in-from-bottom-4",
           isMinimized ? "h-[56px]" : "h-[480px]"
