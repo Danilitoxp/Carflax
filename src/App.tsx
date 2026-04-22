@@ -197,16 +197,29 @@ function DashboardContent({
             }];
           });
 
-          // Notificação Nativa
-          if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(title, {
-              body: newMsg.obs || "Nova mensagem recebida",
-              icon: "/favicon.png",
-              tag: "carflax-chat-msg"
-            });
+          // Notificação Nativa (Chrome/Edge/Safari)
+          if ("Notification" in window) {
+            if (Notification.permission === "granted") {
+              try {
+                new Notification(title, {
+                  body: newMsg.obs || "Nova mensagem recebida",
+                  icon: "/favicon.svg", // Certifique-se que este arquivo existe em /public
+                  tag: "carflax-chat-msg",
+                  silent: false
+                });
+              } catch (err) {
+                console.error("[CRM] Erro ao disparar notificação:", err);
+              }
+            } else if (Notification.permission !== "denied") {
+              Notification.requestPermission();
+            }
           }
 
-          try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play().catch(() => {}); } catch { /* silência */ }
+          try { 
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+            audio.volume = 0.5;
+            audio.play().catch(() => {}); 
+          } catch { /* silêncio */ }
         }
       })
       .subscribe();
