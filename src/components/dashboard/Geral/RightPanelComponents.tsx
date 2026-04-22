@@ -416,9 +416,9 @@ export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: bo
 
   if (loading || !employee) {
     return (
-      <div className="flex-1 flex flex-col min-h-[380px] bg-card border border-border rounded-2xl shadow-sm overflow-hidden animate-pulse">
-        <div className="h-28 bg-slate-100 dark:bg-slate-800 shrink-0" />
-        <div className="flex-1 flex flex-col items-center px-6 -mt-12 relative z-10 pb-6 space-y-6">
+      <div className="flex-1 flex flex-col min-h-[320px] bg-card border border-border rounded-2xl shadow-sm overflow-hidden animate-pulse">
+        <div className="h-20 bg-slate-100 dark:bg-slate-800 shrink-0" />
+        <div className="flex-1 flex flex-col items-center px-6 -mt-10 relative z-10 pb-6 space-y-4">
            <div className="w-24 h-24 rounded-3xl bg-card p-1.5 shadow-xl">
              <div className="w-full h-full rounded-2xl bg-secondary/50 dark:bg-slate-800/50" />
            </div>
@@ -426,8 +426,7 @@ export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: bo
               <div className="h-4 w-3/4 bg-slate-100 dark:bg-slate-800 rounded mx-auto" />
               <div className="h-3 w-1/2 bg-secondary/30 dark:bg-slate-800/30 rounded mx-auto" />
            </div>
-           <div className="flex-1 w-full bg-secondary/10 dark:bg-slate-800/20 rounded-2xl" />
-           <div className="w-full h-10 bg-secondary/30 dark:bg-slate-800/30 rounded-xl" />
+           <div className="w-full h-24 bg-secondary/10 dark:bg-slate-800/20 rounded-2xl" />
         </div>
       </div>
     );
