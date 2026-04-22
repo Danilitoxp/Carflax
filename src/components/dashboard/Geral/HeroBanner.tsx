@@ -40,13 +40,13 @@ export function HeroBanner({ loading }: { loading?: boolean }) {
       </div>
 
       {/* Sparkles and Gfx Section - Reduced height */}
-      <div className="absolute inset-x-0 bottom-0 h-48 w-full overflow-hidden [mask-image:radial-gradient(50%_50%,white,transparent)] pointer-events-none">
+      <div className="absolute inset-x-0 bottom-0 h-48 w-full overflow-hidden [mask-image:radial-gradient(circle_at_50%_50%,white,transparent)] pointer-events-none">
         <div className="absolute inset-0 before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_bottom_center,var(--gradient-color),transparent_70%)] before:opacity-40" />
         <div className="absolute -left-1/2 top-[60%] aspect-[1/0.7] z-10 w-[200%] rounded-[100%] border-t border-blue-500/20 bg-blue-500/5 dark:bg-blue-900/20 backdrop-blur-3xl" />
         
         <Sparkles
           density={800}
-          className="absolute inset-x-0 bottom-0 h-full w-full [mask-image:radial-gradient(50%_50%,white,transparent_85%)]"
+          className="absolute inset-x-0 bottom-0 h-full w-full [mask-image:radial-gradient(circle_at_50%_50%,white,transparent_85%)]"
           color={theme === "dark" ? "#ffffff" : "#2563eb"}
         />
       </div>
