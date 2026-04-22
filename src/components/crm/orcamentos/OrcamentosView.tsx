@@ -276,7 +276,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           if (!crm) return o;
           return {
             ...o,
-            lossReason: o.lossReason ?? crm.motivo_perda,
+            lossReason: o.lossReason ?? crm.motivo_perda ?? undefined,
             lembreteData: crm.lembrete_data ?? undefined,
           };
         }
@@ -289,7 +289,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         return {
           ...o,
           status: crmStatus === "PERDIDO" ? o.status : crmStatus,
-          lossReason: o.lossReason ?? crm.motivo_perda,
+          lossReason: o.lossReason ?? crm.motivo_perda ?? undefined,
           lembreteData: crm.lembrete_data ?? undefined,
         };
       });
