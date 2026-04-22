@@ -14,6 +14,8 @@ import {
   UpcomingEventsCard,
   EmployeeOfMonthCard,
 } from "@/components/dashboard/Geral/RightPanelComponents";
+import { type CrmItem } from "@/lib/api";
+import { type CrmConversa } from "@/lib/crm-service";
 import { GeralView } from "@/components/dashboard/Geral/GeralView";
 import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,9 +63,13 @@ function DashboardContent({
 
   useEffect(() => {
     if (activeItem === "Geral") {
-      setGeralLoading(true);
-      const timer = setTimeout(() => setGeralLoading(false), 500);
-      return () => clearTimeout(timer);
+      // Usar setTimeout para evitar renderização em cascata síncrona
+      const startTimer = setTimeout(() => setGeralLoading(true), 0);
+      const endTimer = setTimeout(() => setGeralLoading(false), 500);
+      return () => {
+        clearTimeout(startTimer);
+        clearTimeout(endTimer);
+      };
     }
 
     const role = userProfile?.role?.toUpperCase();
@@ -85,10 +91,12 @@ function DashboardContent({
 
     if (!isPublic && !hasPermission && activeItem !== "Geral") {
       console.warn(`[Security] Acesso negado para: ${activeItem}. Redirecionando para Geral.`);
-      setActiveItem("Geral");
-      localStorage.setItem("carflax-active-section", "Geral");
+      setTimeout(() => {
+        setActiveItem("Geral");
+        localStorage.setItem("carflax-active-section", "Geral");
+      }, 0);
     }
-  }, [activeItem, userProfile?.permissions]);
+  }, [activeItem, userProfile?.permissions, userProfile?.role]);
 
   // ── Sincronização Global do Chat (Realtime) ───────────────────────────
   const [globalChat, setGlobalChat] = useState<{ 
@@ -97,7 +105,7 @@ function DashboardContent({
     title: string;
     sellerName?: string;
     sellerCode?: string;
-    items?: any[];
+    items?: CrmItem[];
   } | null>(() => {
     // Restaurar estado do chat do localStorage ao iniciar
     const saved = localStorage.getItem("carflax_global_chat");
@@ -124,9 +132,9 @@ function DashboardContent({
       try {
         const { data } = await supabase.from("usuarios").select("id, name, avatar");
         if (data) {
-          const cache: any = {};
+          const cache: Record<string, { id: string; name: string; avatar: string | null }> = {};
           data.forEach(u => cache[u.id] = u);
-          (window as any)._carflaxUserCache = cache;
+          (window as unknown as { _carflaxUserCache: typeof cache })._carflaxUserCache = cache;
         }
       } catch (e) {
         console.error("[CRM] Falha ao carregar cache de usuários:", e);
@@ -172,7 +180,7 @@ function DashboardContent({
     
     channel
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' }, (payload) => {
-        const newMsg = payload.new as any;
+        const newMsg = payload.new as CrmConversa;
         if (newMsg.enviado_por === userProfile?.id) return;
 
         // USA O REF que é atualizado pelo initSession
@@ -194,13 +202,13 @@ function DashboardContent({
           // Notificação Nativa
           if ("Notification" in window && Notification.permission === "granted") {
             new Notification(title, {
-              body: newMsg.mensagem || newMsg.obs || "Nova mensagem recebida",
+              body: newMsg.obs || "Nova mensagem recebida",
               icon: "/favicon.png",
               tag: "carflax-chat-msg"
             });
           }
 
-          try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play().catch(()=>{}); } catch(e){}
+          try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play().catch(() => {}); } catch { /* silência */ }
         }
       })
       .subscribe((status) => {

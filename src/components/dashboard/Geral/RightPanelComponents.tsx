@@ -16,8 +16,7 @@ import {
   AlertCircle,
   Plane,
   Sun,
-  Star,
-  ThumbsUp
+  Star
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -306,7 +305,6 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
 }
 
 export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: boolean }) {
-  const [likes, setLikes] = useState<{name: string, avatar: string}[]>([]);
   const [employee, setEmployee] = useState<{ name: string; role: string; department: string; achievement: string; avatar: string } | null>(null);
   const [internalLoading, setInternalLoading] = useState(true);
 
@@ -413,19 +411,8 @@ export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: bo
       }
     }
 
-    async function fetchLikes() {
-      try {
-        const { data } = await supabase.from("usuarios").select("name, avatar").limit(5);
-        if (data) setLikes(data.filter(u => u.avatar || u.name));
-      } catch (err) { console.error(err); }
-    }
-
     fetchHighlight();
-    fetchLikes();
   }, []);
-
-  const getLikeAvatar = (avatar: string, name: string) => 
-    avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || 'user')}`;
 
   if (loading || !employee) {
     return (
@@ -448,19 +435,19 @@ export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: bo
 
 
   return (
-    <div className="flex-1 flex flex-col min-h-[380px] bg-card border border-border rounded-2xl shadow-sm overflow-hidden group transition-all duration-500 hover:shadow-xl hover:shadow-blue-900/5 hover:border-blue-200">
-      {/* Header Banner - Carflax Blue */}
-      <div className="h-28 bg-gradient-to-br from-blue-700 to-blue-600 relative overflow-hidden flex items-center justify-center shrink-0">
+    <div className="flex-1 flex flex-col min-h-[320px] bg-card border border-border rounded-2xl shadow-sm overflow-hidden group transition-all duration-500 hover:shadow-xl hover:shadow-blue-900/5 hover:border-blue-200">
+      {/* Header Banner - Carflax Blue - Reduced height */}
+      <div className="h-20 bg-gradient-to-br from-blue-700 to-blue-600 relative overflow-hidden flex items-center justify-center shrink-0">
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "linear-gradient(30deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(150deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(30deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(150deg, #000 12%, transparent 12.5%, transparent 87%, #000 87.5%, #000), linear-gradient(60deg, #999 25%, transparent 25.5%, transparent 75%, #999 75%, #999), linear-gradient(60deg, #999 25%, transparent 25.5%, transparent 75%, #999 75%, #999)", backgroundSize: "80px 140px" }} />
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16" />
         
 
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col items-center px-6 -mt-12 relative z-10 pb-6">
-        {/* Avatar Spotlight */}
-        <div className="relative mb-4 group-hover:scale-105 transition-transform duration-500">
+      {/* Main Content Area - Reduced negative margin */}
+      <div className="flex-1 flex flex-col items-center px-6 -mt-10 relative z-10 pb-6">
+        {/* Avatar Spotlight - Reduced bottom margin */}
+        <div className="relative mb-3 group-hover:scale-105 transition-transform duration-500">
           <div className="w-24 h-24 rounded-3xl bg-card p-1.5 shadow-xl shadow-blue-950/20 border border-border overflow-hidden">
             <div className="w-full h-full rounded-2xl overflow-hidden bg-secondary dark:bg-slate-800 border border-border">
               <img src={employee.avatar} className="w-full h-full object-cover" alt={employee.name} />
@@ -471,8 +458,8 @@ export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: bo
           </div>
         </div>
 
-        {/* Info Block */}
-        <div className="text-center w-full mb-6">
+        {/* Info Block - Reduced bottom margin */}
+        <div className="text-center w-full mb-4">
           <h4 className="text-lg font-black text-foreground uppercase tracking-tighter leading-tight mb-1">
             {employee.name}
           </h4>
@@ -483,8 +470,8 @@ export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: bo
           </div>
         </div>
 
-        {/* Achievement Quote - Fills space */}
-        <div className="flex-1 w-full bg-slate-50/50 dark:bg-secondary/30 backdrop-blur-md rounded-2xl p-4 border border-slate-100 dark:border-border flex flex-col relative overflow-hidden group/quote">
+        {/* Achievement Quote - Compact */}
+        <div className="w-full bg-slate-50/50 dark:bg-secondary/30 backdrop-blur-md rounded-2xl p-4 border border-slate-100 dark:border-border flex flex-col relative overflow-hidden group/quote">
           <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50/50 rounded-full blur-2xl -mr-8 -mt-8" />
           
           <div className="flex items-start gap-2 mb-2 relative z-10">
@@ -497,42 +484,7 @@ export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: bo
           </p>
         </div>
 
-        {/* Bottom Metadata & Social Proof */}
-        <div className="w-full pt-4 mt-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {likes.length > 0 ? (
-              <div className="flex -space-x-2">
-                {likes.slice(0, 4).map((like, i) => (
-                  <div key={i} className="w-6 h-6 rounded-full border-2 border-white overflow-hidden bg-slate-100 ring-1 ring-slate-100 transition-transform hover:scale-110 hover:z-10">
-                    <img 
-                      src={getLikeAvatar(like.avatar, like.name)} 
-                      className="w-full h-full object-cover" 
-                      alt={like.name} 
-                    />
-                  </div>
-                ))}
-                {likes.length > 4 && (
-                  <div className="w-6 h-6 rounded-full border-2 border-white bg-slate-50 flex items-center justify-center">
-                    <span className="text-[8px] font-black text-slate-400">+{likes.length - 4}</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex -space-x-2 opacity-20">
-                {[1,2,3].map(i => <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-slate-200" />)}
-              </div>
-            )}
-            <div className="flex flex-col">
-              <span className="text-[8px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">Reconhecimento</span>
-              <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">{employee.department}</span>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 rounded-xl shadow-lg shadow-blue-600/20 group-hover:scale-105 transition-all cursor-pointer active:scale-95">
-             <ThumbsUp className="w-3 h-3 text-white" />
-             <span className="text-[10px] font-black text-white">{likes.length + 18}</span>
-          </div>
-        </div>
       </div>
     </div>
   );
