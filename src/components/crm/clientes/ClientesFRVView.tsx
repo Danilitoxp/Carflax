@@ -12,7 +12,10 @@ import {
   X,
   ExternalLink,
   Calendar as CalendarIcon,
-  History
+  History,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RFMMatrix } from "./RFMMatrix";
@@ -97,6 +100,8 @@ const DATE_PRESETS = [
   { label: "Personalizado", value: "custom" },
 ];
 
+type SortKey = keyof ClienteFRV;
+
 export function ClientesFRVView() {
   const [activeView, setActiveView] = useState<"lista" | "analise">("lista");
   const [searchTerm, setSearchTerm] = useState("");
@@ -105,6 +110,12 @@ export function ClientesFRVView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedSegment, setSelectedSegment] = useState<{ label: string; clients: any[] } | null>(null);
   
+  // Ordenação
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
+    key: "valor_total",
+    direction: "desc"
+  });
+
   // Filtro de Data
   const [preset, setPreset] = useState("3m");
   const [showCalendar, setShowCalendar] = useState(false);
@@ -136,7 +147,7 @@ export function ClientesFRVView() {
         break;
       case "custom":
         setShowCalendar(true);
-        return; // Don't update range yet
+        return;
     }
 
     setDateRange({ start, end });
@@ -194,13 +205,34 @@ export function ClientesFRVView() {
     }) as ClienteFRV[];
   }, [clientesRaw]);
 
+  const sortedData = useMemo(() => {
+    const data = [...processedData];
+    data.sort((a, b) => {
+      const aVal = a[sortConfig.key];
+      const bVal = b[sortConfig.key];
+      
+      if (aVal === undefined || bVal === undefined) return 0;
+      
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortConfig.direction === "asc" 
+          ? aVal.localeCompare(bVal) 
+          : bVal.localeCompare(aVal);
+      }
+      
+      return sortConfig.direction === "asc" 
+        ? (aVal as number) - (bVal as number) 
+        : (bVal as number) - (aVal as number);
+    });
+    return data;
+  }, [processedData, sortConfig]);
+
   const filteredClientes = useMemo(() => {
-    return processedData.filter(c => {
+    return sortedData.filter(c => {
       const matchesSearch = c.nome_cliente.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            c.cliente_id.includes(searchTerm);
       return matchesSearch;
     });
-  }, [processedData, searchTerm]);
+  }, [sortedData, searchTerm]);
 
   const totalPages = Math.ceil(filteredClientes.length / ITEMS_PER_PAGE);
   const paginatedClientes = useMemo(() => {
@@ -223,6 +255,22 @@ export function ClientesFRVView() {
       fv_score: c.fv_score || 1
     }));
   }, [processedData]);
+
+  const requestSort = (key: SortKey) => {
+    let direction: "asc" | "desc" = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+    setCurrentPage(1);
+  };
+
+  const getSortIcon = (key: SortKey) => {
+    if (sortConfig.key !== key) return <ChevronsUpDown className="w-3 h-3 opacity-30" />;
+    return sortConfig.direction === "asc" 
+      ? <ChevronUp className="w-3 h-3 text-primary" /> 
+      : <ChevronDown className="w-3 h-3 text-primary" />;
+  };
 
   return (
     <div className="h-full flex flex-col bg-background p-6 gap-6 overflow-hidden relative">
@@ -271,7 +319,6 @@ export function ClientesFRVView() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* PRESET SELECT */}
           <TinyDropdown 
             icon={History}
             value={preset}
@@ -281,7 +328,6 @@ export function ClientesFRVView() {
             variant="blue"
           />
 
-          {/* CALENDARIO MANUAL */}
           <div className="relative">
             <button 
               onClick={() => setShowCalendar(!showCalendar)}
@@ -507,11 +553,46 @@ export function ClientesFRVView() {
               <table className="w-full text-left border-collapse min-w-[1000px]">
                 <thead className="sticky top-0 z-10 bg-secondary/80 backdrop-blur-md border-b border-border">
                   <tr>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Cliente</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Última Compra</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Recência (Dias)</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Frequência</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Valor Total</th>
+                    <th 
+                      onClick={() => requestSort("nome_cliente")}
+                      className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer hover:text-primary transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        Cliente {getSortIcon("nome_cliente")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => requestSort("ultima_compra")}
+                      className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center cursor-pointer hover:text-primary transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        Última Compra {getSortIcon("ultima_compra")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => requestSort("recencia_dias")}
+                      className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center cursor-pointer hover:text-primary transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        Recência (Dias) {getSortIcon("recencia_dias")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => requestSort("frequencia")}
+                      className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center cursor-pointer hover:text-primary transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        Frequência {getSortIcon("frequencia")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => requestSort("valor_total")}
+                      className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right cursor-pointer hover:text-primary transition-colors"
+                    >
+                      <div className="flex items-center justify-end gap-2">
+                        Valor Total {getSortIcon("valor_total")}
+                      </div>
+                    </th>
                     <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Score RFV</th>
                   </tr>
                 </thead>
