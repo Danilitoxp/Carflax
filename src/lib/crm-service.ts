@@ -64,6 +64,8 @@ export interface CrmStatus {
   fechamento_previsto?: string | null;
   entrega_prevista?: string | null;
   updated_at?: string;
+  itens_estoque?: string[] | null;
+  itens_preco?: string[] | null;
 }
 
 export interface CrmConversa {

@@ -363,7 +363,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           ].filter(Boolean).join("\n");
 
           // Preparar payload para o Supabase com as novas colunas
-          const crmStatusUpdate: any = {
+          const crmStatusUpdate: CrmStatus = {
             documento: selectedItem.id,
             empresa: selectedItem.empresa ?? "001",
             status_crm: newStatus.toUpperCase(),
@@ -631,7 +631,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
           <TinyDropdown value={filterStatus} options={["Todos os Status", "Em Aberto", "Emitido", "Enviado", "Negociação", "Lib. Crédito", "Aguard. Pedido", "Venda", "Perdido"]} onChange={setFilterStatus} icon={FileCheck} variant="blue" placeholder="Todos os Status" />
           
-          {(userProfile?.role === 'ADMIN' || userProfile?.role === 'GERENTE') && (
+          {isGerente(userProfile?.role) && (
             <TinyDropdown value={filterSeller} options={uniqueSellers} onChange={setFilterSeller} icon={UserIcon} variant="slate" placeholder="Todos os Vendedores" />
           )}
 
@@ -962,7 +962,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     ].map((btn, i) => (
                       <button
                         key={i}
-                        onClick={() => btn.next ? setStatusStep(btn.next as any) : handleUpdateStatus(btn.label.toUpperCase())}
+                        onClick={() => btn.next ? setStatusStep(btn.next as "enviado" | "negociacao" | "perdido") : handleUpdateStatus(btn.label.toUpperCase())}
                         className="flex items-center gap-3 py-3 px-4 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/80 transition-all text-left"
                       >
                         <div className={cn("w-2 h-2 rounded-full", btn.dot)} />
