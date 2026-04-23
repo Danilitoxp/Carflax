@@ -1,0 +1,4 @@
+project_id = "carflax-digital"
+
+[functions.automate-announcements]
+verify_jwt = false

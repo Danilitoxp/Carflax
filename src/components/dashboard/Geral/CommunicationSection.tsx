@@ -245,7 +245,7 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
         content: c.descricao || "",
         category: c.filtro || "Empresa",
         author: c.usuarios?.name || c.tag || "Carflax",
-        authorAvatar: c.usuarios?.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${c.tag || 'carflax'}`,
+        authorAvatar: c.usuarios?.avatar || (c.tag === "Carflax" ? "https://zwfvrmqffxcqurxpfewi.supabase.co/storage/v1/object/public/avatares/Carflax.jpg" : `https://api.dicebear.com/7.x/identicon/svg?seed=${c.tag || 'carflax'}`),
         date: new Date(c.created_at).toLocaleDateString("pt-BR"),
         image: (c.image_url || c.image || "").trim() || `https://api.dicebear.com/7.x/shapes/svg?seed=${c.id}`,
         likes: c.likes || 0,

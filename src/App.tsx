@@ -28,6 +28,7 @@ import { LoginView } from "@/components/auth/LoginView";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { OrgChartView } from "@/components/ui/OrgChartModal";
 import { SqlRunnerView } from "@/components/admin/SqlRunnerView";
+import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 import { type VendedorResumo } from "@/lib/api";
 
 export interface UserProfile {
@@ -139,6 +140,13 @@ function DashboardContent({
     
     preloadUsers();
   }, [userProfile?.id]);
+
+  // 1.1 Automação de Comunicados (Apenas para Admins)
+  useEffect(() => {
+    if (userProfile?.role?.toUpperCase() === "ADMIN") {
+      runAnnouncementAutomation();
+    }
+  }, [userProfile?.role]);
 
   // 0. Permissão para Notificações do Navegador
   useEffect(() => {

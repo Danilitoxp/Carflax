@@ -1,0 +1,155 @@
+import { supabase } from "./supabase";
+
+/**
+ * Announcement Automation Service (Birthdays, Work Anniversaries & Calendar Events)
+ */
+
+export async function runAnnouncementAutomation() {
+  console.log("Starting announcement automation check...");
+  
+  const results = {
+    birthdays: 0,
+    workAnniversaries: 0,
+    events: 0
+  };
+
+  try {
+    results.birthdays = await checkAndPostBirthdays();
+    results.workAnniversaries = await checkAndPostWorkAnniversaries();
+    results.events = await checkAndPostEvents();
+
+    console.log("Automation completed:", results);
+    return results;
+  } catch (error) {
+    console.error("Error in announcement automation:", error);
+    return results;
+  }
+}
+
+async function checkAndPostBirthdays() {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+
+  const { data: birthdayUsers } = await supabase
+    .from("usuarios")
+    .select("id, name, avatar, birth_date")
+    .filter("birth_date", "ilike", `%-${month}-${day}`);
+
+  if (!birthdayUsers || birthdayUsers.length === 0) return 0;
+
+  let postsCreated = 0;
+  for (const user of birthdayUsers) {
+    const postTitle = `FELIZ ANIVERSÁRIO, ${user.name.toUpperCase()}! 🎂`;
+    
+    const { data: existingPost } = await supabase
+      .from("comunicados")
+      .select("id")
+      .eq("titulo", postTitle)
+      .gte("created_at", `${today.getFullYear()}-${month}-${day}T00:00:00`)
+      .maybeSingle();
+
+    if (!existingPost) {
+      await supabase.from("comunicados").insert([{
+        titulo: postTitle,
+        descricao: `Hoje celebramos a vida da noss(o)a colega ${user.name}! A família Carflax se alegra em compartilhar esse momento especial ao seu lado, reconhecendo toda a dedicação, profissionalismo e energia que você contribui no dia a dia. Parabéns! 🎈✨`,
+        filtro: "Social",
+        image_url: user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`,
+        tag: "Sistema Carflax",
+        likes: 0,
+        liked_by: []
+      }]);
+      postsCreated++;
+    }
+  }
+  return postsCreated;
+}
+
+async function checkAndPostWorkAnniversaries() {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+
+  const { data: users } = await supabase
+    .from("usuarios")
+    .select("id, name, avatar, admission_date")
+    .filter("admission_date", "ilike", `%-${month}-${day}`);
+
+  if (!users || users.length === 0) return 0;
+
+  let postsCreated = 0;
+  for (const user of users) {
+    if (!user.admission_date) continue;
+    
+    const admissionYear = parseInt(user.admission_date.split('-')[0]);
+    const years = currentYear - admissionYear;
+    
+    if (years <= 0) continue; 
+
+    const postTitle = `PARABÉNS PELO ANIVERSÁRIO DE EMPRESA, ${user.name.toUpperCase()}! 🎖️`;
+    
+    const { data: existingPost } = await supabase
+      .from("comunicados")
+      .select("id")
+      .eq("titulo", postTitle)
+      .gte("created_at", `${currentYear}-${month}-${day}T00:00:00`)
+      .maybeSingle();
+
+    if (!existingPost) {
+      await supabase.from("comunicados").insert([{
+        titulo: postTitle,
+        descricao: `Hoje comemoramos os ${years} ${years === 1 ? 'ano' : 'anos'} de dedicação e história do(a) ${user.name} na Carflax! 🚀\n\nÉ um orgulho ter você em nosso time. Obrigado por toda a parceria, empenho e por fazer parte da nossa trajetória. Que venham muitos outros anos de sucesso juntos! 🥂✨`,
+        filtro: "Empresa",
+        image_url: user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`,
+        tag: "Sistema Carflax",
+        likes: 0,
+        liked_by: []
+      }]);
+      postsCreated++;
+    }
+  }
+  return postsCreated;
+}
+
+async function checkAndPostEvents() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
+  const day = today.getDate();
+
+  const { data: events } = await supabase
+    .from("eventos_calendario")
+    .select("*")
+    .eq("year", year)
+    .eq("month", month)
+    .eq("day", day);
+
+  if (!events || events.length === 0) return 0;
+
+  let postsCreated = 0;
+  for (const event of events) {
+    const postTitle = event.title.toUpperCase();
+
+    const { data: existingPost } = await supabase
+      .from("comunicados")
+      .select("id")
+      .eq("titulo", postTitle)
+      .gte("created_at", `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00`)
+      .maybeSingle();
+
+    if (!existingPost) {
+      await supabase.from("comunicados").insert([{
+        titulo: postTitle,
+        descricao: `Fiquem atentos! Hoje temos um evento importante em nossa agenda: ${event.title}. Não esqueçam de participar!`,
+        filtro: "Eventos",
+        image_url: `https://api.dicebear.com/7.x/shapes/svg?seed=${event.id}`,
+        tag: "Agenda Carflax",
+        likes: 0,
+        liked_by: []
+      }]);
+      postsCreated++;
+    }
+  }
+  return postsCreated;
+}
