@@ -255,7 +255,15 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             )}>
               {percentageVsEquilibrio.toFixed(0)}%
             </span>
-            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Equilíbrio</span>
+            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
+              {percentageVsEquilibrio.toFixed(0) === '100' 
+                ? "Equilíbrio" 
+                : (equilibrio - Number(total) > 0 
+                    ? `- ${formatBRL(equilibrio - Number(total))}` 
+                    : `+ ${formatBRL(Math.abs(equilibrio - Number(total)))}`
+                  )
+              }
+            </span>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Minus, Square, Loader2, Package, ShoppingBag } from "lucide-react";
+import { X, Send, Minus, Square, Loader2, Package, ShoppingBag, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getConversas, addConversa, type CrmConversa } from "@/lib/crm-service";
 import { supabase } from "@/lib/supabase";
@@ -38,6 +38,7 @@ export function ChatModal({
   itemsInitial
 }: ChatModalProps) {
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [messageText, setMessageText] = useState("");
   const [conversas, setConversas] = useState<CrmConversa[]>([]);
   const [loading, setLoading] = useState(false);
@@ -533,8 +534,9 @@ export function ChatModal({
   return (
     <div className="pointer-events-none">
       <div className={cn(
-          "w-[340px] bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 animate-in slide-in-from-bottom-4",
-          isMinimized ? "h-[56px]" : "h-[480px]"
+          "bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 animate-in slide-in-from-bottom-4",
+          isMaximized && !isMinimized ? "w-[600px]" : "w-[340px]",
+          isMinimized ? "h-[56px]" : (isMaximized ? "h-[70vh]" : "h-[480px]")
         )}>
         <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/30 rounded-t-2xl shrink-0 cursor-pointer"
           onClick={() => isMinimized && setIsMinimized(false)}>
@@ -579,9 +581,14 @@ export function ChatModal({
                 <Package className="w-3.5 h-3.5" />
               </button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground">
+            <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); if (isMaximized) setIsMaximized(false); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground" title={isMinimized ? "Restaurar" : "Minimizar"}>
               {isMinimized ? <Square className="w-3 h-3" /> : <Minus className="w-3.5 h-3.5" />}
             </button>
+            {!isMinimized && (
+              <button onClick={(e) => { e.stopPropagation(); setIsMaximized(!isMaximized); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground" title={isMaximized ? "Restaurar" : "Maximizar"}>
+                {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              </button>
+            )}
             <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="p-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors text-muted-foreground">
               <X className="w-3.5 h-3.5" />
             </button>

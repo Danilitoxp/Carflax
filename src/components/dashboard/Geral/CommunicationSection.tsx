@@ -1,4 +1,4 @@
-import { Plus, ThumbsUp, Edit2, Share2, Image as ImageIcon, Tag } from "lucide-react";
+import { Plus, ThumbsUp, Edit2, EyeOff, Image as ImageIcon, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -23,7 +23,32 @@ export interface CommunicationPost {
   likedBy: string[];
 }
 
-export function CommunicationCard({ data, onEdit, userProfile }: { data: CommunicationPost; onEdit: (d: CommunicationPost) => void, userProfile?: any }) {
+interface DbComunicado {
+  id: number;
+  titulo: string;
+  descricao: string | null;
+  filtro: string | null;
+  tag: string | null;
+  image_url: string | null;
+  image: string | null;
+  created_at: string;
+  likes: number | null;
+  liked_by: string[] | null;
+  usuarios: {
+    name: string;
+    avatar: string | null;
+  } | null;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  role: string;
+  permissions?: string[];
+  avatar?: string;
+}
+
+export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data: CommunicationPost; onEdit: (d: CommunicationPost) => void, onHide: (id: string | number) => void, userProfile?: UserProfile }) {
   const currentUserId = userProfile?.id;
   const canManage = userProfile?.permissions?.includes("Gerenciar Comunicados") || userProfile?.role === "admin";
   const isLiked = currentUserId ? data.likedBy.includes(currentUserId) : false;
@@ -34,11 +59,13 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
 
   const userAvatar = userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}`;
 
-  // Sincronizar estado local se os dados externos mudarem
-  useEffect(() => {
+  // Sincronizar estado local se os dados externos mudarem (Padrão recomendado para evitar useEffect desnecessário)
+  const [lastDataId, setLastDataId] = useState(data.id);
+  if (data.id !== lastDataId) {
     setLikes(data.likes);
     setInteraction(currentUserId && data.likedBy.includes(currentUserId) ? "like" : null);
-  }, [data.likes, data.likedBy, currentUserId]);
+    setLastDataId(data.id);
+  }
 
   useEffect(() => {
     const fetchAvatars = async () => {
@@ -126,10 +153,10 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
     }
   };
 
-  const handleShare = () => {
-    const text = `*${data.title}*\n\n${data.content}\n\n_Enviado via Carflax Digital_`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(whatsappUrl, '_blank');
+  const handleHide = () => {
+    if (confirm("Deseja ocultar este comunicado? Você não o verá novamente nesta sessão.")) {
+      onHide(data.dbId);
+    }
   };
 
   return (
@@ -162,8 +189,8 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
              <span className="text-xs text-slate-500 dark:text-slate-500 font-bold">{data.date}</span>
           </div>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-            <button onClick={handleShare} className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all" title="Compartilhar">
-              <Share2 className="w-4 h-4" />
+            <button onClick={handleHide} className="p-2 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-secondary rounded-xl transition-all" title="Ocultar Comunicado">
+              <EyeOff className="w-4 h-4" />
             </button>
             {canManage && (
               <button onClick={() => onEdit(data)} className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all" title="Editar">
@@ -211,7 +238,7 @@ export function CommunicationCard({ data, onEdit, userProfile }: { data: Communi
   );
 }
 
-export function CommunicationSection({ userProfile, loading: externalLoading }: { userProfile?: any, loading?: boolean }) {
+export function CommunicationSection({ userProfile, loading: externalLoading }: { userProfile?: UserProfile, loading?: boolean }) {
   const { showNotification } = useNotification();
   const [activeCategory, setActiveCategory] = useState("Todos");
   const [comms, setComms] = useState<CommunicationPost[]>([]);
@@ -222,6 +249,21 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | string | null>(null);
+  const [hiddenPosts, setHiddenPosts] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("carflax_hidden_comms");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleHidePost = (id: string | number) => {
+    const idStr = String(id);
+    const newHidden = [...hiddenPosts, idStr];
+    setHiddenPosts(newHidden);
+    localStorage.setItem("carflax_hidden_comms", JSON.stringify(newHidden));
+  };
 
   const fetchComunicados = useCallback(async (silent = false) => {
     if (!silent) setInternalLoading(true);
@@ -238,7 +280,7 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setComms(data.map((c: any) => ({
+      setComms((data as unknown as DbComunicado[]).map((c) => ({
         id: String(c.id),
         dbId: String(c.id),
         title: c.titulo,
@@ -337,7 +379,8 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
     setNewPost(p => ({ ...p, image: URL.createObjectURL(file), _imageFile: file }));
   };
 
-  const filtered = activeCategory === "Todos" ? comms : comms.filter(c => c.category === activeCategory);
+  const filtered = (activeCategory === "Todos" ? comms : comms.filter(c => c.category === activeCategory))
+    .filter(c => !hiddenPosts.includes(String(c.dbId)));
 
   return (
     <div className="flex flex-col relative">
@@ -458,7 +501,7 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
         ))}
         {!loading && filtered.length === 0 && <p className="text-center text-slate-400 text-sm py-8 font-bold text-slate-300">NADA POR ENQUANTO.</p>}
         {!loading && filtered.map((item) => (
-          <CommunicationCard key={item.id} data={item} onEdit={handleEdit} userProfile={userProfile} />
+          <CommunicationCard key={item.id} data={item} onEdit={handleEdit} onHide={handleHidePost} userProfile={userProfile} />
         ))}
       </div>
     </div>
