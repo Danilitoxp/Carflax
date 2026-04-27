@@ -41,7 +41,7 @@ interface DbComunicado {
 }
 
 export interface UserProfile {
-  id: string;
+  id?: string;
   name: string;
   role: string;
   permissions?: string[];

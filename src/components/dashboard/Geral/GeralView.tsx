@@ -1,11 +1,5 @@
 import { HeroBanner } from "./HeroBanner";
-import { CommunicationSection } from "./CommunicationSection";
-
-interface UserProfile {
-  name: string;
-  role: string;
-  avatar?: string;
-}
+import { CommunicationSection, type UserProfile } from "./CommunicationSection";
 
 export function GeralView({ userProfile, loading }: { userProfile?: UserProfile, loading?: boolean }) {
   return (
