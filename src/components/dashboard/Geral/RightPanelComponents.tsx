@@ -1,3 +1,4 @@
+// Dashboard Right Panel Components
 import {
   Gift,
   Target,
