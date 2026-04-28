@@ -365,6 +365,7 @@ function DashboardContent({
         isMobileOpen={isMobileMenuOpen}
         onMobileClose={() => setIsMobileMenuOpen(false)}
         onLogout={onLogout}
+        loading={geralLoading}
       />
 
       {isMobileMenuOpen && (

@@ -228,15 +228,19 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
           )}
         </div>
         <div className="relative">
-          <button 
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className={cn(
-              "p-1.5 rounded-lg transition-all hover:bg-secondary",
-              isDropdownOpen && "bg-secondary"
-            )}
-          >
-            <MoreHorizontal className="w-4 h-4 text-slate-400" />
-          </button>
+          {(userProfile?.role?.toUpperCase().includes("DIRETOR") || 
+            userProfile?.role?.toUpperCase().includes("GERENTE DE VENDAS") || 
+            userProfile?.role?.toUpperCase() === "ADMIN") && (
+            <button 
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className={cn(
+                "p-1.5 rounded-lg transition-all hover:bg-secondary",
+                isDropdownOpen && "bg-secondary"
+              )}
+            >
+              <MoreHorizontal className="w-4 h-4 text-slate-400" />
+            </button>
+          )}
 
           {isDropdownOpen && (
             <>

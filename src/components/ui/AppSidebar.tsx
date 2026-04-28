@@ -127,9 +127,10 @@ interface AppSidebarProps {
   activeItem: string;
   onActiveItemChange: (item: string) => void;
   onLogout: () => void;
+  loading?: boolean;
 }
 
-export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout }: AppSidebarProps) {
+export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout, loading }: AppSidebarProps) {
   const { theme, setTheme } = useTheme();
   const [openMenus, setOpenMenus] = useState<string[]>(["Dashboard"]);
 
@@ -189,27 +190,40 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
         >
           {!isCollapsed && (
             <div className="flex items-center gap-3 overflow-hidden flex-1 px-1">
-              <div className="w-10 h-10 rounded-lg border border-border flex items-center justify-center bg-secondary/50 shrink-0">
-                <img
-                  src={userAvatar}
-                  alt="Profile"
-                  className="w-full h-full rounded-lg object-cover"
-                />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className={cn(
-                  "text-[10px] font-black truncate uppercase",
-                  theme === "dark" ? "text-white" : "text-black"
-                )}>
-                  {userProfile?.name || "Carregando..."}
-                </span>
-                <span className={cn(
-                  "text-[9px] font-medium uppercase tracking-widest leading-none mt-1",
-                  theme === "dark" ? "text-slate-400" : "text-slate-500"
-                )}>
-                  {userProfile?.role || "Membro"}
-                </span>
-              </div>
+              {(!userProfile || loading) ? (
+                // Profile Skeleton
+                <>
+                  <div className="w-10 h-10 rounded-lg bg-secondary animate-pulse shrink-0" />
+                  <div className="flex flex-col gap-2 flex-1">
+                    <div className="h-2 w-20 bg-secondary animate-pulse rounded" />
+                    <div className="h-1.5 w-12 bg-secondary animate-pulse rounded" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-10 h-10 rounded-lg border border-border flex items-center justify-center bg-secondary/50 shrink-0">
+                    <img
+                      src={userAvatar}
+                      alt="Profile"
+                      className="w-full h-full rounded-lg object-cover"
+                    />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className={cn(
+                      "text-[10px] font-black truncate uppercase",
+                      theme === "dark" ? "text-white" : "text-black"
+                    )}>
+                      {userProfile?.name}
+                    </span>
+                    <span className={cn(
+                      "text-[9px] font-medium uppercase tracking-widest leading-none mt-1",
+                      theme === "dark" ? "text-slate-400" : "text-slate-500"
+                    )}>
+                      {userProfile?.role || "Membro"}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -233,104 +247,114 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
       <div className="flex-1 overflow-y-auto pt-4 px-3 space-y-6 scrollbar-hide">
         <div>
           <div className="space-y-1">
-            {menuItems
-              .filter(item => {
-                if (item.isDropdown && item.subItems) {
-                  return item.subItems.some(sub => isAllowed(sub.label));
-                }
-                return isAllowed(item.label);
-              })
-              .map((item, idx) => {
-                const filteredSubItems = item.subItems?.filter(sub => isAllowed(sub.label));
-                
-                const isOpen = openMenus.includes(item.label);
-                const isActive = activeItem === item.label || filteredSubItems?.some(s => s.label === activeItem);
+            {(!userProfile || loading) ? (
+              // Navigation Skeletons
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg">
+                  <div className={cn("w-4.5 h-4.5 rounded bg-secondary animate-pulse shrink-0", isCollapsed && "mx-auto")} />
+                  {!isCollapsed && <div className="h-2 w-24 bg-secondary animate-pulse rounded" />}
+                </div>
+              ))
+            ) : (
+              menuItems
+                .filter(item => {
+                  if (item.isDropdown && item.subItems) {
+                    return item.subItems.some(sub => isAllowed(sub.label));
+                  }
+                  return isAllowed(item.label);
+                })
+                .map((item, idx) => {
+                  const filteredSubItems = item.subItems?.filter(sub => isAllowed(sub.label));
+                  
+                  const isOpen = openMenus.includes(item.label);
+                  const isActive = activeItem === item.label || filteredSubItems?.some(s => s.label === activeItem);
 
-              return (
-                <div key={idx} className="space-y-1">
-                  <div
-                    onClick={() => {
-                      if (item.isDropdown) {
-                        toggleMenu(item.label);
-                      } else {
-                        onActiveItemChange(item.label);
-                        if (onMobileClose) onMobileClose();
-                      }
-                    }}
-                    className={cn(
-                      "flex items-center transition-all duration-200 group cursor-pointer relative py-2 rounded-lg",
-                      isActive && !item.isDropdown
-                        ? "bg-primary/5 text-primary dark:bg-primary/10"
-                        : "hover:bg-secondary/80 dark:hover:bg-slate-800/50 text-muted-foreground hover:text-foreground dark:hover:text-slate-200",
-                      isCollapsed ? "justify-center h-11 px-0" : "gap-3 px-3",
-                    )}
-                  >
-                    <item.icon
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div
+                      onClick={() => {
+                        if (item.isDropdown) {
+                          toggleMenu(item.label);
+                        } else {
+                          onActiveItemChange(item.label);
+                          if (onMobileClose) onMobileClose();
+                        }
+                      }}
                       className={cn(
-                        "w-4.5 h-4.5 shrink-0 transition-colors",
-                        isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                        "flex items-center transition-all duration-200 group cursor-pointer relative py-2 rounded-lg",
+                        isActive && !item.isDropdown
+                          ? "bg-primary/5 text-primary dark:bg-primary/10"
+                          : "hover:bg-secondary/80 dark:hover:bg-slate-800/50 text-muted-foreground hover:text-foreground dark:hover:text-slate-200",
+                        isCollapsed ? "justify-center h-11 px-0" : "gap-3 px-3",
                       )}
-                      strokeWidth={isActive ? 2 : 1.5}
-                    />
-                    {!isCollapsed && (
-                      <div className="flex items-center flex-1 duration-200 overflow-hidden">
-                        <span className={cn(
-                          "text-xs font-bold flex-1 tracking-tight truncate",
+                    >
+                      <item.icon
+                        className={cn(
+                          "w-4.5 h-4.5 shrink-0 transition-colors",
                           isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                        )}>
-                          {item.label}
-                        </span>
-                        {item.isDropdown && (
-                          <ChevronDown
-                            className={cn(
-                              "w-3.5 h-3.5 opacity-40 transition-transform duration-300",
-                              isOpen ? "rotate-180" : "rotate-0",
-                            )}
-                            strokeWidth={2}
-                          />
                         )}
-                      </div>
-                    )}
-                  </div>
+                        strokeWidth={isActive ? 2 : 1.5}
+                      />
+                      {!isCollapsed && (
+                        <div className="flex items-center flex-1 duration-200 overflow-hidden">
+                          <span className={cn(
+                            "text-xs font-bold flex-1 tracking-tight truncate",
+                            isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                          )}>
+                            {item.label}
+                          </span>
+                          {item.isDropdown && (
+                            <ChevronDown
+                              className={cn(
+                                "w-3.5 h-3.5 opacity-40 transition-transform duration-300",
+                                isOpen ? "rotate-180" : "rotate-0",
+                              )}
+                              strokeWidth={2}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Dropdown items - Subtler */}
-                  <div
-                    className={cn(
-                      "grid transition-all duration-300 ease-in-out",
-                      isOpen && !isCollapsed
-                        ? "grid-rows-[1fr] opacity-100"
-                        : "grid-rows-[0fr] opacity-0 overflow-hidden",
-                    )}
-                  >
-                    <div className="overflow-hidden">
-                      <div className="pl-4 space-y-0.5 mt-1">
-                        {filteredSubItems?.map((sub, i) => (
-                          <div
-                            key={i}
-                            onClick={() => {
-                              onActiveItemChange(sub.label);
-                              if (onMobileClose) onMobileClose();
-                            }}
-                            className={cn(
-                              "text-[11px] font-bold py-2 px-3 rounded-md cursor-pointer transition-all flex items-center gap-3",
-                              activeItem === sub.label
-                                ? "bg-primary/5 text-primary dark:bg-primary/10"
-                                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-slate-800/50 dark:hover:text-slate-200",
-                            )}
-                          >
-                            <div className={cn(
-                              "w-1 h-1 rounded-full",
-                              activeItem === sub.label ? "bg-primary" : "bg-muted-foreground/30"
-                            )} />
-                            <span>{sub.label}</span>
-                          </div>
-                        ))}
+                    {/* Dropdown items - Subtler */}
+                    <div
+                      className={cn(
+                        "grid transition-all duration-300 ease-in-out",
+                        isOpen && !isCollapsed
+                          ? "grid-rows-[1fr] opacity-100"
+                          : "grid-rows-[0fr] opacity-0 overflow-hidden",
+                      )}
+                    >
+                      <div className="overflow-hidden">
+                        <div className="pl-4 space-y-0.5 mt-1">
+                          {filteredSubItems?.map((sub, i) => (
+                            <div
+                              key={i}
+                              onClick={() => {
+                                onActiveItemChange(sub.label);
+                                if (onMobileClose) onMobileClose();
+                              }}
+                              className={cn(
+                                "text-[11px] font-bold py-2 px-3 rounded-md cursor-pointer transition-all flex items-center gap-3",
+                                activeItem === sub.label
+                                  ? "bg-primary/5 text-primary dark:bg-primary/10"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-slate-800/50 dark:hover:text-slate-200",
+                              )}
+                            >
+                              <div className={cn(
+                                "w-1 h-1 rounded-full",
+                                activeItem === sub.label ? "bg-primary" : "bg-muted-foreground/30"
+                              )} />
+                              <span>{sub.label}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
