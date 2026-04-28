@@ -240,9 +240,32 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [startDate, setStartDate] = useState<Date | null>(new Date(2026, 3, 1));
   const [endDate, setEndDate] = useState<Date | null>(new Date(2026, 3, 30));
 
+  const cacheKey = useMemo(() => {
+    if (!startDate || !endDate) return null;
+    return `crm_orcamentos_${startDate.getTime()}_${endDate.getTime()}_${userProfile?.id || 'anon'}`;
+  }, [startDate, endDate, userProfile?.id]);
+
+  // 1. Carregar cache inicial (Instantâneo)
+  useEffect(() => {
+    if (!cacheKey) return;
+    const saved = sessionStorage.getItem(cacheKey);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setOrçamentosData(parsed);
+          // Se temos cache, podemos pular o skeleton inicial
+          // mas o fetchData ainda rodará em background para atualizar
+        }
+      } catch {
+        sessionStorage.removeItem(cacheKey);
+      }
+    }
+  }, [cacheKey]);
+
   // ── Fetch data ───────────────────────────────────────────────────────────
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const toLocalDateStr = (d: Date) =>
         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -295,14 +318,23 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       });
 
       setOrçamentosData(merged);
+      
+      // Salvar no Cache
+      if (cacheKey && merged.length > 0) {
+        sessionStorage.setItem(cacheKey, JSON.stringify(merged));
+      }
     } catch (e) {
       console.error("CRM fetch:", e);
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate, userProfile]);
+  }, [startDate, endDate, userProfile, cacheKey]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { 
+    // Se já temos dados carregados via cache (useEffect acima), fazemos o fetch "silencioso"
+    const hasCache = cacheKey ? !!sessionStorage.getItem(cacheKey) : false;
+    fetchData(hasCache); 
+  }, [fetchData, cacheKey]);
 
   // ── Status update ────────────────────────────────────────────────────────
 
