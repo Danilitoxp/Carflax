@@ -444,8 +444,8 @@ export function ChatModal({
       if (tableRows.length > 0) {
         result.push(
           <div key={`table-${result.length}`} className="my-3 rounded-xl border border-border/50 overflow-hidden bg-background/50 shadow-inner">
-            <table className="w-full text-left text-[10px]">
-              <thead className="bg-secondary/60 text-muted-foreground uppercase tracking-widest font-black">
+            <table className={cn("w-full text-left transition-all", isMaximized ? "text-[11px]" : "text-[10px]")}>
+              <thead className={cn("bg-secondary/60 text-muted-foreground uppercase tracking-widest font-black", isMaximized ? "text-[9px]" : "text-[8px]")}>
                 <tr>
                   {tableRows[0].map((h, i) => <th key={i} className={cn("px-2 py-1.5 border-b border-border/50", i > 0 && "text-center")}>{h}</th>)}
                 </tr>
@@ -540,8 +540,8 @@ export function ChatModal({
     <div className="pointer-events-none">
       <div className={cn(
           "bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 animate-in slide-in-from-bottom-4",
-          isMaximized && !isMinimized ? "w-[600px]" : "w-[340px]",
-          isMinimized ? "h-[56px]" : (isMaximized ? "h-[70vh]" : "h-[480px]")
+          isMaximized && !isMinimized ? "w-[900px]" : "w-[340px]",
+          isMinimized ? "h-[56px]" : (isMaximized ? "h-[85vh]" : "h-[480px]")
         )}>
         <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/30 rounded-t-2xl shrink-0 cursor-pointer"
           onClick={() => isMinimized && setIsMinimized(false)}>
@@ -677,7 +677,11 @@ export function ChatModal({
                       })()}
                     </span>
                   )}
-                  <div className={cn("p-3.5 rounded-2xl max-w-full text-[11px] font-medium shadow-xl", isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40")}>
+                  <div className={cn(
+                    "rounded-2xl max-w-full shadow-xl leading-relaxed transition-all", 
+                    isMaximized ? "p-4 text-[14px] font-bold" : "p-3.5 text-[11px] font-medium",
+                    isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40"
+                  )}>
                     {renderFormattedText(msg.obs)}
                   </div>
                   <div className={cn("flex items-center gap-2", isMe(msg) ? "mr-1" : "ml-1")}>
@@ -690,7 +694,10 @@ export function ChatModal({
             </div>
             <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="p-4 border-t border-border bg-secondary/10">
               <div className="relative flex items-center gap-2">
-                <input type="text" value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Adicionar observação..." className="w-full bg-secondary/50 border border-border rounded-xl pl-4 pr-10 py-3 text-[11px] font-bold outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/30 uppercase" />
+                <input type="text" value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Adicionar observação..." className={cn(
+                  "w-full bg-secondary/50 border border-border rounded-xl pl-4 pr-10 outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/30 uppercase font-bold",
+                  isMaximized ? "py-4 text-[13px]" : "py-3 text-[11px]"
+                )} />
                 <button type="submit" disabled={sending || !messageText.trim()} className="absolute right-2 p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all active:scale-90 disabled:opacity-40">
                   {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 </button>
