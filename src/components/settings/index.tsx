@@ -766,6 +766,7 @@ function OrcamentosTab() {
 /* ─────────────────────────────────────────────
    COMPONENTE PRINCIPAL (TINY REDESIGN)
 ───────────────────────────────────────────── */
+
 export function SettingsSection({ externalTab, userProfile }: SettingsSectionProps) {
   const [activeTab, setActiveTab] = useState("profile");
 
