@@ -360,7 +360,7 @@ export function ChatModal({
   };
 
   const handleSend = async () => {
-    const text = messageText.trim();
+    const text = messageText.trim().toUpperCase();
     if (!text || sending) return;
     setSending(true);
 
@@ -678,7 +678,7 @@ export function ChatModal({
                     </span>
                   )}
                   <div className={cn(
-                    "rounded-2xl max-w-full shadow-xl leading-relaxed transition-all", 
+                    "rounded-2xl max-w-full shadow-xl leading-relaxed transition-all uppercase", 
                     isMaximized ? "p-4 text-[14px] font-bold" : "p-3.5 text-[11px] font-medium",
                     isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40"
                   )}>
