@@ -104,7 +104,18 @@ function DashboardContent({
     sellerCode?: string;
     items?: CrmItem[];
   }
-  const [activeChats, setActiveChats] = useState<ActiveChat[]>([]);
+  const [activeChats, setActiveChats] = useState<ActiveChat[]>(() => {
+    try {
+      const saved = localStorage.getItem("carflax-active-chats");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("carflax-active-chats", JSON.stringify(activeChats));
+  }, [activeChats]);
   
   // Reset de estado durante o render ao trocar de usuário (Recomendado pelo React 18+)
   const [prevUserId, setPrevUserId] = useState(userProfile?.id);
@@ -449,12 +460,15 @@ function DashboardContent({
         />
 
         {/* Chat Multijanelas */}
-        <div className="fixed bottom-0 right-0 z-[9999] flex flex-row-reverse gap-4 p-4 pointer-events-none">
+        <div className="fixed bottom-0 right-0 z-[9999] flex flex-row-reverse items-end gap-4 p-4 pointer-events-none">
           {activeChats.map((chat) => (
             <div key={chat.doc || chat.id} className="pointer-events-auto">
               <ChatModal
                 isOpen={true}
-                onClose={() => setActiveChats(prev => prev.filter(c => c.doc !== chat.doc))}
+                onClose={async () => {
+                  // Marcar como lida antes de remover da lista (opcional, já que o modal fará isso internamente se disparado via onClose)
+                  setActiveChats(prev => prev.filter(c => c.doc !== chat.doc));
+                }}
                 documento={chat.doc}
                 empresa="001"
                 title={chat.title}

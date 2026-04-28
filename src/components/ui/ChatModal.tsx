@@ -154,13 +154,7 @@ export function ChatModal({
       setConversas(data);
       setLoading(false);
 
-      // Marcar como lidas
-      const unreadForMe = data.filter(m => !m.lida && (m.destino === userProfile?.id || (amICentralizer && m.destino === "todos")));
-      if (unreadForMe.length > 0) {
-        const ids = unreadForMe.map(m => m.id).filter(Boolean);
-        await supabase.from("crm_conversas").update({ lida: true }).in("id", ids);
-        setConversas(prev => prev.map(m => ids.includes(m.id) ? { ...m, lida: true } : m));
-      }
+      // Marcação automática removida (solicitado pelo usuário)
     });
 
     // Realtime para este documento (Filtragem manual estabilizada)
@@ -180,9 +174,7 @@ export function ChatModal({
             return [...prev, newMsg];
           });
           
-          if (newMsg.destino === userProfile?.id || (amICentralizer && newMsg.destino === "todos")) {
-            supabase.from("crm_conversas").update({ lida: true }).eq("id", newMsg.id).then();
-          }
+          // Marcação automática em realtime removida (solicitado pelo usuário)
         })
       .subscribe();
 
@@ -266,7 +258,7 @@ export function ChatModal({
         }
       }
     }
-  }, [conversas, userProfile?.id, userProfile?.name, amICentralizer, sellerName, isOpen]);
+  }, [conversas, userProfile?.id, userProfile?.name, amICentralizer, sellerName, isOpen, budgetOwner, ownerProfile]);
 
 
   // Scroll automático
@@ -360,7 +352,7 @@ export function ChatModal({
   };
 
   const handleSend = async () => {
-    const text = messageText.trim().toUpperCase();
+    const text = messageText.trim();
     if (!text || sending) return;
     setSending(true);
 
@@ -536,6 +528,23 @@ export function ChatModal({
     </div>
   );
 
+  const handleClose = async () => {
+    // Marcar como lida apenas ao fechar explicitamente
+    const unreadIds = conversas
+      .filter(m => !m.lida && (m.destino === userProfile?.id || (amICentralizer && m.destino === "todos")))
+      .map(m => m.id)
+      .filter(Boolean);
+
+    if (unreadIds.length > 0) {
+      try {
+        await supabase.from("crm_conversas").update({ lida: true }).in("id", unreadIds);
+      } catch (err) {
+        console.error("[Chat] Falha ao marcar como lidas no fechamento:", err);
+      }
+    }
+    onClose();
+  };
+
   return (
     <div className="pointer-events-none">
       <div className={cn(
@@ -594,7 +603,7 @@ export function ChatModal({
                 {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               </button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="p-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors text-muted-foreground">
+            <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="p-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors text-muted-foreground">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -678,7 +687,7 @@ export function ChatModal({
                     </span>
                   )}
                   <div className={cn(
-                    "rounded-2xl max-w-full shadow-xl leading-relaxed transition-all uppercase", 
+                    "rounded-2xl max-w-full shadow-xl leading-relaxed transition-all", 
                     isMaximized ? "p-4 text-[14px] font-bold" : "p-3.5 text-[11px] font-medium",
                     isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40"
                   )}>
@@ -695,7 +704,7 @@ export function ChatModal({
             <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="p-4 border-t border-border bg-secondary/10">
               <div className="relative flex items-center gap-2">
                 <input type="text" value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Adicionar observação..." className={cn(
-                  "w-full bg-secondary/50 border border-border rounded-xl pl-4 pr-10 outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/30 uppercase font-bold",
+                  "w-full bg-secondary/50 border border-border rounded-xl pl-4 pr-10 outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/30 font-bold",
                   isMaximized ? "py-4 text-[13px]" : "py-3 text-[11px]"
                 )} />
                 <button type="submit" disabled={sending || !messageText.trim()} className="absolute right-2 p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all active:scale-90 disabled:opacity-40">

@@ -444,9 +444,9 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     "Falta de Estoque",
     "Desistiu",
     "Prazo de Entrega",
-    "Tomada de Preço",
     "Mão de Obra e Material",
     "Comparativo de Linhas",
+    "Tomada de Preço",
   ];
 
   const filteredAndSortedItems = useMemo(() => {
@@ -522,18 +522,20 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       .filter((o) => !["VENDA", "PERDIDO"].includes(o.status))
       .reduce((s, o) => s + o.totalValue, 0);
 
-    // Base de cálculo para conversão (exclui motivos que não são considerados "perda real")
+    // Regra de Conversão: Excluir motivos consultivos (não penaliza o vendedor)
     const filteredForConv = filteredAndSortedItems.filter(o => {
       const reason = (o.lossReason || "").toUpperCase();
       return !reason.includes("TOMADA DE PREÇO") && 
-             !reason.includes("TOMADA DE PRECO") && 
-             !reason.includes("COMPARATIVO DE LINHAS") && 
-             !reason.includes("MÃO DE OBRA E MATERIAL") && 
+             !reason.includes("TOMADA DE PRECO") &&
+             !reason.includes("COMPARATIVO DE LINHAS") &&
+             !reason.includes("MÃO DE OBRA E MATERIAL") &&
              !reason.includes("MAO DE OBRA E MATERIAL");
     });
-    
-    const totalForConv = filteredForConv.length;
-    const convQtd = totalForConv > 0 ? ((vendas / totalForConv) * 100).toFixed(1) : "0.0";
+
+    const vFiltered = filteredForConv.filter(o => o.status === "VENDA").length;
+    const pFiltered = filteredForConv.filter(o => o.status === "PERDIDO").length;
+    const divisor = vFiltered + pFiltered;
+    const convQtd = divisor > 0 ? ((vFiltered / divisor) * 100).toFixed(1) : "0.0";
 
     const reasonCounts = filteredAndSortedItems
       .filter((o) => o.status === "PERDIDO" && o.lossReason)
@@ -1075,7 +1077,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Selecione o Motivo *</label>
                       <TinyDropdown 
                         value={statusMotivoPerdido} 
-                        options={["Preço Alto", "Falta de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas"]} 
+                        options={["Preço Alto", "Falta de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas", "Tomada de Preço"]} 
                         onChange={(val) => setStatusMotivoPerdido(val)} 
                         icon={Tag} 
                         variant="slate" 
