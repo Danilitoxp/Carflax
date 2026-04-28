@@ -243,7 +243,9 @@ export function VacationModal({
                 type="button"
                 onClick={() => {
                   if (confirm("Tem certeza que deseja excluir este lançamento de férias?")) {
-                    onDelete(editingVacation.id);
+                    if (editingVacation.id !== undefined) {
+                      onDelete(editingVacation.id);
+                    }
                     onClose();
                   }
                 }}
