@@ -45,12 +45,19 @@ async function checkAndPostBirthdays() {
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
 
-  const { data: birthdayUsers } = await supabase
+  const { data: allUsers } = await supabase
     .from("usuarios")
-    .select("id, name, avatar, birth_date")
-    .filter("birth_date", "ilike", `%-${month}-${day}`);
+    .select("id, name, avatar, birth_date");
 
-  if (!birthdayUsers || birthdayUsers.length === 0) return 0;
+  if (!allUsers || allUsers.length === 0) return 0;
+
+  const birthdayUsers = allUsers.filter(user => {
+    if (!user.birth_date) return false;
+    // birth_date is usually YYYY-MM-DD
+    return user.birth_date.includes(`-${month}-${day}`);
+  });
+
+  if (birthdayUsers.length === 0) return 0;
 
   let postsCreated = 0;
   for (const user of birthdayUsers) {
@@ -85,12 +92,18 @@ async function checkAndPostWorkAnniversaries() {
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
 
-  const { data: users } = await supabase
+  const { data: allUsers } = await supabase
     .from("usuarios")
-    .select("id, name, avatar, admission_date")
-    .filter("admission_date", "ilike", `%-${month}-${day}`);
+    .select("id, name, avatar, admission_date");
 
-  if (!users || users.length === 0) return 0;
+  if (!allUsers || allUsers.length === 0) return 0;
+
+  const users = allUsers.filter(user => {
+    if (!user.admission_date) return false;
+    return user.admission_date.includes(`-${month}-${day}`);
+  });
+
+  if (users.length === 0) return 0;
 
   let postsCreated = 0;
   for (const user of users) {

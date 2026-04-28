@@ -253,7 +253,7 @@ function getStrength(pw: string): number {
    MEU PERFIL - REDESIGN ESTRUTURADO
    Foco em cards, hierarquia e organização
 ───────────────────────────────────────────── */
-function ProfileTab() {
+function ProfileTab({ userProfile }: { userProfile?: any }) {
   const [form, setForm] = useState({
     nome: "",
     email: "",
@@ -261,6 +261,18 @@ function ProfileTab() {
     cargo: "",
   });
   const [isSaved, setIsSaved] = useState(false);
+
+  // Preenche o formulário quando os dados do perfil chegam
+  useEffect(() => {
+    if (userProfile) {
+      setForm({
+        nome: userProfile.name || "",
+        email: userProfile.email || "",
+        telefone: userProfile.phone || userProfile.whatsapp || "",
+        cargo: userProfile.role || "",
+      });
+    }
+  }, [userProfile]);
 
   function handleSave() {
     setIsSaved(true);
@@ -276,7 +288,7 @@ function ProfileTab() {
           <div className="relative group shrink-0">
             <div className="w-28 h-28 rounded-2xl border-2 border-slate-100 dark:border-white/10 shadow-sm overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center transition-all group-hover:shadow-md">
               <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Danilo&backgroundColor=0053FC"
+                src={userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}&backgroundColor=0053FC`}
                 className="w-full h-full object-cover transition-transform group-hover:scale-105"
                 alt="Avatar"
               />
@@ -290,7 +302,7 @@ function ProfileTab() {
           <div className="flex-1 text-center md:text-left space-y-3">
             <div className="space-y-1">
               <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-none uppercase">
-                {form.nome}
+                {form.nome || "Usuário Carflax"}
               </h3>
               <div className="flex flex-wrap gap-2 justify-center md:justify-start items-center">
                 <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2.5 py-1 rounded-md uppercase tracking-wider">
@@ -780,7 +792,7 @@ export function SettingsSection({ externalTab, userProfile }: SettingsSectionPro
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto px-6 md:px-10 py-10 scrollbar-hide">
         <div className="max-w-[1200px] mx-auto">
-          {activeTab === "profile" && <ProfileTab />}
+          {activeTab === "profile" && <ProfileTab userProfile={userProfile} />}
           {activeTab === "orcamentos" && <OrcamentosTab />}
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "security" && <SecurityTab />}
