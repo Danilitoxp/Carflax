@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { X, Send, Minus, Square, Loader2, Package, ShoppingBag, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getConversas, addConversa, type CrmConversa } from "@/lib/crm-service";
@@ -160,7 +160,7 @@ export function ChatModal({
     // Realtime para este documento (Filtragem manual estabilizada)
     const cleanDoc = documento.replace("#", "").trim();
     const channel = supabase
-      .channel(`chat_room_${cleanDoc}`) // Nome estável
+      .channel(`chat_room_${cleanDoc}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' }, 
         (payload) => {
           const newMsg = payload.new as CrmConversa;
@@ -169,12 +169,12 @@ export function ChatModal({
           if (msgDoc !== cleanDoc) return;
 
           setConversas((prev) => {
-            const exists = prev.some(m => m.id === newMsg.id || (m.timestamp === newMsg.timestamp && m.obs === newMsg.obs));
+            // Otimização: verifica apenas as últimas 5 mensagens para duplicatas (rápido)
+            const recent = prev.slice(-5);
+            const exists = recent.some(m => m.id === newMsg.id || (m.timestamp === newMsg.timestamp && m.obs === newMsg.obs));
             if (exists) return prev;
             return [...prev, newMsg];
           });
-          
-          // Marcação automática em realtime removida (solicitado pelo usuário)
         })
       .subscribe();
 
@@ -275,42 +275,45 @@ export function ChatModal({
     }
   }, [conversas, isMinimized, loading, headerLoading]);
 
-  if (!isOpen) return null;
-
-  // Lógica de exibição no Header: Prioridade TOTAL ao humano (Remetente da última mensagem -> Dono do Orçamento -> Centralizador)
-  const displayUser = (() => {
+  // 3. Lógica de exibição no Header: Memoizada para performance
+  const displayUser = useMemo(() => {
     if (conversas && conversas.length > 0) {
-      const otherMessage = [...conversas].reverse().find(m => 
-        m.enviado_por && 
-        m.enviado_por !== userProfile?.id && 
-        m.enviado_por_nome?.toUpperCase() !== "SISTEMA"
-      );
+      let otherMessage = null;
+      for (let i = conversas.length - 1; i >= 0; i--) {
+        const m = conversas[i];
+        if (m.enviado_por && m.enviado_por !== userProfile?.id && m.enviado_por_nome?.toUpperCase() !== "SISTEMA") {
+          otherMessage = m;
+          break;
+        }
+      }
 
       if (otherMessage && otherMessage.enviado_por_nome) {
         return {
           name: otherMessage.enviado_por_nome,
-          // Se tiver a foto atachada na mensagem usa, senão usa as que baixou no useEffect
           avatar: (otherMessage as CrmConversa & { enviado_por_foto?: string }).enviado_por_foto || ownerProfile?.avatar || centralizer?.avatar || ""
         };
       }
     }
 
     if (amICentralizer) {
+      const name = (ownerProfile?.name && ownerProfile.name.toUpperCase() !== "SISTEMA" && ownerProfile.name.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? ownerProfile.name : null) || 
+                   (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? sellerName : null) || 
+                   (title.toUpperCase().includes(userProfile?.name?.toUpperCase() || "---") ? `Orçamento #${documento.replace("#", "")}` : title);
       return { 
-        name: (ownerProfile?.name && ownerProfile.name.toUpperCase() !== "SISTEMA" && ownerProfile.name.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? ownerProfile.name : null) || 
-              (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? sellerName : null) || 
-              (title.toUpperCase().includes(userProfile?.name?.toUpperCase() || "---") ? `Orçamento #${documento.replace("#", "")}` : title), 
+        name,
         avatar: ownerProfile?.avatar || "" 
       };
-    } else {
-      return { 
-        name: (centralizer?.name) || 
-              (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? sellerName : null) || 
-              "Centralizador Carflax", 
-        avatar: centralizer?.avatar || "" 
-      };
     }
-  })();
+
+    return { 
+      name: (centralizer?.name) || 
+            (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? sellerName : null) || 
+            "Centralizador Carflax", 
+      avatar: centralizer?.avatar || "" 
+    };
+  }, [conversas, userProfile?.id, userProfile?.name, ownerProfile, centralizer, amICentralizer, sellerName, title, documento]);
+
+  if (!isOpen) return null;
 
   const handleToggleItems = async () => {
     if (showItems) {

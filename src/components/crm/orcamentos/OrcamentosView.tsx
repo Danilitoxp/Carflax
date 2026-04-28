@@ -314,7 +314,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           ...o,
           status: crmStatus === "PERDIDO" ? o.status : crmStatus,
           lossReason: o.lossReason ?? crm.motivo_perda ?? undefined,
-          lembreteData: crm.lembrete_data ?? undefined,
+          lembreteData: crm.lembrete_data ?? crm.fechamento_previsto ?? undefined,
         };
       });
 
@@ -345,17 +345,32 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const handleUpdateStatus = async (newStatus: string, extra?: Partial<CrmStatus>) => {
     if (!selectedItem) return;
     
-    // 1. Salvar Status
-    await upsertCrmStatus({
+    // 1. Preparar Payload Completo
+    const payload: CrmStatus = {
       documento: selectedItem.id,
       empresa: selectedItem.empresa ?? "001",
-      status_crm: newStatus,
-      motivo_perda: extra?.motivo_perda ?? null,
+      status_crm: newStatus.toUpperCase(),
+      vendedor: selectedItem.seller,
+      vendedor_codigo: selectedItem.sellerCode,
+      motivo_perda: extra?.motivo_perda?.toUpperCase() ?? null,
+      lembrete_data: extra?.lembrete_data ?? null,
       endereco_obra: extra?.endereco_obra ?? null,
       fechamento_previsto: extra?.fechamento_previsto ?? null,
       entrega_prevista: extra?.entrega_prevista ?? null,
-      vendedor: selectedItem.seller,
-    });
+      updated_at: new Date().toISOString()
+    };
+
+    // Tratamento específico para itens perdidos
+    if (newStatus.toUpperCase() === "PERDIDO") {
+      if (extra?.motivo_perda?.toUpperCase().includes("ESTOQUE")) {
+        payload.itens_estoque = lostItemsIds;
+      } else if (extra?.motivo_perda?.toUpperCase().includes("PREÇO")) {
+        payload.itens_preco = lostItemsIds;
+      }
+    }
+
+    // 2. Salvar no Supabase
+    await upsertCrmStatus(payload);
 
     // 2. Notificação Automática para o Centralizador
     const triggerStatuses = ["ENVIADO", "NEGOCIAÇÃO", "LIB. CRÉDITO", "AGUARD. PEDIDO", "PERDIDO"];
@@ -399,31 +414,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
             footer
           ].filter(Boolean).join("\n");
 
-          // Preparar payload para o Supabase com as novas colunas
-          const crmStatusUpdate: CrmStatus = {
-            documento: selectedItem.id,
-            empresa: selectedItem.empresa ?? "001",
-            status_crm: newStatus.toUpperCase(),
-            vendedor: selectedItem.seller,
-            updated_at: new Date().toISOString()
-          };
-
-          if (newStatus.toUpperCase() === "PERDIDO") {
-            crmStatusUpdate.motivo_perda = extra?.motivo_perda?.toUpperCase();
-            if (extra?.motivo_perda?.toUpperCase().includes("ESTOQUE")) {
-              crmStatusUpdate.itens_estoque = lostItemsIds;
-            } else if (extra?.motivo_perda?.toUpperCase().includes("PREÇO")) {
-              crmStatusUpdate.itens_preco = lostItemsIds;
-            }
-          }
-
-          const { error: statusError } = await supabase
-            .from("crm_status")
-            .upsert(crmStatusUpdate, { onConflict: 'documento,empresa' });
-
-          if (statusError) {
-            console.error("Erro ao salvar status:", statusError);
-          }
+          // Notificação já salva o status no histórico de conversas abaixo
 
           await addConversa({
             documento: selectedItem.id,
@@ -442,7 +433,12 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     setOrçamentosData((prev) =>
       prev.map((item) =>
         item.id === selectedItem.id
-          ? { ...item, status: newStatus.toUpperCase(), lossReason: extra?.motivo_perda ?? item.lossReason }
+          ? { 
+              ...item, 
+              status: newStatus.toUpperCase(), 
+              lossReason: extra?.motivo_perda ?? item.lossReason,
+              lembreteData: extra?.lembrete_data ?? extra?.fechamento_previsto ?? item.lembreteData
+            }
           : item
       )
     );
@@ -858,6 +854,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       }}
                       onOpenStatus={(o) => {
                         setSelectedItem(o);
+                        // Pré-popular campos do modal
+                        setStatusData(o.lembreteData || "");
+                        setStatusFechamento(o.lembreteData || "");
+                        setStatusMotivoPerdido(o.lossReason || "");
                         setIsStatusModalOpen(true);
                         setStatusStep("selection");
                       }}
