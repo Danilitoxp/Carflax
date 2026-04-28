@@ -1,0 +1,283 @@
+export function IaIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      viewBox="0 0 800 800" 
+      className={className}
+      width="100%" 
+      height="100%"
+    >
+      <defs>
+        {/* Core Glow Filters */}
+        <filter id="heavy-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="15" result="blur1" />
+          <feGaussianBlur stdDeviation="30" result="blur2" />
+          <feMerge>
+            <feMergeNode in="blur2" />
+            <feMergeNode in="blur1" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+
+        <filter id="soft-glow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="8" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="15" stdDeviation="15" floodColor="#051024" floodOpacity="0.3" />
+        </filter>
+
+        {/* White Shell Gradients */}
+        <radialGradient id="head-base-grad" cx="50%" cy="30%" r="70%" fx="50%" fy="20%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="60%" stopColor="#E8F1F9" />
+          <stop offset="90%" stopColor="#C2D3E6" />
+          <stop offset="100%" stopColor="#9EADC2" />
+        </radialGradient>
+
+        {/* Black Screen Gradients */}
+        <radialGradient id="screen-grad" cx="50%" cy="40%" r="60%">
+          <stop offset="0%" stopColor="#14213D" />
+          <stop offset="50%" stopColor="#0A1121" />
+          <stop offset="100%" stopColor="#000000" />
+        </radialGradient>
+
+        {/* Blue Accent Gradients */}
+        <linearGradient id="blue-accent-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#00C3FF" />
+          <stop offset="40%" stopColor="#0077FF" />
+          <stop offset="100%" stopColor="#003DAB" />
+        </linearGradient>
+
+        <linearGradient id="blue-ear-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00E5FF" />
+          <stop offset="50%" stopColor="#0077FF" />
+          <stop offset="100%" stopColor="#002277" />
+        </linearGradient>
+
+        <linearGradient id="blue-ear-grad-rev" x1="100%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#00E5FF" />
+          <stop offset="50%" stopColor="#0077FF" />
+          <stop offset="100%" stopColor="#002277" />
+        </linearGradient>
+
+        {/* Eye & Antenna Gradients */}
+        <radialGradient id="eye-core-grad" cx="50%" cy="50%" r="50%" fx="40%" fy="40%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="30%" stopColor="#80FFFF" />
+          <stop offset="80%" stopColor="#00D4FF" />
+          <stop offset="100%" stopColor="#0066FF" />
+        </radialGradient>
+
+        <radialGradient id="antenna-glow" cx="50%" cy="40%" r="60%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="25%" stopColor="#00FFFF" />
+          <stop offset="70%" stopColor="#0077FF" />
+          <stop offset="100%" stopColor="#0044AA" />
+        </radialGradient>
+
+        {/* Screen Gloss Gradients */}
+        <linearGradient id="gloss-top" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.6" />
+          <stop offset="40%" stopColor="#FFFFFF" stopOpacity="0.1" />
+          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
+
+        <linearGradient id="gloss-bottom" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor="#00A2FF" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="#00A2FF" stopOpacity="0" />
+        </linearGradient>
+
+        {/* Textures */}
+        <pattern id="dot-grid" width="6" height="6" patternUnits="userSpaceOnUse">
+          <circle cx="3" cy="3" r="1.5" fill="#FFFFFF" opacity="0.15" />
+        </pattern>
+        <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
+          <rect width="4" height="1.5" fill="#FFFFFF" opacity="0.02" />
+        </pattern>
+
+        <style>{`
+          /* Float Animation */
+          @keyframes float {
+            0%, 100% { transform: translateY(20px); }
+            50% { transform: translateY(5px); }
+          }
+
+          /* Mood Cycle: Antenna Stem Morph */
+          @keyframes mood-stem {
+            0%, 20%, 80%, 100% { d: path("M 390 240 C 390 150, 470 120, 520 150 C 490 180, 440 200, 410 245 Z"); }
+            40%, 60% { d: path("M 390 240 C 390 120, 520 130, 495 240 C 455 200, 420 200, 410 245 Z"); }
+          }
+
+          /* Mood Cycle: Antenna Tip Translate & Rotate */
+          @keyframes mood-tip {
+            0%, 20%, 80%, 100% { transform: translate(510px, 140px) rotate(-20deg); }
+            40%, 60% { transform: translate(495px, 240px) rotate(45deg); }
+          }
+
+          /* Mood Cycle: Mouth Morph */
+          @keyframes mood-mouth {
+            0%, 20%, 80%, 100% { d: path("M 360 570 Q 400 605 440 570"); }
+            40%, 60% { d: path("M 370 595 Q 400 575 430 595"); }
+          }
+
+          /* Mood Cycle: Mouth Highlight Morph */
+          @keyframes mood-mouth-hl {
+            0%, 20%, 80%, 100% { d: path("M 380 582 Q 400 595 420 582"); }
+            40%, 60% { d: path("M 390 583 Q 400 578 410 583"); }
+          }
+
+          /* Mood Cycle: Eyes */
+          @keyframes mood-eye-left {
+            0%, 20%, 80%, 100% { transform: translate(0, 0) scaleY(1) rotate(0deg); }
+            40%, 60% { transform: translate(0, 15px) scaleY(0.72) rotate(16deg); }
+          }
+          @keyframes mood-eye-right {
+            0%, 20%, 80%, 100% { transform: translate(0, 0) scaleY(1) rotate(0deg); }
+            40%, 60% { transform: translate(0, 15px) scaleY(0.72) rotate(-16deg); }
+          }
+
+          /* Blinking Animation */
+          @keyframes blink {
+            0%, 46%, 50%, 100% { transform: scaleY(1); }
+            48% { transform: scaleY(0.1); }
+          }
+
+          /* Class Assignments */
+          .robot-body { animation: float 4s infinite ease-in-out; }
+          .anim-stem { animation: mood-stem 8s infinite ease-in-out; }
+          .anim-tip { animation: mood-tip 8s infinite ease-in-out; }
+          .anim-mouth { animation: mood-mouth 8s infinite ease-in-out; }
+          .anim-mouth-hl { animation: mood-mouth-hl 8s infinite ease-in-out; }
+          
+          .anim-eye-left { 
+            transform-origin: 290px 480px; 
+            animation: mood-eye-left 8s infinite ease-in-out; 
+          }
+          .anim-eye-right { 
+            transform-origin: 510px 480px; 
+            animation: mood-eye-right 8s infinite ease-in-out; 
+          }
+
+          .anim-blink-left {
+            transform-origin: 290px 480px;
+            animation: blink 5s infinite;
+          }
+          .anim-blink-right {
+            transform-origin: 510px 480px;
+            animation: blink 5s infinite;
+          }
+        `}</style>
+      </defs>
+
+      {/* ROOT GROUP (Handles the continuous floating effect) */}
+      <g className="robot-body">
+        
+        {/* LAYER 1: ANIMATED ANTENNA */}
+        <g id="antenna">
+          <path d="M 370 230 Q 400 215 430 230 L 420 260 Q 400 270 380 260 Z" fill="#002255" />
+          <path className="anim-stem" d="M 390 240 C 390 150, 470 120, 520 150 C 490 180, 440 200, 410 245 Z" fill="url(#blue-accent-grad)" />
+          <g className="anim-tip" style={{ transformBox: 'fill-box' }}>
+            <ellipse cx="0" cy="0" rx="35" ry="25" fill="#00FFFF" opacity="0.6" filter="url(#heavy-glow)" />
+            <ellipse cx="0" cy="0" rx="25" ry="18" fill="url(#antenna-glow)" />
+            <path d="M -15 -10 C -5 -20, 5 -15, 10 -5 C 0 -5, -10 -2, -15 -10 Z" fill="#FFFFFF" opacity="0.8" />
+          </g>
+        </g>
+
+        {/* LAYER 2: EARS (SIDE PANELS) */}
+        <g id="ears">
+          <path d="M 120 400 C 60 400, 50 430, 50 500 C 50 570, 60 600, 120 600 Z" fill="#9EADC2" />
+          <path d="M 125 405 C 70 405, 60 430, 60 500 C 60 570, 70 595, 125 595 Z" fill="#FFFFFF" />
+          <path d="M 130 425 C 90 425, 80 445, 80 500 C 80 555, 90 575, 130 575 Z" fill="url(#blue-ear-grad)" />
+          <path d="M 130 435 C 100 435, 95 450, 95 500 C 95 550, 100 565, 130 565 Z" fill="none" stroke="#FFFFFF" strokeWidth="3" opacity="0.4" />
+          <path d="M 100 450 C 90 470, 90 530, 100 550" fill="none" stroke="#FFFFFF" strokeWidth="6" strokeLinecap="round" opacity="0.6" filter="url(#soft-glow)"/>
+
+          <path d="M 680 400 C 740 400, 750 430, 750 500 C 750 570, 740 600, 680 600 Z" fill="#9EADC2" />
+          <path d="M 675 405 C 730 405, 740 430, 740 500 C 740 570, 730 595, 675 595 Z" fill="#FFFFFF" />
+          <path d="M 670 425 C 710 425, 720 445, 720 500 C 720 555, 710 575, 670 575 Z" fill="url(#blue-ear-grad-rev)" />
+          <path d="M 670 435 C 700 435, 705 450, 705 500 C 705 550, 700 565, 670 565 Z" fill="none" stroke="#FFFFFF" strokeWidth="3" opacity="0.4" />
+          <path d="M 700 450 C 710 470, 710 530, 700 550" fill="none" stroke="#FFFFFF" strokeWidth="6" strokeLinecap="round" opacity="0.6" filter="url(#soft-glow)"/>
+        </g>
+
+        {/* LAYER 3: MAIN WHITE BODY SHELL */}
+        <g id="main-body" filter="url(#shadow)">
+          <path d="M 400 240 C 600 240, 700 350, 700 500 C 700 660, 580 720, 400 720 C 220 720, 100 660, 100 500 C 100 350, 200 240, 400 240 Z" fill="url(#head-base-grad)" />
+          <path d="M 140 580 C 250 720, 550 720, 660 580 C 600 750, 200 750, 140 580 Z" fill="#6B83A6" opacity="0.3" filter="url(#soft-glow)" />
+        </g>
+
+        {/* LAYER 4: SHELL PANELS & TOP CAP */}
+        <g id="shell-panels">
+          <path d="M 280 260 C 220 300, 150 400, 120 480" fill="none" stroke="#9EADC2" strokeWidth="4" strokeLinecap="round" />
+          <path d="M 282 262 C 222 302, 152 402, 122 482" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
+          <path d="M 520 260 C 580 300, 650 400, 680 480" fill="none" stroke="#9EADC2" strokeWidth="4" strokeLinecap="round" />
+          <path d="M 518 262 C 578 302, 648 402, 678 482" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
+          <path d="M 170 650 C 230 680, 280 690, 330 695" fill="none" stroke="#9EADC2" strokeWidth="3" strokeLinecap="round" />
+          <path d="M 170 652 C 230 682, 280 692, 330 697" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
+          <path d="M 630 650 C 570 680, 520 690, 470 695" fill="none" stroke="#9EADC2" strokeWidth="3" strokeLinecap="round" />
+          <path d="M 630 652 C 570 682, 520 692, 470 697" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
+        </g>
+
+        <g id="top-blue-cap">
+          <path d="M 270 268 C 320 230, 480 230, 530 268 C 500 290, 460 300, 400 300 C 340 300, 300 290, 270 268 Z" fill="url(#blue-accent-grad)" filter="url(#shadow)" />
+          <path d="M 290 260 C 340 238, 460 238, 510 260 C 470 270, 330 270, 290 260 Z" fill="#FFFFFF" opacity="0.4" />
+          <path d="M 270 268 C 300 290, 340 300, 400 300 C 460 300, 500 290, 530 268" fill="none" stroke="#6B83A6" strokeWidth="3" />
+        </g>
+
+        {/* LAYER 5: FACE SCREEN BACKGROUND */}
+        <g id="face-screen">
+          <path d="M 148 490 C 148 370, 248 315, 400 315 C 552 315, 652 370, 652 490 C 652 610, 542 662, 400 662 C 258 662, 148 610, 148 490 Z" fill="#0A1428" />
+          <path d="M 155 490 C 155 380, 255 325, 400 325 C 545 325, 645 380, 645 490 C 645 600, 535 650, 400 650 C 265 650, 155 600, 155 490 Z" fill="url(#screen-grad)" />
+          <path d="M 155 490 C 155 380, 255 325, 400 325 C 545 325, 645 380, 645 490 C 645 600, 535 650, 400 650 C 265 650, 155 600, 155 490 Z" fill="url(#scanlines)" />
+        </g>
+
+        {/* LAYER 6: ANIMATED EYES & MOUTH */}
+        <g id="face-features">
+          <g className="anim-eye-left">
+            <g className="anim-blink-left">
+              <ellipse cx="290" cy="480" rx="60" ry="80" fill="#00D4FF" opacity="0.4" filter="url(#heavy-glow)" />
+              <ellipse cx="290" cy="480" rx="35" ry="55" fill="#00E5FF" filter="url(#soft-glow)"/>
+              <ellipse cx="290" cy="480" rx="35" ry="55" fill="url(#dot-grid)" />
+              <ellipse cx="290" cy="480" rx="20" ry="38" fill="url(#eye-core-grad)" />
+              <ellipse cx="290" cy="445" rx="10" ry="6" fill="#FFFFFF" opacity="0.8" />
+            </g>
+          </g>
+
+          <g className="anim-eye-right">
+            <g className="anim-blink-right">
+              <ellipse cx="510" cy="480" rx="60" ry="80" fill="#00D4FF" opacity="0.4" filter="url(#heavy-glow)" />
+              <ellipse cx="510" cy="480" rx="35" ry="55" fill="#00E5FF" filter="url(#soft-glow)"/>
+              <ellipse cx="510" cy="480" rx="35" ry="55" fill="url(#dot-grid)" />
+              <ellipse cx="510" cy="480" rx="20" ry="38" fill="url(#eye-core-grad)" />
+              <ellipse cx="510" cy="445" rx="10" ry="6" fill="#FFFFFF" opacity="0.8" />
+            </g>
+          </g>
+
+          <g id="smile">
+            <path className="anim-mouth" d="M 360 570 Q 400 605 440 570" fill="none" stroke="#00E5FF" strokeWidth="14" strokeLinecap="round" opacity="0.5" filter="url(#heavy-glow)" />
+            <path className="anim-mouth" d="M 360 570 Q 400 605 440 570" fill="none" stroke="#00FFFF" strokeWidth="8" strokeLinecap="round" filter="url(#soft-glow)"/>
+            <path className="anim-mouth-hl" d="M 380 582 Q 400 595 420 582" fill="none" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" opacity="0.9" />
+          </g>
+        </g>
+
+        {/* LAYER 7: SCREEN GLASS & BEZELS */}
+        <g id="screen-reflections">
+          <path d="M 165 480 C 185 360, 275 330, 400 330 C 525 330, 615 360, 635 480 C 570 420, 480 400, 400 400 C 320 400, 230 420, 165 480 Z" fill="url(#gloss-top)" />
+          <path d="M 180 450 C 230 355, 330 335, 400 335 C 470 335, 570 355, 620 450 C 560 370, 480 345, 400 345 C 320 345, 240 370, 180 450 Z" fill="#FFFFFF" opacity="0.7" />
+          <path d="M 230 630 C 310 650, 490 650, 570 630 C 530 610, 450 600, 400 600 C 350 600, 270 610, 230 630 Z" fill="url(#gloss-bottom)" />
+          <path d="M 610 520 C 620 540, 620 560, 600 580 C 625 550, 625 530, 610 520 Z" fill="#FFFFFF" opacity="0.15" />
+        </g>
+
+        <g id="screen-bezel">
+          <path d="M 155 490 C 155 380, 255 325, 400 325 C 545 325, 645 380, 645 490" fill="none" stroke="#FFFFFF" strokeWidth="6" strokeLinecap="round" opacity="0.8" />
+          <path d="M 155 490 C 155 600, 265 650, 400 650 C 535 650, 645 600, 645 490" fill="none" stroke="#8A9EB5" strokeWidth="4" strokeLinecap="round" opacity="0.5" />
+          <path d="M 160 500 C 170 600, 270 645, 400 645 C 530 645, 630 600, 640 500" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+        </g>
+
+      </g>
+    </svg>
+  );
+}

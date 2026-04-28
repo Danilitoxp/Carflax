@@ -220,7 +220,6 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
       {/* 1. HEADER (Limpado) */}
       <div className="flex items-center justify-between relative">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           {selectedCod !== "TOTAL" && (
             <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-tighter truncate max-w-[150px]">
               {data?.NOME_VENDEDOR}
@@ -606,7 +605,6 @@ export function WeatherTrafficCard() {
       <div className="pt-3 border-t border-border flex flex-col gap-2 relative z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
             <span className="text-[10px] font-bold text-foreground uppercase">Trânsito Fluindo</span>
           </div>
           <span className="text-[9px] font-medium text-muted-foreground">Normal</span>

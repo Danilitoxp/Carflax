@@ -3,7 +3,9 @@ import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react";
 import { apiVendedores, type VendedorResumo } from "@/lib/api";
 
-export function StatCards({ userProfile, loading: externalLoading }: { userProfile?: any, loading?: boolean }) {
+import { type UserProfile } from "@/App";
+
+export function StatCards({ userProfile, loading: externalLoading }: { userProfile?: UserProfile | null, loading?: boolean }) {
   const [internalLoading, setInternalLoading] = useState(true);
   const [data, setData] = useState<VendedorResumo | null>(null);
 
