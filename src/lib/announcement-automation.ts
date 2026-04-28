@@ -1,4 +1,6 @@
 import { supabase } from "./supabase";
+import { apiDashboardGeral } from "./api";
+
 
 /**
  * Announcement Automation Service (Birthdays, Work Anniversaries & Calendar Events)
@@ -10,13 +12,15 @@ export async function runAnnouncementAutomation() {
   const results = {
     birthdays: 0,
     workAnniversaries: 0,
-    events: 0
+    events: 0,
+    goals: 0
   };
 
   try {
     results.birthdays = await checkAndPostBirthdays();
     results.workAnniversaries = await checkAndPostWorkAnniversaries();
     results.events = await checkAndPostEvents();
+    results.goals = await checkAndPostGoalAchievements();
 
     console.log("Automation completed:", results);
     return results;
@@ -152,4 +156,59 @@ async function checkAndPostEvents() {
     }
   }
   return postsCreated;
+}
+
+async function checkAndPostGoalAchievements() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const dataStr = `${year}-${month}-${day}`;
+  const mesAno = `${month}/${year}`;
+
+  try {
+    const metrics = await apiDashboardGeral(undefined, dataStr);
+    if (!metrics || metrics.length === 0) return 0;
+
+    let postsCreated = 0;
+    const winners = metrics.filter(m => {
+      const total = Number(m.TOTAL || 0);
+      const meta = Number(m.META || 0);
+      return meta > 0 && total >= meta;
+    });
+
+    for (const winner of winners) {
+      const sellerName = winner.NOME_VENDEDOR.toUpperCase();
+      const postTitle = `META BATIDA: ${sellerName} - ${mesAno} 🏆`;
+
+      const { data: existingPost } = await supabase
+        .from("comunicados")
+        .select("id")
+        .eq("titulo", postTitle)
+        .maybeSingle();
+
+      if (!existingPost) {
+        const { data: userData } = await supabase
+          .from("usuarios")
+          .select("avatar")
+          .ilike("name", `%${winner.NOME_VENDEDOR.split(' ')[0]}%`)
+          .maybeSingle();
+
+        await supabase.from("comunicados").insert([{
+          titulo: postTitle,
+          descricao: `É com imenso orgulho que anunciamos: ${winner.NOME_VENDEDOR} ACABA DE BATER A META DE ${mesAno}! 🚀✨\n\nParabéns por todo o empenho, resiliência e foco nos resultados. Você é um exemplo de excelência para toda a equipe Carflax. Que essa conquista seja apenas o começo de um mês extraordinário! Vamos pra cima! 🥂👊`,
+          filtro: "Empresa",
+          image_url: userData?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${winner.NOME_VENDEDOR}`,
+          tag: "Conquista Carflax",
+          likes: 0,
+          liked_by: []
+        }]);
+        postsCreated++;
+      }
+    }
+    return postsCreated;
+  } catch (error) {
+    console.error("Error in goal automation:", error);
+    return 0;
+  }
 }

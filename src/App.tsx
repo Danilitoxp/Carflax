@@ -64,14 +64,9 @@ function DashboardContent({
   const [geralLoading, setGeralLoading] = useState(true);
 
   useEffect(() => {
-    if (activeItem === "Geral") {
-      // Usar setTimeout para evitar renderização em cascata síncrona
-      const startTimer = setTimeout(() => setGeralLoading(true), 0);
-      const endTimer = setTimeout(() => setGeralLoading(false), 500);
-      return () => {
-        clearTimeout(startTimer);
-        clearTimeout(endTimer);
-      };
+    if (activeItem === "Geral" && geralLoading) {
+      const timer = setTimeout(() => setGeralLoading(false), 500);
+      return () => clearTimeout(timer);
     }
 
     const role = userProfile?.role?.toUpperCase();
