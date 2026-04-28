@@ -37,6 +37,9 @@ interface UserProfileLite {
 export function SalesMetricsCard({ isCompact, userProfile, data: externalData, loading: externalLoading }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo, loading?: boolean }) {
   const [internalLoading, setInternalLoading] = useState(!externalData);
   const [data, setData] = useState<VendedorResumo | null>(externalData || null);
+  const [allVendedores, setAllVendedores] = useState<VendedorResumo[]>([]);
+  const [selectedCod, setSelectedCod] = useState<string>("TOTAL");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const loading = externalLoading !== undefined ? externalLoading : internalLoading;
 
@@ -64,8 +67,10 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
         const response = await apiDashboardGeral(isManager ? undefined : codVendedor, dataStr);
 
         if (response && response.length > 0) {
-          if (isManager && response.length > 1) {
-            // Agrega os dados de todos os vendedores
+          if (isManager) {
+            setAllVendedores(response);
+            
+            // Agrega os dados de todos os vendedores para o estado inicial "TOTAL"
             const aggregated: VendedorResumo = {
               COD_VENDEDOR: "TOTAL",
               NOME_VENDEDOR: "TOTAL GERAL",
@@ -213,11 +218,95 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
       isCompact ? "p-4" : "p-5"
     )}>
       {/* 1. HEADER (Limpado) */}
-      <div className="flex items-center justify-between">
-        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-        <button className="p-1 hover:bg-slate-50 rounded transition-colors">
-          <MoreHorizontal className="w-3.5 h-3.5 text-slate-400" />
-        </button>
+      <div className="flex items-center justify-between relative">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          {selectedCod !== "TOTAL" && (
+            <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-tighter truncate max-w-[150px]">
+              {data?.NOME_VENDEDOR}
+            </span>
+          )}
+        </div>
+        <div className="relative">
+          <button 
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className={cn(
+              "p-1.5 rounded-lg transition-all hover:bg-secondary",
+              isDropdownOpen && "bg-secondary"
+            )}
+          >
+            <MoreHorizontal className="w-4 h-4 text-slate-400" />
+          </button>
+
+          {isDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+              <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="px-3 py-2 border-b border-border mb-1">
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Selecionar Vendedor</span>
+                </div>
+                <div className="max-h-64 overflow-y-auto scrollbar-hide">
+                  <button
+                    onClick={() => {
+                      setSelectedCod("TOTAL");
+                      // Re-agregando (ou podemos salvar o aggregated num ref/state)
+                      const response = allVendedores;
+                      const aggregated: VendedorResumo = {
+                        COD_VENDEDOR: "TOTAL",
+                        NOME_VENDEDOR: "TOTAL GERAL",
+                        META: response.reduce((acc, r) => acc + Number(r.META || 0), 0),
+                        FATURADO: response.reduce((acc, r) => acc + Number(r.FATURADO || 0), 0),
+                        EM_ABERTO: response.reduce((acc, r) => acc + Number(r.EM_ABERTO || 0), 0),
+                        TOTAL: response.reduce((acc, r) => acc + Number(r.TOTAL || 0), 0),
+                        FALTANTE: response.reduce((acc, r) => acc + Number(r.FALTANTE || 0), 0),
+                        TOTAL_VENDIDO_HOJE: response.reduce((acc, r) => acc + Number(r.TOTAL_VENDIDO_HOJE || 0), 0),
+                        QTD_VENDAS: response.reduce((acc, r) => acc + Number(r.QTD_VENDAS || 0), 0),
+                        QTD_ORCAMENTOS: response.reduce((acc, r) => acc + Number(r.QTD_ORCAMENTOS || 0), 0),
+                        ORC_FECHADOS: response.reduce((acc, r) => acc + Number(r.ORC_FECHADOS || 0), 0),
+                        PRAZO_MEDIO_DIAS: response.reduce((acc, r) => acc + Number(r.PRAZO_MEDIO_DIAS || 0), 0) / Math.max(response.length, 1),
+                        TICKET_MEDIO: 0,
+                        TAXA_CONVERSAO: 0,
+                        dias_trabalhados: response[0]?.dias_trabalhados 
+                      };
+                      aggregated.TICKET_MEDIO = aggregated.QTD_VENDAS > 0 ? Number(aggregated.TOTAL) / aggregated.QTD_VENDAS : 0;
+                      aggregated.TAXA_CONVERSAO = Number(aggregated.QTD_ORCAMENTOS) > 0 ? (Number(aggregated.ORC_FECHADOS) / Number(aggregated.QTD_ORCAMENTOS)) * 100 : 0;
+                      
+                      setData(aggregated);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={cn(
+                      "w-full px-4 py-2 text-left text-xs font-bold transition-colors hover:bg-secondary flex items-center justify-between",
+                      selectedCod === "TOTAL" ? "text-blue-600 bg-blue-50/50 dark:bg-blue-900/20" : "text-foreground"
+                    )}
+                  >
+                    <span>Total Geral</span>
+                    {selectedCod === "TOTAL" && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
+                  </button>
+
+                  {allVendedores
+                    .sort((a, b) => (a.NOME_VENDEDOR || "").localeCompare(b.NOME_VENDEDOR || ""))
+                    .map((v) => (
+                      <button
+                        key={v.COD_VENDEDOR}
+                        onClick={() => {
+                          setSelectedCod(v.COD_VENDEDOR);
+                          setData(v);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "w-full px-4 py-2 text-left text-[11px] font-bold transition-colors hover:bg-secondary flex items-center justify-between",
+                          selectedCod === v.COD_VENDEDOR ? "text-blue-600 bg-blue-50/50 dark:bg-blue-900/20" : "text-slate-600 dark:text-slate-300"
+                        )}
+                      >
+                        <span className="truncate uppercase pr-2">{v.NOME_VENDEDOR}</span>
+                        {selectedCod === v.COD_VENDEDOR && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* 2. GRÁFICO DE ROSCA (TOP) */}
