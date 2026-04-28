@@ -444,6 +444,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     "Falta de Estoque",
     "Desistiu",
     "Prazo de Entrega",
+    "Tomada de Preço",
     "Mão de Obra e Material",
     "Comparativo de Linhas",
   ];
@@ -520,7 +521,19 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     const pipeline = filteredAndSortedItems
       .filter((o) => !["VENDA", "PERDIDO"].includes(o.status))
       .reduce((s, o) => s + o.totalValue, 0);
-    const convQtd = total > 0 ? ((vendas / total) * 100).toFixed(1) : "0.0";
+
+    // Base de cálculo para conversão (exclui motivos que não são considerados "perda real")
+    const filteredForConv = filteredAndSortedItems.filter(o => {
+      const reason = (o.lossReason || "").toUpperCase();
+      return !reason.includes("TOMADA DE PREÇO") && 
+             !reason.includes("TOMADA DE PRECO") && 
+             !reason.includes("COMPARATIVO DE LINHAS") && 
+             !reason.includes("MÃO DE OBRA E MATERIAL") && 
+             !reason.includes("MAO DE OBRA E MATERIAL");
+    });
+    
+    const totalForConv = filteredForConv.length;
+    const convQtd = totalForConv > 0 ? ((vendas / totalForConv) * 100).toFixed(1) : "0.0";
 
     const reasonCounts = filteredAndSortedItems
       .filter((o) => o.status === "PERDIDO" && o.lossReason)
