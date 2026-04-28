@@ -92,7 +92,7 @@ function DashboardContent({
         localStorage.setItem("carflax-active-section", "Geral");
       }, 0);
     }
-  }, [activeItem, userProfile?.permissions, userProfile?.role]);
+  }, [activeItem, userProfile?.permissions, userProfile?.role, geralLoading]);
 
   // ── Sincronização Global do Chat (Realtime) ───────────────────────────
   // Chat Multijanelas
@@ -111,6 +111,10 @@ function DashboardContent({
     } catch {
       return [];
     }
+  });
+
+  const [openChatDoc, setOpenChatDoc] = useState<string | null>(() => {
+    return activeChats.length > 0 ? activeChats[0].doc : null;
   });
 
   useEffect(() => {
@@ -210,7 +214,11 @@ function DashboardContent({
           
           setActiveChats(prev => {
             // Verifica se este chat já está aberto
-            if (prev.some(c => c.doc === newMsg.documento)) return prev;
+            if (prev.some(c => c.doc === newMsg.documento)) {
+              setOpenChatDoc(newMsg.documento);
+              return prev;
+            }
+            setOpenChatDoc(newMsg.documento);
             return [...prev, {
               id: Date.now(),
               doc: newMsg.documento,
@@ -273,7 +281,11 @@ function DashboardContent({
             }
 
             setActiveChats(prev => {
-              if (prev.some(c => c.doc === msg.documento)) return prev;
+              if (prev.some(c => c.doc === msg.documento)) {
+                setOpenChatDoc(msg.documento);
+                return prev;
+              }
+              setOpenChatDoc(msg.documento);
               return [...prev, {
                 id: Date.now(),
                 doc: msg.documento,
@@ -297,7 +309,11 @@ function DashboardContent({
         // No caso do open-crm-chat manual do OrcamentosView, o sellerName já vem preenchido.
         
         setActiveChats(prev => {
-          if (prev.some(c => c.doc === detail.doc)) return prev;
+          if (prev.some(c => c.doc === detail.doc)) {
+            setOpenChatDoc(detail.doc);
+            return prev;
+          }
+          setOpenChatDoc(detail.doc);
           return [...prev, {
             id: Date.now(),
             doc: detail.doc,
@@ -459,15 +475,15 @@ function DashboardContent({
           onClose={() => setIsSugestaoModalOpen(false)} 
         />
 
-        {/* Chat Multijanelas */}
-        <div className="fixed bottom-0 right-0 z-[9999] flex flex-row-reverse items-end gap-4 p-4 pointer-events-none">
+        {/* Chat Multijanelas - Empilhamento Vertical */}
+        <div className="fixed bottom-0 right-0 z-[9999] flex flex-col-reverse items-end gap-3 p-4 pointer-events-none max-h-screen overflow-y-auto scrollbar-hide">
           {activeChats.map((chat) => (
             <div key={chat.doc || chat.id} className="pointer-events-auto">
               <ChatModal
                 isOpen={true}
                 onClose={async () => {
-                  // Marcar como lida antes de remover da lista (opcional, já que o modal fará isso internamente se disparado via onClose)
                   setActiveChats(prev => prev.filter(c => c.doc !== chat.doc));
+                  if (openChatDoc === chat.doc) setOpenChatDoc(null);
                 }}
                 documento={chat.doc}
                 empresa="001"
@@ -477,6 +493,11 @@ function DashboardContent({
                 sellerCode={chat.sellerCode}
                 itemsInitial={chat.items}
                 amICentralizer={isCentralizer}
+                isMinimized={openChatDoc !== chat.doc}
+                onMinimizeChange={(min) => {
+                  if (!min) setOpenChatDoc(chat.doc);
+                  else if (openChatDoc === chat.doc) setOpenChatDoc(null);
+                }}
               />
             </div>
           ))}

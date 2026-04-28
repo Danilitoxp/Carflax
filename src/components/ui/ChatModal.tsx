@@ -23,6 +23,9 @@ interface ChatModalProps {
   sellerCode?: string;
   amICentralizer?: boolean;
   itemsInitial?: CrmItem[];
+  initialMinimized?: boolean;
+  isMinimized?: boolean;
+  onMinimizeChange?: (minimized: boolean) => void;
 }
 
 export function ChatModal({ 
@@ -35,9 +38,19 @@ export function ChatModal({
   sellerName, 
   sellerCode,
   amICentralizer,
-  itemsInitial
+  initialMinimized,
+  itemsInitial,
+  isMinimized: propMinimized,
+  onMinimizeChange
 }: ChatModalProps) {
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [localMinimized, setLocalMinimized] = useState(initialMinimized || false);
+  const isMinimized = propMinimized !== undefined ? propMinimized : localMinimized;
+
+  const setIsMinimized = (val: boolean) => {
+    setLocalMinimized(val);
+    onMinimizeChange?.(val);
+  };
+
   const [isMaximized, setIsMaximized] = useState(false);
   const [messageText, setMessageText] = useState("");
   const [conversas, setConversas] = useState<CrmConversa[]>([]);
@@ -168,10 +181,12 @@ export function ChatModal({
           const msgDoc = (newMsg.documento || "").replace("#", "").trim();
           if (msgDoc !== cleanDoc) return;
 
+          // Se fui eu quem enviou, ignoro o realtime (pois já adicionei localmente via update otimista)
+          if (newMsg.enviado_por === userProfile?.id) return;
+
           setConversas((prev) => {
-            // Otimização: verifica apenas as últimas 5 mensagens para duplicatas (rápido)
-            const recent = prev.slice(-5);
-            const exists = recent.some(m => m.id === newMsg.id || (m.timestamp === newMsg.timestamp && m.obs === newMsg.obs));
+            // Verifica se a mensagem já existe (por ID ou conteúdo exato recente)
+            const exists = prev.some(m => m.id === newMsg.id || (m.obs === newMsg.obs && m.enviado_por === newMsg.enviado_por));
             if (exists) return prev;
             return [...prev, newMsg];
           });
@@ -551,11 +566,14 @@ export function ChatModal({
   return (
     <div className="pointer-events-none">
       <div className={cn(
-          "bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 animate-in slide-in-from-bottom-4",
+          "bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 animate-in slide-in-from-bottom-4 overflow-hidden",
           isMaximized && !isMinimized ? "w-[900px]" : "w-[340px]",
           isMinimized ? "h-[56px]" : (isMaximized ? "h-[85vh]" : "h-[480px]")
         )}>
-        <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/30 rounded-t-2xl shrink-0 cursor-pointer"
+        <div className={cn(
+            "border-b border-border flex items-center justify-between bg-secondary/30 rounded-t-2xl shrink-0 cursor-pointer transition-all",
+            isMinimized ? "h-full px-4" : "p-4"
+          )}
           onClick={() => isMinimized && setIsMinimized(false)}>
           <div className="flex items-center gap-3">
             <div className={cn(
