@@ -136,9 +136,10 @@ function DashboardContent({
     preloadUsers();
   }, [userProfile?.id]);
 
-  // 1.1 Automação de Comunicados (Apenas para Admins)
+  // 1.1 Automação de Comunicados (Admins e Gerentes)
   useEffect(() => {
-    if (userProfile?.role?.toUpperCase() === "ADMIN") {
+    const role = userProfile?.role?.toUpperCase() || "";
+    if (role === "ADMIN" || role.includes("GERENTE")) {
       runAnnouncementAutomation();
     }
   }, [userProfile?.role]);

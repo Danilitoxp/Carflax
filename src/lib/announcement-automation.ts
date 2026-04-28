@@ -6,7 +6,15 @@ import { apiDashboardGeral } from "./api";
  * Announcement Automation Service (Birthdays, Work Anniversaries & Calendar Events)
  */
 
+let isAutomationRunning = false;
+
 export async function runAnnouncementAutomation() {
+  if (isAutomationRunning) {
+    console.log("[Automation] Already running, skipping concurrent call.");
+    return { birthdays: 0, workAnniversaries: 0, events: 0, goals: 0 };
+  }
+  
+  isAutomationRunning = true;
   console.log("Starting announcement automation check...");
   
   const results = {
@@ -27,6 +35,8 @@ export async function runAnnouncementAutomation() {
   } catch (error) {
     console.error("Error in announcement automation:", error);
     return results;
+  } finally {
+    isAutomationRunning = false;
   }
 }
 
@@ -188,18 +198,19 @@ async function checkAndPostGoalAchievements() {
         .maybeSingle();
 
       if (!existingPost) {
+        // Busca o avatar usando o código do vendedor para ser 100% preciso
         const { data: userData } = await supabase
           .from("usuarios")
           .select("avatar")
-          .ilike("name", `%${winner.NOME_VENDEDOR.split(' ')[0]}%`)
+          .eq("operator_code", String(winner.COD_VENDEDOR))
           .maybeSingle();
 
         await supabase.from("comunicados").insert([{
           titulo: postTitle,
-          descricao: `É com imenso orgulho que anunciamos: ${winner.NOME_VENDEDOR} ACABA DE BATER A META DE ${mesAno}! 🚀✨\n\nParabéns por todo o empenho, resiliência e foco nos resultados. Você é um exemplo de excelência para toda a equipe Carflax. Que essa conquista seja apenas o começo de um mês extraordinário! Vamos pra cima! 🥂👊`,
+          descricao: `É com imenso orgulho que anunciamos: ${winner.NOME_VENDEDOR} ACABA DE BATER A META DE ${mesAno}! 🚀✨\n\nParabéns por todo o empenho, resiliência e foco nos resultados. Você é um exemplo de excellence para toda a equipe Carflax. Que essa conquista seja apenas o começo de um mês extraordinário! Vamos pra cima! 🥂👊`,
           filtro: "Empresa",
           image_url: userData?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${winner.NOME_VENDEDOR}`,
-          tag: "Conquista Carflax",
+          tag: "Sistema Carflax",
           likes: 0,
           liked_by: []
         }]);
