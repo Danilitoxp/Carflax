@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import {
   Search,
   Calendar,
+  CalendarDays,
   ChevronDown,
   ChevronsUpDown,
   ChevronUp,
@@ -1036,7 +1037,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                   <div className="space-y-4">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Data de Retorno</label>
-                      <input type="text" placeholder="dd/mm/aaaa" value={statusData} onChange={(e) => { handleDateMask(e); setStatusData(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all placeholder:text-muted-foreground/30" />
+                      <div className="relative group">
+                        <input type="text" placeholder="dd/mm/aaaa" value={statusData} onChange={(e) => { handleDateMask(e); setStatusData(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all placeholder:text-muted-foreground/30" />
+                        <CalendarDays className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
+                      </div>
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Observação</label>
@@ -1074,11 +1078,17 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Fechamento *</label>
-                        <input type="text" placeholder="dd/mm/aaaa" value={statusFechamento} onChange={(e) => { handleDateMask(e); setStatusFechamento(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50" />
+                        <div className="relative group">
+                          <input type="text" placeholder="dd/mm/aaaa" value={statusFechamento} onChange={(e) => { handleDateMask(e); setStatusFechamento(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50" />
+                          <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-amber-500 transition-colors pointer-events-none" />
+                        </div>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Entrega *</label>
-                        <input type="text" placeholder="dd/mm/aaaa" value={statusEntrega} onChange={(e) => { handleDateMask(e); setStatusEntrega(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50" />
+                        <div className="relative group">
+                          <input type="text" placeholder="dd/mm/aaaa" value={statusEntrega} onChange={(e) => { handleDateMask(e); setStatusEntrega(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50" />
+                          <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-amber-500 transition-colors pointer-events-none" />
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-1.5">
@@ -1117,7 +1127,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                         className="w-full" 
                       />
                     </div>
-                    {(statusMotivoPerdido === "Preço Alto" || statusMotivoPerdido === "Falta de Estoque") ? (
+                    {(statusMotivoPerdido === "Falta de Estoque") ? (
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Marque os Itens Perdidos *</label>
                         <div className="max-h-[220px] overflow-y-auto border border-border rounded-xl bg-secondary/40 divide-y divide-border/50 scrollbar-hide">
@@ -1155,7 +1165,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     )}
                     <button
                       onClick={() => handleUpdateStatus("PERDIDO", { motivo_perda: statusMotivoPerdido })}
-                      disabled={!statusMotivoPerdido || ((statusMotivoPerdido === "Preço Alto" || statusMotivoPerdido === "Falta de Estoque") && lostItemsIds.length === 0)}
+                      disabled={!statusMotivoPerdido || (statusMotivoPerdido === "Falta de Estoque" && lostItemsIds.length === 0)}
                       className="w-full h-14 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-500/20 active:scale-[0.98] transition-all"
                     >
                       Confirmar Perda
