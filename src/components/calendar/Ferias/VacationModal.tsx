@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { 
   X, 
   Calendar as CalendarIcon, 
@@ -8,14 +8,23 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
+interface Vacation {
+  id?: number;
+  name: string;
+  start: Date;
+  end: Date;
+  color: string;
+  avatar: string;
+}
+
 interface VacationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (vacation: { name: string; start: Date; end: Date; color: string; avatar: string; id?: number }) => void;
+  onSave: (vacation: Vacation) => void;
   onDelete?: (id: number) => void;
-  editingVacation?: any;
+  editingVacation?: Vacation | null;
   employees: { name: string; avatar?: string }[];
-  vacations: any[];
+  vacations: Vacation[];
   canManage?: boolean;
 }
 
@@ -34,15 +43,25 @@ export function VacationModal({
   const [end, setEnd] = useState("");
   const [selectedColor, setSelectedColor] = useState("bg-orange-500");
 
-  useEffect(() => {
+  const [prevEditingVacation, setPrevEditingVacation] = useState(editingVacation);
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+
+  if (editingVacation !== prevEditingVacation || isOpen !== prevIsOpen) {
+    setPrevEditingVacation(editingVacation);
+    setPrevIsOpen(isOpen);
+
     if (isOpen) {
       if (editingVacation) {
         setName(editingVacation.name);
         setSelectedColor(editingVacation.color);
         const s = editingVacation.start;
         const e = editingVacation.end;
-        setStart(`${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}-${String(s.getDate()).padStart(2, '0')}`);
-        setEnd(`${e.getFullYear()}-${String(e.getMonth() + 1).padStart(2, '0')}-${String(e.getDate()).padStart(2, '0')}`);
+        if (s instanceof Date && !isNaN(s.getTime())) {
+          setStart(`${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}-${String(s.getDate()).padStart(2, '0')}`);
+        }
+        if (e instanceof Date && !isNaN(e.getTime())) {
+          setEnd(`${e.getFullYear()}-${String(e.getMonth() + 1).padStart(2, '0')}-${String(e.getDate()).padStart(2, '0')}`);
+        }
       } else {
         setName("");
         setStart("");
@@ -50,7 +69,7 @@ export function VacationModal({
         setSelectedColor("bg-orange-500");
       }
     }
-  }, [isOpen, editingVacation]);
+  }
 
   const colors = [
     { name: "Laranja", class: "bg-orange-500" },
@@ -113,10 +132,10 @@ export function VacationModal({
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-sm">
       <div className="fixed inset-0" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg bg-white rounded-2xl p-8 md:p-10 shadow-2xl border border-slate-200 overflow-hidden text-left">
+      <div className="relative w-full max-w-lg bg-white dark:bg-card rounded-2xl p-8 md:p-10 shadow-2xl border border-slate-200 dark:border-border overflow-hidden text-left">
         <button 
           onClick={onClose}
-          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
+          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-all"
         >
           <X className="w-5 h-5" />
         </button>
@@ -124,53 +143,53 @@ export function VacationModal({
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="flex items-center gap-4 mb-2">
             <div>
-                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                <h3 className="text-xl font-black text-slate-900 dark:text-foreground uppercase tracking-tight">
                   {editingVacation ? "Editar Férias" : "Lançar Férias"}
                 </h3>
-                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Gestão de Ausências</p>
+                <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-0.5">Gestão de Ausências</p>
             </div>
           </div>
 
           <div className="space-y-5">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
+              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1 flex items-center gap-2">
                 <User className="w-3 h-3" /> Funcionário
               </label>
               <select 
                 value={name}
                 onChange={(e) => handleNameChange(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all"
+                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all"
                 required
               >
-                <option value="">Selecione um colaborador</option>
+                <option value="" className="dark:bg-slate-900">Selecione um colaborador</option>
                 {employees.map((emp, i) => (
-                  <option key={i} value={emp.name}>{emp.name}</option>
+                  <option key={i} value={emp.name} className="dark:bg-slate-900">{emp.name}</option>
                 ))}
               </select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1 flex items-center gap-2">
                   <CalendarIcon className="w-3 h-3" /> Início
                 </label>
                 <input 
                   type="date"
                   value={start}
                   onChange={(e) => setStart(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all font-sans"
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all font-sans"
                   required
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1 flex items-center gap-2">
                   <CalendarIcon className="w-3 h-3" /> Fim
                 </label>
                 <input 
                   type="date"
                   value={end}
                   onChange={(e) => setEnd(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all font-sans"
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all font-sans"
                   required
                 />
               </div>
@@ -187,7 +206,7 @@ export function VacationModal({
                     type="button"
                     onClick={() => setSelectedColor(c.class)}
                     className={cn(
-                      "w-8 h-8 rounded-full transition-all relative flex items-center justify-center border-2 border-white shadow-sm ring-1 ring-slate-100",
+                      "w-8 h-8 rounded-full transition-all relative flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm ring-1 ring-slate-100 dark:ring-slate-800",
                       c.class,
                       selectedColor === c.class ? "ring-2 ring-blue-600 scale-110" : "hover:scale-105"
                     )}
@@ -205,7 +224,7 @@ export function VacationModal({
                 type="button"
                 variant="ghost" 
                 onClick={onClose}
-                className="flex-1 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 transition-all"
+                className="flex-1 h-12 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 transition-all"
               >
                 {canManage ? "Cancelar" : "Fechar"}
               </Button>
