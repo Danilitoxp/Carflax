@@ -19,6 +19,9 @@ export function CoachIa({ metrics, userRole, userName, className }: CoachIaProps
 
   useEffect(() => {
     const showCycle = async () => {
+      // Só gasta API se o usuário estiver realmente vendo a página
+      if (document.visibilityState !== "visible") return;
+
       // 1. Busca a mensagem no Gemini (via backend)
       const aiMessage = await getCoachIaMessage(
         metrics || null, 
@@ -41,10 +44,10 @@ export function CoachIa({ metrics, userRole, userName, className }: CoachIaProps
       }, 10000);
     };
 
-    // Primeiro ciclo após 5 segundos
-    const initialTimer = setTimeout(showCycle, 5000);
-    // Repete a cada 60 segundos
-    const interval = setInterval(showCycle, 60000);
+    // Primeiro ciclo após 10 segundos
+    const initialTimer = setTimeout(showCycle, 10000);
+    // Repete a cada 5 minutos (300.000 ms) - Muito mais econômico!
+    const interval = setInterval(showCycle, 300000);
 
     return () => {
       clearTimeout(initialTimer);
