@@ -321,31 +321,14 @@ export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: bo
   
   useEffect(() => {
     async function fetchHighlight() {
+      const now = new Date();
+      const mesanoISO = now.toISOString().slice(0, 7); // '2026-04'
+      const currentMonthNum = now.getMonth();
+
       try {
         setInternalLoading(true);
-        const now = new Date();
-        const mesanoISO = now.toISOString().slice(0, 7); // '2026-04'
-        const currentMonthNum = now.getMonth();
 
-        // 1. Tenta buscar destaque oficial do banco (Supabase)
-        const { data: official } = await supabase
-          .from("destaque_do_mes")
-          .select("*, usuarios(name, avatar, department, role)")
-          .eq("mesano", mesanoISO)
-          .maybeSingle();
-
-        if (official && official.usuarios) {
-          setEmployee({
-            name: official.usuarios.name,
-            role: official.usuarios.role || official.setor,
-            department: official.usuarios.department || official.setor,
-            achievement: official.motivo_conquista,
-            avatar: official.usuarios.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${official.usuarios.name}`
-          });
-          return;
-        }
-
-        // 2. Automação: Calcula e Salva na destaque_do_mes se não existir
+        // Agora usamos apenas a Automação, já que a tabela física foi removida
         const winner = await calculateMonthlyWinner(mesanoISO); 
         if (winner) {
            setEmployee({

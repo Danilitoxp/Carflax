@@ -10,14 +10,26 @@ import { apiDashboardGeral } from "./api";
  */
 export async function calculateMonthlyWinner(_mesano: string) {
   try {
-    // 1. Buscar Dados de Vendas no Dashboard Geral (Unificando com o painel de vendas)
+    // 1. Buscar Dados de Vendas no Dashboard Geral
     const sellers = await apiDashboardGeral();
-    const MIN_ACHIEVEMENT = 1; // Barreira mínima para qualificação (qualquer venda acima de 1%)
+    const { data: usersRoles } = await supabase.from("usuarios").select("operator_code, role");
+    
+    const MIN_ACHIEVEMENT = 1;
 
     const sellersScores = (sellers || [])
       .map(v => {
+        // Busca o cargo deste vendedor no banco de usuários
+        const userRole = usersRoles?.find(u => String(u.operator_code) === String(v.COD_VENDEDOR))?.role || "Consultor de Vendas";
+        
+        // Critério de exclusão: Gerentes e Admins não entram no destaque de performance de vendas
+        const isManager = userRole.toUpperCase().includes("GERENTE") || userRole.toUpperCase().includes("ADMIN");
+        if (isManager) return null;
+
         const faturado = parseFloat(String(v.FATURADO)) || 0;
-        const meta = parseFloat(String(v.META)) || 1; // Evita divisão por zero
+        const meta = parseFloat(String(v.META)) || 0;
+        
+        if (meta <= 0) return null; // Ignora quem não tem meta cadastrada
+
         const achievement = (faturado / meta) * 100;
 
         return {
@@ -25,15 +37,15 @@ export async function calculateMonthlyWinner(_mesano: string) {
           cod_vendedor: v.COD_VENDEDOR,
           score: achievement,
           setor: "Comercial",
-          role: "Consultor de Vendas",
+          role: userRole,
           department: "Comercial",
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${v.NOME_VENDEDOR}`,
           motivo: `Líder de performance com ${achievement.toFixed(2)}% de sua meta atingida até o momento.`
         };
       })
-      .filter(v => v.score >= MIN_ACHIEVEMENT); // Aplica a barreira mínima
+      .filter((v): v is NonNullable<typeof v> => v !== null && v.score >= MIN_ACHIEVEMENT);
 
-    // 3. Unificar e Rankear (Ordena pelo maior aproveitamento)
+    // 3. Unificar e Rankear
     const winner = sellersScores.sort((a, b) => b.score - a.score)[0];
 
     if (!winner) return null;

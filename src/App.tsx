@@ -523,7 +523,12 @@ function App() {
             ? (Number(aggregated.ORC_FECHADOS) / Number(aggregated.QTD_ORCAMENTOS)) * 100 
             : 0;
 
-          setVendedorMetrics(aggregated);
+          // Só atualiza se for realmente diferente para evitar loops
+          setVendedorMetrics(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(aggregated)) return prev;
+            return aggregated;
+          });
+
         } else {
           const myData = response.find((r: VendedorResumo) => r.COD_VENDEDOR === codVendedor) || response[0];
           setVendedorMetrics(myData);

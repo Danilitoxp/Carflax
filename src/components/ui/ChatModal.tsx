@@ -210,8 +210,12 @@ export function ChatModal({
         u.name?.toUpperCase() === lookup || lookup.includes(u.name?.toUpperCase())
       );
       if (match && match.id !== userProfile?.id) {
-        setOwnerProfile({ name: match.name, avatar: match.avatar || "" });
-        setBudgetOwner(match.id);
+        if (ownerProfile?.name !== match.name || ownerProfile?.avatar !== match.avatar) {
+          setOwnerProfile({ name: match.name, avatar: match.avatar || "" });
+        }
+        if (budgetOwner !== match.id) {
+          setBudgetOwner(match.id);
+        }
         return true;
       }
       return false;
@@ -262,7 +266,8 @@ export function ChatModal({
         }
       }
     }
-  }, [conversas, userProfile?.id, userProfile?.name, ownerProfile, amICentralizer, sellerName, isOpen]);
+  }, [conversas, userProfile?.id, userProfile?.name, amICentralizer, sellerName, isOpen]);
+
 
   // Scroll automático
   useEffect(() => {
