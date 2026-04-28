@@ -484,18 +484,22 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     }
 
     if (filterStatus !== "Todos os Status") {
-      const statusMap: Record<string, string> = {
-        "Em Aberto": "EM ABERTO",
-        Emitido: "EMITIDO",
-        Enviado: "ENVIADO",
-        Negociação: "NEGOCIAÇÃO",
-        "Lib. Crédito": "LIB. CRÉDITO",
-        "Aguard. Pedido": "AGUARD. PEDIDO",
-        Venda: "VENDA",
-        Perdido: "PERDIDO",
-      };
-      const mapped = statusMap[filterStatus];
-      if (mapped) result = result.filter((item) => item.status === mapped);
+      if (filterStatus === "Em Aberto") {
+        // "Em Aberto" agora mostra tudo que não é finalizado (Venda ou Perdido)
+        result = result.filter((item) => !["VENDA", "PERDIDO"].includes(item.status));
+      } else {
+        const statusMap: Record<string, string> = {
+          Emitido: "EMITIDO",
+          Enviado: "ENVIADO",
+          Negociação: "NEGOCIAÇÃO",
+          "Lib. Crédito": "LIB. CRÉDITO",
+          "Aguard. Pedido": "AGUARD. PEDIDO",
+          Venda: "VENDA",
+          Perdido: "PERDIDO",
+        };
+        const mapped = statusMap[filterStatus];
+        if (mapped) result = result.filter((item) => item.status === mapped);
+      }
     }
 
     if (filterSeller !== "Todos os Vendedores")
