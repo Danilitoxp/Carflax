@@ -1035,7 +1035,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                           type="date" 
                           value={statusData} 
                           onChange={(e) => setStatusData(e.target.value)} 
-                          className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all appearance-none" 
+                          className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
                         />
                         <CalendarDays className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
                       </div>
@@ -1075,7 +1075,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                             type="date" 
                             value={statusFechamento} 
                             onChange={(e) => setStatusFechamento(e.target.value)} 
-                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 appearance-none" 
+                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
                           />
                           <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-amber-500 transition-colors pointer-events-none" />
                         </div>
@@ -1087,7 +1087,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                             type="date" 
                             value={statusEntrega} 
                             onChange={(e) => setStatusEntrega(e.target.value)} 
-                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 appearance-none" 
+                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
                           />
                           <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-amber-500 transition-colors pointer-events-none" />
                         </div>
