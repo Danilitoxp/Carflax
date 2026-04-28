@@ -701,17 +701,33 @@ export function ChatModal({
               ))}
               <div ref={bottomRef} />
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="p-4 border-t border-border bg-secondary/10">
-              <div className="relative flex items-center gap-2">
-                <input type="text" value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Adicionar observação..." className={cn(
-                  "w-full bg-secondary/50 border border-border rounded-xl pl-4 pr-10 outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/30 font-bold",
-                  isMaximized ? "py-4 text-[13px]" : "py-3 text-[11px]"
-                )} />
-                <button type="submit" disabled={sending || !messageText.trim()} className="absolute right-2 p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all active:scale-90 disabled:opacity-40">
+            <div className="p-4 border-t border-border bg-secondary/10">
+              <div className="relative flex items-end gap-2">
+                <textarea 
+                  value={messageText} 
+                  onChange={(e) => setMessageText(e.target.value)} 
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder="Adicionar observação..." 
+                  rows={1}
+                  className={cn(
+                    "w-full bg-secondary/50 border border-border rounded-xl pl-4 pr-10 outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/30 font-bold resize-none py-3 scrollbar-hide",
+                    isMaximized ? "text-[13px] min-h-[52px]" : "text-[11px] min-h-[44px]"
+                  )} 
+                />
+                <button 
+                  onClick={() => handleSend()}
+                  disabled={sending || !messageText.trim()} 
+                  className="absolute right-2 bottom-2 p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all active:scale-90 disabled:opacity-40"
+                >
                   {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         )}
       </div>
