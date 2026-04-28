@@ -158,7 +158,7 @@ async function checkAndPostEvents() {
         descricao: `Fiquem atentos! Hoje temos um evento importante em nossa agenda: ${event.title}. Não esqueçam de participar!`,
         filtro: "Eventos",
         image_url: `https://api.dicebear.com/7.x/shapes/svg?seed=${event.id}`,
-        tag: "Agenda Carflax",
+        tag: "Carflax",
         likes: 0,
         liked_by: []
       }]);
@@ -210,7 +210,7 @@ async function checkAndPostGoalAchievements() {
           descricao: `É com imenso orgulho que anunciamos: ${winner.NOME_VENDEDOR} ACABA DE BATER A META DE ${mesAno}! 🚀✨\n\nParabéns por todo o empenho, resiliência e foco nos resultados. Você é um exemplo de excellence para toda a equipe Carflax. Que essa conquista seja apenas o começo de um mês extraordinário! Vamos pra cima! 🥂👊`,
           filtro: "Empresa",
           image_url: userData?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${winner.NOME_VENDEDOR}`,
-          tag: "Sistema Carflax",
+          tag: "Carflax",
           likes: 0,
           liked_by: []
         }]);
