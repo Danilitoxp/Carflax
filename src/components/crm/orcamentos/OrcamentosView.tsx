@@ -468,7 +468,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     "Prazo de Entrega",
     "Mão de Obra e Material",
     "Comparativo de Linhas",
-    "Tomada de Preço",
   ];
 
   const filteredAndSortedItems = useMemo(() => {
@@ -551,9 +550,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     // Regra de Conversão: Excluir motivos consultivos (não penaliza o vendedor)
     const filteredForConv = filteredAndSortedItems.filter(o => {
       const reason = (o.lossReason || "").toUpperCase();
-      return !reason.includes("TOMADA DE PREÇO") && 
-             !reason.includes("TOMADA DE PRECO") &&
-             !reason.includes("COMPARATIVO DE LINHAS") &&
+      return !reason.includes("COMPARATIVO DE LINHAS") &&
              !reason.includes("MÃO DE OBRA E MATERIAL") &&
              !reason.includes("MAO DE OBRA E MATERIAL");
     });
@@ -1125,7 +1122,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Selecione o Motivo *</label>
                       <TinyDropdown 
                         value={statusMotivoPerdido} 
-                        options={["Preço Alto", "Falta de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas", "Tomada de Preço"]} 
+                        options={["Preço Alto", "Falta de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas"]} 
                         onChange={(val) => setStatusMotivoPerdido(val)} 
                         icon={Tag} 
                         variant="slate" 
