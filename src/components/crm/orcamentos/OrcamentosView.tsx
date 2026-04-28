@@ -457,13 +457,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     if (start && end) setIsDateModalOpen(false);
   };
 
-  const handleDateMask = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, "");
-    if (value.length > 8) value = value.slice(0, 8);
-    if (value.length >= 5) value = value.replace(/(\d{2})(\d{2})(\d{1,4})/, "$1/$2/$3");
-    else if (value.length >= 3) value = value.replace(/(\d{2})(\d{1,2})/, "$1/$2");
-    e.target.value = value;
-  };
 
 
   const uniqueSellers = useMemo(() => {
@@ -1038,7 +1031,12 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Data de Retorno</label>
                       <div className="relative group">
-                        <input type="text" placeholder="dd/mm/aaaa" value={statusData} onChange={(e) => { handleDateMask(e); setStatusData(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all placeholder:text-muted-foreground/30" />
+                        <input 
+                          type="date" 
+                          value={statusData} 
+                          onChange={(e) => setStatusData(e.target.value)} 
+                          className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all appearance-none" 
+                        />
                         <CalendarDays className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
                       </div>
                     </div>
@@ -1047,13 +1045,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <textarea placeholder="Ex: Cliente solicitou retorno na segunda..." rows={4} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all resize-none placeholder:text-muted-foreground/30" />
                     </div>
                     <button onClick={() => {
-                      // Converte dd/mm/aaaa → ISO para salvar no banco
-                      let iso: string | null = null;
-                      if (statusData && statusData.length === 10) {
-                        const [d, m, y] = statusData.split("/");
-                        iso = `${y}-${m}-${d}`;
-                      }
-                      handleUpdateStatus("ENVIADO", { lembrete_data: iso });
+                      handleUpdateStatus("ENVIADO", { lembrete_data: statusData });
                     }} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/10 active:scale-[0.98] transition-all">
                       Confirmar Envio
                     </button>
@@ -1079,14 +1071,24 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Fechamento *</label>
                         <div className="relative group">
-                          <input type="text" placeholder="dd/mm/aaaa" value={statusFechamento} onChange={(e) => { handleDateMask(e); setStatusFechamento(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50" />
+                          <input 
+                            type="date" 
+                            value={statusFechamento} 
+                            onChange={(e) => setStatusFechamento(e.target.value)} 
+                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 appearance-none" 
+                          />
                           <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-amber-500 transition-colors pointer-events-none" />
                         </div>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Entrega *</label>
                         <div className="relative group">
-                          <input type="text" placeholder="dd/mm/aaaa" value={statusEntrega} onChange={(e) => { handleDateMask(e); setStatusEntrega(e.target.value); }} className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50" />
+                          <input 
+                            type="date" 
+                            value={statusEntrega} 
+                            onChange={(e) => setStatusEntrega(e.target.value)} 
+                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 appearance-none" 
+                          />
                           <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-amber-500 transition-colors pointer-events-none" />
                         </div>
                       </div>
