@@ -64,11 +64,22 @@ function DashboardContent({
   const [geralLoading, setGeralLoading] = useState(true);
 
   useEffect(() => {
-    if (activeItem === "Geral" && geralLoading) {
+    // Timer de segurança: Nunca deixa o loading infinito (máximo 3s)
+    const safetyTimer = setTimeout(() => setGeralLoading(false), 3000);
+
+    if (geralLoading) {
+      // Se já temos o perfil, podemos carregar a estrutura básica em 500ms
       const timer = setTimeout(() => setGeralLoading(false), 500);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(safetyTimer);
+      };
     }
 
+    return () => clearTimeout(safetyTimer);
+  }, [geralLoading]);
+
+  useEffect(() => {
     const role = userProfile?.role?.toUpperCase();
     const isVendedorRole = role === "VENDEDOR";
     const sellerAllowedItems = [
