@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { IaIcon } from "./IaIcon";
 import { cn } from "@/lib/utils";
 import { type VendedorResumo } from "@/lib/api";
@@ -17,12 +17,22 @@ export function CoachIa({ metrics, userRole, userName, className }: CoachIaProps
   const [isVisible, setIsVisible] = useState(false);
   const [showBubble, setShowBubble] = useState(false);
 
+    const lastSentRef = useRef<number>(0);
+
   useEffect(() => {
     const showCycle = async () => {
-      // Só gasta API se o usuário estiver realmente vendo a página
+      // 1. Só gasta API se o usuário estiver realmente vendo a página
       if (document.visibilityState !== "visible") return;
 
-      // 1. Busca a mensagem no Gemini (via backend)
+      // 2. Trava de Segurança: Só envia se passou mais de 1 hora (3.600.000 ms)
+      const now = Date.now();
+      if (now - lastSentRef.current < 3600000) {
+        console.log("[CoachIA] Cooldown ativo. Aguardando próximo ciclo.");
+        return;
+      }
+      lastSentRef.current = now;
+
+      // 3. Busca a mensagem no Gemini (via backend)
       const aiMessage = await getCoachIaMessage(
         metrics || null, 
         userRole || "VENDEDOR", 
@@ -44,10 +54,10 @@ export function CoachIa({ metrics, userRole, userName, className }: CoachIaProps
       }, 10000);
     };
 
-    // Primeiro ciclo após 10 segundos
-    const initialTimer = setTimeout(showCycle, 10000);
-    // Repete a cada 5 minutos (300.000 ms) - Muito mais econômico!
-    const interval = setInterval(showCycle, 300000);
+    // Primeiro ciclo após 1 minuto (para dar tempo de carregar tudo)
+    const initialTimer = setTimeout(showCycle, 60000);
+    // Repete a cada 1 hora (3.600.000 ms)
+    const interval = setInterval(showCycle, 3600000);
 
     return () => {
       clearTimeout(initialTimer);
