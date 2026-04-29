@@ -27,6 +27,21 @@ interface ChatModalProps {
   isMinimized?: boolean;
 }
 
+// ── NOTIFICAÇÕES ──────────────────────────────────────────────────────────
+const notifyMessage = (title: string, body: string, avatar?: string) => {
+  if (!("Notification" in window)) return;
+  
+  if (Notification.permission === "granted") {
+    new Notification(title, {
+      body: body,
+      icon: avatar || "/favicon.ico",
+      tag: "carflax-chat" // Agrupa notificações para não inundar
+    });
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission();
+  }
+};
+
 export function ChatModal({ 
   isOpen, 
   onClose, 
@@ -61,6 +76,11 @@ export function ChatModal({
   // 1. Efeito Principal de Inicialização e Realtime
   useEffect(() => {
     if (!isOpen || !documento) return;
+    
+    // Solicitar permissão de notificação ao abrir o chat se ainda não tiver
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
 
     // Resetar itens ao trocar de documento. Priorizar itemsInitial se vier do evento
     setItems(itemsInitial || []);
@@ -176,10 +196,15 @@ export function ChatModal({
           // Se fui eu quem enviou, ignoro o realtime (pois já adicionei localmente via update otimista)
           if (newMsg.enviado_por === userProfile?.id) return;
 
-          setConversas((prev) => {
+           setConversas((prev) => {
             // Verifica se a mensagem já existe (por ID ou conteúdo exato recente)
             const exists = prev.some(m => m.id === newMsg.id || (m.obs === newMsg.obs && m.enviado_por === newMsg.enviado_por));
             if (exists) return prev;
+            
+            // Notificação do Chrome
+            const senderName = newMsg.enviado_por_nome || "Mensagem no Chat";
+            notifyMessage(`Carflax: ${senderName}`, newMsg.obs);
+
             return [...prev, newMsg];
           });
         })
