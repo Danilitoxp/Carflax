@@ -33,10 +33,10 @@ export interface Delivery {
   priority?: "low" | "medium" | "high";
   instrucoes?: string;
   driverName?: string;
-  romaneio_id?: string;
   driverCode?: string;
-  romNumber?: number;
+  romCode?: string;
   romStatus?: string;
+  romDate?: string;
 }
 
 interface MovGerRecord {
@@ -54,7 +54,6 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [motoristas, setMotoristas] = useState<{ COD: string; NOME: string }[]>([]);
   const [selectedMotorista, setSelectedMotorista] = useState<string>("");
-  const [currentRomaneioId, setCurrentRomaneioId] = useState<string | null>(null);
   const [nfInput, setNfInput] = useState("");
   const [driverAvatars, setDriverAvatars] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -69,74 +68,59 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
       if (motoristasRes.success) {
         setMotoristas(motoristasRes.motoristas);
       }
+            // 1. Buscar entregas diretamente (Hoje se pendente, ou Histórico se concluído)
+      const query = supabase.from("entregas").select("*");
       
-      let romIds: string[] = [];
-
-      // 1. Buscar romaneios de hoje
-      const query = supabase.from("romaneios").select("id, driver, motorista_cod, rom_number, status").eq("date", hoje);
+      if (activeTab === "pending") {
+        query.eq("rom_date", hoje).eq("rom_status", "em_andamento");
+      } else {
+        query.eq("rom_status", "concluido");
+      }
       
       if (selectedMotorista) {
-        query.eq("motorista_cod", selectedMotorista);
+        query.eq("driver_cod", selectedMotorista);
       }
 
-      const { data: roms } = await query;
-      if (roms && roms.length > 0) {
-        romIds = roms.map(r => r.id);
-        if (selectedMotorista && roms.length === 1) {
-          setCurrentRomaneioId(roms[0].id);
-        }
+      if (activeTab === "completed") {
+        query.order("rom_date", { ascending: false }).limit(100); 
       } else {
-        setCurrentRomaneioId(null);
+        query.order("created_at", { ascending: true });
       }
 
-      // 2. Buscar entregas vinculadas aos romaneios encontrados
-      if (romIds.length > 0) {
-        const { data: lancados } = await supabase
-          .from("entregas")
-          .select("*, romaneios(driver, motorista_cod, rom_number, status)")
-          .in("romaneio_id", romIds)
-          .order("created_at", { ascending: true });
+      const { data: lancados } = await query;
 
-        if (lancados) {
-          const mapped = lancados.map(d => ({
-            id: d.id,
-            nf: d.nf,
-            client: d.client,
-            address: d.address,
-            status: d.status as "pending" | "completed" | "failed",
-            value: `R$ ${Number(d.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-            instrucoes: d.instructions || "",
-            image: d.image,
-            driverName: d.romaneios?.driver,
-            driverCode: d.romaneios?.motorista_cod,
-            romaneio_id: d.romaneio_id,
-            romNumber: d.romaneios?.rom_number,
-            romStatus: d.romaneios?.status
-          }));
-          
-          setDeliveries(mapped);
+      if (lancados) {
+        const mapped = lancados.map(d => ({
+          id: d.id,
+          nf: d.nf,
+          client: d.client,
+          address: d.address,
+          status: d.status as "pending" | "completed" | "failed",
+          value: `R$ ${Number(d.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          instrucoes: d.instructions || "",
+          image: d.image,
+          driverName: d.driver_name,
+          driverCode: d.driver_cod,
+          romCode: d.rom_code,
+          romStatus: d.rom_status,
+          romDate: d.rom_date
+        }));
+        
+        setDeliveries(mapped);
 
-          const uniqueRoms = Array.from(new Set(lancados.map(l => l.romaneio_id)));
-          for (const rid of uniqueRoms) {
-            const romDeliveries = lancados.filter(l => l.romaneio_id === rid);
-            const romInfo = romDeliveries[0]?.romaneios;
-            
-            // Verificação robusta: status atual é em_andamento, existe lista de entregas, e nenhuma delas é 'pending'
-            if (romInfo?.status === 'em_andamento' && 
-                romDeliveries.length > 0 && 
-                romDeliveries.every(d => d.status === 'completed' || d.status === 'failed')) {
-              console.log(`[Admin] Finalizando romaneio ${rid} automaticamente...`);
-              const { error } = await supabase.from("romaneios").update({ status: 'concluido' }).eq("id", rid);
-              if (error) {
-                console.error("[Admin] Erro ao finalizar romaneio:", error.message);
-              } else {
-                fetchData(true);
-              }
+        // Auto-finalização: Se todas as entregas de um rom_code estão prontas, marcar rom_status como concluído
+        if (activeTab === "pending") {
+          const uniqueRomCodes = Array.from(new Set(mapped.map(m => m.romCode)));
+          for (const code of uniqueRomCodes) {
+            const romItems = mapped.filter(m => m.romCode === code);
+            if (romItems.length > 0 && romItems.every(i => i.status === "completed" || i.status === "failed")) {
+              console.log(`[Admin] Finalizando romaneio ${code} automaticamente...`);
+              await supabase.from("entregas").update({ rom_status: 'concluido' }).eq("rom_code", code);
+              fetchData(true);
             }
           }
         }
       } else {
-        // Se não houver romaneios hoje, só limpamos se não estivermos carregando silenciosamente
         if (!isSilent) setDeliveries([]);
       }
 
@@ -155,7 +139,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
     } finally {
       if (!isSilent) setLoading(false);
     }
-  }, [hoje, selectedMotorista]);
+  }, [hoje, selectedMotorista, activeTab]);
 
   useEffect(() => {
     fetchData();
@@ -163,7 +147,6 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
     const channel = supabase
       .channel('admin_full_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'entregas' }, () => fetchData(true))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'romaneios' }, () => fetchData(true))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
@@ -221,88 +204,32 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
       
       if (res.success && res.data && res.data.length > 0) {
         const e = res.data[0] as MovGerRecord;
-        
-        const formattedValue = new Intl.NumberFormat('pt-BR', {
-          style: 'currency',
-          currency: 'BRL'
-        }).format(Number(e.VALOR || 0));
         const motorista = motoristas.find(m => m.COD === selectedMotorista);
         const driverName = motorista ? motorista.NOME : (selectedMotorista || "Geral");
-
-        let romId = currentRomaneioId;
-        let romNumValue = 0;
-
-        if (!romId) {
-          const { data: existingRom } = await supabase
-            .from("romaneios")
-            .select("id, rom_number")
-            .eq("motorista_cod", selectedMotorista || "geral")
-            .eq("date", hoje)
-            .maybeSingle();
-          
-          if (existingRom) {
-            romId = existingRom.id;
-            romNumValue = existingRom.rom_number;
-            setCurrentRomaneioId(romId);
-          }
-        }
-
-        // 2. Se realmente não existir, cria um novo
-        if (!romId) {
-          const { data: newRom, error: romErr } = await supabase
-            .from("romaneios")
-            .insert([{ 
-              driver: driverName, 
-              motorista_cod: selectedMotorista || "geral",
-              date: hoje, 
-              status: 'em_andamento' 
-            }])
-            .select()
-            .single();
-          
-          if (romErr) throw romErr;
-          romId = newRom.id;
-          romNumValue = newRom.rom_number;
-          setCurrentRomaneioId(romId);
-        }
-
-        // 3. Preparar a entrega completa para evitar sumiço no filtro
-        const newDelivery: Delivery = {
-          id: e.NF,
-          nf: e.NF,
-          client: e.CLIENTE,
-          address: `${e.ENDERECO}, ${e.BAIRRO} - ${e.CIDADE}`,
-          status: "pending",
-          value: formattedValue,
-          instrucoes: e.OBS || "",
-          romaneio_id: romId || undefined,
-          driverName: driverName,
-          driverCode: selectedMotorista || "geral",
-          romNumber: romNumValue,
-          romStatus: 'em_andamento'
-        };
+        const driverCod = selectedMotorista || "geral";
+        const romCode = `ROM-${hoje.replace(/-/g, '')}-${driverCod}`;
 
         const cleanValue = Number(String(e.VALOR).replace(',', '.')) || 0;
 
         const { error: insError } = await supabase
           .from("entregas")
           .insert([{
-            romaneio_id: romId,
             nf: e.NF,
             client: e.CLIENTE,
             address: `${e.ENDERECO}, ${e.BAIRRO} - ${e.CIDADE}`,
             value: cleanValue,
             status: "pending",
-            instructions: e.OBS || ""
+            instructions: e.OBS || "",
+            driver_name: driverName,
+            driver_cod: driverCod,
+            rom_code: romCode,
+            rom_date: hoje,
+            rom_status: 'em_andamento'
           }]);
 
         if (insError) throw insError;
         
-        setDeliveries(prev => {
-          if (prev.some(d => d.nf === e.NF)) return prev;
-          return [newDelivery, ...prev];
-        });
-
+        fetchData(true);
         setNfInput("");
       } else {
         alert("NF não encontrada no banco de dados.");
@@ -313,9 +240,9 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
     }
   };
 
-  const handleDeleteDelivery = async (nf: string, romaneioIdToDel?: string) => {
-    if (!romaneioIdToDel) {
-      alert("Não foi possível excluir: ID do romaneio ausente.");
+  const handleDeleteDelivery = async (nf: string, romCodeToDel?: string) => {
+    if (!romCodeToDel) {
+      alert("Não foi possível excluir: Código do romaneio ausente.");
       return;
     }
     if (!confirm(`Deseja remover a NF ${nf} do romaneio?`)) return;
@@ -326,7 +253,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
         .from("entregas")
         .delete()
         .eq("nf", nf)
-        .eq("romaneio_id", romaneioIdToDel);
+        .eq("rom_code", romCodeToDel);
       
       if (error) throw error;
       
@@ -448,17 +375,16 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
               return activeTab === "completed" ? isRomCompleted : !isRomCompleted;
             });
             
-            // Agrupar por romaneio_id para exibir os cards
-            const romGroups = Array.from(new Set(filteredDeliveries.map(d => d.romaneio_id)));
+            // Agrupar por rom_code para exibir os cards
+            const romGroups = Array.from(new Set(filteredDeliveries.map(d => d.romCode)));
 
-            return romGroups.length > 0 ? romGroups.map(romId => {
-              const items = filteredDeliveries.filter(d => d.romaneio_id === romId);
+            return romGroups.length > 0 ? romGroups.map(romCode => {
+              const items = filteredDeliveries.filter(d => d.romCode === romCode);
               const motoristaNome = items[0]?.driverName || "Motorista";
               const motoristaCod = items[0]?.driverCode || "000";
-              const romNum = items[0]?.romNumber || 0;
               
               return (
-                <div key={romId} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm mb-6">
+                <div key={romCode} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm mb-6">
                   <div className="p-4 border-b border-border bg-secondary/20 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="relative">
@@ -479,7 +405,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
                           <h4 className="text-[12px] font-black text-foreground uppercase tracking-tight leading-none flex items-center gap-2">
                             {motoristaNome}
                             <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 text-[9px] font-black tracking-tight">
-                              RM-{hoje.replace(/-/g, '')}-{String(romNum).padStart(3, '0')}
+                              {items[0]?.romCode}
                             </span>
                           </h4>
                           <span className={cn(
@@ -622,7 +548,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
                                 </button>
                                 {canLancar && activeTab === "pending" && (
                                   <button 
-                                    onClick={() => handleDeleteDelivery(delivery.nf, delivery.romaneio_id)}
+                                    onClick={() => handleDeleteDelivery(delivery.nf, delivery.romCode)}
                                     className="p-1.5 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500" 
                                     title="Excluir"
                                   >

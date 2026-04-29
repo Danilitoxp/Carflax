@@ -10,12 +10,10 @@ let isAutomationRunning = false;
 
 export async function runAnnouncementAutomation() {
   if (isAutomationRunning) {
-    console.log("[Automation] Already running, skipping concurrent call.");
     return { birthdays: 0, workAnniversaries: 0, events: 0, goals: 0 };
   }
   
   isAutomationRunning = true;
-  console.log("Starting announcement automation check...");
   
   const results = {
     birthdays: 0,
@@ -30,7 +28,6 @@ export async function runAnnouncementAutomation() {
     results.events = await checkAndPostEvents();
     results.goals = await checkAndPostGoalAchievements();
 
-    console.log("Automation completed:", results);
     return results;
   } catch (error) {
     console.error("Error in announcement automation:", error);

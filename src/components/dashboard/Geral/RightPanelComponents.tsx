@@ -83,7 +83,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
               FATURADO: faturadoTotal,
               EM_ABERTO: emAbertoTotal,
               TOTAL: totalTotal,
-              FALTANTE: metaTotal - totalTotal,
+              FALTANTE: Math.max(0, metaTotal - totalTotal),
               TOTAL_VENDIDO_HOJE: response.reduce((acc, r) => acc + Number(r.TOTAL_VENDIDO_HOJE || 0), 0),
               QTD_VENDAS: response.reduce((acc, r) => acc + Number(r.QTD_VENDAS || 0), 0),
               QTD_ORCAMENTOS: response.reduce((acc, r) => acc + Number(r.QTD_ORCAMENTOS || 0), 0),
@@ -163,12 +163,12 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   const calculateDiarioNecessario = () => {
     if (!data) return 0;
     const faltante = typeof data.FALTANTE === 'string' ? parseFloat(data.FALTANTE) : (data.FALTANTE || 0);
-    return (faltante as number) / getDiasRestantes();
+    return Math.max(0, (faltante as number) / Math.max(getDiasRestantes(), 1));
   };
 
   const metrics = data ? [
     { label: m("Meta"), value: formatBRL(data.META), icon: Target, valueColor: "text-slate-900" },
-    { label: m("Faltante"), value: formatBRL(data.FALTANTE), icon: ArrowDownRight, valueColor: "text-rose-600" },
+    { label: m("Faltante"), value: formatBRL(data.FALTANTE), icon: ArrowDownRight, valueColor: Number(data.FALTANTE) <= 0 ? "text-emerald-600" : "text-rose-600" },
     { label: m("Faturado"), value: formatBRL(data.FATURADO), icon: Clock, valueColor: "text-emerald-600" },
     { label: m("Em Aberto"), value: formatBRL(data.EM_ABERTO), icon: Clock, valueColor: "text-amber-600" },
     { label: m("Total"), value: formatBRL(data.TOTAL), icon: TrendingUp, valueColor: "text-slate-900" },
@@ -269,7 +269,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                         FATURADO: response.reduce((acc, r) => acc + Number(r.FATURADO || 0), 0),
                         EM_ABERTO: response.reduce((acc, r) => acc + Number(r.EM_ABERTO || 0), 0),
                         TOTAL: totalTotal,
-                        FALTANTE: metaTotal - totalTotal,
+                        FALTANTE: Math.max(0, metaTotal - totalTotal),
                         TOTAL_VENDIDO_HOJE: response.reduce((acc, r) => acc + Number(r.TOTAL_VENDIDO_HOJE || 0), 0),
                         QTD_VENDAS: response.reduce((acc, r) => acc + Number(r.QTD_VENDAS || 0), 0),
                         QTD_ORCAMENTOS: response.reduce((acc, r) => acc + Number(r.QTD_ORCAMENTOS || 0), 0),

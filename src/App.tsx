@@ -41,6 +41,7 @@ export interface UserProfile {
   operator_code?: string;
   operatorCode?: string;
   permissions?: string[];
+  is_admin?: boolean;
 }
 
 interface DashboardContentProps {
@@ -80,6 +81,8 @@ function DashboardContent({
   }, [geralLoading]);
 
   useEffect(() => {
+    if (!userProfile || geralLoading) return; // Aguarda o perfil carregar
+
     const role = userProfile?.role?.toUpperCase();
     const isVendedorRole = role === "VENDEDOR";
     const sellerAllowedItems = [
@@ -97,7 +100,6 @@ function DashboardContent({
       "Coletor",
       "Logística",
       "Romaneios",
-      "Concluídas",
       "Entregas",
       "Sugestões",
       "Meu Perfil",
@@ -121,6 +123,7 @@ function DashboardContent({
     ].includes(activeItem);
 
     const hasPermission =
+      userProfile?.is_admin ||
       userProfile?.permissions?.includes(activeItem) ||
       (isVendedorRole && sellerAllowedItems.includes(activeItem));
 
@@ -133,7 +136,7 @@ function DashboardContent({
         localStorage.setItem("carflax-active-section", "Geral");
       }, 0);
     }
-  }, [activeItem, userProfile?.permissions, userProfile?.role, geralLoading]);
+  }, [activeItem, userProfile, geralLoading]);
 
   // ── Sincronização Global do Chat (Realtime) ───────────────────────────
   // Chat Multijanelas
@@ -556,7 +559,7 @@ function DashboardContent({
             />
           ) : isCrmView ? (
             <CrmSection activeTab={activeItem} userProfile={userProfile} />
-          ) : ["Entregas", "Romaneios", "Concluídas"].includes(activeItem) ? (
+          ) : ["Entregas", "Romaneios"].includes(activeItem) ? (
             <EntregasView activeTab={activeItem} userProfile={userProfile} />
           ) : ["Coletor", "Painel Coletor"].includes(activeItem) ? (
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">

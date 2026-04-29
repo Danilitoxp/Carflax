@@ -28,16 +28,29 @@ import {
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
+interface UserProfile {
+  id?: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string;
+  department?: string;
+  phone?: string;
+  whatsapp?: string;
+  permissions?: string[];
+  is_admin?: boolean;
+}
+
 interface SettingsSectionProps {
   externalTab?: string;
-  userProfile?: any;
+  userProfile?: UserProfile | null;
 }
 
 /* ─────────────────────────────────────────────
    BANNERS
    Gestão de imagens de topo e avisos
    ───────────────────────────────────────────── */
-function BannersTab({ userProfile }: { userProfile?: any }) {
+function BannersTab({ userProfile }: { userProfile?: UserProfile | null }) {
   const [transitionEnabled, setTransitionEnabled] = useState(true);
   const [banners] = useState([
     { id: 1, title: "Banner Promoção Abril", url: "https://images.unsplash.com/photo-1549416805-0e6d62635928?q=80&w=1200", dims: "1800 x 600px" },
@@ -253,7 +266,7 @@ function getStrength(pw: string): number {
    MEU PERFIL - REDESIGN ESTRUTURADO
    Foco em cards, hierarquia e organização
 ───────────────────────────────────────────── */
-function ProfileTab({ userProfile }: { userProfile?: any }) {
+function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
   const [form, setForm] = useState({
     nome: "",
     email: "",
@@ -262,17 +275,17 @@ function ProfileTab({ userProfile }: { userProfile?: any }) {
   });
   const [isSaved, setIsSaved] = useState(false);
 
-  // Preenche o formulário quando os dados do perfil chegam
-  useEffect(() => {
-    if (userProfile) {
-      setForm({
-        nome: userProfile.name || "",
-        email: userProfile.email || "",
-        telefone: userProfile.phone || userProfile.whatsapp || "",
-        cargo: userProfile.role || "",
-      });
-    }
-  }, [userProfile]);
+  // Sincronização de Props para Estado (Padrão recomendado pelo React para evitar useEffect)
+  const [prevUserId, setPrevUserId] = useState<string | undefined>(userProfile?.id);
+  if (userProfile?.id !== prevUserId) {
+    setPrevUserId(userProfile?.id);
+    setForm({
+      nome: userProfile?.name || "",
+      email: userProfile?.email || "",
+      telefone: userProfile?.phone || userProfile?.whatsapp || "",
+      cargo: userProfile?.role || "",
+    });
+  }
 
   function handleSave() {
     setIsSaved(true);
@@ -657,6 +670,7 @@ function AppearanceTab() {
 function OrcamentosTab() {
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [coachEnabled, setCoachEnabled] = useState<boolean>(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -681,6 +695,16 @@ function OrcamentosTab() {
         .maybeSingle();
 
       if (configData) setSelectedUserId(configData.value);
+
+      // 3. Fetch Coach IA config
+      const { data: aiData } = await supabase
+        .from("crm_config")
+        .select("value")
+        .eq("key", "coach_ia_enabled")
+        .maybeSingle();
+      
+      if (aiData) setCoachEnabled(aiData.value === "true");
+
       setLoading(false);
     }
     fetchData();
@@ -690,7 +714,10 @@ function OrcamentosTab() {
     setSaving(true);
     const { error } = await supabase
       .from("crm_config")
-      .upsert({ key: "centralizer_user_id", value: selectedUserId || null });
+      .upsert([
+        { key: "centralizer_user_id", value: selectedUserId || null },
+        { key: "coach_ia_enabled", value: String(coachEnabled) }
+      ]);
 
     setSaving(false);
     if (!error) {
@@ -736,12 +763,25 @@ function OrcamentosTab() {
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="p-4 bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-500/20 rounded-xl flex items-start gap-3">
-            <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-            <p className="text-[10px] font-medium text-blue-800 dark:text-blue-200 leading-relaxed uppercase tracking-tight">
-              Este usuário será notificado automaticamente sempre que houver novas mensagens ou alterações de status críticas que exijam supervisão centralizada.
-            </p>
+        {/* Coach IA Global Control */}
+        <div className="mt-8 pt-8 border-t border-slate-50 dark:border-white/5">
+          <div className="flex items-center justify-between p-4 bg-blue-600/5 dark:bg-blue-500/5 border border-blue-600/10 dark:border-blue-500/10 rounded-2xl">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-blue-600 dark:bg-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h5 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-1">
+                  Inteligência Artificial (Coach IA)
+                </h5>
+                <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                  Habilitar robô de coaching para todos os usuários
+                </p>
+              </div>
+            </div>
+            <Toggle checked={coachEnabled} onChange={setCoachEnabled} />
           </div>
         </div>
 
@@ -770,7 +810,10 @@ function OrcamentosTab() {
 export function SettingsSection({ externalTab, userProfile }: SettingsSectionProps) {
   const [activeTab, setActiveTab] = useState("profile");
 
-  useEffect(() => {
+  // Sincronização de Navegação Externa (Padrão recomendado pelo React)
+  const [prevExternalTab, setPrevExternalTab] = useState<string | undefined>(externalTab);
+  if (externalTab !== prevExternalTab) {
+    setPrevExternalTab(externalTab);
     if (externalTab) {
       const tabMap: Record<string, string> = {
         "Meu Perfil": "profile",
@@ -786,7 +829,7 @@ export function SettingsSection({ externalTab, userProfile }: SettingsSectionPro
         setActiveTab(target);
       }
     }
-  }, [externalTab]);
+  }
 
   return (
     <div className="h-full flex flex-col bg-[#F8FAFC] dark:bg-slate-950">

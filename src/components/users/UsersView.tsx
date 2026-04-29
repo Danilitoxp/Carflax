@@ -33,6 +33,7 @@ interface User {
   birthDate?: string;
   admissionDate?: string;
   coletorPermissions?: Record<string, boolean>;
+  is_admin?: boolean;
 }
 
 export function UsersView() {
@@ -60,6 +61,7 @@ export function UsersView() {
     admissionDate: string;
     coletorPermissions: Record<string, boolean>;
     _avatarFile?: File;
+    is_admin: boolean;
   }
 
   // User State for Modal
@@ -83,13 +85,14 @@ export function UsersView() {
       can_localizacao: false,
       can_embalagens: false,
       can_inventario: false
-    }
+    },
+    is_admin: false
   });
 
   const availableModules = [
     "Geral", "Produtos", "Eventos", "Férias",
     "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", "Romaneios",
-    "Concluídas", "Usuários", "DB Admin", "Sugestões",
+    "Usuários", "DB Admin", "Sugestões",
     "Gerenciar Comunicados", "Gerenciar Férias", "Gerenciar Banners", "Gerenciar Calendário",
     "Lançar Entrega",
     "Criar Campanha"
@@ -180,7 +183,8 @@ export function UsersView() {
           department: u.department,
           birthDate: isoToMasked(u.birth_date || ""),
           admissionDate: isoToMasked(u.admission_date || ""),
-          coletorPermissions: u.coletor_permissions || {}
+          coletorPermissions: u.coletor_permissions || {},
+          is_admin: u.is_admin || false
         })));
       }
       setLoading(false);
@@ -220,7 +224,8 @@ export function UsersView() {
         can_localizacao: false,
         can_embalagens: false,
         can_inventario: false
-      }
+      },
+      is_admin: user.is_admin || false
     });
     setAvatarLoading(false);
     setSaving(false);
@@ -258,7 +263,8 @@ export function UsersView() {
       operator_code: newUser.operatorCode || null,
       birth_date: maskedToISO(newUser.birthDate || "") || null,
       admission_date: maskedToISO(newUser.admissionDate || "") || null,
-      coletor_permissions: newUser.coletorPermissions
+      coletor_permissions: newUser.coletorPermissions,
+      is_admin: newUser.is_admin
     };
 
     console.log("[Users] Salvando usuário. Payload final:", finalPayload);
@@ -290,7 +296,8 @@ export function UsersView() {
           company: u.company, department: u.department,
           birthDate: isoToMasked(u.birth_date || ""),
           admissionDate: isoToMasked(u.admission_date || ""),
-          coletorPermissions: u.coletor_permissions || {}
+          coletorPermissions: u.coletor_permissions || {},
+          is_admin: u.is_admin || false
         })));
       }
       setIsAddModalOpen(false);
@@ -367,7 +374,8 @@ export function UsersView() {
                   can_localizacao: false,
                   can_embalagens: false,
                   can_inventario: false
-                }
+                },
+                is_admin: false
               });
               setAvatarLoading(false);
               setSaving(false);
@@ -645,6 +653,24 @@ export function UsersView() {
                   <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Data de Admissão</label>
                   <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={newUser.admissionDate} onChange={(e) => setNewUser({ ...newUser, admissionDate: applyDateMask(e.target.value) })} className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/30" />
                 </div>
+              </div>
+
+              {/* Admin Toggle */}
+              <div className="p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20">
+                    <Shield className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h5 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-1">
+                      Acesso Administrativo
+                    </h5>
+                    <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                      Permissão total e acesso a configurações globais
+                    </p>
+                  </div>
+                </div>
+                <Switch enabled={newUser.is_admin || false} onChange={() => setNewUser({ ...newUser, is_admin: !newUser.is_admin })} />
               </div>
 
               {/* Permissions Section */}

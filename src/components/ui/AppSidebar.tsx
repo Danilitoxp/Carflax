@@ -22,7 +22,6 @@ import {
   FileBadge,
   Plane,
   FileText,
-  CheckCircle2,
   Image,
   PhoneCall,
   Smartphone,
@@ -89,7 +88,6 @@ const menuItems: MenuItem[] = [
     isDropdown: true,
     subItems: [
       { label: "Romaneios", icon: FileText },
-      { label: "Concluídas", icon: CheckCircle2 },
     ],
   },
   { icon: Users, label: "Usuários" },
@@ -157,7 +155,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
       "Geral", "Produtos", "Dashboard", 
       "Calendário", "Eventos", "Férias", 
       "CRM", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", 
-      "Logística", "Romaneios", "Concluídas", "Entregas", 
+      "Logística", "Romaneios", "Entregas", 
       "Produtos", "Estoque", "Preços", "Eventos", "Férias"
     ];
     if (role.includes('VENDEDOR') && vendedorStandard.includes(label)) return true;

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { type VendedorResumo } from "@/lib/api";
 import { getCoachIaMessage } from "@/lib/gemini-service";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/lib/supabase";
 
 interface CoachIaProps {
   metrics?: VendedorResumo | null;
@@ -23,6 +24,19 @@ export function CoachIa({ metrics, userRole, userName, className }: CoachIaProps
     const showCycle = async () => {
       // 1. Só gasta API se o usuário estiver realmente vendo a página
       if (document.visibilityState !== "visible") return;
+
+      // 1.1 Verificação Global de Admin: O robô está habilitado?
+      const { data: config } = await supabase
+        .from("crm_config")
+        .select("value")
+        .eq("key", "coach_ia_enabled")
+        .maybeSingle();
+      
+      if (config && config.value === "false") {
+        console.log("[CoachIA] Desativado globalmente pelo administrador.");
+        setIsVisible(false);
+        return;
+      }
 
       // 2. Trava de Segurança: Só envia se passou mais de 1 hora (3.600.000 ms)
       const now = Date.now();
