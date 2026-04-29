@@ -194,6 +194,39 @@ function DashboardContent({
   const [isCentralizer, setIsCentralizer] = useState(false);
   const initialCheckPerformed = useRef(false);
 
+  // ── Notificações de Entregas (Realtime) ─────────────────────────────
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    
+    const myCode = userProfile.operator_code || userProfile.operatorCode;
+    if (!myCode) return;
+
+    const channel = supabase
+      .channel('vendedor_entregas_notify')
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'entregas',
+        filter: `vendedor_codigo=eq.${myCode}` 
+      }, (payload) => {
+        const newData = payload.new as { nf: string; client: string; status: string };
+        const oldData = payload.old as { status: string };
+        
+        if (newData.status === 'completed' && oldData.status !== 'completed') {
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification(`Entrega Concluída! ✅`, {
+              body: `A NF #${newData.nf} para ${newData.client} foi finalizada pelo motorista.`,
+              icon: "/favicon.svg",
+              tag: `entrega-${newData.nf}`
+            });
+          }
+        }
+      })
+      .subscribe();
+      
+    return () => { supabase.removeChannel(channel); };
+  }, [userProfile]);
+
   // 1. Cache Global de Usuários (Preload similar ao CRM Legado)
   useEffect(() => {
     if (!userProfile?.id) return;
@@ -838,6 +871,13 @@ function App() {
   );
 
   useEffect(() => {
+    const isMotorista = window.location.pathname.includes("/motorista") || window.location.search.includes("v=");
+    
+    if (isMotorista) {
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {

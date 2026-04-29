@@ -47,6 +47,7 @@ interface MovGerRecord {
   CIDADE: string;
   VALOR: string | number;
   OBS: string;
+  VENDEDOR_COD: string;
 }
 
 export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
@@ -194,7 +195,8 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
           GER_BAICON as BAIRRO,
           GER_CIDCON as CIDADE,
           GER_VLRCON as VALOR,
-          GER_MENEX2 as OBS
+          GER_MENEX2 as OBS,
+          GER_CODVEN as VENDEDOR_COD
         FROM MOVGER 
         WHERE GER_NUMDOC = '${nfFormatada}'
         LIMIT 1
@@ -224,7 +226,8 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
             driver_cod: driverCod,
             rom_code: romCode,
             rom_date: hoje,
-            rom_status: 'em_andamento'
+            rom_status: 'em_andamento',
+            vendedor_codigo: e.VENDEDOR_COD
           }]);
 
         if (insError) throw insError;

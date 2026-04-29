@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   MapPin, 
   CheckCircle2, 
@@ -25,7 +25,7 @@ interface Delivery {
   value: string;
   image?: string;
   instructions?: string;
-  romaneio_id: string;
+  romCode: string;
 }
 
 export function MotoristaView() {
@@ -42,7 +42,7 @@ export function MotoristaView() {
   const driverCode = searchParams.get("v") || "geral";
   const hoje = new Date().toISOString().split('T')[0];
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -55,37 +55,28 @@ export function MotoristaView() {
       if (users && users.length > 0) {
         setDriverAvatar(users[0].avatar || null);
       }
-
-      const { data: roms } = await supabase
-        .from("romaneios")
-        .select("id, driver")
-        .eq("motorista_cod", driverCode)
-        .eq("date", hoje);
-
-      if (roms && roms.length > 0) {
-        setDriverName(roms[0].driver);
-        const romIds = roms.map(r => r.id);
-
-        const { data: deliveriesData } = await supabase
-          .from("entregas")
-          .select("*")
-          .in("romaneio_id", romIds)
-          .order("created_at", { ascending: true });
-
-        if (deliveriesData) {
-          setEntregas(deliveriesData.map(d => ({
-            id: d.id,
-            nf: d.nf,
-            client: d.client,
-            address: d.address,
-            status: d.status,
-            time: d.time,
-            value: `R$ ${Number(d.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-            image: d.image,
-            instructions: d.instructions,
-            romaneio_id: d.romaneio_id
-          })));
-        }
+ 
+      const { data: deliveriesData } = await supabase
+        .from("entregas")
+        .select("*")
+        .eq("driver_cod", driverCode)
+        .eq("rom_date", hoje)
+        .order("created_at", { ascending: true });
+ 
+      if (deliveriesData && deliveriesData.length > 0) {
+        setDriverName(deliveriesData[0].driver_name || "Motorista");
+        setEntregas(deliveriesData.map(d => ({
+          id: d.id,
+          nf: d.nf,
+          client: d.client,
+          address: d.address,
+          status: d.status,
+          time: d.time,
+          value: `R$ ${Number(d.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          image: d.image,
+          instructions: d.instructions,
+          romCode: d.rom_code
+        })));
       } else {
         setEntregas([]);
       }
@@ -94,7 +85,7 @@ export function MotoristaView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [driverCode, hoje]);
 
   useEffect(() => {
     fetchData();
@@ -107,7 +98,7 @@ export function MotoristaView() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [driverCode]);
+  }, [driverCode, fetchData]);
 
   const handleFinish = async (file: File) => {
     if (!selectedDelivery) return;
@@ -127,16 +118,16 @@ export function MotoristaView() {
       const { data: allEntregas } = await supabase
         .from("entregas")
         .select("status")
-        .eq("romaneio_id", selectedDelivery.romaneio_id);
+        .eq("rom_code", selectedDelivery.romCode);
 
       if (allEntregas) {
         const hasPending = allEntregas.some(e => e.status === "pending");
         if (!hasPending) {
           console.log("[Mobile] Roteiro finalizado! Atualizando status do romaneio...");
           await supabase
-            .from("romaneios")
-            .update({ status: "concluido" })
-            .eq("id", selectedDelivery.romaneio_id);
+            .from("entregas")
+            .update({ rom_status: "concluido" })
+            .eq("rom_code", selectedDelivery.romCode);
         }
       }
 
