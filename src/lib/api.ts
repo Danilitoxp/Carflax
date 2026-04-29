@@ -13,7 +13,12 @@ const API_CAMPAIGN = isLocal
 async function get<T>(path: string, params?: Record<string, string>, base: string = API_BASE): Promise<T> {
   // Se base for um caminho relativo, usamos o origin do navegador
   const baseUrl = base.startsWith("http") ? base : window.location.origin + base;
-  const url = new URL(`${baseUrl}${path}`);
+  
+  // CORREÇÃO: Evitar que o path com '/' resete a baseUrl
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  const fullUrl = baseUrl.endsWith("/") ? `${baseUrl}${cleanPath}` : `${baseUrl}/${cleanPath}`;
+  
+  const url = new URL(fullUrl);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
@@ -21,7 +26,11 @@ async function get<T>(path: string, params?: Record<string, string>, base: strin
 }
 
 async function post<T>(path: string, body: unknown, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const baseUrl = API_BASE.startsWith("http") ? API_BASE : window.location.origin + API_BASE;
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  const fullUrl = baseUrl.endsWith("/") ? `${baseUrl}${cleanPath}` : `${baseUrl}/${cleanPath}`;
+
+  const res = await fetch(fullUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
