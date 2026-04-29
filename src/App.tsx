@@ -288,20 +288,17 @@ function DashboardContent({
             setActiveChats((prev) => {
               const existing = prev.find((c) => c.doc === newMsg.documento);
               if (existing) {
-                return prev.map(c => 
-                  c.doc === newMsg.documento
-                    ? { 
-                        ...c, 
-                        unreadCount: openChatDocRef.current !== newMsg.documento ? (c.unreadCount || 0) + 1 : 0,
-                        lastMessage: newMsg.obs,
-                        lastMessageTime: newMsg.timestamp
-                      }
-                    : c
-                );
+                const updated = { 
+                  ...existing, 
+                  unreadCount: openChatDocRef.current !== newMsg.documento ? (existing.unreadCount || 0) + 1 : 0,
+                  lastMessage: newMsg.obs,
+                  lastMessageTime: newMsg.timestamp
+                };
+                // Remove o antigo e coloca o atualizado no topo
+                return [updated, ...prev.filter(c => c.doc !== newMsg.documento)];
               }
               
               return [
-                ...prev,
                 {
                   id: Date.now(),
                   doc: newMsg.documento,
@@ -312,6 +309,7 @@ function DashboardContent({
                   lastMessage: newMsg.obs,
                   lastMessageTime: newMsg.timestamp
                 },
+                ...prev,
               ];
             });
 
@@ -434,7 +432,7 @@ function DashboardContent({
       supabase.removeChannel(channel);
       window.removeEventListener("open-crm-chat", handleOpenChat);
     };
-  }, [userProfile?.id]);
+  }, [userProfile?.id, handleSelectChat]);
 
   const handleActiveItemChange = (item: string) => {
     if (item === "Sugestões") {
@@ -630,6 +628,11 @@ function DashboardContent({
         amICentralizer={isCentralizer}
         openChatDoc={openChatDoc}
         setOpenChatDoc={handleSelectChat}
+        onUpdateChat={(doc, data) => {
+          setActiveChats((prev) =>
+            prev.map((c) => (c.doc === doc ? { ...c, ...data } : c)),
+          );
+        }}
       />
 
       {/* Floating Coach IA */}

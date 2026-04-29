@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { X, Send, Minus, Loader2, Package, ShoppingBag, Maximize2, Minimize2 } from "lucide-react";
+import { X, Send, Loader2, Package, ShoppingBag, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getConversas, addConversa, type CrmConversa } from "@/lib/crm-service";
 import { supabase } from "@/lib/supabase";
@@ -23,9 +23,7 @@ interface ChatModalProps {
   sellerCode?: string;
   amICentralizer?: boolean;
   itemsInitial?: CrmItem[];
-  initialMinimized?: boolean;
-  isMinimized?: boolean;
-  onMinimizeChange?: (minimized: boolean) => void;
+  onUpdateLastMessage?: (msg: string, time: string) => void;
 }
 
 export function ChatModal({ 
@@ -34,23 +32,13 @@ export function ChatModal({
   documento, 
   empresa, 
   title, 
-  userProfile, 
-  sellerName, 
+  userProfile,
+  sellerName,
   sellerCode,
   amICentralizer,
-  initialMinimized,
   itemsInitial,
-  isMinimized: propMinimized,
-  onMinimizeChange
+  onUpdateLastMessage
 }: ChatModalProps) {
-  const [localMinimized, setLocalMinimized] = useState(initialMinimized || false);
-  const isMinimized = propMinimized !== undefined ? propMinimized : localMinimized;
-
-  const setIsMinimized = (val: boolean) => {
-    setLocalMinimized(val);
-    onMinimizeChange?.(val);
-  };
-
   const [isMaximized, setIsMaximized] = useState(false);
   const [messageText, setMessageText] = useState("");
   const [conversas, setConversas] = useState<CrmConversa[]>([]);
@@ -95,7 +83,6 @@ export function ChatModal({
         setOwnerProfile({ name: match.name, avatar: match.avatar || "" });
         setBudgetOwner(match.id);
         resolvedImmediately = true;
-        console.log("[Chat] Vendedor resolvido via cache:", match.name);
       }
     }
 
@@ -167,7 +154,10 @@ export function ChatModal({
       setConversas(data);
       setLoading(false);
 
-      // Marcação automática removida (solicitado pelo usuário)
+      if (data.length > 0) {
+        const last = data[data.length - 1];
+        onUpdateLastMessage?.(last.obs, last.timestamp || new Date().toISOString());
+      }
     });
 
     // Realtime para este documento (Filtragem manual estabilizada)
@@ -196,6 +186,7 @@ export function ChatModal({
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, documento, userProfile?.id, userProfile?.name, itemsInitial, amICentralizer, sellerCode, sellerName]);
 
   // 2. Efeito de Resolução Dinâmica de Perfil baseada em Mensagens e Cache Global
@@ -278,7 +269,7 @@ export function ChatModal({
 
   // Scroll automático
   useEffect(() => {
-    if (!isMinimized && conversas.length > 0) {
+    if (conversas.length > 0) {
       const scroll = () => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
       };
@@ -288,7 +279,7 @@ export function ChatModal({
       const timer = setTimeout(scroll, 100);
       return () => clearTimeout(timer);
     }
-  }, [conversas, isMinimized, loading, headerLoading]);
+  }, [conversas, loading, headerLoading]);
 
   // 3. Lógica de exibição no Header: Memoizada para performance
   const displayUser = useMemo(() => {
@@ -405,6 +396,7 @@ export function ChatModal({
         enviado_por: userProfile?.id || null,
         enviado_por_nome: userProfile?.name || "Você"
       });
+      onUpdateLastMessage?.(nova.obs, nova.timestamp || new Date().toISOString());
       const updated = await getConversas(documento);
       setConversas(updated);
     } catch (err) {
@@ -567,14 +559,9 @@ export function ChatModal({
     <div className="pointer-events-none">
       <div className={cn(
           "bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 animate-in slide-in-from-bottom-4 overflow-hidden",
-          isMaximized && !isMinimized ? "w-[900px]" : "w-[340px]",
-          isMinimized ? "h-[56px]" : (isMaximized ? "h-[85vh]" : "h-[480px]")
+          isMaximized ? "w-[900px] h-[85vh]" : "w-[340px] h-[480px]"
         )}>
-        <div className={cn(
-            "border-b border-border flex items-center justify-between bg-secondary/30 rounded-t-2xl shrink-0 cursor-pointer transition-all",
-            isMinimized ? "h-full px-4" : "p-4"
-          )}
-          onClick={() => isMinimized && setIsMinimized(false)}>
+        <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/30 rounded-t-2xl shrink-0 transition-all">
           <div className="flex items-center gap-3">
             <div className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black overflow-hidden border border-blue-500/30",
@@ -616,23 +603,16 @@ export function ChatModal({
                 <Package className="w-3.5 h-3.5" />
               </button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground" title="Minimizar para a lista">
-              <Minus className="w-3.5 h-3.5" />
+            <button onClick={(e) => { e.stopPropagation(); setIsMaximized(!isMaximized); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground" title={isMaximized ? "Restaurar" : "Maximizar"}>
+              {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
             </button>
-            {!isMinimized && (
-              <button onClick={(e) => { e.stopPropagation(); setIsMaximized(!isMaximized); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground" title={isMaximized ? "Restaurar" : "Maximizar"}>
-                {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              </button>
-            )}
             <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="p-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors text-muted-foreground">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
-
-        {!isMinimized && (
-          <div className="flex-1 flex flex-col min-h-0 relative">
-            {/* PAINEL DE ITENS DO ORCAMENTO */}
+        <div className="flex-1 flex flex-col min-h-0 relative">
+          {/* PAINEL DE ITENS DO ORCAMENTO */}
             {showItems && (
               <div className="absolute inset-0 z-50 bg-card flex flex-col animate-in slide-in-from-right-full duration-300">
                 <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/20">
@@ -750,8 +730,7 @@ export function ChatModal({
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
-    </div>
-  );
+    );
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { MessageSquare, X, ChevronRight, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChatModal } from "./ChatModal";
@@ -30,6 +30,7 @@ interface ChatCenterProps {
   amICentralizer: boolean;
   openChatDoc: string | null;
   setOpenChatDoc: (doc: string | null) => void;
+  onUpdateChat?: (doc: string, data: Partial<ActiveChat>) => void;
 }
 
 export function ChatCenter({ 
@@ -38,7 +39,8 @@ export function ChatCenter({
   userProfile, 
   amICentralizer,
   openChatDoc,
-  setOpenChatDoc
+  setOpenChatDoc,
+  onUpdateChat
 }: ChatCenterProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,18 +50,82 @@ export function ChatCenter({
   }, [activeChats]);
 
   const filteredChats = useMemo(() => {
-    if (!searchTerm) return activeChats;
-    const term = searchTerm.toLowerCase();
-    return activeChats.filter(c => 
-      c.title.toLowerCase().includes(term) || 
-      c.doc.toLowerCase().includes(term) ||
-      c.sellerName?.toLowerCase().includes(term)
-    );
+    let chats = [...activeChats];
+    
+    // Filtro de busca
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      chats = chats.filter(c => 
+        c.title.toLowerCase().includes(term) || 
+        c.doc.toLowerCase().includes(term) ||
+        c.sellerName?.toLowerCase().includes(term)
+      );
+    }
+
+    // Ordenação: 1. Não lidas primeiro, 2. Mais recentes primeiro
+    return chats.sort((a, b) => {
+      if ((a.unreadCount || 0) > (b.unreadCount || 0)) return -1;
+      if ((a.unreadCount || 0) < (b.unreadCount || 0)) return 1;
+      
+      const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+      const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+      return timeB - timeA;
+    });
   }, [activeChats, searchTerm]);
 
   const activeChatData = useMemo(() => {
     return activeChats.find(c => c.doc === openChatDoc);
   }, [activeChats, openChatDoc]);
+
+  const activeChatDocRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeChatDocRef.current = activeChatData?.doc || null;
+  }, [activeChatData?.doc]);
+
+  const handleUpdateLastMessage = useCallback((msg: string, time: string) => {
+    if (activeChatDocRef.current) {
+      onUpdateChat?.(activeChatDocRef.current, { lastMessage: msg, lastMessageTime: time });
+    }
+  }, [onUpdateChat]);
+
+  const formatLastMessage = (text: string | undefined) => {
+    if (!text) return "Nenhuma mensagem...";
+    
+    // Se for mensagem de status do sistema (estratégia por linha)
+    if (text.toUpperCase().includes("STATUS:")) {
+      const lines = text.split('\n');
+      const statusLine = lines.find(l => l.toUpperCase().includes("STATUS:"));
+      if (statusLine) {
+        // Pega tudo que vem depois de "STATUS:"
+        const afterStatus = statusLine.split(/STATUS:/i)[1];
+        if (afterStatus) {
+          // Remove emojis e símbolos, mantém letras e espaços
+          const cleaned = afterStatus.replace(/[^\w\sÀ-Ú]/g, "").trim().toUpperCase();
+          if (cleaned) return cleaned;
+        }
+      }
+    }
+
+    // Se for divergência/aviso
+    if (text.toUpperCase().includes("DIVERGÊNCIA:")) {
+      const lines = text.split('\n');
+      const divLine = lines.find(l => l.toUpperCase().includes("DIVERGÊNCIA:"));
+      if (divLine) {
+        const afterDiv = divLine.split(/DIVERGÊNCIA:/i)[1];
+        if (afterDiv) {
+          return afterDiv.replace(/[^\w\sÀ-Ú]/g, "").trim().toUpperCase();
+        }
+      }
+    }
+
+    // Limpeza para mensagens de sistema que não casaram acima
+    if (text.includes("ATUALIZAÇÃO DE STATUS")) {
+      return "ATUALIZAÇÃO";
+    }
+
+    // Limpeza geral para outras mensagens (remove hífens repetidos e quebras)
+    return text.replace(/[-=_]{3,}/g, "").trim();
+  };
 
   if (activeChats.length === 0) return null;
 
@@ -80,6 +146,7 @@ export function ChatCenter({
             itemsInitial={activeChatData.items}
             amICentralizer={amICentralizer}
             isMinimized={false}
+            onUpdateLastMessage={handleUpdateLastMessage}
           />
         </div>
       )}
@@ -180,17 +247,35 @@ export function ChatCenter({
                           #{chat.doc.replace("#", "")}
                         </span>
                       </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        {chat.lastMessage?.toUpperCase().includes("STATUS:") && (
+                          <div className={cn(
+                            "w-2 h-2 rounded-full shrink-0",
+                            (() => {
+                              const s = formatLastMessage(chat.lastMessage);
+                              if (s.includes("ENVIADO")) return "bg-blue-500";
+                              if (s.includes("FATURADO") || s.includes("APROVADO") || s.includes("PEDIDO")) return "bg-emerald-500";
+                              if (s.includes("PERDIDO") || s.includes("DECLINADO") || s.includes("CANCELADO")) return "bg-rose-500";
+                              if (s.includes("PENDENTE") || s.includes("AGUARDANDO")) return "bg-amber-500";
+                              return "bg-blue-500";
+                            })()
+                          )} />
+                        )}
+                        <p className={cn(
+                          "text-[10px] font-bold truncate leading-tight",
+                          chat.lastMessage?.toUpperCase().includes("STATUS:") ? "text-blue-500/80" : "text-muted-foreground/60"
+                        )}>
+                          {formatLastMessage(chat.lastMessage)}
+                        </p>
+                      </div>
                       {chat.lastMessageTime && (
                         <span className="text-[8px] font-black text-muted-foreground uppercase opacity-40 shrink-0">
                           {new Date(chat.lastMessageTime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       )}
-                    </div>
-                    
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[10px] font-bold text-muted-foreground/60 truncate leading-tight">
-                        {chat.lastMessage || "Nenhuma mensagem..."}
-                      </p>
                     </div>
                   </div>
                   
