@@ -24,6 +24,7 @@ interface ChatModalProps {
   amICentralizer?: boolean;
   itemsInitial?: CrmItem[];
   onUpdateLastMessage?: (msg: string, time: string) => void;
+  isMinimized?: boolean;
 }
 
 export function ChatModal({ 
@@ -37,7 +38,8 @@ export function ChatModal({
   sellerCode,
   amICentralizer,
   itemsInitial,
-  onUpdateLastMessage
+  onUpdateLastMessage,
+  isMinimized = false
 }: ChatModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [messageText, setMessageText] = useState("");
@@ -554,6 +556,8 @@ export function ChatModal({
     }
     onClose();
   };
+
+  if (!isOpen || isMinimized) return null;
 
   return (
     <div className="pointer-events-none">
