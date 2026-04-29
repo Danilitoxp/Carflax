@@ -71,14 +71,19 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             setAllVendedores(response);
             
             // Agrega os dados de todos os vendedores para o estado inicial "TOTAL"
+            const metaTotal = response.reduce((acc, r) => acc + Number(r.META || 0), 0);
+            const faturadoTotal = response.reduce((acc, r) => acc + Number(r.FATURADO || 0), 0);
+            const emAbertoTotal = response.reduce((acc, r) => acc + Number(r.EM_ABERTO || 0), 0);
+            const totalTotal = response.reduce((acc, r) => acc + Number(r.TOTAL || 0), 0);
+
             const aggregated: VendedorResumo = {
               COD_VENDEDOR: "TOTAL",
               NOME_VENDEDOR: "TOTAL GERAL",
-              META: response.reduce((acc, r) => acc + Number(r.META || 0), 0),
-              FATURADO: response.reduce((acc, r) => acc + Number(r.FATURADO || 0), 0),
-              EM_ABERTO: response.reduce((acc, r) => acc + Number(r.EM_ABERTO || 0), 0),
-              TOTAL: response.reduce((acc, r) => acc + Number(r.TOTAL || 0), 0),
-              FALTANTE: response.reduce((acc, r) => acc + Number(r.FALTANTE || 0), 0),
+              META: metaTotal,
+              FATURADO: faturadoTotal,
+              EM_ABERTO: emAbertoTotal,
+              TOTAL: totalTotal,
+              FALTANTE: metaTotal - totalTotal,
               TOTAL_VENDIDO_HOJE: response.reduce((acc, r) => acc + Number(r.TOTAL_VENDIDO_HOJE || 0), 0),
               QTD_VENDAS: response.reduce((acc, r) => acc + Number(r.QTD_VENDAS || 0), 0),
               QTD_ORCAMENTOS: response.reduce((acc, r) => acc + Number(r.QTD_ORCAMENTOS || 0), 0),
@@ -254,14 +259,17 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                       setSelectedCod("TOTAL");
                       // Re-agregando (ou podemos salvar o aggregated num ref/state)
                       const response = allVendedores;
+                      const metaTotal = response.reduce((acc, r) => acc + Number(r.META || 0), 0);
+                      const totalTotal = response.reduce((acc, r) => acc + Number(r.TOTAL || 0), 0);
+                      
                       const aggregated: VendedorResumo = {
                         COD_VENDEDOR: "TOTAL",
                         NOME_VENDEDOR: "TOTAL GERAL",
-                        META: response.reduce((acc, r) => acc + Number(r.META || 0), 0),
+                        META: metaTotal,
                         FATURADO: response.reduce((acc, r) => acc + Number(r.FATURADO || 0), 0),
                         EM_ABERTO: response.reduce((acc, r) => acc + Number(r.EM_ABERTO || 0), 0),
-                        TOTAL: response.reduce((acc, r) => acc + Number(r.TOTAL || 0), 0),
-                        FALTANTE: response.reduce((acc, r) => acc + Number(r.FALTANTE || 0), 0),
+                        TOTAL: totalTotal,
+                        FALTANTE: metaTotal - totalTotal,
                         TOTAL_VENDIDO_HOJE: response.reduce((acc, r) => acc + Number(r.TOTAL_VENDIDO_HOJE || 0), 0),
                         QTD_VENDAS: response.reduce((acc, r) => acc + Number(r.QTD_VENDAS || 0), 0),
                         QTD_ORCAMENTOS: response.reduce((acc, r) => acc + Number(r.QTD_ORCAMENTOS || 0), 0),

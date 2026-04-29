@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { X, Send, Minus, Square, Loader2, Package, ShoppingBag, Maximize2, Minimize2 } from "lucide-react";
+import { X, Send, Minus, Loader2, Package, ShoppingBag, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getConversas, addConversa, type CrmConversa } from "@/lib/crm-service";
 import { supabase } from "@/lib/supabase";
@@ -616,8 +616,8 @@ export function ChatModal({
                 <Package className="w-3.5 h-3.5" />
               </button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); if (isMaximized) setIsMaximized(false); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground" title={isMinimized ? "Restaurar" : "Minimizar"}>
-              {isMinimized ? <Square className="w-3 h-3" /> : <Minus className="w-3.5 h-3.5" />}
+            <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground" title="Minimizar para a lista">
+              <Minus className="w-3.5 h-3.5" />
             </button>
             {!isMinimized && (
               <button onClick={(e) => { e.stopPropagation(); setIsMaximized(!isMaximized); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground" title={isMaximized ? "Restaurar" : "Maximizar"}>

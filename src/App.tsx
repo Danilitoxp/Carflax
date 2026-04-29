@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { ThemeProvider } from "@/context/theme-provider";
 import { AppSidebar } from "@/components/ui/AppSidebar";
-import { ChatModal } from "@/components/ui/ChatModal";
+import { ChatCenter } from "@/components/ui/ChatCenter";
 import { supabase } from "@/lib/supabase";
 import { CommunicationSection } from "@/components/dashboard/Geral/CommunicationSection";
 import { CalendarSection } from "@/components/calendar";
@@ -133,6 +133,9 @@ function DashboardContent({
     sellerName?: string;
     sellerCode?: string;
     items?: CrmItem[];
+    unreadCount?: number;
+    lastMessage?: string;
+    lastMessageTime?: string;
   }
   const [activeChats, setActiveChats] = useState<ActiveChat[]>(() => {
     try {
@@ -147,9 +150,25 @@ function DashboardContent({
     return activeChats.length > 0 ? activeChats[0].doc : null;
   });
 
+  const openChatDocRef = useRef<string | null>(openChatDoc);
+  useEffect(() => {
+    openChatDocRef.current = openChatDoc;
+  }, [openChatDoc]);
+
+  const handleSelectChat = useCallback((doc: string | null) => {
+    setOpenChatDoc(doc);
+    if (doc) {
+      setActiveChats((prev) =>
+        prev.map((c) => (c.doc === doc ? { ...c, unreadCount: 0 } : c)),
+      );
+    }
+  }, []);
+
   useEffect(() => {
     localStorage.setItem("carflax-active-chats", JSON.stringify(activeChats));
   }, [activeChats]);
+
+
 
   // Reset de estado durante o render ao trocar de usuário (Recomendado pelo React 18+)
   const [prevUserId, setPrevUserId] = useState(userProfile?.id);
@@ -267,12 +286,20 @@ function DashboardContent({
             }
 
             setActiveChats((prev) => {
-              // Verifica se este chat já está aberto
-              if (prev.some((c) => c.doc === newMsg.documento)) {
-                setOpenChatDoc(newMsg.documento);
-                return prev;
+              const existing = prev.find((c) => c.doc === newMsg.documento);
+              if (existing) {
+                return prev.map(c => 
+                  c.doc === newMsg.documento
+                    ? { 
+                        ...c, 
+                        unreadCount: openChatDocRef.current !== newMsg.documento ? (c.unreadCount || 0) + 1 : 0,
+                        lastMessage: newMsg.obs,
+                        lastMessageTime: newMsg.timestamp
+                      }
+                    : c
+                );
               }
-              setOpenChatDoc(newMsg.documento);
+              
               return [
                 ...prev,
                 {
@@ -281,6 +308,9 @@ function DashboardContent({
                   title: displayTitle,
                   sellerName: resolvedSellerName,
                   sellerCode: undefined,
+                  unreadCount: 1,
+                  lastMessage: newMsg.obs,
+                  lastMessageTime: newMsg.timestamp
                 },
               ];
             });
@@ -379,10 +409,10 @@ function DashboardContent({
 
         setActiveChats((prev) => {
           if (prev.some((c) => c.doc === detail.doc)) {
-            setOpenChatDoc(detail.doc);
+            handleSelectChat(detail.doc);
             return prev;
           }
-          setOpenChatDoc(detail.doc);
+          handleSelectChat(detail.doc);
           return [
             ...prev,
             {
@@ -392,6 +422,7 @@ function DashboardContent({
               sellerName: resolvedSellerName,
               sellerCode: detail.sellerCode,
               items: detail.items,
+              unreadCount: 0,
             },
           ];
         });
@@ -588,35 +619,18 @@ function DashboardContent({
         onClose={() => setIsSugestaoModalOpen(false)}
       />
 
-      {/* Chat Multijanelas - Empilhamento Vertical */}
-      <div className="fixed bottom-0 right-0 z-[9999] flex flex-col-reverse items-end gap-3 p-4 pointer-events-none max-h-screen overflow-y-auto scrollbar-hide">
-        {activeChats.map((chat) => (
-          <div key={chat.doc || chat.id} className="pointer-events-auto">
-            <ChatModal
-              isOpen={true}
-              onClose={async () => {
-                setActiveChats((prev) =>
-                  prev.filter((c) => c.doc !== chat.doc),
-                );
-                if (openChatDoc === chat.doc) setOpenChatDoc(null);
-              }}
-              documento={chat.doc}
-              empresa="001"
-              title={chat.title}
-              userProfile={userProfile || undefined}
-              sellerName={chat.sellerName}
-              sellerCode={chat.sellerCode}
-              itemsInitial={chat.items}
-              amICentralizer={isCentralizer}
-              isMinimized={openChatDoc !== chat.doc}
-              onMinimizeChange={(min) => {
-                if (!min) setOpenChatDoc(chat.doc);
-                else if (openChatDoc === chat.doc) setOpenChatDoc(null);
-              }}
-            />
-          </div>
-        ))}
-      </div>
+      {/* Chat Center - Consolidated View */}
+      <ChatCenter 
+        activeChats={activeChats}
+        onCloseChat={(doc) => {
+          setActiveChats((prev) => prev.filter((c) => c.doc !== doc));
+          if (openChatDoc === doc) setOpenChatDoc(null);
+        }}
+        userProfile={userProfile || undefined}
+        amICentralizer={isCentralizer}
+        openChatDoc={openChatDoc}
+        setOpenChatDoc={handleSelectChat}
+      />
 
       {/* Floating Coach IA */}
       <div className="fixed top-8 right-62 w-14 h-14 z-[9999] pointer-events-auto select-none drop-shadow-2xl">
@@ -664,23 +678,17 @@ function App() {
       if (response && response.length > 0) {
         if (isManager && response.length > 1) {
           // Agrega os dados de todos os vendedores
+          const metaTotal = response.reduce((acc, r) => acc + Number(r.META || 0), 0);
+          const totalTotal = response.reduce((acc, r) => acc + Number(r.TOTAL || 0), 0);
+          
           const aggregated: VendedorResumo = {
             COD_VENDEDOR: "TOTAL",
             NOME_VENDEDOR: "TOTAL GERAL",
-            META: response.reduce((acc, r) => acc + Number(r.META || 0), 0),
-            FATURADO: response.reduce(
-              (acc, r) => acc + Number(r.FATURADO || 0),
-              0,
-            ),
-            EM_ABERTO: response.reduce(
-              (acc, r) => acc + Number(r.EM_ABERTO || 0),
-              0,
-            ),
-            TOTAL: response.reduce((acc, r) => acc + Number(r.TOTAL || 0), 0),
-            FALTANTE: response.reduce(
-              (acc, r) => acc + Number(r.FALTANTE || 0),
-              0,
-            ),
+            META: metaTotal,
+            FATURADO: response.reduce((acc, r) => acc + Number(r.FATURADO || 0), 0),
+            EM_ABERTO: response.reduce((acc, r) => acc + Number(r.EM_ABERTO || 0), 0),
+            TOTAL: totalTotal,
+            FALTANTE: metaTotal - totalTotal,
             TOTAL_VENDIDO_HOJE: response.reduce(
               (acc, r) => acc + Number(r.TOTAL_VENDIDO_HOJE || 0),
               0,
