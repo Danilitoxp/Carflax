@@ -1,12 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api-marketing/:path*",
-      "destination": "https://marketing-carflax.velbav.easypanel.host/:path*"
-    },
-    {
-      "source": "/api-campaign/:path*",
-      "destination": "https://marketing-gestao-de-tempo.velbav.easypanel.host/:path*"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
