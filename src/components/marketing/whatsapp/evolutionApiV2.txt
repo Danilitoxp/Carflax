@@ -1,0 +1,187 @@
+# Evolution API Documentation
+
+## Docs
+
+- [Archive Chat](https://doc.evolution-api.com/v2/api-reference/chat-controller/archive-chat.md): Archive Chat
+- [Check is WhatsApp](https://doc.evolution-api.com/v2/api-reference/chat-controller/check-is-whatsapp.md): Check if numbers are on WhatsApp
+- [Delete Message for Everyone](https://doc.evolution-api.com/v2/api-reference/chat-controller/delete-message-for-everyone.md): Delete Message For Everyone
+- [Fetch Profile Picture URL](https://doc.evolution-api.com/v2/api-reference/chat-controller/fetch-profilepic-url.md): Fetch Profile Picture URL
+- [Find Chats](https://doc.evolution-api.com/v2/api-reference/chat-controller/find-chats.md): Find all chats
+- [Find Contacts](https://doc.evolution-api.com/v2/api-reference/chat-controller/find-contacts.md): Here it is possible to list all contacts or just one,using the 'where' option.
+- [Find Messages](https://doc.evolution-api.com/v2/api-reference/chat-controller/find-messages.md): Find all messages
+- [Find Status Message](https://doc.evolution-api.com/v2/api-reference/chat-controller/find-status-message.md): Find status message
+- [Get Base64](https://doc.evolution-api.com/v2/api-reference/chat-controller/get-base64.md): Get base64 from media message
+- [Mark Message As Read](https://doc.evolution-api.com/v2/api-reference/chat-controller/mark-as-read.md): Mark message as read
+- [Mark Message As Unread](https://doc.evolution-api.com/v2/api-reference/chat-controller/mark-as-unread.md): Mark message as read
+- [Send Presence](https://doc.evolution-api.com/v2/api-reference/chat-controller/send-presence.md): Send Presence (typing...)
+- [Update Message](https://doc.evolution-api.com/v2/api-reference/chat-controller/update-message.md): Update message
+- [Update Block Status](https://doc.evolution-api.com/v2/api-reference/chat-controller/updateBlockStatus.md): Block status to contacts
+- [Get Information](https://doc.evolution-api.com/v2/api-reference/get-information.md): Get information about your EvolutionAPI
+- [Fetch All Groups](https://doc.evolution-api.com/v2/api-reference/group-controller/fetch-all-groups.md): Fetch all groups
+- [Fetch Invite Code](https://doc.evolution-api.com/v2/api-reference/group-controller/fetch-invite-code.md): Fetch group invite code
+- [Find Group by Invite Code](https://doc.evolution-api.com/v2/api-reference/group-controller/find-group-by-invite-code.md): Find group by invite code
+- [Find Group by JID](https://doc.evolution-api.com/v2/api-reference/group-controller/find-group-by-jid.md): Find group by remote JID
+- [Find Group Members](https://doc.evolution-api.com/v2/api-reference/group-controller/find-participants.md): Fetch all group members
+- [Create Group](https://doc.evolution-api.com/v2/api-reference/group-controller/group-create.md): Create group
+- [Leave Group](https://doc.evolution-api.com/v2/api-reference/group-controller/leave-group.md): Leave group
+- [Revoke Invite Code](https://doc.evolution-api.com/v2/api-reference/group-controller/revoke-invite-code.md): Revoke group invite
+- [Send Group Invite](https://doc.evolution-api.com/v2/api-reference/group-controller/send-invite-url.md): Send group invite
+- [Toggle Ephemeral](https://doc.evolution-api.com/v2/api-reference/group-controller/toggle-ephemeral.md): Toggle temporary messages on group
+- [Update Group Description](https://doc.evolution-api.com/v2/api-reference/group-controller/update-group-description.md): Update group description
+- [Update Group Picture](https://doc.evolution-api.com/v2/api-reference/group-controller/update-group-picture.md): Update group picture
+- [Update Group Subject](https://doc.evolution-api.com/v2/api-reference/group-controller/update-group-subject.md): Update group subject
+- [Update Group Members](https://doc.evolution-api.com/v2/api-reference/group-controller/update-participant.md): Update group members
+- [Update Group Setting](https://doc.evolution-api.com/v2/api-reference/group-controller/update-setting.md): Update group settings
+- [Connection State](https://doc.evolution-api.com/v2/api-reference/instance-controller/connection-state.md): Gets the state of the connection
+- [Create Instance](https://doc.evolution-api.com/v2/api-reference/instance-controller/create-instance-basic.md)
+- [Delete Instance](https://doc.evolution-api.com/v2/api-reference/instance-controller/delete-instance.md): Delete instance
+- [Fetch Instances](https://doc.evolution-api.com/v2/api-reference/instance-controller/fetch-instances.md): Returns the instance with the name informed in the parameter, or all the instances if empty.
+- [Instance Connect](https://doc.evolution-api.com/v2/api-reference/instance-controller/instance-connect.md): Generates and returns the QR code for WhatsApp connection
+- [Logout Instance](https://doc.evolution-api.com/v2/api-reference/instance-controller/logout-instance.md): Makes logout on instance
+- [Restart Instance](https://doc.evolution-api.com/v2/api-reference/instance-controller/restart-instance.md): Restarts the instance
+- [Set Presence](https://doc.evolution-api.com/v2/api-reference/instance-controller/set-presence.md): Deletes instance
+- [Find Chatwoot](https://doc.evolution-api.com/v2/api-reference/integrations/chatwoot/find-chatwoot.md): Find Chatwoot
+- [Set Chatwoot](https://doc.evolution-api.com/v2/api-reference/integrations/chatwoot/set-chatwoot.md): Set Chatwoot
+- [Change Status Bot](https://doc.evolution-api.com/v2/api-reference/integrations/dify/change-status.md): Altera o status de um bot Dify. O status pode ser `opened`, `paused`, ou `closed`. O status `closed` encerra a interação do bot.
+- [Create Dify Bot](https://doc.evolution-api.com/v2/api-reference/integrations/dify/create-dify.md): Creates a new Dify bot with the provided configuration
+- [Find Dify Bot](https://doc.evolution-api.com/v2/api-reference/integrations/dify/find-bot-dify.md): Update dify bot.
+- [Find Dify Bots](https://doc.evolution-api.com/v2/api-reference/integrations/dify/find-dify.md): Fetches dify bots.
+- [Find Dify Settings](https://doc.evolution-api.com/v2/api-reference/integrations/dify/find-settings.md): Find settigns dify bot
+- [Find Status Bot](https://doc.evolution-api.com/v2/api-reference/integrations/dify/find-status.md): Recupera as sessões ativas de um bot Dify específico, com base no ID do bot (`difyId`) e na instância do bot (`instance`).
+- [Set Dify Settings](https://doc.evolution-api.com/v2/api-reference/integrations/dify/set-settings-dify.md): Atualiza as configurações do bot Dify.
+- [Update Dify Bot](https://doc.evolution-api.com/v2/api-reference/integrations/dify/update-dify.md): Update bot Dify
+- [Change Status Bot](https://doc.evolution-api.com/v2/api-reference/integrations/evoai/change-status.md): Altera o status de um bot EvoAI. O status pode ser `opened`, `paused`, ou `closed`. O status `closed` encerra a interação do bot.
+- [Create EvoAI Bot](https://doc.evolution-api.com/v2/api-reference/integrations/evoai/create-evoai.md): Creates a new EvoAI bot with the provided configuration
+- [Find EvoAI Bots](https://doc.evolution-api.com/v2/api-reference/integrations/evoai/find-evoai.md): Fetches EvoAI bots.
+- [Find EvoAI Settings](https://doc.evolution-api.com/v2/api-reference/integrations/evoai/find-settings.md): Find settigns EvoAI bot
+- [Find Status Bot](https://doc.evolution-api.com/v2/api-reference/integrations/evoai/find-status.md): Recupera as sessões ativas de um bot EvoAI específico, com base no ID do bot (`evoaiId`) e na instância do bot (`instance`).
+- [Set EvoAI Settings](https://doc.evolution-api.com/v2/api-reference/integrations/evoai/set-settings-evoai.md): Atualiza as configurações do bot EvoAI.
+- [Update EvoAI Bot](https://doc.evolution-api.com/v2/api-reference/integrations/evoai/update-evoai.md): Update bot EvoAI
+- [Change Evolution Bot status](https://doc.evolution-api.com/v2/api-reference/integrations/evolution/change-status-session.md): Change status session
+- [Create Evolution Bot](https://doc.evolution-api.com/v2/api-reference/integrations/evolution/create-bot.md): Create a new Evolution Bot configuration.
+- [Delete Evolution Bot](https://doc.evolution-api.com/v2/api-reference/integrations/evolution/delete-bot.md): Delete Bot
+- [Fetch Evolution Bot](https://doc.evolution-api.com/v2/api-reference/integrations/evolution/fetch-bots.md): Update evo bot.
+- [Fetch Evolution Bot Session](https://doc.evolution-api.com/v2/api-reference/integrations/evolution/fetch-session.md): Find evolution bot settings
+- [Find Evolution Bots](https://doc.evolution-api.com/v2/api-reference/integrations/evolution/find-bot.md): Update evo bots.
+- [Find Settings Bot](https://doc.evolution-api.com/v2/api-reference/integrations/evolution/find-settings.md): Find evolution bot settings
+- [Set Settings Bot](https://doc.evolution-api.com/v2/api-reference/integrations/evolution/set-settings.md): Configure settings for an Evolution Bot.
+- [Update Evolution Bot](https://doc.evolution-api.com/v2/api-reference/integrations/evolution/update.md): Update an existing Evolution Bot configuration.
+- [Change Status Session](https://doc.evolution-api.com/v2/api-reference/integrations/flowise/change-session-status.md): Atualiza os settings do bot flowise
+- [Create Flowise Bot](https://doc.evolution-api.com/v2/api-reference/integrations/flowise/create-bot.md): Create Bot Flowise
+- [Delete Flowise Bot](https://doc.evolution-api.com/v2/api-reference/integrations/flowise/delete-flowise-bot.md): Delete Bot
+- [Find Flowise Bot](https://doc.evolution-api.com/v2/api-reference/integrations/flowise/find-flowise-bot.md): Fetch bots flowise
+- [Find Flowise Bots](https://doc.evolution-api.com/v2/api-reference/integrations/flowise/find-flowise-bots.md): Fetch bots flowise
+- [Find Sessions Flowise](https://doc.evolution-api.com/v2/api-reference/integrations/flowise/find-sessions.md): Fetch session flowise
+- [Find Flowise settings](https://doc.evolution-api.com/v2/api-reference/integrations/flowise/find-settings.md): Fetch settings flowise
+- [Set Settings Flowise Bots](https://doc.evolution-api.com/v2/api-reference/integrations/flowise/set-settings.md): Set Settings Flowise bot
+- [Update Flowise Bot](https://doc.evolution-api.com/v2/api-reference/integrations/flowise/update-flowise-bot.md): Update flowise bot
+- [Change Status Bot](https://doc.evolution-api.com/v2/api-reference/integrations/n8n/change-status.md): Altera o status de um bot n8n. O status pode ser `opened`, `paused`, ou `closed`. O status `closed` encerra a interação do bot.
+- [Create n8n Bot](https://doc.evolution-api.com/v2/api-reference/integrations/n8n/create-n8n.md): Creates a new n8n bot with the provided configuration
+- [Find n8n Bots](https://doc.evolution-api.com/v2/api-reference/integrations/n8n/find-n8n.md): Fetches n8n bots.
+- [Find n8n Settings](https://doc.evolution-api.com/v2/api-reference/integrations/n8n/find-settings.md): Find settigns n8n bot
+- [Find Status Bot](https://doc.evolution-api.com/v2/api-reference/integrations/n8n/find-status.md): Recupera as sessões ativas de um bot n8n específico, com base no ID do bot (`n8nId`) e na instância do bot (`instance`).
+- [Set n8n Settings](https://doc.evolution-api.com/v2/api-reference/integrations/n8n/set-settings-n8n.md): Atualiza as configurações do bot n8n.
+- [Update n8n Bot](https://doc.evolution-api.com/v2/api-reference/integrations/n8n/update-n8n.md): Update bot n8n
+- [Change status OpenAI](https://doc.evolution-api.com/v2/api-reference/integrations/openai/change-status.md): Changes the status of the OpenAI bot instance.
+- [Create OpenIA Bot](https://doc.evolution-api.com/v2/api-reference/integrations/openai/create-bot.md): Create an OpenAI bot with detailed configuration
+- [Delete OpenIA Bot](https://doc.evolution-api.com/v2/api-reference/integrations/openai/delete-bot.md): Delete bot OpenAi
+- [Delete OpenIA Bot](https://doc.evolution-api.com/v2/api-reference/integrations/openai/delete-creds.md): Delete bot OpenAi
+- [Find OpenIA Bot](https://doc.evolution-api.com/v2/api-reference/integrations/openai/find-bot.md): Get OpenAI bot with detailed configuration
+- [Find OpenIA Bots](https://doc.evolution-api.com/v2/api-reference/integrations/openai/find-bots.md): Get OpenAI bot with detailed configuration
+- [Find OpenIA Creds](https://doc.evolution-api.com/v2/api-reference/integrations/openai/find-creds-openai.md): Get OpenAI Creds
+- [Find sessions OpenAI](https://doc.evolution-api.com/v2/api-reference/integrations/openai/find-session.md): Fetches the sessions of the specified OpenAI bot instance.
+- [Find settings OpenAI](https://doc.evolution-api.com/v2/api-reference/integrations/openai/find-settings.md): Find settings OpenAi
+- [Creds config OpenAI](https://doc.evolution-api.com/v2/api-reference/integrations/openai/set-creds.md): Creds openia bot configuration
+- [Settigns config OpenAI](https://doc.evolution-api.com/v2/api-reference/integrations/openai/settings-openai.md): Set settings for an OpenAI bot instance.
+- [Update Bot](https://doc.evolution-api.com/v2/api-reference/integrations/openai/update-bot.md): Update OpenAI bot with detailed configuration
+- [Find RabbitMQ](https://doc.evolution-api.com/v2/api-reference/integrations/rabbitmq/find-rabbitmq.md): Find RabbitMQ
+- [Set RabbitMQ](https://doc.evolution-api.com/v2/api-reference/integrations/rabbitmq/set-rabbitmq.md): Set RabbitMQ
+- [Find SQS](https://doc.evolution-api.com/v2/api-reference/integrations/sqs/find-sqs.md): Find SQS
+- [Set SQS](https://doc.evolution-api.com/v2/api-reference/integrations/sqs/set-sqs.md): Set SQS
+- [Change Session Status](https://doc.evolution-api.com/v2/api-reference/integrations/typebot/change-session-status.md): Change status session
+- [Delete Typebot](https://doc.evolution-api.com/v2/api-reference/integrations/typebot/delete-typebot.md): Delete typebot
+- [Fetch Session Typebot](https://doc.evolution-api.com/v2/api-reference/integrations/typebot/fetch-session.md): Find session typebot
+- [Fetch Typebot](https://doc.evolution-api.com/v2/api-reference/integrations/typebot/fetch-typebot.md): Find typebot
+- [Fetch Typebot Settings](https://doc.evolution-api.com/v2/api-reference/integrations/typebot/find-settings-typebot.md): Find typebot settings
+- [Find Typebot](https://doc.evolution-api.com/v2/api-reference/integrations/typebot/find-typebot.md): Find typebot
+- [Create Typebot](https://doc.evolution-api.com/v2/api-reference/integrations/typebot/set-typebot.md): Set typebot
+- [Settings Typebot](https://doc.evolution-api.com/v2/api-reference/integrations/typebot/settings-typebot.md): Set settings typebot
+- [Start Typebot](https://doc.evolution-api.com/v2/api-reference/integrations/typebot/start-typebot.md): Start typebot
+- [Update Typebot](https://doc.evolution-api.com/v2/api-reference/integrations/typebot/update-typebot.md): Start typebot
+- [Find Websocket](https://doc.evolution-api.com/v2/api-reference/integrations/websocket/find-websocket.md): Find Websocket
+- [Set Websocket](https://doc.evolution-api.com/v2/api-reference/integrations/websocket/set-websocket.md): Set Websocket
+- [Send WhatsApp Audio](https://doc.evolution-api.com/v2/api-reference/message-controller/send-audio.md): Send WhatsApp Audio
+- [Send Buttons](https://doc.evolution-api.com/v2/api-reference/message-controller/send-button.md): Send Buttons
+- [Send Contact](https://doc.evolution-api.com/v2/api-reference/message-controller/send-contact.md): Send Contact
+- [Send List](https://doc.evolution-api.com/v2/api-reference/message-controller/send-list.md): Send List
+- [Send Location](https://doc.evolution-api.com/v2/api-reference/message-controller/send-location.md): Send Location
+- [Send Media](https://doc.evolution-api.com/v2/api-reference/message-controller/send-media.md): Send media message
+- [Send Poll](https://doc.evolution-api.com/v2/api-reference/message-controller/send-poll.md): Send Poll
+- [Send Reaction](https://doc.evolution-api.com/v2/api-reference/message-controller/send-reaction.md): Send Reaction
+- [Send Status](https://doc.evolution-api.com/v2/api-reference/message-controller/send-status.md): Post WhatsApp status (stories)
+- [Send Sticker](https://doc.evolution-api.com/v2/api-reference/message-controller/send-sticker.md): Send Sticker
+- [Send Plain Text](https://doc.evolution-api.com/v2/api-reference/message-controller/send-text.md): Send plain text message
+- [Fetch Business Profile](https://doc.evolution-api.com/v2/api-reference/profile-settings/fetch-business-profile.md): Fetch business profile from phone number
+- [Fetch Privacy Settings](https://doc.evolution-api.com/v2/api-reference/profile-settings/fetch-privacy-settings.md): Fetch privacy settings
+- [Fetch Profile](https://doc.evolution-api.com/v2/api-reference/profile-settings/fetch-profile.md): Fetch profile from phone number
+- [Remove Profile Picture](https://doc.evolution-api.com/v2/api-reference/profile-settings/remove-profile-picture.md): Update profile picture
+- [Update Privacy Settings](https://doc.evolution-api.com/v2/api-reference/profile-settings/update-privacy-settings.md): Update privacy settings
+- [Update Profile Name](https://doc.evolution-api.com/v2/api-reference/profile-settings/update-profile-name.md): Update profile name
+- [Update Profile Picture](https://doc.evolution-api.com/v2/api-reference/profile-settings/update-profile-picture.md): Update profile picture
+- [Update Profile Status](https://doc.evolution-api.com/v2/api-reference/profile-settings/update-profile-status.md): Update profile status
+- [Find Settings](https://doc.evolution-api.com/v2/api-reference/settings/get.md): Fetch Webhook configuration
+- [Set Settings](https://doc.evolution-api.com/v2/api-reference/settings/set.md): Set settings
+- [Find Webhook](https://doc.evolution-api.com/v2/api-reference/webhook/get.md): Fetch Webhook configuration
+- [Set Webhook](https://doc.evolution-api.com/v2/api-reference/webhook/set.md): Set Webhook for instance
+- [Available Features](https://doc.evolution-api.com/v2/en/configuration/available-resources.md)
+- [Webhooks](https://doc.evolution-api.com/v2/en/configuration/webhooks.md)
+- [Environment Variables](https://doc.evolution-api.com/v2/en/env.md)
+- [Introduction](https://doc.evolution-api.com/v2/en/get-started/introduction.md)
+- [Docker](https://doc.evolution-api.com/v2/en/install/docker.md)
+- [Nginx and SSL](https://doc.evolution-api.com/v2/en/install/nginx.md)
+- [NVM](https://doc.evolution-api.com/v2/en/install/nvm.md)
+- [Chatwoot](https://doc.evolution-api.com/v2/en/integrations/chatwoot.md)
+- [WhatsApp Cloud API](https://doc.evolution-api.com/v2/en/integrations/cloudapi.md)
+- [Dify](https://doc.evolution-api.com/v2/en/integrations/dify.md)
+- [EvoAI](https://doc.evolution-api.com/v2/en/integrations/evoai.md)
+- [Evolution Bot](https://doc.evolution-api.com/v2/en/integrations/evolution-bot.md)
+- [Evolution Channel](https://doc.evolution-api.com/v2/en/integrations/evolution-channel.md)
+- [Flowise](https://doc.evolution-api.com/v2/en/integrations/flowise.md)
+- [OpenAI](https://doc.evolution-api.com/v2/en/integrations/openai.md)
+- [RabbitMQ](https://doc.evolution-api.com/v2/en/integrations/rabbitmq.md)
+- [S3minio](https://doc.evolution-api.com/v2/en/integrations/s3minio.md)
+- [Amazon SQS](https://doc.evolution-api.com/v2/en/integrations/sqs.md)
+- [Typebot](https://doc.evolution-api.com/v2/en/integrations/typebot.md)
+- [Websocket](https://doc.evolution-api.com/v2/en/integrations/websocket.md)
+- [Database](https://doc.evolution-api.com/v2/en/requirements/database.md)
+- [Redis](https://doc.evolution-api.com/v2/en/requirements/redis.md)
+- [Update](https://doc.evolution-api.com/v2/en/updates.md)
+- [Recursos Disponíveis](https://doc.evolution-api.com/v2/pt/configuration/available-resources.md)
+- [Webhooks](https://doc.evolution-api.com/v2/pt/configuration/webhooks.md)
+- [Variáveis de Ambiente](https://doc.evolution-api.com/v2/pt/env.md)
+- [Introdução](https://doc.evolution-api.com/v2/pt/get-started/introduction.md)
+- [Docker](https://doc.evolution-api.com/v2/pt/install/docker.md)
+- [Nginx e SSL](https://doc.evolution-api.com/v2/pt/install/nginx.md)
+- [NVM](https://doc.evolution-api.com/v2/pt/install/nvm.md)
+- [Chatwoot](https://doc.evolution-api.com/v2/pt/integrations/chatwoot.md)
+- [WhatsApp Cloud API](https://doc.evolution-api.com/v2/pt/integrations/cloudapi.md)
+- [Dify](https://doc.evolution-api.com/v2/pt/integrations/dify.md)
+- [EvoAI](https://doc.evolution-api.com/v2/pt/integrations/evoai.md): https://github.com/EvolutionAPI/evo-ai/
+- [Evolution Bot](https://doc.evolution-api.com/v2/pt/integrations/evolution-bot.md)
+- [Canal Evolution](https://doc.evolution-api.com/v2/pt/integrations/evolution-channel.md)
+- [Flowise](https://doc.evolution-api.com/v2/pt/integrations/flowise.md)
+- [OpenAI](https://doc.evolution-api.com/v2/pt/integrations/openai.md)
+- [RabbitMQ](https://doc.evolution-api.com/v2/pt/integrations/rabbitmq.md)
+- [S3/Minio](https://doc.evolution-api.com/v2/pt/integrations/s3minio.md)
+- [Amazon SQS](https://doc.evolution-api.com/v2/pt/integrations/sqs.md)
+- [Typebot](https://doc.evolution-api.com/v2/pt/integrations/typebot.md)
+- [WebSocket](https://doc.evolution-api.com/v2/pt/integrations/websocket.md)
+- [Banco de Dados](https://doc.evolution-api.com/v2/pt/requirements/database.md)
+- [Redis](https://doc.evolution-api.com/v2/pt/requirements/redis.md)
+- [Atualização](https://doc.evolution-api.com/v2/pt/updates.md)
+
+## OpenAPI Specs
+
+- [openapi-v2](https://doc.evolution-api.com/openapi/openapi-v2.json)
+- [openapi-v1](https://doc.evolution-api.com/openapi/openapi-v1.json)
+- [openapi](https://doc.evolution-api.com/api-reference/openapi.json)

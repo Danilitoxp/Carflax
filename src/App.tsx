@@ -29,6 +29,7 @@ import { LoginView } from "@/components/auth/LoginView";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { OrgChartView } from "@/components/ui/OrgChartModal";
 import { SqlRunnerView } from "@/components/admin/SqlRunnerView";
+import { MarketingView } from "@/components/marketing/MarketingView";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 
 export interface UserProfile {
@@ -97,6 +98,9 @@ function DashboardContent({
       "Ligações",
       "Campanhas",
       "Relatórios",
+      "Marketing",
+      "Whatsapp",
+      "Cronograma",
       "Coletor",
       "Logística",
       "Romaneios",
@@ -306,6 +310,7 @@ function DashboardContent({
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "crm_conversas" },
         (payload) => {
+          console.log("[CRM] Nova mensagem recebida em realtime:", payload.new);
           const newMsg = payload.new as CrmConversa;
           if (newMsg.enviado_por === userProfile?.id) return;
 
@@ -359,6 +364,13 @@ function DashboardContent({
                 ...prev,
               ];
             });
+
+            // CORREÇÃO REALTIME: Abre o modal se for sistema ou se não houver nada aberto
+            // Isso evita que o usuário tenha que atualizar a página para ver a mensagem
+            if (isForMe && (isSystem || !openChatDocRef.current)) {
+              console.log("[CRM] Realtime: Abrindo modal automaticamente para:", newMsg.documento);
+              handleSelectChat(newMsg.documento);
+            }
 
             // Notificação Nativa (Chrome/Edge/Safari)
             if ("Notification" in window) {
@@ -516,6 +528,13 @@ function DashboardContent({
     "Ligações",
     "Relatórios",
   ].includes(activeItem);
+  const isMarketingView = [
+    "Marketing",
+    "Whatsapp",
+    "Cronograma",
+    "Clientes",
+    "Relatórios",
+  ].includes(activeItem);
   const isComercial =
     userProfile?.department === "Comercial" ||
     userProfile?.department === "Vendas" ||
@@ -592,6 +611,8 @@ function DashboardContent({
             />
           ) : isCrmView ? (
             <CrmSection activeTab={activeItem} userProfile={userProfile} />
+          ) : isMarketingView ? (
+            <MarketingView activeTab={activeItem} userProfile={userProfile} />
           ) : ["Entregas", "Romaneios"].includes(activeItem) ? (
             <EntregasView activeTab={activeItem} userProfile={userProfile} />
           ) : ["Coletor", "Painel Coletor"].includes(activeItem) ? (

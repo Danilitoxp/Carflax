@@ -75,6 +75,17 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    icon: Megaphone,
+    label: "Marketing",
+    isDropdown: true,
+    subItems: [
+      { label: "Whatsapp", icon: Smartphone },
+      { label: "Clientes", icon: Users },
+      { label: "Cronograma", icon: Calendar },
+      { label: "Relatórios", icon: FileBarChart },
+    ],
+  },
+  {
     icon: Smartphone,
     label: "Coletor",
     isDropdown: true,
@@ -155,6 +166,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
       "Geral", "Produtos", "Dashboard", 
       "Calendário", "Eventos", "Férias", 
       "CRM", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", 
+      "Marketing", "Whatsapp", "Cronograma",
       "Logística", "Romaneios", "Entregas", 
       "Produtos", "Estoque", "Preços", "Eventos", "Férias"
     ];

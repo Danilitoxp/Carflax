@@ -312,7 +312,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         const crmStatus = crm.status_crm.toUpperCase();
         return {
           ...o,
-          status: crmStatus === "PERDIDO" ? o.status : crmStatus,
+          status: crmStatus,
           lossReason: o.lossReason ?? crm.motivo_perda ?? undefined,
           lembreteData: crm.lembrete_data ?? crm.fechamento_previsto ?? undefined,
         };
