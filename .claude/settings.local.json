@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__get_page_text",
+      "mcp__Claude_in_Chrome__read_page",
+      "Bash(curl -s -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" \"https://marketing-evolution-api.velbav.easypanel.host/instance/connectionState/Trafego\")",
+      "Bash(curl -s -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" \"https://marketing-evolution-api.velbav.easypanel.host/message/sendText/Trafego\" -X POST -H \"Content-Type: application/json\" -d '{\"number\":\"5511949470025\",\"text\":\"ping\"}')",
+      "Bash(curl -s -X POST -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" \"https://marketing-evolution-api.velbav.easypanel.host/instance/restart/Trafego\")",
+      "Bash(curl -s -X POST -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" -H \"Content-Type: application/json\" \"https://marketing-evolution-api.velbav.easypanel.host/message/sendText/Trafego\" -d '{\"number\":\"5511949470025\",\"text\":\"ping test\"}')",
+      "mcp__Claude_in_Chrome__navigate",
+      "Bash(curl -s -X POST -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" -H \"Content-Type: application/json\" \"https://marketing-evolution-api.velbav.easypanel.host/message/sendText/Trafego\" -d '{\"number\":\"5511949470039\",\"text\":\"teste pos restart\"}')"
+    ]
+  }
+}

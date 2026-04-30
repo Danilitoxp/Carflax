@@ -10,11 +10,8 @@ const EVO_CONFIG = {
   instance: import.meta.env.VITE_EVO_INSTANCE,
 };
 
-// Converte URL de HTTP para WS/WSS
 const getWsUrl = () => {
-  // Tentando o padrão /websocket/instancia (comum em v2/Easypanel)
-  const baseUrl = EVO_CONFIG.url.replace(/^http/, 'ws');
-  return `${baseUrl}/websocket/${EVO_CONFIG.instance}`;
+  return EVO_CONFIG.url;
 };
 
 async function fetchEvo<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -42,12 +39,14 @@ export const evolutionApi = {
    */
   connectWebSocket(): Socket {
     const wsUrl = getWsUrl();
-    console.log("Tentando conexão WebSocket (/websocket/instancia) em:", wsUrl);
-    
+    console.log("Tentando conexão WebSocket em:", wsUrl);
+
     return io(wsUrl, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       query: {
-        apikey: EVO_CONFIG.apiKey
+        apikey: EVO_CONFIG.apiKey,
+        token: EVO_CONFIG.apiKey,
+        instance: EVO_CONFIG.instance,
       },
       reconnectionAttempts: 10,
       reconnectionDelay: 3000

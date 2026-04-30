@@ -92,6 +92,8 @@ const getTempColor = (temp?: string) => {
   }
 };
 
+const avatarCache = new Map<string, string>();
+
 export function WhatsappView() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -108,6 +110,17 @@ export function WhatsappView() {
   const [saleValue, setSaleValue] = useState("");
   
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const fetchAvatar = useCallback(async (remoteJid: string) => {
+    if (avatarCache.has(remoteJid)) return avatarCache.get(remoteJid)!;
+    const url = await evolutionApi.getProfilePic(remoteJid);
+    const result = url || "";
+    avatarCache.set(remoteJid, result);
+    if (result) {
+      setChats(prev => prev.map(c => c.id === remoteJid ? { ...c, avatar: result } : c));
+    }
+    return result;
+  }, []);
 
   const loadChats = useCallback(async (isSilent = false) => {
     try {
@@ -142,58 +155,64 @@ export function WhatsappView() {
     const socket = evolutionApi.connectWebSocket();
 
     socket.on('connect', () => {
-      console.log('✅ Carflax HUB: Conectado ao WhatsApp Realtime');
+      console.log('✅ Conectado (transport:', socket.io.engine.transport.name + ')');
+      // Tenta entrar na sala da instância após conectar
+      socket.emit('subscribe', { instance: import.meta.env.VITE_EVO_INSTANCE });
+      socket.emit('join', import.meta.env.VITE_EVO_INSTANCE);
+    });
+
+    socket.io.engine?.on('upgrade', () => {
+      console.log('✅ WebSocket upgrade para:', socket.io.engine.transport.name);
+    });
+
+    // Captura qualquer pacote bruto do engine (nível abaixo do socket.io)
+    socket.io.engine?.on('message', (rawData: unknown) => {
+      console.log('🔍 RAW engine message:', rawData);
     });
 
     socket.onAny((event, ...args) => {
-      console.log('📡 DEBUG Realtime Event:', event, args);
+      console.log('📡 Realtime Event:', event, JSON.stringify(args).slice(0, 300));
     });
 
     socket.on('connect_error', (err) => {
       console.error('❌ Erro de conexão WebSocket:', err.message);
     });
 
-    const handleIncomingMessage = (data: Record<string, unknown>) => {
-      console.log('📩 Nova mensagem recebida (Realtime):', data);
-      
-      // Na v2, o dado pode vir em data.data ou direto
-      const payload = (data.data || data) as EvoMessageResponse;
-      const message = payload.message ? payload : ((payload as unknown as Record<string, unknown>).message ? (payload as unknown as Record<string, unknown>).message as EvoMessageResponse : payload);
-      
+    const processMessage = (message: EvoMessageResponse) => {
       const remoteJid = message.key?.remoteJid;
       if (!remoteJid) return;
 
-      // 1. Extrai informações da mensagem
       const messageContent = message.message;
-      const text = 
-        messageContent?.conversation || 
-        messageContent?.extendedTextMessage?.text || 
+      const text =
+        messageContent?.conversation ||
+        messageContent?.extendedTextMessage?.text ||
         messageContent?.imageMessage?.caption ||
+        messageContent?.videoMessage?.caption ||
         "Mídia";
-      
-      const time = message.messageTimestamp 
-        ? new Date(message.messageTimestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+
+      const time = message.messageTimestamp
+        ? new Date(message.messageTimestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      // 2. Atualiza a lista de chats lateral
       setChats(prevChats => {
         const existingChatIndex = prevChats.findIndex(c => c.id === remoteJid);
-        
         if (existingChatIndex !== -1) {
           const updatedChats = [...prevChats];
           const chat = { ...updatedChats[existingChatIndex] };
           chat.lastMessage = text;
           chat.time = time;
           updatedChats.splice(existingChatIndex, 1);
+          if (!chat.avatar) fetchAvatar(remoteJid);
           return [chat, ...updatedChats];
         } else {
+          fetchAvatar(remoteJid);
           const newChat: Chat = {
             id: remoteJid,
             name: message.pushName || "Novo Lead",
             lastMessage: text,
             time: time,
             unreadCount: 1,
-            avatar: "",
+            avatar: avatarCache.get(remoteJid) || "",
             leadInfo: {
               status: "Novo Lead",
               temperature: "Frio",
@@ -205,14 +224,11 @@ export function WhatsappView() {
         }
       });
 
-      // 3. Se for o chat selecionado, adiciona a mensagem na tela
       setSelectedChat(currentSelected => {
         if (currentSelected?.id === remoteJid) {
           const msgId = message.key?.id || Date.now().toString();
           setMessages(prevMsgs => {
-            // Evita duplicados (especialmente mensagens enviadas por nós mesmos)
             if (prevMsgs.some(m => m.id === msgId)) return prevMsgs;
-            
             const newMsg: Message = {
               id: msgId,
               text: text,
@@ -227,9 +243,26 @@ export function WhatsappView() {
       });
     };
 
-    // Escuta as duas variações de nomes de eventos comuns na v2
+    const handleIncomingMessage = (data: Record<string, unknown>) => {
+      console.log('📩 Nova mensagem recebida (Realtime):', data);
+
+      // Com WEBSOCKET_GLOBAL_EVENTS=true o payload vem como { instance, data: msg|msg[] }
+      // Filtra apenas eventos da instância configurada
+      const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
+      if (data.instance && data.instance !== instanceName) return;
+
+      const raw = data.data ?? data;
+      const messages: EvoMessageResponse[] = Array.isArray(raw)
+        ? (raw as EvoMessageResponse[])
+        : [raw as EvoMessageResponse];
+
+      messages.forEach(processMessage);
+    };
+
     socket.on('messages.upsert', handleIncomingMessage);
     socket.on('MESSAGES_UPSERT', handleIncomingMessage);
+    socket.on('message', handleIncomingMessage);
+    socket.on('message-received', handleIncomingMessage);
 
     socket.on('disconnect', () => {
       console.log('❌ Carflax HUB: Desconectado do WhatsApp Realtime');
