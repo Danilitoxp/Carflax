@@ -108,6 +108,8 @@ export function WhatsappView() {
   const [showTempDropdown, setShowTempDropdown] = useState(false);
   const [budgetId, setBudgetId] = useState("");
   const [saleValue, setSaleValue] = useState("");
+  const [typingChats, setTypingChats] = useState<Set<string>>(new Set());
+  const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -143,12 +145,16 @@ export function WhatsappView() {
       }));
       
       setChats(mappedChats);
+
+      // Busca avatares dos primeiros 20 chats em paralelo
+      const first20 = mappedChats.slice(0, 20);
+      await Promise.all(first20.map(c => fetchAvatar(c.id)));
     } catch (error) {
       console.error("Erro ao carregar chats:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchAvatar]);
 
   useEffect(() => {
     // Conecta ao WebSocket para receber mensagens em tempo real
@@ -264,6 +270,68 @@ export function WhatsappView() {
     socket.on('message', handleIncomingMessage);
     socket.on('message-received', handleIncomingMessage);
 
+    // Usa profilePicUrl direto do evento contacts.update (sem chamada extra à API)
+    const handleContactsUpdate = (data: Record<string, unknown>) => {
+      const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
+      if (data.instance && data.instance !== instanceName) return;
+
+      const raw = data.data ?? data;
+      const contacts = Array.isArray(raw) ? raw : [raw];
+
+      (contacts as Array<{ remoteJid?: string; profilePicUrl?: string }>).forEach(c => {
+        const jid = c.remoteJid;
+        const picUrl = c.profilePicUrl;
+        if (!jid || !picUrl || !jid.endsWith('@s.whatsapp.net')) return;
+        avatarCache.set(jid, picUrl);
+        setChats(prev => prev.map(chat =>
+          chat.id === jid ? { ...chat, avatar: picUrl } : chat
+        ));
+      });
+    };
+
+    socket.on('contacts.update', handleContactsUpdate);
+    socket.on('CONTACTS_UPDATE', handleContactsUpdate);
+
+    const handlePresenceUpdate = (data: Record<string, unknown>) => {
+      const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
+      if (data.instance && data.instance !== instanceName) return;
+
+      const raw = (data.data ?? data) as Record<string, unknown>;
+      // formato: { id: "jid", presences: { "jid": { lastKnownPresence: "composing"|"paused"|"available" } } }
+      const jid = (raw.id ?? raw.remoteJid) as string | undefined;
+      if (!jid) return;
+
+      const presences = raw.presences as Record<string, { lastKnownPresence?: string }> | undefined;
+      const presence = presences
+        ? Object.values(presences)[0]?.lastKnownPresence
+        : (raw.presence as string | undefined);
+
+      const isTyping = presence === 'composing' || presence === 'recording';
+
+      setTypingChats(prev => {
+        const next = new Set(prev);
+        if (isTyping) {
+          next.add(jid);
+          // limpa após 5s sem atualização
+          const existing = typingTimers.current.get(jid);
+          if (existing) clearTimeout(existing);
+          const timer = setTimeout(() => {
+            setTypingChats(s => { const n = new Set(s); n.delete(jid); return n; });
+            typingTimers.current.delete(jid);
+          }, 5000);
+          typingTimers.current.set(jid, timer);
+        } else {
+          next.delete(jid);
+          const existing = typingTimers.current.get(jid);
+          if (existing) { clearTimeout(existing); typingTimers.current.delete(jid); }
+        }
+        return next;
+      });
+    };
+
+    socket.on('presence.update', handlePresenceUpdate);
+    socket.on('PRESENCE_UPDATE', handlePresenceUpdate);
+
     socket.on('disconnect', () => {
       console.log('❌ Carflax HUB: Desconectado do WhatsApp Realtime');
     });
@@ -271,7 +339,7 @@ export function WhatsappView() {
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [fetchAvatar]);
 
   useEffect(() => {
     // loadChats(); // Desativado a pedido do usuário para não carregar conversas antigas
@@ -477,7 +545,10 @@ export function WhatsappView() {
                   <span className={cn("font-black text-xs uppercase truncate", selectedChat?.id === chat.id ? "text-white" : "text-foreground")}>{chat.name}</span>
                   <span className="text-[9px] font-bold opacity-60">{chat.time}</span>
                 </div>
-                <p className="text-[11px] truncate opacity-70">{chat.lastMessage}</p>
+                {typingChats.has(chat.id)
+                  ? <p className="text-[11px] truncate text-emerald-400 font-bold">digitando...</p>
+                  : <p className="text-[11px] truncate opacity-70">{chat.lastMessage}</p>
+                }
               </div>
               {chat.unreadCount > 0 && (
                 <div className="absolute top-4 right-4 w-5 h-5 bg-rose-500 text-white rounded-lg flex items-center justify-center text-[9px] font-black">
@@ -501,7 +572,10 @@ export function WhatsappView() {
                 <div>
                   <h4 className="font-black text-sm uppercase tracking-tighter">{selectedChat.name}</h4>
                   <div className="flex items-center gap-2">
-                    <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Online</p>
+                    {typingChats.has(selectedChat.id)
+                      ? <p className="text-[10px] text-emerald-400 font-bold tracking-widest animate-pulse">digitando...</p>
+                      : <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Online</p>
+                    }
                     {selectedChat.leadInfo && <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">• {selectedChat.leadInfo.campaign}</p>}
                   </div>
                 </div>
@@ -531,14 +605,14 @@ export function WhatsappView() {
               </div>
             </div>
 
-            <div className="flex-1 flex flex-col bg-[url('https://w0.peakpx.com/wallpaper/580/650/HD-wallpaper-whatsapp-background-dark-mode-pattern-whatsapp-dark-mode-thumbnail.jpg')] bg-repeat">
+            <div className="flex-1 min-h-0 flex flex-col bg-[url('https://w0.peakpx.com/wallpaper/580/650/HD-wallpaper-whatsapp-background-dark-mode-pattern-whatsapp-dark-mode-thumbnail.jpg')] bg-repeat">
               {loadingMessages ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-3">
                   <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                   <span className="text-[10px] font-black uppercase tracking-widest text-primary">Carregando...</span>
                 </div>
               ) : (
-                <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
                   {messages.map((msg) => (
                     <div key={msg.id} className={cn("flex", msg.sender === "me" ? "justify-end" : "justify-start")}>
                       <div className={cn("max-w-[75%] px-4 py-2 rounded-2xl shadow-sm relative", msg.sender === "me" ? "bg-primary text-white rounded-tr-none" : "bg-card border border-border text-foreground rounded-tl-none")}>
