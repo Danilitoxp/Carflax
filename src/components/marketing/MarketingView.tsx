@@ -2,6 +2,7 @@ import { Megaphone, Calendar } from "lucide-react";
 import { WhatsappView } from "./whatsapp/WhatsappView";
 import { ClientesView } from "./ClientesView";
 import { LeadsView } from "./LeadsView";
+import { ReportsView } from "./ReportsView";
 
 interface UserProfile {
   id?: string;
@@ -27,6 +28,10 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
 
   if (activeTab === "Leads") {
     return <LeadsView />;
+  }
+
+  if (activeTab.includes("Relatórios")) {
+    return <ReportsView />;
   }
 
   return (

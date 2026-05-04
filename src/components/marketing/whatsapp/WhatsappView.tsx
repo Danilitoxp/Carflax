@@ -258,35 +258,59 @@ function CustomAudioPlayer({
 
 export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const [chats, setChats] = useState<Chat[]>([]);
-  const [viewMode, setViewMode] = useState<"active" | "archived">("active");
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  
-  const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [showSaleModal, setShowSaleModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [showTempDropdown, setShowTempDropdown] = useState(false);
-  const [budgetId, setBudgetId] = useState("");
+  
   const [saleValue, setSaleValue] = useState("");
-  const [myAvatar, setMyAvatar] = useState<string>("");
-  const [presenceChats, setPresenceChats] = useState<Map<string, 'composing' | 'recording'>>(new Map());
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, chat: Chat } | null>(null);
-  const lastSeenMap = useRef<Map<string, Date>>(new Map());
-  const [, forceUpdate] = useState(0); // para re-render ao atualizar lastSeenMap
-  const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const lidToJidMap = useRef<Map<string, string>>(new Map());
-  const lastPhoneJid = useRef<string | null>(null);
 
+  const tempBtnRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedChatRef = useRef<Chat | null>(null);
-  const tempBtnRef = useRef<HTMLButtonElement>(null);
+  const lastPhoneJid = useRef<string | null>(null);
+  const lidToJidMap = useRef<Map<string, string>>(new Map());
+  const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const lastSeenMap = useRef<Map<string, Date>>(new Map());
+
+  const [presenceChats, setPresenceChats] = useState<Map<string, string>>(new Map());
+  const [myAvatar, setMyAvatar] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"active" | "archived">("active");
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, chat: Chat } | null>(null);
+  const [, forceUpdate] = useState(0); 
 
   useEffect(() => {
     selectedChatRef.current = selectedChat;
   }, [selectedChat]);
+
+  useEffect(() => {
+    // Solicita permissão para notificações do Chrome
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  const sendBrowserNotification = (title: string, body: string, icon?: string) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, {
+        body,
+        icon: icon || "/favicon.ico",
+        badge: "/favicon.ico"
+      });
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('wpp_lid_map');
+      if (saved) new Map<string, string>(JSON.parse(saved)).forEach((v, k) => lidToJidMap.current.set(k, v));
+    } catch { /* ignora */ }
+  }, []);
 
   useEffect(() => {
     try {
@@ -499,6 +523,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         const reactedMsgId = messageContent.reactionMessage.key?.id;
         const reactionText = messageContent.reactionMessage.text || "";
         if (reactedMsgId) {
+          if (!message.key.fromMe) {
+            const senderName = message.pushName || remoteJid.split('@')[0];
+            const text = "Nova reação recebida";
+            sendBrowserNotification(`Nova reação de ${senderName}`, text);
+          }
           setMessages(prev => prev.map(m => m.id === reactedMsgId ? { ...m, reacao: reactionText } : m));
           // Atualização simples da reação no banco pode ser implementada depois se necessário
           return;
@@ -517,6 +546,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       const timestamp = message.messageTimestamp
         ? new Date(message.messageTimestamp * 1000).toISOString()
         : new Date().toISOString();
+
+      if (!message.key?.fromMe) {
+        const senderName = message.pushName || remoteJid.split('@')[0];
+        sendBrowserNotification(`Nova mensagem de ${senderName}`, text);
+      }
 
       const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -879,8 +913,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       marketingService.markAsRead(chat.id);
     }
     setLoadingMessages(true);
-    setBudgetId(chat.leadInfo?.budgetId || "");
-    setSaleValue(chat.leadInfo?.saleValue || "");
+    setSaleValue("");
     evolutionApi.subscribePresence(chat.id);
 
 
@@ -980,7 +1013,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     } finally {
       setLoadingMessages(false);
     }
-  }, [setBudgetId, setSaleValue, setSelectedChat, setMessages, setLoadingMessages, vendedorId]);
+  }, [vendedorId]);
 
   // Initial Auto-selection - MOVED BELOW handleSelectChat
   useEffect(() => {
@@ -995,6 +1028,34 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       ...selectedChat,
       leadInfo: { ...selectedChat.leadInfo, followUpDate: label }
     });
+  };
+
+  const handleConfirmSale = async () => {
+    if (!selectedChat || !saleValue) return;
+    
+    try {
+      const val = parseFloat(saleValue.replace(',', '.'));
+      if (isNaN(val)) return;
+
+      await marketingService.registerSale(selectedChat.id, val);
+      
+      // Feedback visual
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const saleMsg: Message = {
+        id: "sale_" + Date.now(),
+        text: `💰 VENDA REGISTRADA: R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        time: time,
+        sender: "me",
+        status: "read",
+        tipo: "text"
+      };
+      
+      setMessages(prev => [...prev, saleMsg]);
+      setShowSaleModal(false);
+      setSaleValue("");
+    } catch (error) {
+      console.error("Erro ao registrar venda:", error);
+    }
   };
 
   return (
@@ -1038,9 +1099,22 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                <button onClick={() => setShowSaleModal(false)}><X className="w-5 h-5"/></button>
             </div>
             <div className="p-6 space-y-4">
-               <input type="text" placeholder="ID Orçamento" value={budgetId} onChange={(e)=>setBudgetId(e.target.value)} className="w-full p-3 bg-secondary rounded-xl text-xs font-bold" />
-               <input type="number" placeholder="Valor" value={saleValue} onChange={(e)=>setSaleValue(e.target.value)} className="w-full p-3 bg-secondary rounded-xl text-xs font-bold" />
-               <button onClick={()=>setShowSaleModal(false)} className="w-full p-4 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase">Confirmar</button>
+               <div className="space-y-1">
+                 <p className="text-[10px] font-black text-muted-foreground uppercase">Valor da Venda</p>
+                 <input 
+                   type="number" 
+                   placeholder="0,00" 
+                   value={saleValue} 
+                   onChange={(e)=>setSaleValue(e.target.value)} 
+                   className="w-full p-4 bg-secondary/50 border border-border rounded-2xl text-lg font-black text-primary outline-none focus:border-primary/50 transition-colors" 
+                 />
+               </div>
+               <button 
+                 onClick={handleConfirmSale} 
+                 className="w-full p-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+               >
+                 Confirmar Venda
+               </button>
             </div>
           </div>
         </div>
@@ -1159,7 +1233,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                 <div className="flex flex-col items-end justify-between py-0.5 shrink-0 min-w-[40px]">
                   <span className="text-[9px] font-bold opacity-50">{chat.time}</span>
                   {chat.unreadCount > 0 ? (
-                    <div className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-lg shadow-primary/20">
+                    <div className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-[9px] font-black">
                       {chat.unreadCount}
                     </div>
                   ) : <div className="h-5" />}
@@ -1174,7 +1248,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       <div className="flex-1 flex flex-col bg-background relative overflow-hidden">
         {selectedChat ? (
           <>
-            <div className="p-4 flex items-center justify-between border-b border-border bg-card/20 backdrop-blur-md">
+            <div className="p-4 flex items-center justify-between border-b border-border bg-card/20 backdrop-blur-md z-40 relative">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border">
                    {selectedChat.avatar ? <img src={selectedChat.avatar} className="w-full h-full object-cover" /> : <User className="w-5 h-5" />}
@@ -1209,19 +1283,15 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                     <span className="text-[10px] font-black uppercase pointer-events-none">{selectedChat.leadInfo?.temperature || "Frio"}</span>
                     <ChevronDown className="w-3 h-3 pointer-events-none" />
                   </button>
-                  {showTempDropdown && (() => {
-                    const rect = tempBtnRef.current?.getBoundingClientRect();
-                    return (
-                      <div
-                        className="fixed w-32 bg-card border border-border rounded-xl shadow-2xl z-[9999] overflow-hidden"
-                        style={{ top: rect ? rect.bottom + 8 : 0, right: rect ? window.innerWidth - rect.right : 0 }}
-                      >
-                        {(["Quente", "Morno", "Frio"] as Temperature[]).map(t => (
-                          <button key={t} onClick={()=>{ setSelectedChat({...selectedChat, leadInfo: {...selectedChat.leadInfo!, temperature: t}}); setShowTempDropdown(false); }} className="w-full p-3 text-[10px] font-black uppercase hover:bg-secondary text-left">{t}</button>
-                        ))}
-                      </div>
-                    );
-                  })()}
+                  {showTempDropdown && (
+                    <div
+                      className="absolute top-12 right-0 w-32 bg-card border border-border rounded-xl shadow-2xl z-[9999] overflow-hidden"
+                    >
+                      {(["Quente", "Morno", "Frio"] as Temperature[]).map(t => (
+                        <button key={t} onClick={()=>{ setSelectedChat({...selectedChat, leadInfo: {...selectedChat.leadInfo!, temperature: t}}); setShowTempDropdown(false); }} className="w-full p-3 text-[10px] font-black uppercase hover:bg-secondary text-left">{t}</button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button onClick={()=>setShowFollowUpModal(true)} className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"><Bell className="w-4 h-4"/></button>
                 <button onClick={()=>setShowSaleModal(true)} className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"><DollarSign className="w-4 h-4"/></button>

@@ -82,7 +82,7 @@ const menuItems: MenuItem[] = [
       { label: "Whatsapp", icon: Smartphone },
       { label: "Leads", icon: Users },
       { label: "Cronograma", icon: Calendar },
-      { label: "Relatórios", icon: FileBarChart },
+      { label: "Relatórios Mkt", icon: FileBarChart },
     ],
   },
   {
@@ -164,7 +164,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
 
     // Permissões específicas do departamento de MARKETING
     const isMarketingDept = userProfile?.department?.toUpperCase() === 'MARKETING';
-    const marketingItems = ["Marketing", "Whatsapp", "Leads", "Cronograma"];
+    const marketingItems = ["Marketing", "Whatsapp", "Leads", "Cronograma", "Relatórios Mkt"];
     if (isMarketingDept && marketingItems.includes(label)) return true;
 
     // Permissões específicas do VENDEDOR

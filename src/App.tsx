@@ -98,6 +98,7 @@ function DashboardContent({
       "Ligações",
       "Campanhas",
       "Relatórios",
+      "Relatórios Mkt",
       "Marketing",
       "Whatsapp",
       "Cronograma",
@@ -122,6 +123,7 @@ function DashboardContent({
       "Organograma",
       "Sugestões",
       "Relatórios",
+      "Relatórios Mkt",
       "Coletor",
       "Painel Coletor",
     ].includes(activeItem);
@@ -533,7 +535,7 @@ function DashboardContent({
     "Whatsapp",
     "Cronograma",
     "Leads",
-    "Relatórios",
+    "Relatórios Mkt",
   ].includes(activeItem);
   const isComercial =
     userProfile?.department === "Comercial" ||

@@ -15,6 +15,8 @@ export interface MarketingCliente {
   fixado?: boolean;
   motivo_arquivamento?: string;
   mensagens_nao_lidas?: number;
+  valor_venda?: number;
+  data_venda?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -250,6 +252,25 @@ export const marketingService = {
   },
 
   /**
+   * Registra uma venda manual para o lead
+   */
+  async registerSale(remoteJid: string, value: number) {
+    const { error } = await supabase
+      .from("marketing_clientes")
+      .update({ 
+        valor_venda: value,
+        data_venda: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("remote_jid", remoteJid);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao registrar venda:", error);
+      throw error;
+    }
+  },
+
+  /**
    * Faz o upload de uma mídia em base64 para o Supabase Storage e retorna a URL pública
    */
   async uploadMedia(base64: string, mimetype: string, filename: string): Promise<string | null> {
@@ -281,5 +302,78 @@ export const marketingService = {
       console.error('[MarketingService] Erro ao processar mídia:', error);
       return null;
     }
+  },
+
+  /**
+   * Busca estatísticas de leads (hoje e mês)
+   */
+  async getMarketingStats(date?: Date) {
+    const selectedDate = date || new Date();
+    const startOfSelectedDay = new Date(selectedDate);
+    startOfSelectedDay.setHours(0, 0, 0, 0);
+    const endOfSelectedDay = new Date(selectedDate);
+    endOfSelectedDay.setHours(23, 59, 59, 999);
+
+    const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1).toISOString();
+
+    const { count: leadsToday } = await supabase
+      .from('marketing_clientes')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', startOfSelectedDay.toISOString())
+      .lte('created_at', endOfSelectedDay.toISOString());
+
+    const { count: leadsMonth } = await supabase
+      .from('marketing_clientes')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', firstDayOfMonth)
+      .lte('created_at', endOfSelectedDay.toISOString());
+
+    const { data: salesToday } = await supabase
+      .from('marketing_clientes')
+      .select('valor_venda')
+      .gte('data_venda', startOfSelectedDay.toISOString())
+      .lte('data_venda', endOfSelectedDay.toISOString());
+
+    const { data: salesMonth } = await supabase
+      .from('marketing_clientes')
+      .select('valor_venda')
+      .gte('data_venda', firstDayOfMonth)
+      .lte('data_venda', endOfSelectedDay.toISOString());
+
+    const billingToday = (salesToday || []).reduce((acc, s) => acc + (s.valor_venda || 0), 0);
+    const billingMonth = (salesMonth || []).reduce((acc, s) => acc + (s.valor_venda || 0), 0);
+
+    return {
+      leadsToday: leadsToday || 0,
+      leadsMonth: leadsMonth || 0,
+      billingToday,
+      billingMonth,
+      salesCountToday: (salesToday || []).length,
+      salesCountMonth: (salesMonth || []).length
+    };
+  },
+
+  /**
+   * Busca leads agrupados por hora para um gráfico de picos
+   */
+  async getHourlyLeads(date: Date) {
+    const startOfSelectedDay = new Date(date);
+    startOfSelectedDay.setHours(0, 0, 0, 0);
+    const endOfSelectedDay = new Date(date);
+    endOfSelectedDay.setHours(23, 59, 59, 999);
+
+    const { data } = await supabase
+      .from('marketing_clientes')
+      .select('created_at')
+      .gte('created_at', startOfSelectedDay.toISOString())
+      .lte('created_at', endOfSelectedDay.toISOString());
+
+    const hourlyCounts = new Array(24).fill(0);
+    data?.forEach(lead => {
+      const hour = new Date(lead.created_at).getHours();
+      hourlyCounts[hour]++;
+    });
+
+    return hourlyCounts;
   }
 };
