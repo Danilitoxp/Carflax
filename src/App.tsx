@@ -532,7 +532,7 @@ function DashboardContent({
     "Marketing",
     "Whatsapp",
     "Cronograma",
-    "Clientes",
+    "Leads",
     "Relatórios",
   ].includes(activeItem);
   const isComercial =

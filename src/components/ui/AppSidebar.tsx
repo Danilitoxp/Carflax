@@ -80,7 +80,7 @@ const menuItems: MenuItem[] = [
     isDropdown: true,
     subItems: [
       { label: "Whatsapp", icon: Smartphone },
-      { label: "Clientes", icon: Users },
+      { label: "Leads", icon: Users },
       { label: "Cronograma", icon: Calendar },
       { label: "Relatórios", icon: FileBarChart },
     ],
@@ -127,6 +127,7 @@ interface AppSidebarProps {
     name: string;
     avatar?: string;
     role?: string;
+    department?: string;
     permissions?: string[];
   };
   isCollapsed: boolean;
@@ -161,12 +162,16 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const alwaysAllowed = ["Meu Perfil", "Aparência", "Notificações", "Segurança", "Relatórios", "Coletor"];
     if (alwaysAllowed.includes(label)) return true;
 
+    // Permissões específicas do departamento de MARKETING
+    const isMarketingDept = userProfile?.department?.toUpperCase() === 'MARKETING';
+    const marketingItems = ["Marketing", "Whatsapp", "Leads", "Cronograma"];
+    if (isMarketingDept && marketingItems.includes(label)) return true;
+
     // Permissões específicas do VENDEDOR
     const vendedorStandard = [
       "Geral", "Produtos", "Dashboard", 
       "Calendário", "Eventos", "Férias", 
       "CRM", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", 
-      "Marketing", "Whatsapp", "Cronograma",
       "Logística", "Romaneios", "Entregas", 
       "Produtos", "Estoque", "Preços", "Eventos", "Férias"
     ];

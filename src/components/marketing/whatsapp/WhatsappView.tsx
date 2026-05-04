@@ -14,9 +14,10 @@ import {
   DollarSign,
   X,
   Bell,
-  History
+  RefreshCw
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
+import { marketingService } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
 
 interface Message {
@@ -44,10 +45,12 @@ interface Chat {
   id: string;
   name: string;
   lastMessage: string;
+  lastMessageSender?: "me" | "contact";
   time: string;
   unreadCount: number;
   avatar?: string;
   online?: boolean;
+  arquivado?: boolean;
   leadInfo?: LeadMetadata;
 }
 
@@ -94,8 +97,9 @@ const getTempColor = (temp?: string) => {
 
 const avatarCache = new Map<string, string>();
 
-export function WhatsappView() {
+export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const [chats, setChats] = useState<Chat[]>([]);
+  const [viewMode, setViewMode] = useState<"active" | "archived">("active");
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
@@ -108,85 +112,199 @@ export function WhatsappView() {
   const [showTempDropdown, setShowTempDropdown] = useState(false);
   const [budgetId, setBudgetId] = useState("");
   const [saleValue, setSaleValue] = useState("");
-  const [typingChats, setTypingChats] = useState<Set<string>>(new Set());
+  const [presenceChats, setPresenceChats] = useState<Map<string, 'composing' | 'recording'>>(new Map());
   const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const lidToJidMap = useRef<Map<string, string>>(new Map());
+  const lastPhoneJid = useRef<string | null>(null);
 
-  const fetchAvatar = useCallback(async (remoteJid: string) => {
-    if (avatarCache.has(remoteJid)) return avatarCache.get(remoteJid)!;
-    const url = await evolutionApi.getProfilePic(remoteJid);
-    const result = url || "";
-    avatarCache.set(remoteJid, result);
-    if (result) {
-      setChats(prev => prev.map(c => c.id === remoteJid ? { ...c, avatar: result } : c));
-    }
-    return result;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const selectedChatRef = useRef<Chat | null>(null);
+  const tempBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    selectedChatRef.current = selectedChat;
+  }, [selectedChat]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('wpp_lid_map');
+      if (saved) new Map<string, string>(JSON.parse(saved)).forEach((v, k) => lidToJidMap.current.set(k, v));
+    } catch { /* ignora */ }
   }, []);
+
+  const fetchAvatar = useCallback(async (remoteJid: string, force = false) => {
+    // Se já tentamos buscar (mesmo que tenha vindo vazio), não tenta de novo nesta sessão
+    if (!force && avatarCache.has(remoteJid)) {
+      return avatarCache.get(remoteJid)!;
+    }
+    
+    try {
+      const url = await evolutionApi.getProfilePic(remoteJid);
+      const finalUrl = url || "";
+      avatarCache.set(remoteJid, finalUrl);
+      
+      if (finalUrl) {
+        setChats(prev => prev.map(c => c.id === remoteJid ? { ...c, avatar: finalUrl } : c));
+      }
+      return finalUrl;
+    } catch {
+      // Silencia erros de busca de foto
+    }
+    return "";
+  }, []);
+
+  const isInitialLoad = useRef(true);
 
   const loadChats = useCallback(async (isSilent = false) => {
     try {
-      if (!isSilent) setLoading(true);
-      const data = await evolutionApi.getChats();
+      // Só mostra o loading pesado se for a primeira carga absoluta
+      if (!isSilent && isInitialLoad.current) setLoading(true);
       
-      const mappedChats: Chat[] = (data as EvoChatResponse[]).map((item) => ({
-        id: (item.id || item.remoteJid) as string,
-        name: (item.name || item.pushName || "Contato") as string,
-        lastMessage: typeof item.lastMessage === 'string' ? item.lastMessage : (item.lastMessage?.message?.conversation || "Mídia"),
-        time: item.updatedAt ? new Date(item.updatedAt as string).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
-        unreadCount: (item.unreadCount || 0) as number,
-        avatar: "",
+      // 1. Busca instantânea no Supabase
+      const dbClientes = await marketingService.getActiveClientes(viewMode === "archived");
+      
+      const mappedChats: Chat[] = dbClientes.map((item) => ({
+        id: item.remote_jid,
+        name: item.nome || item.push_name || item.remote_jid.split('@')[0],
+        lastMessage: item.ultima_mensagem || "",
+        time: item.ultima_conversa_em ? new Date(item.ultima_conversa_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
+        unreadCount: 0,
+        avatar: item.foto_url || "",
+        arquivado: item.arquivado,
         leadInfo: {
-          status: "Novo Lead",
-          temperature: "Frio",
+          status: item.status || "Novo Lead",
+          temperature: (item.temperatura as Temperature) || "Frio",
           source: "WhatsApp",
           campaign: "Geral"
         }
       }));
       
+      // MOSTRA OS DADOS DO BANCO IMEDIATAMENTE
       setChats(mappedChats);
+      setLoading(false);
+      isInitialLoad.current = false;
 
-      // Busca avatares dos primeiros 20 chats em paralelo
-      const first20 = mappedChats.slice(0, 20);
-      await Promise.all(first20.map(c => fetchAvatar(c.id)));
+      // 2. Sincronização em segundo plano (Não trava o usuário)
+      if (mappedChats.length > 0) {
+        evolutionApi.getChats().then(async (evoData) => {
+          const evoChats = evoData as EvoChatResponse[];
+          const updates: import("@/lib/marketing-service").MarketingCliente[] = []; 
+
+          const enrichedChats = mappedChats.map(chat => {
+            const evo = evoChats.find(e => (e.id || e.remoteJid) === chat.id);
+            if (!evo) return chat;
+
+            const resolvedName = evo.name || evo.pushName || chat.name;
+            const lastMsg = typeof evo.lastMessage === 'string' ? evo.lastMessage : (evo.lastMessage?.message?.conversation || chat.lastMessage);
+
+            if (resolvedName !== chat.name || lastMsg !== chat.lastMessage) {
+              updates.push({
+                remote_jid: chat.id,
+                push_name: resolvedName,
+                ultima_mensagem: lastMsg,
+                ultima_conversa_em: evo.updatedAt || new Date().toISOString()
+              });
+            }
+
+            return { ...chat, name: resolvedName, lastMessage: lastMsg };
+          });
+
+          // Atualiza UI apenas se houver mudanças reais
+          if (updates.length > 0) {
+            setChats(enrichedChats);
+            marketingService.upsertClientes(updates);
+          }
+          
+          // Busca fotos e nomes extras também em background
+          enrichedChats.forEach(chat => {
+            const isPhoneOnly = /^\d+$/.test(chat.name);
+            if (isPhoneOnly || !chat.avatar) {
+              evolutionApi.getContact(chat.id).then(contact => {
+                if (!contact) return;
+                const cUpdates: { push_name?: string; foto_url?: string } = {};
+                if (contact.pushName && contact.pushName !== chat.name) cUpdates.push_name = contact.pushName;
+                if (contact.profilePicUrl && contact.profilePicUrl !== chat.avatar) {
+                  cUpdates.foto_url = contact.profilePicUrl;
+                  avatarCache.set(chat.id, contact.profilePicUrl);
+                }
+                if (Object.keys(cUpdates).length > 0) {
+                  marketingService.upsertCliente({ remote_jid: chat.id, ...cUpdates });
+                  setChats(prev => prev.map(c => c.id === chat.id ? {
+                    ...c,
+                    ...(contact.pushName ? { name: contact.pushName } : {}),
+                    ...(contact.profilePicUrl ? { avatar: contact.profilePicUrl } : {})
+                  } : c));
+                }
+              });
+            }
+          });
+        });
+      }
     } catch (error) {
       console.error("Erro ao carregar chats:", error);
-    } finally {
       setLoading(false);
     }
-  }, [fetchAvatar]);
+  }, [viewMode]);
+
+  const handleArchiveChat = async (reason?: string) => {
+    if (!selectedChat) return;
+    
+    try {
+      await marketingService.upsertCliente({
+        remote_jid: selectedChat.id,
+        arquivado: true,
+        status: reason || "Arquivado"
+      });
+      
+      // Remove da lista local e limpa seleção
+      setChats(prev => prev.filter(c => c.id !== selectedChat.id));
+      setSelectedChat(null);
+      setShowArchiveModal(false);
+    } catch (error) {
+      console.error("Erro ao arquivar chat:", error);
+    }
+  };
+
+  const handleUnarchiveChat = async () => {
+    if (!selectedChat) return;
+    
+    try {
+      await marketingService.upsertCliente({
+        remote_jid: selectedChat.id,
+        arquivado: false
+      });
+      
+      // Remove da lista de arquivados e limpa seleção
+      setChats(prev => prev.filter(c => c.id !== selectedChat.id));
+      setSelectedChat(null);
+    } catch (error) {
+      console.error("Erro ao desarquivar chat:", error);
+    }
+  };
 
   useEffect(() => {
     // Conecta ao WebSocket para receber mensagens em tempo real
     const socket = evolutionApi.connectWebSocket();
 
     socket.on('connect', () => {
-      console.log('✅ Conectado (transport:', socket.io.engine.transport.name + ')');
-      // Tenta entrar na sala da instância após conectar
       socket.emit('subscribe', { instance: import.meta.env.VITE_EVO_INSTANCE });
       socket.emit('join', import.meta.env.VITE_EVO_INSTANCE);
     });
 
-    socket.io.engine?.on('upgrade', () => {
-      console.log('✅ WebSocket upgrade para:', socket.io.engine.transport.name);
-    });
-
-    // Captura qualquer pacote bruto do engine (nível abaixo do socket.io)
-    socket.io.engine?.on('message', (rawData: unknown) => {
-      console.log('🔍 RAW engine message:', rawData);
-    });
-
-    socket.onAny((event, ...args) => {
-      console.log('📡 Realtime Event:', event, JSON.stringify(args).slice(0, 300));
-    });
-
-    socket.on('connect_error', (err) => {
-      console.error('❌ Erro de conexão WebSocket:', err.message);
-    });
-
-    const processMessage = (message: EvoMessageResponse) => {
+    const processMessage = async (message: EvoMessageResponse) => {
       const remoteJid = message.key?.remoteJid;
-      if (!remoteJid) return;
+      if (!remoteJid || !remoteJid.endsWith('@s.whatsapp.net')) return;
+
+      // Guarda o JID para correlacionar com o LID do chats.update que vem logo após
+      lastPhoneJid.current = remoteJid;
+
+      // FILTRO DE DATA: Ignora mensagens anteriores ao cleanup manual de hoje (08:50)
+      const MIN_SYNC_TIMESTAMP = Math.floor(new Date('2026-05-04T08:50:00').getTime() / 1000);
+      if (message.messageTimestamp < MIN_SYNC_TIMESTAMP) {
+        return;
+      }
+
+      console.log('📩 Mensagem de:', { remoteJid, pushName: message.pushName, fromMe: message.key?.fromMe, status: message.status });
 
       const messageContent = message.message;
       const text =
@@ -196,9 +314,35 @@ export function WhatsappView() {
         messageContent?.videoMessage?.caption ||
         "Mídia";
 
-      const time = message.messageTimestamp
-        ? new Date(message.messageTimestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const timestamp = message.messageTimestamp
+        ? new Date(message.messageTimestamp * 1000).toISOString()
+        : new Date().toISOString();
+
+      const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const msgId = message.key?.id || Date.now().toString();
+
+      // pushName em mensagens recebidas (fromMe=false) é sempre o nome do contato
+      const validPushName = !message.key?.fromMe && message.pushName ? message.pushName : null;
+
+      // 1. Garante que o cliente existe ANTES de salvar a mensagem (evita FK constraint)
+      await marketingService.upsertCliente({
+        remote_jid: remoteJid,
+        ...(validPushName ? { push_name: validPushName } : {}),
+        ultima_mensagem: text,
+        ultima_conversa_em: timestamp
+      });
+
+      // 2. Salva a mensagem no Supabase
+      await marketingService.saveMessage({
+        message_id: msgId,
+        remote_jid: remoteJid,
+        texto: text,
+        sender: message.key?.fromMe ? "me" : "contact",
+        timestamp: timestamp,
+        status: message.status === "READ" ? "read" : "sent",
+        ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {})
+      });
 
       setChats(prevChats => {
         const existingChatIndex = prevChats.findIndex(c => c.id === remoteJid);
@@ -206,16 +350,74 @@ export function WhatsappView() {
           const updatedChats = [...prevChats];
           const chat = { ...updatedChats[existingChatIndex] };
           chat.lastMessage = text;
+          chat.lastMessageSender = message.key?.fromMe ? "me" : "contact";
           chat.time = time;
+
+          // Atualiza nome se ainda estiver como número de telefone e tiver push name válido
+          if (validPushName) {
+            const isPhoneNumber = /^\d+$/.test(chat.name.replace(/\D/g, '')) && chat.name.length >= 8;
+            if (isPhoneNumber || chat.name === "Novo Lead") {
+              chat.name = validPushName;
+            }
+          } else if (message.key?.fromMe) {
+            // Se nós enviamos e ainda não temos o nome real, busca na API em background
+            const isPhoneNumber = /^\d+$/.test(chat.name.replace(/\D/g, '')) && chat.name.length >= 8;
+            if (isPhoneNumber || chat.name === "Novo Lead" || !chat.avatar) {
+              evolutionApi.getContact(remoteJid).then(contact => {
+                if (!contact) return;
+                setChats(prev => prev.map(c => {
+                  if (c.id === remoteJid) {
+                    const updated = { ...c };
+                    if (contact.pushName && (isPhoneNumber || c.name === "Novo Lead")) updated.name = contact.pushName;
+                    if (contact.profilePicUrl && !c.avatar) updated.avatar = contact.profilePicUrl;
+                    return updated;
+                  }
+                  return c;
+                }));
+                
+                if (contact.pushName || contact.profilePicUrl) {
+                  marketingService.upsertCliente({ 
+                    remote_jid: remoteJid, 
+                    ...(contact.pushName ? { push_name: contact.pushName } : {}),
+                    ...(contact.profilePicUrl ? { foto_url: contact.profilePicUrl } : {})
+                  });
+                }
+              });
+            }
+          }
+
+          // Incrementa unread se não for o chat selecionado
+          if (selectedChatRef.current?.id !== remoteJid) {
+            chat.unreadCount = (chat.unreadCount || 0) + 1;
+          }
+
           updatedChats.splice(existingChatIndex, 1);
           if (!chat.avatar) fetchAvatar(remoteJid);
           return [chat, ...updatedChats];
         } else {
           fetchAvatar(remoteJid);
+
+          // Se foi o vendedor que enviou primeiro, busca nome/foto do contato em background
+          if (message.key?.fromMe) {
+            evolutionApi.getContact(remoteJid).then(contact => {
+              if (!contact) return;
+              if (contact.pushName) {
+                setChats(prev => prev.map(c => c.id === remoteJid && (c.name === remoteJid.split('@')[0]) ? { ...c, name: contact.pushName! } : c));
+                marketingService.upsertCliente({ remote_jid: remoteJid, push_name: contact.pushName });
+              }
+              if (contact.profilePicUrl) {
+                avatarCache.set(remoteJid, contact.profilePicUrl);
+                setChats(prev => prev.map(c => c.id === remoteJid ? { ...c, avatar: contact.profilePicUrl! } : c));
+                marketingService.upsertCliente({ remote_jid: remoteJid, foto_url: contact.profilePicUrl });
+              }
+            });
+          }
+
           const newChat: Chat = {
             id: remoteJid,
-            name: message.pushName || "Novo Lead",
+            name: message.key?.fromMe ? remoteJid.split('@')[0] : (validPushName || "Novo Lead"),
             lastMessage: text,
+            lastMessageSender: message.key?.fromMe ? "me" : "contact",
             time: time,
             unreadCount: 1,
             avatar: avatarCache.get(remoteJid) || "",
@@ -232,7 +434,6 @@ export function WhatsappView() {
 
       setSelectedChat(currentSelected => {
         if (currentSelected?.id === remoteJid) {
-          const msgId = message.key?.id || Date.now().toString();
           setMessages(prevMsgs => {
             if (prevMsgs.some(m => m.id === msgId)) return prevMsgs;
             const newMsg: Message = {
@@ -250,7 +451,6 @@ export function WhatsappView() {
     };
 
     const handleIncomingMessage = (data: Record<string, unknown>) => {
-      console.log('📩 Nova mensagem recebida (Realtime):', data);
 
       // Com WEBSOCKET_GLOBAL_EVENTS=true o payload vem como { instance, data: msg|msg[] }
       // Filtra apenas eventos da instância configurada
@@ -281,8 +481,18 @@ export function WhatsappView() {
       (contacts as Array<{ remoteJid?: string; profilePicUrl?: string }>).forEach(c => {
         const jid = c.remoteJid;
         const picUrl = c.profilePicUrl;
-        if (!jid || !picUrl || !jid.endsWith('@s.whatsapp.net')) return;
+        if (!jid || !picUrl) return;
+
+        if (jid.endsWith('@lid')) {
+          // Mapeia LID → JID real usando o mesmo profilePicUrl
+          const matchedJid = [...avatarCache.entries()].find(([, url]) => url === picUrl)?.[0];
+          if (matchedJid) lidToJidMap.current.set(jid, matchedJid);
+          return;
+        }
+
+        if (!jid.endsWith('@s.whatsapp.net')) return;
         avatarCache.set(jid, picUrl);
+        marketingService.upsertCliente({ remote_jid: jid, foto_url: picUrl });
         setChats(prev => prev.map(chat =>
           chat.id === jid ? { ...chat, avatar: picUrl } : chat
         ));
@@ -297,26 +507,31 @@ export function WhatsappView() {
       if (data.instance && data.instance !== instanceName) return;
 
       const raw = (data.data ?? data) as Record<string, unknown>;
-      // formato: { id: "jid", presences: { "jid": { lastKnownPresence: "composing"|"paused"|"available" } } }
-      const jid = (raw.id ?? raw.remoteJid) as string | undefined;
-      if (!jid) return;
+      const rawJid = (raw.id ?? raw.remoteJid) as string | undefined;
+      if (!rawJid) return;
+
+      const jid = rawJid.endsWith('@lid')
+        ? (lidToJidMap.current.get(rawJid) ?? rawJid)
+        : rawJid;
 
       const presences = raw.presences as Record<string, { lastKnownPresence?: string }> | undefined;
       const presence = presences
         ? Object.values(presences)[0]?.lastKnownPresence
         : (raw.presence as string | undefined);
+      // Recebido: "typing" ou "composing" = digitando | "recording" = gravando áudio
+      const presenceType = (presence === 'composing' || presence === 'typing') ? 'composing'
+        : presence === 'recording' ? 'recording'
+        : null;
 
-      const isTyping = presence === 'composing' || presence === 'recording';
-
-      setTypingChats(prev => {
-        const next = new Set(prev);
-        if (isTyping) {
-          next.add(jid);
-          // limpa após 5s sem atualização
+      setPresenceChats(prev => {
+        const next = new Map(prev);
+        if (presenceType) {
+          console.log(`💬 ${selectedChatRef.current?.id === jid ? selectedChatRef.current.name : jid.split('@')[0]} está ${presenceType === 'recording' ? 'gravando áudio' : 'digitando'}...`);
+          next.set(jid, presenceType);
           const existing = typingTimers.current.get(jid);
           if (existing) clearTimeout(existing);
           const timer = setTimeout(() => {
-            setTypingChats(s => { const n = new Set(s); n.delete(jid); return n; });
+            setPresenceChats(s => { const n = new Map(s); n.delete(jid); return n; });
             typingTimers.current.delete(jid);
           }, 5000);
           typingTimers.current.set(jid, timer);
@@ -332,17 +547,33 @@ export function WhatsappView() {
     socket.on('presence.update', handlePresenceUpdate);
     socket.on('PRESENCE_UPDATE', handlePresenceUpdate);
 
+    // Correlaciona LID com JID de telefone usando a sequência de eventos
+    const handleChatsUpdate = (data: Record<string, unknown>) => {
+      const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
+      if (data.instance && data.instance !== instanceName) return;
+      const raw = data.data ?? data;
+      const items = Array.isArray(raw) ? raw : [raw];
+      (items as Array<{ remoteJid?: string }>).forEach(item => {
+        const lid = item.remoteJid;
+        if (lid?.endsWith('@lid') && lastPhoneJid.current) {
+          lidToJidMap.current.set(lid, lastPhoneJid.current);
+          localStorage.setItem('wpp_lid_map', JSON.stringify([...lidToJidMap.current.entries()]));
+        }
+      });
+    };
+    socket.on('chats.update', handleChatsUpdate);
+    socket.on('CHATS_UPDATE', handleChatsUpdate);
+
     socket.on('disconnect', () => {
-      console.log('❌ Carflax HUB: Desconectado do WhatsApp Realtime');
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [fetchAvatar]);
+  }, [fetchAvatar, vendedorId]);
 
   useEffect(() => {
-    // loadChats(); // Desativado a pedido do usuário para não carregar conversas antigas
+    loadChats(); // Ativado para carregar conversas do banco/API
     setLoading(false);
   }, [loadChats]);
 
@@ -352,6 +583,7 @@ export function WhatsappView() {
     }
   }, [messages]);
 
+
   const handleSendMessage = async () => {
     if (!inputText.trim() || !selectedChat) return;
     
@@ -359,15 +591,32 @@ export function WhatsappView() {
     setInputText("");
 
     try {
+      const msgId = "me_" + Date.now().toString();
+      const timestamp = new Date().toISOString();
+      const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
       const newMsg: Message = {
-        id: Date.now().toString(),
+        id: msgId,
         text: textToSend,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        time: time,
         sender: "me",
         status: "sent"
       };
       setMessages(prev => [...prev, newMsg]);
+
+      // 1. Envia via API
       await evolutionApi.sendText(selectedChat.id, textToSend);
+
+      // 2. Salva no Supabase
+      await marketingService.saveMessage({
+        message_id: msgId,
+        remote_jid: selectedChat.id,
+        texto: textToSend,
+        sender: "me",
+        timestamp: timestamp,
+        status: "sent",
+        vendedor_id: vendedorId
+      });
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
     }
@@ -375,17 +624,41 @@ export function WhatsappView() {
 
   const handleSelectChat = useCallback(async (chat: Chat) => {
     setSelectedChat(chat);
+    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unreadCount: 0 } : c));
     setLoadingMessages(true);
     setBudgetId(chat.leadInfo?.budgetId || "");
     setSaleValue(chat.leadInfo?.saleValue || "");
+    evolutionApi.subscribePresence(chat.id);
+
 
     try {
-      console.log("Buscando mensagens para:", chat.id);
+      // 1. Busca do Banco primeiro (apenas mensagens a partir de hoje)
+      const MIN_SYNC_DATE = '2026-05-04T08:50:00.000Z';
+      const dbMessages = await marketingService.getMessagesByJid(chat.id, 50, MIN_SYNC_DATE);
+      
+      if (dbMessages.length > 0) {
+        const msgs: Message[] = dbMessages.map(m => ({
+          id: m.message_id,
+          text: m.texto || "",
+          time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          sender: m.sender,
+          status: (m.status as "sent" | "delivered" | "read") || "sent"
+        }));
+        setMessages(msgs);
+
+        // Atualiza o lastMessageSender no chat da sidebar
+        const lastMsg = dbMessages[dbMessages.length - 1];
+        setChats(prev => prev.map(c =>
+          c.id === chat.id ? { ...c, lastMessageSender: lastMsg.sender } : c
+        ));
+
+        setLoadingMessages(false);
+      }
+
+      // 2. Busca da Evolution API para sincronizar o que falta (opcional/segundo plano)
       const data = await evolutionApi.getMessages(chat.id) as Record<string, unknown>;
-      console.log("Dados brutos da API:", data);
       
       const dataObj = data as Record<string, unknown>;
-      // Busca exaustiva pelo array de mensagens
       let rawMessages: EvoMessageResponse[] = [];
 
       if (Array.isArray(data)) {
@@ -398,34 +671,60 @@ export function WhatsappView() {
         rawMessages = (dataObj.messages as Record<string, unknown>).records as EvoMessageResponse[];
       }
 
-      const msgs: Message[] = rawMessages.map((m: EvoMessageResponse) => {
-        // Extração robusta de texto na v2
-        const messageContent = m.message;
-        const text = 
-          messageContent?.conversation || 
-          messageContent?.extendedTextMessage?.text || 
-          messageContent?.imageMessage?.caption ||
-          messageContent?.videoMessage?.caption ||
-          (typeof messageContent === 'string' ? messageContent : "") ||
-          "Mídia";
+      const MIN_SYNC_TIMESTAMP = Math.floor(new Date('2026-05-04T08:50:00').getTime() / 1000);
 
-        return {
-          id: (m.key?.id || m.id || Math.random().toString()) as string,
-          text: text as string,
-          time: m.messageTimestamp ? new Date((m.messageTimestamp as number) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
-          sender: (m.key?.fromMe ? "me" : "contact") as "me" | "contact",
-          status: (m.status === "READ" ? "read" : "sent") as "sent" | "delivered" | "read"
-        };
-      }).reverse();
+      const apiMsgs: Message[] = rawMessages
+        .filter((m: EvoMessageResponse) => {
+          // Filtra apenas mensagens deste contato específico
+          const msgJid = m.key?.remoteJid;
+          if (msgJid && msgJid !== chat.id) return false;
+          // Filtra mensagens antigas
+          if (m.messageTimestamp && (m.messageTimestamp as number) < MIN_SYNC_TIMESTAMP) return false;
+          return true;
+        })
+        .map((m: EvoMessageResponse) => {
+          const messageContent = m.message;
+          const text = 
+            messageContent?.conversation || 
+            messageContent?.extendedTextMessage?.text || 
+            messageContent?.imageMessage?.caption ||
+            messageContent?.videoMessage?.caption ||
+            (typeof messageContent === 'string' ? messageContent : "") ||
+            "Mídia";
+
+          const msgTimestamp = m.messageTimestamp ? new Date((m.messageTimestamp as number) * 1000).toISOString() : new Date().toISOString();
+          const msgId = (m.key?.id || m.id || Math.random().toString()) as string;
+
+          // Salva mensagens da API no banco de forma assíncrona
+          marketingService.saveMessage({
+            message_id: msgId,
+            remote_jid: chat.id,
+            texto: text as string,
+            sender: (m.key?.fromMe ? "me" : "contact") as "me" | "contact",
+            timestamp: msgTimestamp,
+            status: (m.status === "READ" ? "read" : "sent"),
+            ...(m.key?.fromMe ? { vendedor_id: vendedorId } : {})
+          });
+
+          return {
+            id: msgId,
+            text: text as string,
+            time: new Date(msgTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            sender: (m.key?.fromMe ? "me" : "contact") as "me" | "contact",
+            status: (m.status === "READ" ? "read" : "sent") as "sent" | "delivered" | "read"
+          };
+        }).reverse();
       
-      console.log("Mensagens processadas:", msgs);
-      setMessages(msgs);
+      // Se não tinha nada no banco, usa as da API
+      if (dbMessages.length === 0) {
+        setMessages(apiMsgs);
+      }
     } catch (error) {
       console.error("Erro ao carregar mensagens:", error);
     } finally {
       setLoadingMessages(false);
     }
-  }, [setBudgetId, setSaleValue, setSelectedChat, setMessages, setLoadingMessages]);
+  }, [setBudgetId, setSaleValue, setSelectedChat, setMessages, setLoadingMessages, vendedorId]);
 
   // Initial Auto-selection - MOVED BELOW handleSelectChat
   useEffect(() => {
@@ -500,7 +799,13 @@ export function WhatsappView() {
             </div>
             <div className="p-6 space-y-2">
               {ARCHIVE_REASONS.map(r => (
-                <button key={r} onClick={()=>setShowArchiveModal(false)} className="w-full p-3 text-left hover:bg-secondary rounded-xl text-xs font-bold">{r}</button>
+                <button 
+                  key={r} 
+                  onClick={() => handleArchiveChat(r)} 
+                  className="w-full p-3 text-left hover:bg-secondary rounded-xl text-xs font-bold transition-colors border border-transparent hover:border-border"
+                >
+                  {r}
+                </button>
               ))}
             </div>
           </div>
@@ -510,11 +815,29 @@ export function WhatsappView() {
       {/* Sidebar - Chats */}
       <div className="w-80 border-r border-border flex flex-col bg-card/50 backdrop-blur-md">
         <div className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black uppercase tracking-tighter">Mensagens</h2>
-            <button onClick={() => loadChats()} className="p-2 hover:bg-secondary rounded-xl">
-              <History className={cn("w-4 h-4", loading && "animate-spin")} />
-            </button>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="font-black text-2xl tracking-tighter uppercase">
+              {viewMode === "active" ? "Mensagens" : "Arquivados"}
+            </h2>
+            <div className="flex gap-1">
+              {viewMode === "archived" && (
+                <button 
+                  onClick={() => setViewMode("active")}
+                  className="p-2 hover:bg-secondary rounded-xl transition-all text-primary font-black text-[10px] uppercase tracking-widest flex items-center gap-1"
+                >
+                  <X className="w-3.5 h-3.5" /> Sair
+                </button>
+              )}
+              {viewMode === "active" && (
+                <button 
+                  onClick={() => setViewMode("archived")} 
+                  className="p-2 hover:bg-secondary rounded-xl transition-colors text-muted-foreground hover:text-primary relative"
+                  title="Arquivados"
+                >
+                  <Archive className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -533,28 +856,54 @@ export function WhatsappView() {
               key={chat.id} 
               onClick={() => handleSelectChat(chat)}
               className={cn(
-                "w-full p-4 rounded-2xl flex gap-4 transition-all relative",
-                selectedChat?.id === chat.id ? "bg-primary text-white shadow-xl" : "hover:bg-secondary/80 text-muted-foreground"
+                "w-full p-4 rounded-2xl flex gap-4 transition-all relative group mb-1",
+                selectedChat?.id === chat.id 
+                  ? "bg-primary/10 border border-primary/20 shadow-[0_0_20px_-5px_rgba(var(--primary),0.2)]" 
+                  : "hover:bg-secondary/50 border border-transparent text-muted-foreground"
               )}
             >
-              <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden shrink-0">
+              {/* Indicador Ativo */}
+              {selectedChat?.id === chat.id && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
+              )}
+
+              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
                 {chat.avatar ? <img src={chat.avatar} className="w-full h-full object-cover" /> : <User className="w-6 h-6" />}
               </div>
-              <div className="flex-1 min-w-0 text-left">
-                <div className="flex justify-between items-center mb-1">
-                  <span className={cn("font-black text-xs uppercase truncate", selectedChat?.id === chat.id ? "text-white" : "text-foreground")}>{chat.name}</span>
-                  <span className="text-[9px] font-bold opacity-60">{chat.time}</span>
+              
+              <div className="flex-1 min-w-0 flex justify-between gap-2">
+                <div className="flex-1 min-w-0 flex flex-col justify-start pt-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className={cn(
+                      "font-bold text-sm truncate tracking-tight font-inter", 
+                      selectedChat?.id === chat.id ? "text-primary" : "text-foreground"
+                    )}>
+                      {chat.name.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                    </span>
+                  </div>
+                  
+                  <p className={cn(
+                    "text-[11px] truncate font-medium pr-2 text-left",
+                    presenceChats.has(chat.id)
+                      ? "text-emerald-400 font-semibold animate-pulse"
+                      : selectedChat?.id === chat.id ? "text-primary/70" : "text-muted-foreground/80"
+                  )}>
+                    {presenceChats.has(chat.id)
+                      ? (presenceChats.get(chat.id) === 'recording' ? 'gravando áudio...' : 'escrevendo...')
+                      : <>{chat.lastMessageSender === "me" && <span className="font-bold">Você: </span>}{chat.lastMessage}</>
+                    }
+                  </p>
                 </div>
-                {typingChats.has(chat.id)
-                  ? <p className="text-[11px] truncate text-emerald-400 font-bold">digitando...</p>
-                  : <p className="text-[11px] truncate opacity-70">{chat.lastMessage}</p>
-                }
+
+                <div className="flex flex-col items-end justify-between py-0.5 shrink-0 min-w-[40px]">
+                  <span className="text-[9px] font-bold opacity-50">{chat.time}</span>
+                  {chat.unreadCount > 0 ? (
+                    <div className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-lg shadow-primary/20">
+                      {chat.unreadCount}
+                    </div>
+                  ) : <div className="h-5" />}
+                </div>
               </div>
-              {chat.unreadCount > 0 && (
-                <div className="absolute top-4 right-4 w-5 h-5 bg-rose-500 text-white rounded-lg flex items-center justify-center text-[9px] font-black">
-                  {chat.unreadCount}
-                </div>
-              )}
             </button>
           ))}
         </div>
@@ -566,24 +915,28 @@ export function WhatsappView() {
           <>
             <div className="p-4 flex items-center justify-between border-b border-border bg-card/20 backdrop-blur-md">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden border border-border">
+                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border">
                    {selectedChat.avatar ? <img src={selectedChat.avatar} className="w-full h-full object-cover" /> : <User className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h4 className="font-black text-sm uppercase tracking-tighter">{selectedChat.name}</h4>
+                  <h4 className="font-bold text-base tracking-tight font-inter">
+                    {selectedChat.name.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                  </h4>
                   <div className="flex items-center gap-2">
-                    {typingChats.has(selectedChat.id)
-                      ? <p className="text-[10px] text-emerald-400 font-bold tracking-widest animate-pulse">digitando...</p>
+                    {presenceChats.has(selectedChat.id)
+                      ? <p className="text-[10px] text-emerald-400 font-bold tracking-widest animate-pulse">
+                          {presenceChats.get(selectedChat.id) === 'recording' ? 'gravando áudio...' : 'escrevendo...'}
+                        </p>
                       : <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Online</p>
                     }
-                    {selectedChat.leadInfo && <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">• {selectedChat.leadInfo.campaign}</p>}
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <button 
+                  <button
+                    ref={tempBtnRef}
                     onClick={() => setShowTempDropdown(!showTempDropdown)}
                     className={cn("p-2.5 rounded-xl border flex items-center gap-2 transition-all", getTempColor(selectedChat.leadInfo?.temperature))}
                   >
@@ -591,17 +944,40 @@ export function WhatsappView() {
                     <span className="text-[10px] font-black uppercase pointer-events-none">{selectedChat.leadInfo?.temperature || "Frio"}</span>
                     <ChevronDown className="w-3 h-3 pointer-events-none" />
                   </button>
-                  {showTempDropdown && (
-                    <div className="absolute top-full right-0 mt-2 w-32 bg-card border border-border rounded-xl shadow-2xl z-[110] overflow-hidden">
-                      {(["Quente", "Morno", "Frio"] as Temperature[]).map(t => (
-                        <button key={t} onClick={()=>{ setSelectedChat({...selectedChat, leadInfo: {...selectedChat.leadInfo!, temperature: t}}); setShowTempDropdown(false); }} className="w-full p-3 text-[10px] font-black uppercase hover:bg-secondary text-left">{t}</button>
-                      ))}
-                    </div>
-                  )}
+                  {showTempDropdown && (() => {
+                    const rect = tempBtnRef.current?.getBoundingClientRect();
+                    return (
+                      <div
+                        className="fixed w-32 bg-card border border-border rounded-xl shadow-2xl z-[9999] overflow-hidden"
+                        style={{ top: rect ? rect.bottom + 8 : 0, right: rect ? window.innerWidth - rect.right : 0 }}
+                      >
+                        {(["Quente", "Morno", "Frio"] as Temperature[]).map(t => (
+                          <button key={t} onClick={()=>{ setSelectedChat({...selectedChat, leadInfo: {...selectedChat.leadInfo!, temperature: t}}); setShowTempDropdown(false); }} className="w-full p-3 text-[10px] font-black uppercase hover:bg-secondary text-left">{t}</button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <button onClick={()=>setShowFollowUpModal(true)} className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"><Bell className="w-4 h-4"/></button>
                 <button onClick={()=>setShowSaleModal(true)} className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"><DollarSign className="w-4 h-4"/></button>
-                <button onClick={()=>setShowArchiveModal(true)} className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"><Archive className="w-4 h-4"/></button>
+                
+                {viewMode === "active" ? (
+                  <button 
+                    onClick={() => setShowArchiveModal(true)} 
+                    className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground hover:text-rose-500 transition-colors"
+                    title="Arquivar Conversa"
+                  >
+                    <Archive className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleUnarchiveChat} 
+                    className="p-2.5 hover:bg-secondary rounded-xl text-primary flex items-center gap-2 font-black text-[10px] uppercase tracking-widest px-4 transition-all"
+                    title="Desarquivar Conversa"
+                  >
+                    <RefreshCw className="w-4 h-4" /> Desarquivar
+                  </button>
+                )}
               </div>
             </div>
 
@@ -624,6 +1000,17 @@ export function WhatsappView() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Indicador de Digitando / Gravando */}
+                  {selectedChat && presenceChats.has(selectedChat.id) && (
+                    <div className="flex justify-start mb-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <div className="bg-card/80 backdrop-blur-md px-4 py-3 rounded-2xl rounded-tl-none border border-border/50 flex gap-1.5 items-center">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

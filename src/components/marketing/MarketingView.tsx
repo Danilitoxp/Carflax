@@ -1,5 +1,7 @@
 import { Megaphone, Calendar } from "lucide-react";
 import { WhatsappView } from "./whatsapp/WhatsappView";
+import { ClientesView } from "./ClientesView";
+import { LeadsView } from "./LeadsView";
 
 interface UserProfile {
   id?: string;
@@ -16,7 +18,15 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
   const firstName = userProfile?.name ? userProfile.name.split(' ')[0] : 'Usuário';
 
   if (activeTab === "Whatsapp") {
-    return <WhatsappView />;
+    return <WhatsappView vendedorId={userProfile?.id} />;
+  }
+
+  if (activeTab === "Clientes") {
+    return <ClientesView />;
+  }
+
+  if (activeTab === "Leads") {
+    return <LeadsView />;
   }
 
   return (

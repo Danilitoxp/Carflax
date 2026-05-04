@@ -39,7 +39,7 @@ export const evolutionApi = {
    */
   connectWebSocket(): Socket {
     const wsUrl = getWsUrl();
-    console.log("Tentando conexão WebSocket em:", wsUrl);
+
 
     return io(wsUrl, {
       transports: ['polling', 'websocket'],
@@ -117,6 +117,39 @@ export const evolutionApi = {
         archive: archive
       }),
     });
+  },
+
+  /**
+   * Busca informações de um contato (nome e foto)
+   */
+  async getContact(remoteJid: string): Promise<{ pushName?: string; profilePicUrl?: string } | null> {
+    try {
+      const data = await fetchEvo<unknown[]>(`/contact/findContacts/${EVO_CONFIG.instance}`, {
+        method: 'POST',
+        body: JSON.stringify({ where: { remoteJid } }),
+      });
+      if (Array.isArray(data) && data.length > 0) {
+        const c = data[0] as { pushName?: string; profilePicUrl?: string };
+        return c;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Inscreve para receber presença de um contato (abre "canal" de presença no protocolo WhatsApp)
+   */
+  async subscribePresence(remoteJid: string): Promise<void> {
+    try {
+      await fetchEvo<unknown>(`/chat/sendPresence/${EVO_CONFIG.instance}`, {
+        method: 'POST',
+        body: JSON.stringify({ number: remoteJid, presence: 'available', delay: 0 }),
+      });
+    } catch {
+      // silencia — não crítico
+    }
   },
 
   /**
