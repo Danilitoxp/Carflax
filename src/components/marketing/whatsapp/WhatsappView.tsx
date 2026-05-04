@@ -300,7 +300,9 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
       // FILTRO DE DATA: Ignora mensagens anteriores ao cleanup manual de hoje (08:50)
       const MIN_SYNC_TIMESTAMP = Math.floor(new Date('2026-05-04T08:50:00').getTime() / 1000);
-      if (message.messageTimestamp < MIN_SYNC_TIMESTAMP) {
+      const msgTimestamp = message.messageTimestamp || 0;
+      
+      if (msgTimestamp < MIN_SYNC_TIMESTAMP) {
         return;
       }
 
