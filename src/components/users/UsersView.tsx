@@ -153,10 +153,13 @@ export function UsersView() {
     "Faturista", "Caixa",
     // TI / Admin sistema
     "admin",
+    // Externos
+    "Consultor",
   ];
   const departments = [
     "Estoque", "Manutenção", "Segurança", "Vendas", "Compras",
     "Marketing", "RH", "Contabilidade", "Administrativo", "TI", "Limpeza",
+    "Consultoria",
   ];
 
   const [users, setUsers] = useState<User[]>([]);

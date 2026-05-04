@@ -203,6 +203,23 @@ export const evolutionApi = {
   },
 
   /**
+   * Envia um documento (PDF, DOCX, etc.) em base64
+   */
+  async sendDocument(remoteJid: string, base64: string, mimetype: string, filename: string, caption?: string): Promise<unknown> {
+    return fetchEvo<unknown>(`/message/sendMedia/${EVO_CONFIG.instance}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        number: remoteJid,
+        mediatype: 'document',
+        media: base64,
+        mimetype: mimetype,
+        fileName: filename,
+        caption: caption || '',
+      }),
+    });
+  },
+
+  /**
    * Envia um áudio (PTT = push-to-talk, aparece como nota de voz)
    */
   async sendAudio(remoteJid: string, audioBase64: string): Promise<unknown> {

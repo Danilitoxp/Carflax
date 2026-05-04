@@ -66,6 +66,22 @@ export const marketingService = {
   },
 
   /**
+   * Remove um cliente permanentemente
+   */
+  async deleteCliente(remoteJid: string) {
+    const { error } = await supabase
+      .from("marketing_clientes")
+      .delete()
+      .eq("remote_jid", remoteJid);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao deletar cliente:", error.message);
+      throw error;
+    }
+    return true;
+  },
+
+  /**
    * Busca apenas clientes que possuem mensagens no banco (CRM Ativo)
    */
   async getActiveClientes(includeArchived = false) {

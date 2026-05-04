@@ -65,6 +65,19 @@ function DashboardContent({
   const [isSugestaoModalOpen, setIsSugestaoModalOpen] = useState(false);
   const [geralLoading, setGeralLoading] = useState(true);
 
+  // Listener para troca de abas via eventos customizados
+  useEffect(() => {
+    const handleTabChange = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        setActiveItem(customEvent.detail);
+        localStorage.setItem("carflax-active-section", customEvent.detail);
+      }
+    };
+    window.addEventListener("carflax-change-tab", handleTabChange);
+    return () => window.removeEventListener("carflax-change-tab", handleTabChange);
+  }, []);
+
   useEffect(() => {
     // Timer de segurança: Nunca deixa o loading infinito (máximo 3s)
     const safetyTimer = setTimeout(() => setGeralLoading(false), 3000);

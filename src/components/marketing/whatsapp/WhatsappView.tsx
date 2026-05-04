@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { 
   Search, 
   Paperclip, 
-  Smile, 
   Send, 
   CheckCheck, 
   User,
@@ -19,11 +18,47 @@ import {
   PinOff,
   Play,
   Pause,
-  Mic
+  Mic,
+  FileText
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { marketingService } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
+import { apiDashboardProdutos } from "@/lib/api";
+import { Package } from "lucide-react";
+
+interface NormalizedProduct {
+  cod: string;
+  descricao: string;
+  marca: string;
+  preco: number;
+  debito: number;
+  credito: number;
+  disponivel: number;
+}
+
+const BRAND_COLORS = [
+  ['from-blue-500 to-blue-700', 'bg-blue-600'],
+  ['from-emerald-500 to-emerald-700', 'bg-emerald-600'],
+  ['from-violet-500 to-violet-700', 'bg-violet-600'],
+  ['from-orange-500 to-orange-700', 'bg-orange-600'],
+  ['from-rose-500 to-rose-700', 'bg-rose-600'],
+  ['from-cyan-500 to-cyan-700', 'bg-cyan-600'],
+  ['from-amber-500 to-amber-700', 'bg-amber-600'],
+  ['from-indigo-500 to-indigo-700', 'bg-indigo-600'],
+  ['from-teal-500 to-teal-700', 'bg-teal-600'],
+  ['from-fuchsia-500 to-fuchsia-700', 'bg-fuchsia-600'],
+];
+
+function getBrandStyle(brand: string) {
+  let hash = 0;
+  for (let i = 0; i < brand.length; i++) hash = brand.charCodeAt(i) + ((hash << 5) - hash);
+  return BRAND_COLORS[Math.abs(hash) % BRAND_COLORS.length];
+}
+
+function getBrandInitials(brand: string): string {
+  return brand.trim().split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase() || '??';
+}
 
 interface Message {
   id: string;
@@ -34,6 +69,7 @@ interface Message {
   tipo?: string;
   mediaUrl?: string;
   reacao?: string;
+  fileName?: string;
 }
 
 type Temperature = "Quente" | "Morno" | "Frio";
@@ -110,6 +146,24 @@ const getTempColor = (temp?: string) => {
 };
 
 const avatarCache = new Map<string, string>();
+
+function getFileExt(filename?: string): string {
+  if (!filename) return "DOC";
+  return (filename.split('.').pop()?.toUpperCase() || "DOC").slice(0, 4);
+}
+
+function getFileIconColor(filename?: string): string {
+  const ext = filename?.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'pdf': return 'bg-red-500';
+    case 'doc': case 'docx': return 'bg-blue-500';
+    case 'xls': case 'xlsx': return 'bg-emerald-600';
+    case 'ppt': case 'pptx': return 'bg-orange-500';
+    case 'zip': case 'rar': case '7z': return 'bg-yellow-600';
+    case 'mp4': case 'mov': case 'avi': return 'bg-purple-500';
+    default: return 'bg-slate-500';
+  }
+}
 
 function formatAudioTime(seconds: number) {
   if (isNaN(seconds)) return "0:00";
@@ -268,9 +322,18 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const [showTempDropdown, setShowTempDropdown] = useState(false);
   
   const [saleValue, setSaleValue] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [allProducts, setAllProducts] = useState<NormalizedProduct[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [cartProducts, setCartProducts] = useState<NormalizedProduct[]>([]);
+  const productsLoadedRef = useRef(false);
 
   const tempBtnRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedChatRef = useRef<Chat | null>(null);
   const lastPhoneJid = useRef<string | null>(null);
   const lidToJidMap = useRef<Map<string, string>>(new Map());
@@ -535,11 +598,13 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
       const isAudio = !!messageContent?.audioMessage;
       const isSticker = !!messageContent?.stickerMessage;
+      const isDocument = !!messageContent?.documentMessage;
       const text =
         messageContent?.conversation ||
         messageContent?.extendedTextMessage?.text ||
         messageContent?.imageMessage?.caption ||
         messageContent?.videoMessage?.caption ||
+        (isDocument ? (messageContent.documentMessage?.fileName || "Documento") : null) ||
         (isAudio ? "🎵 Áudio" : isSticker ? "🖼️ Figurinha" : "📎 Mídia");
 
       const timestamp = message.messageTimestamp
@@ -882,26 +947,203 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         text: textToSend,
         time: time,
         sender: "me",
-        status: "sent"
+        status: "sent",
+        tipo: "text"
       };
+
       setMessages(prev => [...prev, newMsg]);
 
-      // 1. Envia via API
-      await evolutionApi.sendText(selectedChat.id, textToSend);
+      // Atualiza o lastMessage no chat da sidebar
+      setChats(prev => prev.map(c => 
+        c.id === selectedChat.id ? { ...c, lastMessage: textToSend, lastMessageSender: "me", time: "Agora" } : c
+      ));
 
-      // 2. Salva no Supabase
+      await evolutionApi.sendText(selectedChat.id, textToSend);
+      
+      await marketingService.upsertCliente({
+        remote_jid: selectedChat.id,
+        ultima_mensagem: textToSend,
+        ultima_conversa_em: timestamp
+      });
+
       await marketingService.saveMessage({
         message_id: msgId,
         remote_jid: selectedChat.id,
         texto: textToSend,
         sender: "me",
-        timestamp: timestamp,
+        timestamp,
         status: "sent",
+        tipo: "text",
         vendedor_id: vendedorId
       });
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
     }
+  };
+
+  const handleSendDocument = async (file: File) => {
+    if (!selectedChat) return;
+    setPendingFile(file);
+  };
+
+  const confirmSendFile = async () => {
+    if (!pendingFile || !selectedChat) return;
+    
+    const file = pendingFile;
+    const caption = inputText;
+    setPendingFile(null);
+    setInputText("");
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Full = reader.result as string;
+      const base64 = base64Full.split(',')[1];
+
+      const msgId = "doc_" + Date.now();
+      const timestamp = new Date().toISOString();
+      const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const newMsg: Message = {
+        id: msgId,
+        text: caption || file.name,
+        time,
+        sender: "me",
+        status: "sent",
+        tipo: "document",
+        mediaUrl: base64Full,
+        fileName: file.name,
+      };
+      setMessages(prev => [...prev, newMsg]);
+
+      try {
+        const ext = file.name.split('.').pop() || 'bin';
+        const filename = `${msgId}.${ext}`;
+        const publicUrl = await marketingService.uploadMedia(base64, file.type, filename);
+
+        if (publicUrl) {
+          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, mediaUrl: publicUrl } : m));
+        }
+
+        await evolutionApi.sendDocument(selectedChat.id, base64, file.type, file.name, caption);
+
+        await marketingService.upsertCliente({
+          remote_jid: selectedChat.id,
+          ultima_mensagem: `📎 ${file.name}`,
+          ultima_conversa_em: timestamp,
+        });
+
+        await marketingService.saveMessage({
+          message_id: msgId,
+          remote_jid: selectedChat.id,
+          texto: caption || file.name,
+          sender: "me",
+          timestamp,
+          status: "sent",
+          tipo: "document",
+          media_url: publicUrl || undefined,
+          vendedor_id: vendedorId,
+        });
+      } catch (error) {
+        console.error("Erro ao enviar documento:", error);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const item = e.clipboardData.items[0];
+    if (item?.kind === 'file') {
+      const file = item.getAsFile();
+      if (file) handleSendDocument(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleSendDocument(file);
+  };
+
+  const loadProducts = useCallback(async () => {
+    if (productsLoadedRef.current) return;
+    setLoadingProducts(true);
+    try {
+      const data = await apiDashboardProdutos();
+      // Normaliza preços uma única vez no fetch — elimina parsing repetido no render
+      const normalized: NormalizedProduct[] = data.map(p => {
+        const preco = parseFloat(String(p.PRECO_VENDA)) || 0;
+        const debitoRaw = p.VALOR_DEBITO ? parseFloat(String(p.VALOR_DEBITO)) : preco;
+        const debito = debitoRaw > 0 ? debitoRaw : preco;
+        const creditoRaw = parseFloat(String(p.VALOR_CREDITO));
+        const credito = creditoRaw > 0 ? creditoRaw : preco * 1.0466;
+        return {
+          cod: p.COD_ITEM,
+          descricao: p.DESCRICAO,
+          marca: p.MARCA || '',
+          disponivel: parseFloat(String(p.TOTAL_DISPONIVEL)) || 0,
+          preco,
+          debito,
+          credito,
+        };
+      });
+      setAllProducts(normalized);
+      productsLoadedRef.current = true;
+    } catch (error) {
+      console.error("Erro ao carregar produtos:", error);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, []); // Sem deps: usa ref para o flag, não recria a função após o load
+
+  useEffect(() => {
+    if (showProductSelector) loadProducts();
+  }, [showProductSelector, loadProducts]);
+
+  const filteredProducts = useMemo(() => {
+    const searchLower = productSearch.trim().toLowerCase();
+    if (searchLower.length < 2) return allProducts.slice(0, 30);
+    const words = searchLower.split(/\s+/);
+    return allProducts
+      .filter(p => {
+        const desc = p.descricao.toLowerCase();
+        return words.every(w => desc.includes(w)) || p.cod.toLowerCase().includes(searchLower);
+      })
+      .slice(0, 50);
+  }, [allProducts, productSearch]);
+
+  const handleSelectProduct = (p: NormalizedProduct) => {
+    setCartProducts(prev => {
+      const already = prev.find(x => x.cod === p.cod);
+      return already ? prev.filter(x => x.cod !== p.cod) : [...prev, p];
+    });
+  };
+
+  const handleInsertQuote = () => {
+    if (cartProducts.length === 0) return;
+    const fmt = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    const totalDebito = cartProducts.reduce((s, p) => s + p.debito, 0);
+    const totalCredito = cartProducts.reduce((s, p) => s + p.credito, 0);
+
+    const items = cartProducts
+      .map((p, i) => `${i + 1}. *${p.descricao}*\n   💵 Débito: R$ ${fmt(p.debito)} | 💳 Crédito: R$ ${fmt(p.credito)}`)
+      .join('\n\n');
+
+    const quote = `📋 *ORÇAMENTO*\n\n${items}\n\n${'─'.repeat(24)}\n💵 *Total Débito: R$ ${fmt(totalDebito)}*\n💳 *Total Crédito: R$ ${fmt(totalCredito)}*`;
+
+    setInputText(quote);
+    setCartProducts([]);
+    setShowProductSelector(false);
+    setProductSearch("");
   };
 
   const handleSelectChat = useCallback(async (chat: Chat) => {
@@ -1017,6 +1259,15 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   // Initial Auto-selection - MOVED BELOW handleSelectChat
   useEffect(() => {
     if (chats.length > 0 && !selectedChat) {
+      const pendingChatJid = localStorage.getItem("carflax_pending_chat");
+      if (pendingChatJid) {
+        const found = chats.find(c => c.id === pendingChatJid);
+        if (found) {
+          handleSelectChat(found);
+          localStorage.removeItem("carflax_pending_chat"); // Consome o evento
+          return;
+        }
+      }
       handleSelectChat(chats[0]);
     }
   }, [chats, selectedChat, handleSelectChat]);
@@ -1219,11 +1470,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                   <p className={cn(
                     "text-[11px] truncate font-medium pr-2 text-left",
                     presenceChats.has(chat.id)
-                      ? "text-emerald-400 font-semibold animate-pulse"
+                      ? "text-white font-semibold animate-pulse"
                       : selectedChat?.id === chat.id ? "text-primary/70" : "text-muted-foreground/80"
                   )}>
                     {presenceChats.has(chat.id)
-                      ? (presenceChats.get(chat.id) === 'recording' ? 'gravando áudio...' : 'escrevendo...')
+                      ? (presenceChats.get(chat.id) === 'recording' ? 'Gravando áudio...' : 'Digitando...')
                       : <>{chat.lastMessageSender === "me" && <span className="font-bold">Você: </span>}{chat.lastMessage}</>
                     }
                   </p>
@@ -1258,8 +1509,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                   </h4>
                   <div className="flex items-center gap-2">
                     {presenceChats.has(selectedChat.id)
-                      ? <p className="text-[10px] text-emerald-400 font-bold tracking-widest animate-pulse">
-                          {presenceChats.get(selectedChat.id) === 'recording' ? 'gravando áudio...' : 'escrevendo...'}
+                      ? <p className="text-[10px] text-white font-bold tracking-widest animate-pulse">
+                          {presenceChats.get(selectedChat.id) === 'recording' ? 'Gravando áudio...' : 'Digitando...'}
                         </p>
                       : lastSeenMap.current.has(selectedChat.id)
                         ? <p className="text-[10px] text-muted-foreground font-medium">
@@ -1315,7 +1566,22 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 flex flex-col bg-[url('https://w0.peakpx.com/wallpaper/580/650/HD-wallpaper-whatsapp-background-dark-mode-pattern-whatsapp-dark-mode-thumbnail.jpg')] bg-repeat">
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className="flex-1 min-h-0 flex flex-col bg-[url('https://w0.peakpx.com/wallpaper/580/650/HD-wallpaper-whatsapp-background-dark-mode-pattern-whatsapp-dark-mode-thumbnail.jpg')] bg-repeat relative"
+            >
+              {isDragging && (
+                <div className="absolute inset-0 z-50 bg-primary/20 backdrop-blur-sm flex items-center justify-center border-4 border-dashed border-primary m-4 rounded-3xl animate-in fade-in duration-200">
+                  <div className="bg-card p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-4">
+                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                       <Paperclip className="w-8 h-8 text-primary animate-bounce" />
+                    </div>
+                    <p className="text-xl font-black uppercase tracking-tighter">Solte para enviar</p>
+                  </div>
+                </div>
+              )}
               {loadingMessages ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-3">
                   <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -1325,15 +1591,16 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                 <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
                   {messages.map((msg) => {
                     const isVisualMedia = msg.tipo === "image" || msg.tipo === "video" || msg.tipo === "sticker";
+                    const isDocumentMsg = msg.tipo === "document";
                     const isSticker = msg.tipo === "sticker";
                     return (
                     <div key={msg.id} className={cn("flex flex-col", msg.sender === "me" ? "items-end" : "items-start")}>
                       <div className={cn(
                         "max-w-[75%] rounded-2xl shadow-sm relative flex flex-col group transition-all", 
-                        isSticker 
-                          ? "bg-transparent shadow-none border-none" 
+                        isSticker
+                          ? "bg-transparent shadow-none border-none"
                           : msg.sender === "me" ? "bg-primary text-white rounded-tr-none" : "bg-card border border-border text-foreground rounded-tl-none",
-                        isVisualMedia ? "p-1" : "px-4 py-2"
+                        isDocumentMsg ? "p-0 overflow-hidden" : isVisualMedia ? "p-1" : "px-4 py-2"
                       )}>
                         
                         {/* Mídia: Imagem ou Figurinha */}
@@ -1376,26 +1643,113 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                         )}
 
                         {/* Mídia: Documento */}
-                        {msg.tipo === "document" && msg.mediaUrl && (
-                          <div className={cn(isVisualMedia ? "px-3 py-2" : "")}>
-                            <a href={msg.mediaUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-black/10 p-3 rounded-xl mb-1 hover:bg-black/20 transition-colors">
-                              <span className="text-xl">📎</span>
-                              <span className="text-xs font-bold underline">Visualizar Anexo</span>
-                            </a>
+                        {msg.tipo === "document" && (
+                          <div className="flex flex-col gap-0 min-w-[280px] max-w-[320px] rounded-2xl overflow-hidden shadow-lg group/doc">
+                            {/* Preview Area (Simulado) */}
+                            <div className={cn(
+                              "h-32 flex flex-col items-center justify-center relative overflow-hidden",
+                              msg.sender === "me" ? "bg-white/10" : "bg-card border-b border-border/10"
+                            )}>
+                               <div className="w-20 h-24 bg-white rounded shadow-md p-3 flex flex-col gap-1.5 transform rotate-2 group-hover/doc:rotate-0 transition-transform duration-500">
+                                  <div className="w-full h-1 bg-slate-200 rounded-full" />
+                                  <div className="w-3/4 h-1 bg-slate-100 rounded-full" />
+                                  <div className="w-full h-1 bg-slate-200 rounded-full" />
+                                  <div className="w-1/2 h-1 bg-slate-100 rounded-full" />
+                                  <div className="w-full h-1 bg-slate-200 rounded-full mt-2" />
+                                  <div className="w-full h-6 bg-slate-50 rounded" />
+                               </div>
+                               <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none" />
+                            </div>
+
+                            {/* Metadata Bar */}
+                            <div className={cn(
+                              "flex items-center gap-3 px-4 py-4",
+                              msg.sender === "me" ? "bg-black/40" : "bg-black/10"
+                            )}>
+                              <div className={cn(
+                                "w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0 shadow-sm",
+                                getFileIconColor(msg.fileName || msg.text)
+                              )}>
+                                <div className="flex flex-col items-center">
+                                  <FileText className="w-5 h-5" />
+                                  <span className="text-[7px] font-black uppercase tracking-tighter leading-none mt-0.5">{getFileExt(msg.fileName || msg.text)}</span>
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={cn(
+                                  "text-[13px] font-bold truncate leading-tight mb-0.5",
+                                  msg.sender === "me" ? "text-white" : "text-foreground"
+                                )}>{msg.text || msg.fileName || "Documento"}</p>
+                                <div className="flex items-center gap-2">
+                                  <span className={cn(
+                                    "text-[9px] font-black uppercase tracking-widest",
+                                    msg.sender === "me" ? "text-white/70" : "text-muted-foreground"
+                                  )}>
+                                    {getFileExt(msg.fileName || msg.text)}
+                                  </span>
+                                  <span className="w-1 h-1 rounded-full bg-current opacity-30" />
+                                  <span className={cn(
+                                    "text-[9px] font-black uppercase tracking-widest",
+                                    msg.sender === "me" ? "text-white/70" : "text-muted-foreground"
+                                  )}>
+                                    740 KB
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1 opacity-80">
+                                <span className={cn(
+                                  "text-[10px] font-bold",
+                                  msg.sender === "me" ? "text-white/90" : "text-muted-foreground"
+                                )}>{msg.time}</span>
+                                {msg.sender === "me" && (
+                                  msg.status === "read"
+                                    ? <CheckCheck className="w-3.5 h-3.5 text-blue-300" />
+                                    : <Check className="w-3.5 h-3.5 text-white/50" />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Actions Area */}
+                            <div className={cn(
+                              "grid grid-cols-2 border-t",
+                              msg.sender === "me" ? "bg-white/5 border-white/10" : "bg-card/50 border-border/50"
+                            )}>
+                               <a
+                                  href={msg.mediaUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className={cn(
+                                    "py-3 text-center text-[11px] font-black uppercase tracking-widest hover:bg-white/5 transition-colors",
+                                    msg.sender === "me" ? "text-white" : "text-primary"
+                                  )}
+                               >
+                                  Abrir
+                               </a>
+                               <a
+                                  href={msg.mediaUrl}
+                                  download={msg.text}
+                                  className={cn(
+                                    "py-3 text-center text-[11px] font-black uppercase tracking-widest hover:bg-white/5 transition-colors border-l",
+                                    msg.sender === "me" ? "text-white/80 border-white/10" : "text-primary border-border/50"
+                                  )}
+                               >
+                                  Salvar como...
+                               </a>
+                            </div>
                           </div>
                         )}
 
                         {/* Texto ou Fallback de Erro */}
-                        {msg.text && (
-                          (!msg.mediaUrl && ["Mídia", "🎵 Áudio", "📎 Mídia", "🖼️ Figurinha"].includes(msg.text)) 
+                        {msg.text && !isDocumentMsg && (
+                          (!msg.mediaUrl && ["Mídia", "🎵 Áudio", "📎 Mídia", "🖼️ Figurinha"].includes(msg.text))
                             ? <p className={cn("text-sm font-medium whitespace-pre-wrap text-red-400", isVisualMedia ? "px-2 pt-2" : "")}>{msg.text} (Indisponível)</p>
-                            : (!["Mídia", "🎵 Áudio", "📎 Mídia", "📷 Imagem", "📹 Vídeo", "🖼️ Figurinha"].includes(msg.text)) 
+                            : (!["Mídia", "🎵 Áudio", "📎 Mídia", "📷 Imagem", "📹 Vídeo", "🖼️ Figurinha"].includes(msg.text))
                               ? <p className={cn("text-sm font-medium whitespace-pre-wrap", isVisualMedia ? "px-2 pt-1 pb-1" : "")}>{msg.text}</p>
                               : null
                         )}
                         
-                        {/* Time & Status (Hided for Audio as it's inside CustomAudioPlayer) */}
-                        {msg.tipo !== "audio" && (
+                        {/* Time & Status (hidden for audio/document as they have their own layout) */}
+                        {msg.tipo !== "audio" && !isDocumentMsg && (
                           <div className={cn(
                             "flex justify-end gap-1",
                             (() => {
@@ -1449,19 +1803,227 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                 </div>
               )}
 
-              <div className="p-4 border-t border-border bg-card/50 backdrop-blur-md">
+              <div className="p-4 border-t border-border bg-card/50 backdrop-blur-md relative">
+                {/* Preview de Arquivo Pendente */}
+                {pendingFile && (
+                  <div className="absolute bottom-full left-0 right-0 p-4 bg-card/90 backdrop-blur-xl border-t border-border animate-in slide-in-from-bottom-4 duration-300 z-50">
+                    <div className="max-w-5xl mx-auto flex items-center gap-4">
+                      <div className={cn(
+                        "w-12 h-14 rounded-xl flex flex-col items-center justify-center text-white shrink-0 shadow-lg",
+                        getFileIconColor(pendingFile.name)
+                      )}>
+                        <FileText className="w-6 h-6" />
+                        <span className="text-[8px] font-black uppercase mt-0.5">{getFileExt(pendingFile.name)}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold truncate">{pendingFile.name}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">
+                          {(pendingFile.size / 1024).toFixed(1)} KB • Pronto para enviar
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => setPendingFile(null)}
+                        className="p-2 hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Seletor de Produtos Integrado */}
+                {showProductSelector && (
+                  <div className="absolute bottom-full left-0 right-0 bg-card/95 backdrop-blur-2xl border-t border-border animate-in slide-in-from-bottom-4 duration-300 z-50 overflow-hidden shadow-2xl">
+                    <div className="max-w-5xl mx-auto flex flex-col h-[400px]">
+                      <div className="p-4 border-b border-border/50 flex items-center gap-4 bg-muted/20">
+                        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                          <Package className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1 relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <input 
+                            autoFocus
+                            type="text"
+                            placeholder="Pesquise o nome do produto (mín. 2 letras)..."
+                            value={productSearch}
+                            onChange={(e) => setProductSearch(e.target.value)}
+                            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:border-primary/50 transition-all shadow-inner"
+                          />
+                        </div>
+                        <button 
+                          onClick={() => { setShowProductSelector(false); setProductSearch(""); setCartProducts([]); }}
+                          className="p-3 hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors"
+                        >
+                          <X className="w-6 h-6" />
+                        </button>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                        {loadingProducts ? (
+                          <div className="h-full flex flex-col items-center justify-center gap-4">
+                            <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                            <span className="text-xs font-black uppercase tracking-widest text-muted-foreground animate-pulse">Sincronizando produtos...</span>
+                          </div>
+                        ) : filteredProducts.length > 0 ? (
+                          <div className="flex flex-col divide-y divide-border/30">
+                            {filteredProducts.map((p) => {
+                              const inCart = cartProducts.some(x => x.cod === p.cod);
+                              const [gradient] = getBrandStyle(p.marca || p.descricao);
+                              const initials = getBrandInitials(p.marca || p.descricao);
+                              return (
+                                <button
+                                  key={p.cod}
+                                  onClick={() => handleSelectProduct(p)}
+                                  className={cn(
+                                    "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all group",
+                                    inCart ? "bg-primary/8" : "hover:bg-secondary/40"
+                                  )}
+                                >
+                                  {/* Imagem / Placeholder da marca */}
+                                  <div className={cn(
+                                    "w-14 h-14 rounded-xl shrink-0 bg-gradient-to-br flex flex-col items-center justify-center shadow-sm relative overflow-hidden",
+                                    gradient
+                                  )}>
+                                    <span className="text-white font-black text-base leading-none tracking-tight">{initials}</span>
+                                    {p.marca && (
+                                      <span className="text-white/60 text-[7px] font-bold uppercase tracking-wider mt-0.5 px-1 text-center leading-tight truncate w-full text-center">{p.marca}</span>
+                                    )}
+                                    {inCart && (
+                                      <div className="absolute inset-0 bg-primary/30 backdrop-blur-[1px] flex items-center justify-center">
+                                        <Check className="w-5 h-5 text-white drop-shadow" />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Info do produto */}
+                                  <div className="flex-1 min-w-0">
+                                    <p className={cn(
+                                      "text-[12px] font-bold leading-snug truncate transition-colors",
+                                      inCart ? "text-primary" : "text-foreground group-hover:text-primary"
+                                    )}>
+                                      {p.descricao}
+                                    </p>
+                                    {p.marca && (
+                                      <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{p.marca}</p>
+                                    )}
+                                    <div className="flex items-center gap-3 mt-1">
+                                      <span className="text-[11px] font-black text-foreground">
+                                        💵 R$ {p.debito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </span>
+                                      <span className="text-border/60">·</span>
+                                      <span className="text-[11px] font-black text-primary">
+                                        💳 R$ {p.credito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Botão +/✓ */}
+                                  <div className={cn(
+                                    "w-8 h-8 rounded-full shrink-0 flex items-center justify-center border-2 transition-all",
+                                    inCart
+                                      ? "bg-primary border-primary text-white"
+                                      : "border-border/50 text-muted-foreground group-hover:border-primary group-hover:text-primary"
+                                  )}>
+                                    {inCart
+                                      ? <Check className="w-4 h-4" />
+                                      : <span className="text-lg leading-none font-bold">+</span>
+                                    }
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                             <Search className="w-16 h-16 mb-4" />
+                             <p className="text-sm font-black uppercase tracking-tighter">Nenhum produto encontrado com "{productSearch}"</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer do carrinho */}
+                      {cartProducts.length > 0 && (
+                        <div className="border-t border-border bg-card/80 backdrop-blur-md px-4 py-3 flex items-center gap-4">
+                          <div className="flex-1 flex items-center gap-6">
+                            <div className="flex flex-col">
+                              <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">{cartProducts.length} {cartProducts.length === 1 ? 'produto' : 'produtos'} selecionados</span>
+                              <div className="flex items-center gap-3 mt-0.5">
+                                <span className="text-xs font-bold text-foreground">
+                                  Débito: <span className="text-primary">R$ {cartProducts.reduce((s, p) => s + p.debito, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </span>
+                                <span className="text-muted-foreground">·</span>
+                                <span className="text-xs font-bold text-foreground">
+                                  Crédito: <span className="text-primary">R$ {cartProducts.reduce((s, p) => s + p.credito, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setCartProducts([])}
+                            className="px-3 py-2 text-[10px] font-black uppercase text-muted-foreground hover:text-rose-500 transition-colors"
+                          >
+                            Limpar
+                          </button>
+                          <button
+                            onClick={handleInsertQuote}
+                            className="px-5 py-2.5 bg-primary text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-primary/90 transition-colors flex items-center gap-2 shadow-lg shadow-primary/20"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            Montar Orçamento
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 max-w-5xl mx-auto">
-                  <button className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"><Smile className="w-5 h-5"/></button>
-                  <button className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"><Paperclip className="w-5 h-5"/></button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt,.csv,.mp4,.mov"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleSendDocument(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    onClick={() => setShowProductSelector(!showProductSelector)}
+                    className={cn(
+                      "p-2.5 rounded-xl transition-all relative",
+                      showProductSelector ? "bg-primary text-white" : "hover:bg-secondary text-muted-foreground"
+                    )}
+                  >
+                    <Package className="w-5 h-5"/>
+                    {cartProducts.length > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center">
+                        {cartProducts.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Paperclip className="w-5 h-5"/>
+                  </button>
                   <input 
                     type="text" 
                     value={inputText} 
                     onChange={(e)=>setInputText(e.target.value)} 
-                    onKeyDown={(e)=>e.key === "Enter" && handleSendMessage()} 
-                    placeholder="Responda agora..." 
-                    className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm outline-none" 
+                    onKeyDown={(e)=>e.key === "Enter" && (pendingFile ? confirmSendFile() : handleSendMessage())} 
+                    onPaste={handlePaste}
+                    placeholder={pendingFile ? "Adicione uma legenda..." : "Responda agora..."} 
+                    className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-all" 
                   />
-                  <button onClick={handleSendMessage} className="w-11 h-11 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg"><Send className="w-5 h-5"/></button>
+                  <button 
+                    onClick={pendingFile ? confirmSendFile : handleSendMessage} 
+                    className="w-11 h-11 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all"
+                  >
+                    <Send className={cn("w-5 h-5", pendingFile && "animate-pulse")} />
+                  </button>
                 </div>
               </div>
             </div>

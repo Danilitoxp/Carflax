@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { 
   Search, 
   User, 
-  Flame, 
   Phone, 
   Clock,
   CheckCircle2,
-  Archive
+  Trash2,
+  MessageSquare
 } from "lucide-react";
 import { marketingService } from "@/lib/marketing-service";
 import type { MarketingCliente } from "@/lib/marketing-service";
@@ -48,14 +48,17 @@ export function LeadsView() {
     setLoading(false);
   };
 
-  const handleUpdateStatus = async (jid: string, status: string) => {
-    await marketingService.upsertCliente({ remote_jid: jid, status });
-    refreshLeads();
+  const handleDeleteLead = async (jid: string) => {
+    if (confirm("Tem certeza que deseja excluir este lead permanentemente?")) {
+      await marketingService.deleteCliente(jid);
+      refreshLeads();
+    }
   };
 
-  const handleUpdateTemp = async (jid: string, temp: keyof typeof TEMP_CONFIG) => {
-    await marketingService.upsertCliente({ remote_jid: jid, temperatura: temp });
-    refreshLeads();
+  const handleOpenChat = (jid: string) => {
+    // Salva o JID para que o WhatsappView possa abrir automaticamente
+    localStorage.setItem("carflax_pending_chat", jid);
+    window.dispatchEvent(new CustomEvent("carflax-change-tab", { detail: "Whatsapp" }));
   };
 
   const filtered = leads.filter(c => {
@@ -169,27 +172,21 @@ export function LeadsView() {
                   </div>
 
                   {/* Ações Rápidas */}
-                  <div className="flex items-center justify-end gap-1.5">
+                  <div className="flex items-center justify-end gap-2">
                     <button 
-                      onClick={() => handleUpdateTemp(lead.remote_jid, "Quente")}
-                      className="w-8 h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white flex items-center justify-center transition-all border border-rose-500/20"
-                      title="Quente"
+                      onClick={() => handleDeleteLead(lead.remote_jid)}
+                      className="p-2 rounded-xl bg-secondary/50 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition-all border border-transparent hover:border-rose-500/20"
+                      title="Excluir Lead"
                     >
-                      <Flame className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
-                    <div className="w-[1px] h-4 bg-border/50 mx-1" />
+                    
                     <button 
-                      onClick={() => handleUpdateStatus(lead.remote_jid, "Arquivado")}
-                      className="p-2 rounded-lg bg-secondary text-muted-foreground hover:bg-destructive hover:text-white transition-all border border-border"
-                      title="Arquivar"
+                      onClick={() => handleOpenChat(lead.remote_jid)}
+                      className="w-10 h-10 rounded-xl bg-primary text-white hover:bg-primary/80 flex items-center justify-center transition-all shadow-lg shadow-primary/20 active:scale-95"
+                      title="Ver Conversa"
                     >
-                      <Archive className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleUpdateStatus(lead.remote_jid, "Em Contato")}
-                      className="px-3 h-8 rounded-lg bg-primary text-white hover:bg-primary/80 font-black text-[9px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg shadow-primary/20"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Qualificar
+                      <MessageSquare className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
