@@ -92,6 +92,7 @@ export function UsersView() {
   const availableModules = [
     "Geral", "Produtos", "Eventos", "Férias",
     "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", "Romaneios",
+    "Marketing", "Whatsapp", "Leads", "Cronograma",
     "Usuários", "DB Admin", "Sugestões",
     "Gerenciar Comunicados", "Gerenciar Férias", "Gerenciar Banners", "Gerenciar Calendário",
     "Lançar Entrega",

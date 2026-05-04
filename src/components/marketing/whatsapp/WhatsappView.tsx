@@ -14,7 +14,12 @@ import {
   DollarSign,
   X,
   Bell,
-  RefreshCw
+  RefreshCw,
+  Pin,
+  PinOff,
+  Play,
+  Pause,
+  Mic
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { marketingService } from "@/lib/marketing-service";
@@ -26,6 +31,9 @@ interface Message {
   time: string;
   sender: "me" | "contact";
   status: "sent" | "delivered" | "read";
+  tipo?: string;
+  mediaUrl?: string;
+  reacao?: string;
 }
 
 type Temperature = "Quente" | "Morno" | "Frio";
@@ -51,6 +59,7 @@ interface Chat {
   avatar?: string;
   online?: boolean;
   arquivado?: boolean;
+  fixado?: boolean;
   leadInfo?: LeadMetadata;
 }
 
@@ -69,10 +78,15 @@ interface EvoMessageResponse {
   id?: string;
   pushName?: string;
   message?: { 
+    base64?: string;
     conversation?: string; 
     extendedTextMessage?: { text?: string };
-    imageMessage?: { caption?: string };
-    videoMessage?: { caption?: string };
+    imageMessage?: { caption?: string; mimetype?: string };
+    videoMessage?: { caption?: string; mimetype?: string };
+    audioMessage?: { ptt?: boolean; mimetype?: string };
+    documentMessage?: { fileName?: string; caption?: string; mimetype?: string };
+    stickerMessage?: { mimetype?: string };
+    reactionMessage?: { key?: { id?: string }; text?: string };
   };
   messageTimestamp?: number;
   status?: string;
@@ -97,6 +111,151 @@ const getTempColor = (temp?: string) => {
 
 const avatarCache = new Map<string, string>();
 
+function formatAudioTime(seconds: number) {
+  if (isNaN(seconds)) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function CustomAudioPlayer({ 
+  src, 
+  isMe, 
+  avatar, 
+  msgTime, 
+  msgStatus 
+}: { 
+  src: string, 
+  isMe: boolean, 
+  avatar?: string,
+  msgTime?: string,
+  msgStatus?: string
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+      setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (audioRef.current) {
+      const seekTime = (Number(e.target.value) / 100) * audioRef.current.duration;
+      audioRef.current.currentTime = seekTime;
+      setProgress(Number(e.target.value));
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+  };
+
+  return (
+    <div className={cn("flex items-center gap-3 min-w-[250px] sm:min-w-[280px] pt-1 pb-1", isMe ? "text-white" : "text-foreground")}>
+      <audio 
+        ref={audioRef} 
+        src={src} 
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        className="hidden" 
+      />
+      
+      {/* Avatar com Microfone */}
+      <div className="relative shrink-0 ml-1">
+        <div className="w-[42px] h-[42px] rounded-full overflow-hidden bg-black/10 flex items-center justify-center">
+          {avatar ? (
+            <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
+          ) : (
+            <User className="w-6 h-6 opacity-50" />
+          )}
+        </div>
+        <div className={cn(
+          "absolute -bottom-0.5 -right-0.5 rounded-full p-[2px] border-2",
+          isMe ? "border-primary bg-primary" : "border-card bg-card"
+        )}>
+           <Mic className={cn("w-[10px] h-[10px]", isMe ? "text-green-300" : "text-green-500")} fill="currentColor" />
+        </div>
+      </div>
+
+      <div className="flex flex-col flex-1 gap-0.5 pr-2">
+        <div className="flex items-center gap-2">
+          {/* Play/Pause Button */}
+          <button onClick={togglePlay} className="p-1 shrink-0 focus:outline-none opacity-80 hover:opacity-100 transition-opacity">
+            {isPlaying ? (
+              <Pause className="w-[22px] h-[22px]" fill="currentColor" />
+            ) : (
+              <Play className="w-[22px] h-[22px]" fill="currentColor" />
+            )}
+          </button>
+
+          {/* Progress Bar */}
+          <div className="flex-1 flex items-center relative h-5">
+            <input 
+              type="range" 
+              min="0" 
+              max="100" 
+              value={progress || 0}
+              onChange={handleSeek}
+              className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
+            />
+            {/* Custom Track */}
+            <div className="w-full h-[3px] bg-black/20 rounded-full overflow-hidden">
+               <div className="h-full bg-current transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            {/* Custom Thumb */}
+            <div 
+              className="absolute h-2.5 w-2.5 rounded-full bg-current shadow-sm transition-all pointer-events-none" 
+              style={{ left: `calc(${progress}% - 5px)` }}
+            />
+          </div>
+        </div>
+
+        {/* Time Text & Message Meta */}
+        <div className="flex items-center justify-between pl-[40px] mt-0.5">
+           <span className="text-[11px] opacity-70 font-medium tracking-wide">
+             {formatAudioTime(isPlaying ? currentTime : duration)}
+           </span>
+
+           <div className="flex items-center gap-1 opacity-70">
+             <span className="text-[9px] font-bold">{msgTime}</span>
+             {isMe && (
+               msgStatus === "read" 
+                ? <CheckCheck className="w-3.5 h-3.5 text-blue-400" /> 
+                : <Check className="w-3.5 h-3.5" />
+             )}
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const [chats, setChats] = useState<Chat[]>([]);
   const [viewMode, setViewMode] = useState<"active" | "archived">("active");
@@ -112,7 +271,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const [showTempDropdown, setShowTempDropdown] = useState(false);
   const [budgetId, setBudgetId] = useState("");
   const [saleValue, setSaleValue] = useState("");
+  const [myAvatar, setMyAvatar] = useState<string>("");
   const [presenceChats, setPresenceChats] = useState<Map<string, 'composing' | 'recording'>>(new Map());
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, chat: Chat } | null>(null);
+  const lastSeenMap = useRef<Map<string, Date>>(new Map());
+  const [, forceUpdate] = useState(0); // para re-render ao atualizar lastSeenMap
   const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const lidToJidMap = useRef<Map<string, string>>(new Map());
   const lastPhoneJid = useRef<string | null>(null);
@@ -130,6 +293,19 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       const saved = localStorage.getItem('wpp_lid_map');
       if (saved) new Map<string, string>(JSON.parse(saved)).forEach((v, k) => lidToJidMap.current.set(k, v));
     } catch { /* ignora */ }
+  }, []);
+
+  // Busca a foto da própria instância (Trafego)
+  useEffect(() => {
+    evolutionApi.getInstanceInfo().then(data => {
+      if (data?.instance?.profilePictureUrl) {
+        setMyAvatar(data.instance.profilePictureUrl);
+      } else if (data?.instance?.owner) {
+        evolutionApi.getProfilePic(data.instance.owner).then(url => {
+          if (url) setMyAvatar(url);
+        });
+      }
+    });
   }, []);
 
   const fetchAvatar = useCallback(async (remoteJid: string, force = false) => {
@@ -168,9 +344,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         name: item.nome || item.push_name || item.remote_jid.split('@')[0],
         lastMessage: item.ultima_mensagem || "",
         time: item.ultima_conversa_em ? new Date(item.ultima_conversa_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
-        unreadCount: 0,
+        unreadCount: item.mensagens_nao_lidas || 0,
         avatar: item.foto_url || "",
         arquivado: item.arquivado,
+        fixado: item.fixado || false,
         leadInfo: {
           status: item.status || "Novo Lead",
           temperature: (item.temperatura as Temperature) || "Frio",
@@ -179,8 +356,12 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         }
       }));
       
-      // MOSTRA OS DADOS DO BANCO IMEDIATAMENTE
-      setChats(mappedChats);
+      // MOSTRA OS DADOS DO BANCO IMEDIATAMENTE COM ORDENAÇÃO DE FIXADOS
+      setChats(mappedChats.sort((a, b) => {
+        if (a.fixado && !b.fixado) return -1;
+        if (!a.fixado && b.fixado) return 1;
+        return 0; // Mantém a ordem por data se ambos forem iguais
+      }));
       setLoading(false);
       isInitialLoad.current = false;
 
@@ -190,9 +371,9 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           const evoChats = evoData as EvoChatResponse[];
           const updates: import("@/lib/marketing-service").MarketingCliente[] = []; 
 
-          const enrichedChats = mappedChats.map(chat => {
+          mappedChats.forEach(chat => {
             const evo = evoChats.find(e => (e.id || e.remoteJid) === chat.id);
-            if (!evo) return chat;
+            if (!evo) return;
 
             const resolvedName = evo.name || evo.pushName || chat.name;
             const lastMsg = typeof evo.lastMessage === 'string' ? evo.lastMessage : (evo.lastMessage?.message?.conversation || chat.lastMessage);
@@ -205,40 +386,20 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                 ultima_conversa_em: evo.updatedAt || new Date().toISOString()
               });
             }
-
-            return { ...chat, name: resolvedName, lastMessage: lastMsg };
           });
 
-          // Atualiza UI apenas se houver mudanças reais
+          // Atualiza UI apenas se houver mudanças reais, preservando a ordem ATUAL do estado
           if (updates.length > 0) {
-            setChats(enrichedChats);
+            setChats(prevChats => prevChats.map(chat => {
+              const evo = evoChats.find(e => (e.id || e.remoteJid) === chat.id);
+              if (!evo) return chat;
+              const resolvedName = evo.name || evo.pushName || chat.name;
+              const lastMsg = typeof evo.lastMessage === 'string' ? evo.lastMessage : (evo.lastMessage?.message?.conversation || chat.lastMessage);
+              return { ...chat, name: resolvedName, lastMessage: lastMsg };
+            }));
             marketingService.upsertClientes(updates);
           }
-          
-          // Busca fotos e nomes extras também em background
-          enrichedChats.forEach(chat => {
-            const isPhoneOnly = /^\d+$/.test(chat.name);
-            if (isPhoneOnly || !chat.avatar) {
-              evolutionApi.getContact(chat.id).then(contact => {
-                if (!contact) return;
-                const cUpdates: { push_name?: string; foto_url?: string } = {};
-                if (contact.pushName && contact.pushName !== chat.name) cUpdates.push_name = contact.pushName;
-                if (contact.profilePicUrl && contact.profilePicUrl !== chat.avatar) {
-                  cUpdates.foto_url = contact.profilePicUrl;
-                  avatarCache.set(chat.id, contact.profilePicUrl);
-                }
-                if (Object.keys(cUpdates).length > 0) {
-                  marketingService.upsertCliente({ remote_jid: chat.id, ...cUpdates });
-                  setChats(prev => prev.map(c => c.id === chat.id ? {
-                    ...c,
-                    ...(contact.pushName ? { name: contact.pushName } : {}),
-                    ...(contact.profilePicUrl ? { avatar: contact.profilePicUrl } : {})
-                  } : c));
-                }
-              });
-            }
           });
-        });
       }
     } catch (error) {
       console.error("Erro ao carregar chats:", error);
@@ -246,40 +407,63 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     }
   }, [viewMode]);
 
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handlePinChat = async (chat: Chat) => {
+    try {
+      const newStatus = !chat.fixado;
+      await marketingService.togglePin(chat.id, newStatus);
+      
+      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, fixado: newStatus } : c).sort((a, b) => {
+        if (a.fixado && !b.fixado) return -1;
+        if (!a.fixado && b.fixado) return 1;
+        return 0;
+      }));
+      
+      if (selectedChat?.id === chat.id) {
+        setSelectedChat({ ...selectedChat, fixado: newStatus });
+      }
+    } catch (error) {
+      console.error("Erro ao fixar chat:", error);
+    }
+    setContextMenu(null);
+  };
+
   const handleArchiveChat = async (reason?: string) => {
-    if (!selectedChat) return;
+    const chatToArchive = contextMenu?.chat || selectedChat;
+    if (!chatToArchive) return;
     
     try {
-      await marketingService.upsertCliente({
-        remote_jid: selectedChat.id,
-        arquivado: true,
-        status: reason || "Arquivado"
-      });
+      await marketingService.toggleArchived(chatToArchive.id, true, reason);
       
-      // Remove da lista local e limpa seleção
-      setChats(prev => prev.filter(c => c.id !== selectedChat.id));
-      setSelectedChat(null);
+      // Remove da lista local e limpa seleção se necessário
+      setChats(prev => prev.filter(c => c.id !== chatToArchive.id));
+      if (selectedChat?.id === chatToArchive.id) setSelectedChat(null);
       setShowArchiveModal(false);
     } catch (error) {
       console.error("Erro ao arquivar chat:", error);
     }
+    setContextMenu(null);
   };
 
   const handleUnarchiveChat = async () => {
-    if (!selectedChat) return;
+    const chatToUnarchive = contextMenu?.chat || selectedChat;
+    if (!chatToUnarchive) return;
     
     try {
-      await marketingService.upsertCliente({
-        remote_jid: selectedChat.id,
-        arquivado: false
-      });
+      await marketingService.toggleArchived(chatToUnarchive.id, false);
       
       // Remove da lista de arquivados e limpa seleção
-      setChats(prev => prev.filter(c => c.id !== selectedChat.id));
-      setSelectedChat(null);
+      setChats(prev => prev.filter(c => c.id !== chatToUnarchive.id));
+      if (selectedChat?.id === chatToUnarchive.id) setSelectedChat(null);
     } catch (error) {
       console.error("Erro ao desarquivar chat:", error);
     }
+    setContextMenu(null);
   };
 
   useEffect(() => {
@@ -298,23 +482,37 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       // Guarda o JID para correlacionar com o LID do chats.update que vem logo após
       lastPhoneJid.current = remoteJid;
 
-      // FILTRO DE DATA: Ignora mensagens anteriores ao cleanup manual de hoje (08:50)
-      const MIN_SYNC_TIMESTAMP = Math.floor(new Date('2026-05-04T08:50:00').getTime() / 1000);
+      // FILTRO DE DATA: Ignora mensagens com mais de 7 dias (evita spam de histórico antigo)
+      const MIN_SYNC_TIMESTAMP = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
       const msgTimestamp = message.messageTimestamp || 0;
       
-      if (msgTimestamp < MIN_SYNC_TIMESTAMP) {
+      if (msgTimestamp > 0 && msgTimestamp < MIN_SYNC_TIMESTAMP) {
         return;
       }
 
       console.log('📩 Mensagem de:', { remoteJid, pushName: message.pushName, fromMe: message.key?.fromMe, status: message.status });
 
       const messageContent = message.message;
+      
+      // Tratamento de reações
+      if (messageContent?.reactionMessage) {
+        const reactedMsgId = messageContent.reactionMessage.key?.id;
+        const reactionText = messageContent.reactionMessage.text || "";
+        if (reactedMsgId) {
+          setMessages(prev => prev.map(m => m.id === reactedMsgId ? { ...m, reacao: reactionText } : m));
+          // Atualização simples da reação no banco pode ser implementada depois se necessário
+          return;
+        }
+      }
+
+      const isAudio = !!messageContent?.audioMessage;
+      const isSticker = !!messageContent?.stickerMessage;
       const text =
         messageContent?.conversation ||
         messageContent?.extendedTextMessage?.text ||
         messageContent?.imageMessage?.caption ||
         messageContent?.videoMessage?.caption ||
-        "Mídia";
+        (isAudio ? "🎵 Áudio" : isSticker ? "🖼️ Figurinha" : "📎 Mídia");
 
       const timestamp = message.messageTimestamp
         ? new Date(message.messageTimestamp * 1000).toISOString()
@@ -323,6 +521,52 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       const msgId = message.key?.id || Date.now().toString();
+
+      // Download de mídias (foto, vídeo, áudio, doc)
+      let mediaUrl: string | undefined = undefined;
+      let tipoMsg = "text";
+      const hasMedia = messageContent?.imageMessage || messageContent?.audioMessage || messageContent?.videoMessage || messageContent?.documentMessage || messageContent?.stickerMessage;
+
+      if (hasMedia && message.key && message.key.id && message.key.remoteJid) {
+        tipoMsg = messageContent.stickerMessage ? "sticker"
+                : messageContent.imageMessage ? "image" 
+                : messageContent.audioMessage ? "audio"
+                : messageContent.videoMessage ? "video"
+                : "document";
+
+        try {
+          // Extrai o objeto de mídia específico para pegar o mimetype
+          const mediaObj = messageContent.imageMessage || messageContent.audioMessage || messageContent.videoMessage || messageContent.documentMessage || messageContent.stickerMessage;
+          const mimetype = mediaObj?.mimetype || "application/octet-stream";
+          
+          let base64String = messageContent.base64;
+
+          // Se o websocket já mandou o base64 (configuração da Evo API), usamos direto!
+          if (base64String) {
+            // Remove o prefixo data:mimetype;base64, se existir
+            if (base64String.includes('base64,')) {
+              base64String = base64String.split('base64,')[1];
+            }
+            
+            const ext = mimetype.split('/')[1]?.split(';')[0] || "bin";
+            const filename = `${msgId}.${ext}`;
+            const publicUrl = await marketingService.uploadMedia(base64String, mimetype, filename);
+            if (publicUrl) mediaUrl = publicUrl;
+          } else {
+            // Fallback: tenta baixar pela API
+            const mediaData = await evolutionApi.getMediaBase64(message);
+            if (mediaData) {
+               const ext = mediaData.mimetype.split('/')[1]?.split(';')[0] || "bin";
+               const filename = `${msgId}.${ext}`;
+               const publicUrl = await marketingService.uploadMedia(mediaData.base64, mediaData.mimetype, filename);
+               if (publicUrl) mediaUrl = publicUrl;
+            }
+          }
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.error("Erro ao processar mídia da Evo API:", errorMessage);
+        }
+      }
 
       // pushName em mensagens recebidas (fromMe=false) é sempre o nome do contato
       const validPushName = !message.key?.fromMe && message.pushName ? message.pushName : null;
@@ -343,7 +587,18 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         sender: message.key?.fromMe ? "me" : "contact",
         timestamp: timestamp,
         status: message.status === "READ" ? "read" : "sent",
+        tipo: tipoMsg,
+        media_url: mediaUrl,
         ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {})
+      });
+
+      // Se o chat estiver arquivado e chegou nova mensagem (de qualquer lado), desarquiva automaticamente
+      setChats(prevChats => {
+        const existingChat = prevChats.find(c => c.id === remoteJid);
+        if (existingChat?.arquivado) {
+          marketingService.toggleArchived(remoteJid, false);
+        }
+        return prevChats;
       });
 
       setChats(prevChats => {
@@ -351,6 +606,12 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         if (existingChatIndex !== -1) {
           const updatedChats = [...prevChats];
           const chat = { ...updatedChats[existingChatIndex] };
+
+          // Se estava arquivado: remove da lista atual (ativa ou arquivada)
+          if (chat.arquivado) {
+            return prevChats.filter(c => c.id !== remoteJid);
+          }
+
           chat.lastMessage = text;
           chat.lastMessageSender = message.key?.fromMe ? "me" : "contact";
           chat.time = time;
@@ -361,59 +622,26 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
             if (isPhoneNumber || chat.name === "Novo Lead") {
               chat.name = validPushName;
             }
-          } else if (message.key?.fromMe) {
-            // Se nós enviamos e ainda não temos o nome real, busca na API em background
-            const isPhoneNumber = /^\d+$/.test(chat.name.replace(/\D/g, '')) && chat.name.length >= 8;
-            if (isPhoneNumber || chat.name === "Novo Lead" || !chat.avatar) {
-              evolutionApi.getContact(remoteJid).then(contact => {
-                if (!contact) return;
-                setChats(prev => prev.map(c => {
-                  if (c.id === remoteJid) {
-                    const updated = { ...c };
-                    if (contact.pushName && (isPhoneNumber || c.name === "Novo Lead")) updated.name = contact.pushName;
-                    if (contact.profilePicUrl && !c.avatar) updated.avatar = contact.profilePicUrl;
-                    return updated;
-                  }
-                  return c;
-                }));
-                
-                if (contact.pushName || contact.profilePicUrl) {
-                  marketingService.upsertCliente({ 
-                    remote_jid: remoteJid, 
-                    ...(contact.pushName ? { push_name: contact.pushName } : {}),
-                    ...(contact.profilePicUrl ? { foto_url: contact.profilePicUrl } : {})
-                  });
-                }
-              });
-            }
           }
 
           // Incrementa unread se não for o chat selecionado
           if (selectedChatRef.current?.id !== remoteJid) {
             chat.unreadCount = (chat.unreadCount || 0) + 1;
+            // Persiste no banco de forma assíncrona
+            marketingService.incrementUnread(remoteJid);
           }
 
           updatedChats.splice(existingChatIndex, 1);
           if (!chat.avatar) fetchAvatar(remoteJid);
-          return [chat, ...updatedChats];
+          // Reinsere respeitando fixados: fixados ficam no topo
+          const reordered = [chat, ...updatedChats];
+          return reordered.sort((a, b) => {
+            if (a.fixado && !b.fixado) return -1;
+            if (!a.fixado && b.fixado) return 1;
+            return 0; // dentro do mesmo grupo, mantém a ordem já existente
+          });
         } else {
           fetchAvatar(remoteJid);
-
-          // Se foi o vendedor que enviou primeiro, busca nome/foto do contato em background
-          if (message.key?.fromMe) {
-            evolutionApi.getContact(remoteJid).then(contact => {
-              if (!contact) return;
-              if (contact.pushName) {
-                setChats(prev => prev.map(c => c.id === remoteJid && (c.name === remoteJid.split('@')[0]) ? { ...c, name: contact.pushName! } : c));
-                marketingService.upsertCliente({ remote_jid: remoteJid, push_name: contact.pushName });
-              }
-              if (contact.profilePicUrl) {
-                avatarCache.set(remoteJid, contact.profilePicUrl);
-                setChats(prev => prev.map(c => c.id === remoteJid ? { ...c, avatar: contact.profilePicUrl! } : c));
-                marketingService.upsertCliente({ remote_jid: remoteJid, foto_url: contact.profilePicUrl });
-              }
-            });
-          }
 
           const newChat: Chat = {
             id: remoteJid,
@@ -430,7 +658,13 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               campaign: "Geral"
             }
           };
-          return [newChat, ...prevChats];
+          // Novo chat nunca é fixado, então vai logo após os fixados
+          const withNew = [newChat, ...prevChats];
+          return withNew.sort((a, b) => {
+            if (a.fixado && !b.fixado) return -1;
+            if (!a.fixado && b.fixado) return 1;
+            return 0;
+          });
         }
       });
 
@@ -443,7 +677,9 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               text: text,
               time: time,
               sender: message.key?.fromMe ? "me" : "contact",
-              status: "sent"
+              status: "sent",
+              tipo: tipoMsg,
+              mediaUrl: mediaUrl
             };
             return [...prevMsgs, newMsg];
           });
@@ -528,7 +764,6 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       setPresenceChats(prev => {
         const next = new Map(prev);
         if (presenceType) {
-          console.log(`💬 ${selectedChatRef.current?.id === jid ? selectedChatRef.current.name : jid.split('@')[0]} está ${presenceType === 'recording' ? 'gravando áudio' : 'digitando'}...`);
           next.set(jid, presenceType);
           const existing = typingTimers.current.get(jid);
           if (existing) clearTimeout(existing);
@@ -538,6 +773,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           }, 5000);
           typingTimers.current.set(jid, timer);
         } else {
+          // Contato ficou offline/indisponível — registra o "visto por último"
+          if (presence === 'unavailable' || presence === 'paused') {
+            lastSeenMap.current.set(jid, new Date());
+            forceUpdate(n => n + 1); // re-render para atualizar o header
+          }
           next.delete(jid);
           const existing = typingTimers.current.get(jid);
           if (existing) { clearTimeout(existing); typingTimers.current.delete(jid); }
@@ -592,6 +832,13 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     const textToSend = inputText;
     setInputText("");
 
+    // Se o chat estiver arquivado, desarquiva imediatamente ao responder
+    if (selectedChat.arquivado) {
+      marketingService.toggleArchived(selectedChat.id, false);
+      setSelectedChat({ ...selectedChat, arquivado: false });
+      setChats(prev => prev.filter(c => c.id !== selectedChat.id));
+    }
+
     try {
       const msgId = "me_" + Date.now().toString();
       const timestamp = new Date().toISOString();
@@ -627,6 +874,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const handleSelectChat = useCallback(async (chat: Chat) => {
     setSelectedChat(chat);
     setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unreadCount: 0 } : c));
+    // Persiste no banco que o usuário leu as mensagens
+    if ((chat.unreadCount || 0) > 0) {
+      marketingService.markAsRead(chat.id);
+    }
     setLoadingMessages(true);
     setBudgetId(chat.leadInfo?.budgetId || "");
     setSaleValue(chat.leadInfo?.saleValue || "");
@@ -634,8 +885,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
 
     try {
-      // 1. Busca do Banco primeiro (apenas mensagens a partir de hoje)
-      const MIN_SYNC_DATE = '2026-05-04T08:50:00.000Z';
+      // 1. Busca do Banco primeiro (últimos 7 dias)
+      const MIN_SYNC_DATE = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const dbMessages = await marketingService.getMessagesByJid(chat.id, 50, MIN_SYNC_DATE);
       
       if (dbMessages.length > 0) {
@@ -644,7 +895,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           text: m.texto || "",
           time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           sender: m.sender,
-          status: (m.status as "sent" | "delivered" | "read") || "sent"
+          status: (m.status as "sent" | "delivered" | "read") || "sent",
+          tipo: m.tipo,
+          mediaUrl: m.media_url,
+          reacao: m.reacao
         }));
         setMessages(msgs);
 
@@ -857,6 +1111,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
             <button 
               key={chat.id} 
               onClick={() => handleSelectChat(chat)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setContextMenu({ x: e.clientX, y: e.clientY, chat });
+              }}
               className={cn(
                 "w-full p-4 rounded-2xl flex gap-4 transition-all relative group mb-1",
                 selectedChat?.id === chat.id 
@@ -882,6 +1140,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                     )}>
                       {chat.name.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
                     </span>
+                    {chat.fixado && <Pin className="w-3 h-3 text-primary rotate-45" />}
                   </div>
                   
                   <p className={cn(
@@ -929,7 +1188,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                       ? <p className="text-[10px] text-emerald-400 font-bold tracking-widest animate-pulse">
                           {presenceChats.get(selectedChat.id) === 'recording' ? 'gravando áudio...' : 'escrevendo...'}
                         </p>
-                      : <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Online</p>
+                      : lastSeenMap.current.has(selectedChat.id)
+                        ? <p className="text-[10px] text-muted-foreground font-medium">
+                            visto por último às {lastSeenMap.current.get(selectedChat.id)!.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        : <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Online</p>
                     }
                   </div>
                 </div>
@@ -991,17 +1254,118 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                 </div>
               ) : (
                 <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
-                  {messages.map((msg) => (
-                    <div key={msg.id} className={cn("flex", msg.sender === "me" ? "justify-end" : "justify-start")}>
-                      <div className={cn("max-w-[75%] px-4 py-2 rounded-2xl shadow-sm relative", msg.sender === "me" ? "bg-primary text-white rounded-tr-none" : "bg-card border border-border text-foreground rounded-tl-none")}>
-                        <p className="text-sm font-medium">{msg.text}</p>
-                        <div className="flex justify-end gap-1 mt-1 opacity-60">
-                          <span className="text-[9px] font-bold">{msg.time}</span>
-                          {msg.sender === "me" && (msg.status === "read" ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />)}
-                        </div>
+                  {messages.map((msg) => {
+                    const isVisualMedia = msg.tipo === "image" || msg.tipo === "video" || msg.tipo === "sticker";
+                    const isSticker = msg.tipo === "sticker";
+                    return (
+                    <div key={msg.id} className={cn("flex flex-col", msg.sender === "me" ? "items-end" : "items-start")}>
+                      <div className={cn(
+                        "max-w-[75%] rounded-2xl shadow-sm relative flex flex-col group transition-all", 
+                        isSticker 
+                          ? "bg-transparent shadow-none border-none" 
+                          : msg.sender === "me" ? "bg-primary text-white rounded-tr-none" : "bg-card border border-border text-foreground rounded-tl-none",
+                        isVisualMedia ? "p-1" : "px-4 py-2"
+                      )}>
+                        
+                        {/* Mídia: Imagem ou Figurinha */}
+                        {(msg.tipo === "image" || msg.tipo === "sticker") && msg.mediaUrl && (
+                          <img 
+                            src={msg.mediaUrl} 
+                            alt={isSticker ? "Figurinha" : "Imagem Recebida"} 
+                            className={cn(
+                              isSticker ? "w-40 sm:w-48 h-auto object-contain" : "w-72 max-w-full object-cover",
+                              msg.text && !["Mídia", "📷 Imagem", "🖼️ Figurinha"].includes(msg.text) ? "rounded-t-xl rounded-b-sm" : "rounded-xl",
+                              (msg.sender === "me" && !isSticker) ? "rounded-tr-none" : (!isSticker ? "rounded-tl-none" : "")
+                            )} 
+                          />
+                        )}
+                        
+                        {/* Mídia: Vídeo */}
+                        {msg.tipo === "video" && msg.mediaUrl && (
+                          <video 
+                            src={msg.mediaUrl} 
+                            controls 
+                            className={cn(
+                              "w-72 max-w-full",
+                              msg.text && !["Mídia", "📹 Vídeo"].includes(msg.text) ? "rounded-t-xl rounded-b-sm" : "rounded-xl",
+                              msg.sender === "me" ? "rounded-tr-none" : "rounded-tl-none"
+                            )} 
+                          />
+                        )}
+                        
+                        {/* Mídia: Áudio */}
+                        {msg.tipo === "audio" && msg.mediaUrl && (
+                          <div className={cn(isVisualMedia ? "px-3 py-2" : "")}>
+                            <CustomAudioPlayer 
+                              src={msg.mediaUrl} 
+                              isMe={msg.sender === "me"} 
+                              avatar={msg.sender === "me" ? myAvatar : selectedChat?.avatar} 
+                              msgTime={msg.time}
+                              msgStatus={msg.status}
+                            />
+                          </div>
+                        )}
+
+                        {/* Mídia: Documento */}
+                        {msg.tipo === "document" && msg.mediaUrl && (
+                          <div className={cn(isVisualMedia ? "px-3 py-2" : "")}>
+                            <a href={msg.mediaUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-black/10 p-3 rounded-xl mb-1 hover:bg-black/20 transition-colors">
+                              <span className="text-xl">📎</span>
+                              <span className="text-xs font-bold underline">Visualizar Anexo</span>
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Texto ou Fallback de Erro */}
+                        {msg.text && (
+                          (!msg.mediaUrl && ["Mídia", "🎵 Áudio", "📎 Mídia", "🖼️ Figurinha"].includes(msg.text)) 
+                            ? <p className={cn("text-sm font-medium whitespace-pre-wrap text-red-400", isVisualMedia ? "px-2 pt-2" : "")}>{msg.text} (Indisponível)</p>
+                            : (!["Mídia", "🎵 Áudio", "📎 Mídia", "📷 Imagem", "📹 Vídeo", "🖼️ Figurinha"].includes(msg.text)) 
+                              ? <p className={cn("text-sm font-medium whitespace-pre-wrap", isVisualMedia ? "px-2 pt-1 pb-1" : "")}>{msg.text}</p>
+                              : null
+                        )}
+                        
+                        {/* Time & Status (Hided for Audio as it's inside CustomAudioPlayer) */}
+                        {msg.tipo !== "audio" && (
+                          <div className={cn(
+                            "flex justify-end gap-1",
+                            (() => {
+                              const hasRealText = msg.text && !["Mídia", "🎵 Áudio", "📎 Mídia", "📷 Imagem", "📹 Vídeo", "🖼️ Figurinha"].includes(msg.text);
+                              if (isVisualMedia && !hasRealText) {
+                                return cn(
+                                  "absolute bottom-2 right-2.5 px-1.5 py-0.5 rounded-full z-10 text-white/90",
+                                  isSticker ? "bg-black/20 backdrop-blur-[2px]" : "bg-black/30 backdrop-blur-md"
+                                );
+                              }
+                              return cn("opacity-60", isVisualMedia ? "px-2 pb-0.5 mt-0.5" : "mt-1");
+                            })()
+                          )}>
+                            <span className="text-[9px] font-bold mt-[1px]">{msg.time}</span>
+                            {msg.sender === "me" && (
+                              <span className={cn(
+                                msg.status === "read" ? "text-blue-400" : "",
+                                (() => {
+                                  const hasRealText = msg.text && !["Mídia", "🎵 Áudio", "📎 Mídia", "📷 Imagem", "📹 Vídeo"].includes(msg.text);
+                                  return (isVisualMedia && !hasRealText && msg.status === "read") ? "text-blue-300" : "";
+                                })()
+                              )}>
+                                {msg.status === "read" ? <CheckCheck className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
+                      
+                      {/* Reação */}
+                      {msg.reacao && (
+                        <div className={cn("text-lg -mt-3 z-10", msg.sender === "me" ? "mr-4" : "ml-4")}>
+                          <div className="bg-card border border-border shadow-md rounded-full px-1.5 py-0.5 text-sm">
+                            {msg.reacao}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  )})}
 
                   {/* Indicador de Digitando / Gravando */}
                   {selectedChat && presenceChats.has(selectedChat.id) && (
@@ -1041,6 +1405,44 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           </div>
         )}
       </div>
+
+      {/* Context Menu UI */}
+      {contextMenu && (
+        <div 
+          className="fixed z-[9999] bg-card border border-border rounded-xl shadow-2xl overflow-hidden py-1 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button 
+            onClick={() => handlePinChat(contextMenu.chat)}
+            className="w-full px-4 py-2 text-left text-xs font-bold hover:bg-secondary flex items-center gap-3 transition-colors"
+          >
+            {contextMenu.chat.fixado ? (
+              <><PinOff className="w-4 h-4 text-muted-foreground" /> Desafixar</>
+            ) : (
+              <><Pin className="w-4 h-4 text-primary" /> Fixar Conversa</>
+            )}
+          </button>
+          
+          <button 
+            onClick={() => {
+              if (viewMode === "active") {
+                setContextMenu(null);
+                setShowArchiveModal(true);
+              } else {
+                handleUnarchiveChat();
+              }
+            }}
+            className="w-full px-4 py-2 text-left text-xs font-bold hover:bg-secondary flex items-center gap-3 transition-colors text-rose-500"
+          >
+            {viewMode === "active" ? (
+              <><Archive className="w-4 h-4" /> Arquivar</>
+            ) : (
+              <><RefreshCw className="w-4 h-4" /> Desarquivar</>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

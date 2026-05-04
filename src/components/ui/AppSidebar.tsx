@@ -172,6 +172,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
       "Geral", "Produtos", "Dashboard", 
       "Calendário", "Eventos", "Férias", 
       "CRM", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", 
+      "Marketing", "Whatsapp", "Leads", "Cronograma",
       "Logística", "Romaneios", "Entregas", 
       "Produtos", "Estoque", "Preços", "Eventos", "Férias"
     ];

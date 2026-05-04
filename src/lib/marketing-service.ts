@@ -12,6 +12,9 @@ export interface MarketingCliente {
   ultima_mensagem?: string;
   ultima_conversa_em?: string;
   arquivado?: boolean;
+  fixado?: boolean;
+  motivo_arquivamento?: string;
+  mensagens_nao_lidas?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -26,6 +29,7 @@ export interface MarketingMessage {
   status?: string;
   timestamp: string;
   media_url?: string;
+  reacao?: string;
   vendedor_id?: string;
   created_at?: string;
 }
@@ -179,5 +183,103 @@ export const marketingService = {
       return [];
     }
     return data as MarketingMessage[];
+  },
+
+  async togglePin(remoteJid: string, pin: boolean) {
+    const { error } = await supabase
+      .from("marketing_clientes")
+      .update({ fixado: pin, updated_at: new Date().toISOString() })
+      .eq("remote_jid", remoteJid);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao fixar/desafixar:", error);
+      throw error;
+    }
+  },
+
+  async markAsRead(remoteJid: string) {
+    const { error } = await supabase
+      .from("marketing_clientes")
+      .update({ mensagens_nao_lidas: 0, updated_at: new Date().toISOString() })
+      .eq("remote_jid", remoteJid);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao marcar como lido:", error.message);
+    }
+  },
+
+  async incrementUnread(remoteJid: string) {
+    // Atualização manual para evitar erros 404 de RPC ausente
+    const { data } = await supabase
+      .from("marketing_clientes")
+      .select("mensagens_nao_lidas")
+      .eq("remote_jid", remoteJid)
+      .single();
+      
+    if (data) {
+      await supabase
+        .from("marketing_clientes")
+        .update({ 
+          mensagens_nao_lidas: (data.mensagens_nao_lidas || 0) + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq("remote_jid", remoteJid);
+    }
+  },
+
+  async toggleArchived(remoteJid: string, archived: boolean, motivo?: string) {
+    const updatePayload: Record<string, unknown> = {
+      arquivado: archived,
+      updated_at: new Date().toISOString()
+    };
+
+    // Salva o motivo no campo 'status' que já existe na tabela
+    if (motivo) {
+      updatePayload.status = motivo;
+    }
+
+    const { error } = await supabase
+      .from("marketing_clientes")
+      .update(updatePayload)
+      .eq("remote_jid", remoteJid);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao arquivar/desarquivar:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Faz o upload de uma mídia em base64 para o Supabase Storage e retorna a URL pública
+   */
+  async uploadMedia(base64: string, mimetype: string, filename: string): Promise<string | null> {
+    try {
+      // Converte base64 para Blob
+      const res = await fetch(`data:${mimetype};base64,${base64}`);
+      const blob = await res.blob();
+
+      // Upload para o bucket "whatsapp-media"
+      const { data, error } = await supabase.storage
+        .from('whatsapp-media')
+        .upload(filename, blob, {
+          contentType: mimetype,
+          upsert: true
+        });
+
+      if (error) {
+        console.error('[MarketingService] Erro no upload da mídia:', error);
+        return null;
+      }
+
+      // Retorna a URL pública
+      const { data: publicUrlData } = supabase.storage
+        .from('whatsapp-media')
+        .getPublicUrl(data.path);
+
+      return publicUrlData.publicUrl;
+    } catch (error) {
+      console.error('[MarketingService] Erro ao processar mídia:', error);
+      return null;
+    }
   }
 };

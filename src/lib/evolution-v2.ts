@@ -162,5 +162,68 @@ export const evolutionApi = {
     } catch {
       return null;
     }
-  }
+  },
+
+  /**
+   * Baixa a mídia de uma mensagem em base64
+   * Usado para salvar fotos, áudios e vídeos no Supabase Storage
+   */
+  async getMediaBase64(messagePayload: { key?: unknown; message?: unknown } | unknown): Promise<{ base64: string; mimetype: string } | null> {
+    try {
+      const payload = messagePayload as { key?: unknown; message?: unknown };
+      const data = await fetchEvo<{ base64: string; mimetype: string }>(`/chat/getBase64FromMediaMessage/${EVO_CONFIG.instance}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          message: {
+            key: payload?.key,
+            message: payload?.message
+          }
+        }),
+      });
+      return data;
+    } catch (error) {
+      console.error("[evolutionApi.getMediaBase64] Erro:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Envia uma imagem
+   */
+  async sendImage(remoteJid: string, imageUrl: string, caption?: string): Promise<unknown> {
+    return fetchEvo<unknown>(`/message/sendMedia/${EVO_CONFIG.instance}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        number: remoteJid,
+        mediatype: 'image',
+        media: imageUrl,
+        caption: caption || '',
+      }),
+    });
+  },
+
+  /**
+   * Envia um áudio (PTT = push-to-talk, aparece como nota de voz)
+   */
+  async sendAudio(remoteJid: string, audioBase64: string): Promise<unknown> {
+    return fetchEvo<unknown>(`/message/sendWhatsAppAudio/${EVO_CONFIG.instance}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        number: remoteJid,
+        audio: audioBase64,
+        encoding: true,
+      }),
+    });
+  },
+
+  /**
+   * Busca informações da instância (incluindo o número conectado)
+   */
+  async getInstanceInfo(): Promise<{ instance: { owner: string; profilePictureUrl?: string } } | null> {
+    try {
+      return await fetchEvo<{ instance: { owner: string; profilePictureUrl?: string } }>(`/instance/connectionState/${EVO_CONFIG.instance}`);
+    } catch {
+      return null;
+    }
+  },
 };
