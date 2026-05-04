@@ -523,13 +523,12 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         const reactedMsgId = messageContent.reactionMessage.key?.id;
         const reactionText = messageContent.reactionMessage.text || "";
         if (reactedMsgId) {
-          if (!message.key.fromMe) {
+          if (message.key && !message.key.fromMe) {
             const senderName = message.pushName || remoteJid.split('@')[0];
             const text = "Nova reação recebida";
             sendBrowserNotification(`Nova reação de ${senderName}`, text);
           }
           setMessages(prev => prev.map(m => m.id === reactedMsgId ? { ...m, reacao: reactionText } : m));
-          // Atualização simples da reação no banco pode ser implementada depois se necessário
           return;
         }
       }
