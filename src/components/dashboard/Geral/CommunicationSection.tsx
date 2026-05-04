@@ -60,7 +60,7 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
 
   const userAvatar = userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}`;
 
-  // Sincronizar estado local se os dados externos mudarem
+  // Sincronizar estado local se os dados externos mudarem (Padrão recomendado para evitar useEffect desnecessário)
   const [lastDataId, setLastDataId] = useState(data.id);
   if (data.id !== lastDataId) {
     setLikes(data.likes);
@@ -75,6 +75,7 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
         return;
       }
       
+      // 1. Pegar os IDs mais recentes
       const sortedIds = [...data.likedBy].reverse().slice(0, 5);
       
       const { data: users } = await supabase
@@ -91,6 +92,8 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
           .map(u => u!.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u!.name}`);
       }
 
+      // 2. SEGURANÇA: Se eu curti e minha foto não apareceu na query por algum motivo (delay/cache)
+      // eu forço ela na primeira posição se eu estiver na lista de likes
       if (currentUserId && data.likedBy.includes(currentUserId)) {
         const alreadyIn = finalAvatars.includes(userAvatar);
         if (!alreadyIn) {
@@ -109,6 +112,7 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
     const isLiking = interaction !== "like";
     const newLikesCount = isLiking ? likes + 1 : Math.max(0, likes - 1);
     
+    // UI OTIMISTA: Atualização Instantânea na Tela
     setLikes(newLikesCount);
     setInteraction(isLiking ? "like" : null);
 
@@ -118,7 +122,9 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
       setLikersAvatars(prev => prev.filter(a => a !== userAvatar));
     }
 
+    // Processamento em Background no Supabase
     try {
+      // 1. Buscar estado atual para sincronização de array
       const { data: currentPost } = await supabase
         .from("comunicados")
         .select("liked_by")
@@ -135,6 +141,7 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
         newLikedBy = newLikedBy.filter((id: string) => id !== currentUserId);
       }
       
+      // 2. Persistir no banco
       await supabase
         .from("comunicados")
         .update({ 
@@ -218,10 +225,10 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
              <button
                 onClick={handleLike}
                 className={cn(
-                   "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-3 py-1.5 rounded-xl",
-                   interaction === "like"
-                     ? "bg-blue-600 dark:bg-blue-500/20 text-white dark:text-blue-400 shadow-lg shadow-blue-600/20 dark:shadow-none"
-                     : "text-slate-400 dark:text-muted-foreground hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary"
+                  "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-3 py-1.5 rounded-xl",
+                  interaction === "like"
+                    ? "bg-blue-600 dark:bg-blue-500/20 text-white dark:text-blue-400 shadow-lg shadow-blue-600/20 dark:shadow-none"
+                    : "text-slate-400 dark:text-muted-foreground hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary"
                 )}
              >
                <ThumbsUp className={cn("w-4 h-4", interaction === "like" && "fill-white dark:fill-current")} />
@@ -277,6 +284,7 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
 
   const fetchComunicados = useCallback(async (silent = false) => {
     if (!silent) setInternalLoading(true);
+    // Buscamos o comunicado e os dados do autor (usuários) em uma única tacada
     const { data, error } = await supabase
       .from("comunicados")
       .select(`
