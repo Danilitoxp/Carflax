@@ -20,7 +20,8 @@ import {
   Pause,
   Mic,
   FileText,
-  Sparkles
+  Sparkles,
+  ShoppingBag
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { marketingService } from "@/lib/marketing-service";
@@ -1069,16 +1070,25 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       const data = await apiDashboardProdutos();
       // Normaliza preços uma única vez no fetch — elimina parsing repetido no render
       const normalized: NormalizedProduct[] = data.map(p => {
-        const preco = parseFloat(String(p.PRECO_VENDA)) || 0;
-        const debitoRaw = p.VALOR_DEBITO ? parseFloat(String(p.VALOR_DEBITO)) : preco;
-        const debito = debitoRaw > 0 ? debitoRaw : preco;
-        const creditoRaw = parseFloat(String(p.VALOR_CREDITO));
-        const credito = creditoRaw > 0 ? creditoRaw : preco * 1.0466;
+        const parseBrl = (val: string | number | null | undefined) => {
+          if (val === undefined || val === null || val === '') return 0;
+          const s = String(val).trim();
+          // Se tiver vírgula e ponto, ou só vírgula, assume formato BRL (1.234,56 ou 1234,56)
+          if (s.includes(',')) {
+            return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+          }
+          return parseFloat(s) || 0;
+        };
+
+        const preco = parseBrl(p.PRECO_VENDA);
+        const debito = preco;
+        const credito = preco * 1.0466;
+        
         return {
           cod: p.COD_ITEM,
           descricao: p.DESCRICAO,
           marca: p.MARCA || '',
-          disponivel: parseFloat(String(p.TOTAL_DISPONIVEL)) || 0,
+          disponivel: parseBrl(p.TOTAL_DISPONIVEL),
           preco,
           debito,
           credito,
@@ -1100,10 +1110,12 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const filteredProducts = useMemo(() => {
     const searchLower = productSearch.trim().toLowerCase();
     
-    // Filtra itens indesejados primeiro
+    // Filtra itens indesejados e itens que já estão no carrinho
+    const cartIds = new Set(cartProducts.map(x => x.cod));
     const validProducts = allProducts.filter(p => 
       p.descricao !== "ITEM CONVERSAO" && 
-      p.debito > 0
+      p.debito > 0 &&
+      !cartIds.has(p.cod)
     );
 
     if (searchLower.length < 2) return validProducts.slice(0, 30);
@@ -1116,7 +1128,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         return words.every(w => desc.includes(w)) || cod.includes(searchLower);
       })
       .slice(0, 50);
-  }, [allProducts, productSearch]);
+  }, [allProducts, productSearch, cartProducts]);
 
   const handleToggleCart = (p: NormalizedProduct) => {
     setCartProducts(prev => {
@@ -1157,7 +1169,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     text += `━━━━━━━━━━━━━━━━━━━━\n`;
     text += `💰 *TOTAL GERAL*\n`;
     text += `💵 *DÉBITO/PIX: R$ ${totalDebito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n`;
-    text += `💳 *CRÉDITO 3X: R$ ${totalCredito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n\n`;
+    text += `💳 *CRÉDITO (Até 3x de R$ ${(totalCredito / 3).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} s/ juros): R$ ${totalCredito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n\n`;
     text += `_Valores sujeitos a alteração de estoque._`;
 
     setInputText(prev => prev + text);
@@ -1942,6 +1954,84 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                       </div>
 
                       <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                        {/* Itens Selecionados (Carrinho) */}
+                        {cartProducts.length > 0 && (
+                          <div className="mb-6 animate-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center justify-between px-3 mb-2">
+                              <h3 className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                                <ShoppingBag className="w-3.5 h-3.5" /> Itens no Orçamento ({cartProducts.length})
+                              </h3>
+                              <button 
+                                onClick={() => setCartProducts([])}
+                                className="text-[9px] font-black uppercase text-rose-500 hover:text-rose-600 transition-colors"
+                              >
+                                Limpar Tudo
+                              </button>
+                            </div>
+                            <div className="flex flex-col divide-y divide-border/30 bg-primary/5 rounded-2xl overflow-hidden border border-primary/10">
+                              {cartProducts.map((p) => {
+                                const [gradient] = getBrandStyle(p.marca || p.descricao);
+                                const initials = getBrandInitials(p.marca || p.descricao);
+                                return (
+                                  <div
+                                    key={`cart-${p.cod}`}
+                                    className="w-full flex items-center gap-3 px-3 py-2.5 bg-background/40"
+                                  >
+                                    <div className={cn(
+                                      "w-12 h-12 rounded-xl shrink-0 bg-gradient-to-br flex flex-col items-center justify-center shadow-sm relative overflow-hidden",
+                                      gradient
+                                    )}>
+                                      <span className="text-white font-black text-xs leading-none">{initials}</span>
+                                      <div className="absolute inset-0 bg-primary/20 backdrop-blur-[1px] flex items-center justify-center">
+                                        <Check className="w-4 h-4 text-white drop-shadow" />
+                                      </div>
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[11px] font-bold leading-snug truncate text-primary">
+                                        {p.descricao}
+                                      </p>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-[10px] font-black text-foreground">
+                                          💵 R$ {(p.debito * (p.quantidade || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center bg-background rounded-lg p-1 border border-border/50 shadow-sm">
+                                      <button 
+                                        onClick={() => handleUpdateQuantity(p.cod, -1)}
+                                        className="w-6 h-6 flex items-center justify-center hover:bg-secondary rounded-md text-muted-foreground transition-colors"
+                                      >
+                                        -
+                                      </button>
+                                      <span className="w-8 text-center text-xs font-black">{p.quantidade || 1}</span>
+                                      <button 
+                                        onClick={() => handleUpdateQuantity(p.cod, 1)}
+                                        className="w-6 h-6 flex items-center justify-center hover:bg-secondary rounded-md text-muted-foreground transition-colors"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+
+                                    <button
+                                      onClick={() => handleToggleCart(p)}
+                                      className="p-2 text-muted-foreground hover:text-rose-500 transition-colors"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            
+                            <div className="relative h-8 flex items-center justify-center mt-2">
+                               <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                               <span className="relative bg-background px-4 text-[9px] font-black uppercase text-muted-foreground/40 tracking-[0.2em]">Resultados da Busca</span>
+                            </div>
+                          </div>
+                        )}
+
                         {loadingProducts ? (
                           <div className="h-full flex flex-col items-center justify-center gap-4">
                             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -2059,7 +2149,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                                 </span>
                                 <span className="text-muted-foreground">·</span>
                                 <span className="text-xs font-bold text-foreground">
-                                  Crédito: <span className="text-primary">R$ {cartProducts.reduce((s, p) => s + (p.credito * (p.quantidade || 1)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                  Crédito (3x de R$ {(cartProducts.reduce((s, p) => s + (p.credito * (p.quantidade || 1)), 0) / 3).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} s/ juros): <span className="text-primary">R$ {cartProducts.reduce((s, p) => s + (p.credito * (p.quantidade || 1)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </span>
                               </div>
                             </div>
