@@ -1154,23 +1154,34 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     const totalDebito = cartProducts.reduce((s, p) => s + (p.debito * (p.quantidade || 1)), 0);
     const totalCredito = cartProducts.reduce((s, p) => s + (p.credito * (p.quantidade || 1)), 0);
 
-    let text = `📦 *ORÇAMENTO CARFLAX*\n\n`;
+    let text = `📦 *ORÇAMENTO:*\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    text += `📋 *ITENS DO PEDIDO:*\n\n`;
     
-    cartProducts.forEach(p => {
+    cartProducts.forEach((p, index) => {
       const qty = p.quantidade || 1;
-      text += `🔹 *${p.descricao}*\n`;
-      text += `   Qtd: ${qty}\n`;
+      text += `${index + 1}️⃣ *${p.descricao.toUpperCase()}*\n`;
+      text += `   ▫️ *Quantidade:* ${qty}\n`;
+      
       if (qty > 1) {
-        text += `   Unit: 💵 R$ ${p.debito.toLocaleString('pt-BR')} | 💳 R$ ${p.credito.toLocaleString('pt-BR')}\n`;
+        text += `   ▫️ *Unitário:* R$ ${p.debito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Pix)\n`;
       }
-      text += `   *Subtotal: 💵 R$ ${(p.debito * qty).toLocaleString('pt-BR')} | 💳 R$ ${(p.credito * qty).toLocaleString('pt-BR')}*\n\n`;
+      
+      text += `   ▫️ *Subtotal:* R$ ${(p.debito * qty).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Pix)\n\n`;
     });
 
-    text += `━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `💰 *TOTAL GERAL*\n`;
-    text += `💵 *DÉBITO/PIX: R$ ${totalDebito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n`;
-    text += `💳 *CRÉDITO (Até 3x de R$ ${(totalCredito / 3).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} s/ juros): R$ ${totalCredito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n\n`;
-    text += `_Valores sujeitos a alteração de estoque._`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    text += `💰 *VALORES TOTAIS:* \n\n`;
+    text += `💵 *À VISTA (PIX/DÉBITO):*\n`;
+    text += `👉 *R$ ${totalDebito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n\n`;
+    
+    text += `💳 *CARTÃO DE CRÉDITO:*\n`;
+    text += `👉 *R$ ${totalCredito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n`;
+    text += `*(Ou 3x de R$ ${(totalCredito / 3).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} s/ juros)*\n\n`;
+
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `⚠️ _Valores sujeitos a alteração de estoque._\n`;
+    text += `🚀 _Aguardamos sua confirmação para reserva!_`;
 
     setInputText(prev => prev + text);
     setShowProductSelector(false);
