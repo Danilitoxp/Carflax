@@ -19,12 +19,14 @@ import {
   Play,
   Pause,
   Mic,
-  FileText
+  FileText,
+  Sparkles
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { marketingService } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
 import { apiDashboardProdutos } from "@/lib/api";
+import { transcribeAudio } from "@/lib/gemini-service";
 import { Package } from "lucide-react";
 
 interface NormalizedProduct {
@@ -70,6 +72,8 @@ interface Message {
   mediaUrl?: string;
   reacao?: string;
   fileName?: string;
+  transcription?: string;
+  isTranscribing?: boolean;
 }
 
 type Temperature = "Quente" | "Morno" | "Frio";
@@ -163,6 +167,10 @@ function getFileIconColor(filename?: string): string {
     case 'mp4': case 'mov': case 'avi': return 'bg-purple-500';
     default: return 'bg-slate-500';
   }
+}
+
+function sortChats(chats: Chat[]): Chat[] {
+  return [...chats].sort((a, b) => (a.fixado === b.fixado ? 0 : a.fixado ? -1 : 1));
 }
 
 function formatAudioTime(seconds: number) {
@@ -339,6 +347,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const lidToJidMap = useRef<Map<string, string>>(new Map());
   const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const lastSeenMap = useRef<Map<string, Date>>(new Map());
+  const processedMsgIds = useRef<Set<string>>(new Set());
+  const lidSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [presenceChats, setPresenceChats] = useState<Map<string, string>>(new Map());
   const [myAvatar, setMyAvatar] = useState<string>("");
@@ -375,13 +385,6 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     } catch { /* ignora */ }
   }, []);
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('wpp_lid_map');
-      if (saved) new Map<string, string>(JSON.parse(saved)).forEach((v, k) => lidToJidMap.current.set(k, v));
-    } catch { /* ignora */ }
-  }, []);
-
   // Busca a foto da própria instância (Trafego)
   useEffect(() => {
     evolutionApi.getInstanceInfo().then(data => {
@@ -404,6 +407,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     try {
       const url = await evolutionApi.getProfilePic(remoteJid);
       const finalUrl = url || "";
+      // Cap: remove a entrada mais antiga quando ultrapassa 300 contatos
+      if (avatarCache.size >= 300) avatarCache.delete(avatarCache.keys().next().value!);
       avatarCache.set(remoteJid, finalUrl);
       
       if (finalUrl) {
@@ -416,14 +421,13 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     return "";
   }, []);
 
-  const isInitialLoad = useRef(true);
-
-  const loadChats = useCallback(async (isSilent = false) => {
+  const loadChats = useCallback(async () => {
     try {
-      // Só mostra o loading pesado se for a primeira carga absoluta
-      if (!isSilent && isInitialLoad.current) setLoading(true);
-      
-      // 1. Busca instantânea no Supabase
+      // Limpa e mostra loading imediatamente — sem delay visual ao trocar de modo
+      setChats([]);
+      setLoading(true);
+
+      // 1. Busca no Supabase
       const dbClientes = await marketingService.getActiveClientes(viewMode === "archived");
       
       const mappedChats: Chat[] = dbClientes.map((item) => ({
@@ -443,14 +447,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         }
       }));
       
-      // MOSTRA OS DADOS DO BANCO IMEDIATAMENTE COM ORDENAÇÃO DE FIXADOS
-      setChats(mappedChats.sort((a, b) => {
-        if (a.fixado && !b.fixado) return -1;
-        if (!a.fixado && b.fixado) return 1;
-        return 0; // Mantém a ordem por data se ambos forem iguais
-      }));
+      setChats(sortChats(mappedChats));
       setLoading(false);
-      isInitialLoad.current = false;
 
       // 2. Sincronização em segundo plano (Não trava o usuário)
       if (mappedChats.length > 0) {
@@ -500,57 +498,52 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
-  const handlePinChat = async (chat: Chat) => {
-    try {
-      const newStatus = !chat.fixado;
-      await marketingService.togglePin(chat.id, newStatus);
-      
-      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, fixado: newStatus } : c).sort((a, b) => {
-        if (a.fixado && !b.fixado) return -1;
-        if (!a.fixado && b.fixado) return 1;
-        return 0;
-      }));
-      
-      if (selectedChat?.id === chat.id) {
-        setSelectedChat({ ...selectedChat, fixado: newStatus });
-      }
-    } catch (error) {
-      console.error("Erro ao fixar chat:", error);
-    }
+  const handlePinChat = (chat: Chat) => {
+    const newStatus = !chat.fixado;
+
+    // Atualiza UI imediatamente
+    setChats(prev =>
+      prev.map(c => c.id === chat.id ? { ...c, fixado: newStatus } : c)
+         .sort((a, b) => (a.fixado === b.fixado ? 0 : a.fixado ? -1 : 1))
+    );
+    if (selectedChat?.id === chat.id) setSelectedChat({ ...selectedChat, fixado: newStatus });
     setContextMenu(null);
+
+    // Persiste em segundo plano
+    marketingService.togglePin(chat.id, newStatus).catch(err =>
+      console.error("Erro ao fixar chat:", err)
+    );
   };
 
   const handleArchiveChat = async (reason?: string) => {
     const chatToArchive = contextMenu?.chat || selectedChat;
     if (!chatToArchive) return;
-    
-    try {
-      await marketingService.toggleArchived(chatToArchive.id, true, reason);
-      
-      // Remove da lista local e limpa seleção se necessário
-      setChats(prev => prev.filter(c => c.id !== chatToArchive.id));
-      if (selectedChat?.id === chatToArchive.id) setSelectedChat(null);
-      setShowArchiveModal(false);
-    } catch (error) {
-      console.error("Erro ao arquivar chat:", error);
-    }
+
+    // Atualiza UI imediatamente, sem esperar o banco
+    setChats(prev => prev.filter(c => c.id !== chatToArchive.id));
+    if (selectedChat?.id === chatToArchive.id) setSelectedChat(null);
+    setShowArchiveModal(false);
     setContextMenu(null);
+
+    // Persiste em segundo plano
+    marketingService.toggleArchived(chatToArchive.id, true, reason).catch(err =>
+      console.error("Erro ao arquivar chat:", err)
+    );
   };
 
   const handleUnarchiveChat = async () => {
     const chatToUnarchive = contextMenu?.chat || selectedChat;
     if (!chatToUnarchive) return;
-    
-    try {
-      await marketingService.toggleArchived(chatToUnarchive.id, false);
-      
-      // Remove da lista de arquivados e limpa seleção
-      setChats(prev => prev.filter(c => c.id !== chatToUnarchive.id));
-      if (selectedChat?.id === chatToUnarchive.id) setSelectedChat(null);
-    } catch (error) {
-      console.error("Erro ao desarquivar chat:", error);
-    }
+
+    // Atualiza UI imediatamente
+    setChats(prev => prev.filter(c => c.id !== chatToUnarchive.id));
+    if (selectedChat?.id === chatToUnarchive.id) setSelectedChat(null);
     setContextMenu(null);
+
+    // Persiste em segundo plano
+    marketingService.toggleArchived(chatToUnarchive.id, false).catch(err =>
+      console.error("Erro ao desarquivar chat:", err)
+    );
   };
 
   useEffect(() => {
@@ -566,18 +559,25 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       const remoteJid = message.key?.remoteJid;
       if (!remoteJid || !remoteJid.endsWith('@s.whatsapp.net')) return;
 
+      // Deduplicação: ignora se esta mensagem já foi processada na sessão
+      const msgKeyId = message.key?.id;
+      if (msgKeyId) {
+        if (processedMsgIds.current.has(msgKeyId)) return;
+        processedMsgIds.current.add(msgKeyId);
+        // Evita crescimento ilimitado: descarta as primeiras 250 entradas ao atingir 500
+        if (processedMsgIds.current.size > 500) {
+          const arr = [...processedMsgIds.current];
+          processedMsgIds.current = new Set(arr.slice(250));
+        }
+      }
+
       // Guarda o JID para correlacionar com o LID do chats.update que vem logo após
       lastPhoneJid.current = remoteJid;
 
-      // FILTRO DE DATA: Ignora mensagens com mais de 7 dias (evita spam de histórico antigo)
+      // Ignora mensagens com mais de 7 dias
       const MIN_SYNC_TIMESTAMP = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
       const msgTimestamp = message.messageTimestamp || 0;
-      
-      if (msgTimestamp > 0 && msgTimestamp < MIN_SYNC_TIMESTAMP) {
-        return;
-      }
-
-      console.log('📩 Mensagem de:', { remoteJid, pushName: message.pushName, fromMe: message.key?.fromMe, status: message.status });
+      if (msgTimestamp > 0 && msgTimestamp < MIN_SYNC_TIMESTAMP) return;
 
       const messageContent = message.message;
       
@@ -690,16 +690,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {})
       });
 
-      // Se o chat estiver arquivado e chegou nova mensagem (de qualquer lado), desarquiva automaticamente
       setChats(prevChats => {
+        // Desarquiva automaticamente se chegou nova mensagem
         const existingChat = prevChats.find(c => c.id === remoteJid);
-        if (existingChat?.arquivado) {
-          marketingService.toggleArchived(remoteJid, false);
-        }
-        return prevChats;
-      });
-
-      setChats(prevChats => {
+        if (existingChat?.arquivado) marketingService.toggleArchived(remoteJid, false);
         const existingChatIndex = prevChats.findIndex(c => c.id === remoteJid);
         if (existingChatIndex !== -1) {
           const updatedChats = [...prevChats];
@@ -732,12 +726,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           updatedChats.splice(existingChatIndex, 1);
           if (!chat.avatar) fetchAvatar(remoteJid);
           // Reinsere respeitando fixados: fixados ficam no topo
-          const reordered = [chat, ...updatedChats];
-          return reordered.sort((a, b) => {
-            if (a.fixado && !b.fixado) return -1;
-            if (!a.fixado && b.fixado) return 1;
-            return 0; // dentro do mesmo grupo, mantém a ordem já existente
-          });
+          return sortChats([chat, ...updatedChats]);
         } else {
           fetchAvatar(remoteJid);
 
@@ -756,13 +745,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               campaign: "Geral"
             }
           };
-          // Novo chat nunca é fixado, então vai logo após os fixados
-          const withNew = [newChat, ...prevChats];
-          return withNew.sort((a, b) => {
-            if (a.fixado && !b.fixado) return -1;
-            if (!a.fixado && b.fixado) return 1;
-            return 0;
-          });
+          return sortChats([newChat, ...prevChats]);
         }
       });
 
@@ -897,7 +880,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         const lid = item.remoteJid;
         if (lid?.endsWith('@lid') && lastPhoneJid.current) {
           lidToJidMap.current.set(lid, lastPhoneJid.current);
-          localStorage.setItem('wpp_lid_map', JSON.stringify([...lidToJidMap.current.entries()]));
+          // Debounce: evita serialização síncrona em cada evento WS
+          if (lidSaveTimer.current) clearTimeout(lidSaveTimer.current);
+          lidSaveTimer.current = setTimeout(() => {
+            localStorage.setItem('wpp_lid_map', JSON.stringify([...lidToJidMap.current.entries()]));
+          }, 2000);
         }
       });
     };
@@ -1146,6 +1133,32 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     setProductSearch("");
   };
 
+  const handleTranscribe = async (msg: Message) => {
+    if (!msg.mediaUrl || msg.isTranscribing) return;
+
+    setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, isTranscribing: true } : m));
+
+    try {
+      // 1. Busca o áudio e converte para base64
+      const response = await fetch(msg.mediaUrl);
+      const blob = await response.blob();
+      
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(blob);
+      });
+
+      const base64 = await base64Promise;
+      const transcription = await transcribeAudio(base64, blob.type || "audio/ogg");
+
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, transcription, isTranscribing: false } : m));
+    } catch (error) {
+      console.error("Erro ao transcrever:", error);
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, isTranscribing: false } : m));
+    }
+  };
+
   const handleSelectChat = useCallback(async (chat: Chat) => {
     setSelectedChat(chat);
     setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unreadCount: 0 } : c));
@@ -1201,7 +1214,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         rawMessages = (dataObj.messages as Record<string, unknown>).records as EvoMessageResponse[];
       }
 
-      const MIN_SYNC_TIMESTAMP = Math.floor(new Date('2026-05-04T08:50:00').getTime() / 1000);
+      const MIN_SYNC_TIMESTAMP = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
 
       const apiMsgs: Message[] = rawMessages
         .filter((m: EvoMessageResponse) => {
@@ -1631,7 +1644,27 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                         
                         {/* Mídia: Áudio */}
                         {msg.tipo === "audio" && msg.mediaUrl && (
-                          <div className={cn(isVisualMedia ? "px-3 py-2" : "")}>
+                          <div className={cn("p-2 relative group/audio", isVisualMedia ? "px-3 py-2" : "")}>
+                            {/* Botão de Transcrição Minimalista */}
+                            {!msg.transcription && !msg.isTranscribing && (
+                              <button 
+                                onClick={() => handleTranscribe(msg)}
+                                title="Transcrever com AI"
+                                className={cn(
+                                  "absolute -top-1 -right-1 p-1.5 rounded-lg opacity-0 group-hover/audio:opacity-100 transition-all z-20 shadow-lg border border-white/10",
+                                  msg.sender === "me" ? "bg-white/10 text-white hover:bg-white/20" : "bg-primary/10 text-primary hover:bg-primary/20"
+                                )}
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+
+                            {msg.isTranscribing && (
+                              <div className="absolute -top-1 -right-1 p-1.5 rounded-lg bg-primary/20 text-primary animate-pulse z-20">
+                                <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                              </div>
+                            )}
+
                             <CustomAudioPlayer 
                               src={msg.mediaUrl} 
                               isMe={msg.sender === "me"} 
@@ -1639,6 +1672,24 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                               msgTime={msg.time}
                               msgStatus={msg.status}
                             />
+                            
+                            <div className="mt-1 flex flex-col gap-2">
+                                {msg.transcription && (
+                                  <div className={cn(
+                                    "p-3 rounded-xl text-sm leading-relaxed animate-in fade-in slide-in-from-top-1 duration-300 relative overflow-hidden",
+                                    msg.sender === "me" ? "bg-black/20 text-white/90" : "bg-secondary/50 text-foreground"
+                                  )}>
+                                    <div className="flex items-center gap-2 mb-1.5 opacity-50">
+                                      <Sparkles className="w-3 h-3 text-primary" />
+                                      <span className="text-[9px] font-black uppercase tracking-widest">Transcrição AI</span>
+                                    </div>
+                                    <p className="italic relative z-10">"{msg.transcription}"</p>
+                                    <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                                      <Sparkles className="w-12 h-12 rotate-12" />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                           </div>
                         )}
 

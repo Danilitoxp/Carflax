@@ -227,21 +227,24 @@ export const marketingService = {
   },
 
   async incrementUnread(remoteJid: string) {
-    // Atualização manual para evitar erros 404 de RPC ausente
-    const { data } = await supabase
-      .from("marketing_clientes")
-      .select("mensagens_nao_lidas")
-      .eq("remote_jid", remoteJid)
-      .single();
-      
-    if (data) {
-      await supabase
+    // Incremento atômico via stored procedure — crie esta função no Supabase SQL Editor:
+    // CREATE OR REPLACE FUNCTION increment_unread(jid TEXT) RETURNS void LANGUAGE sql AS
+    // $$ UPDATE marketing_clientes SET mensagens_nao_lidas = COALESCE(mensagens_nao_lidas,0)+1,
+    //    updated_at = now() WHERE remote_jid = jid; $$;
+    const { error } = await supabase.rpc('increment_unread', { jid: remoteJid });
+    if (error) {
+      // Fallback (não atômico) enquanto a função não existir no banco
+      const { data } = await supabase
         .from("marketing_clientes")
-        .update({ 
-          mensagens_nao_lidas: (data.mensagens_nao_lidas || 0) + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq("remote_jid", remoteJid);
+        .select("mensagens_nao_lidas")
+        .eq("remote_jid", remoteJid)
+        .single();
+      if (data) {
+        await supabase
+          .from("marketing_clientes")
+          .update({ mensagens_nao_lidas: (data.mensagens_nao_lidas || 0) + 1, updated_at: new Date().toISOString() })
+          .eq("remote_jid", remoteJid);
+      }
     }
   },
 
