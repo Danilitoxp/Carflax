@@ -37,6 +37,7 @@ interface NormalizedProduct {
   debito: number;
   credito: number;
   disponivel: number;
+  quantidade?: number;
 }
 
 const BRAND_COLORS = [
@@ -1098,39 +1099,70 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
   const filteredProducts = useMemo(() => {
     const searchLower = productSearch.trim().toLowerCase();
-    if (searchLower.length < 2) return allProducts.slice(0, 30);
+    
+    // Filtra itens indesejados primeiro
+    const validProducts = allProducts.filter(p => 
+      p.descricao !== "ITEM CONVERSAO" && 
+      p.debito > 0
+    );
+
+    if (searchLower.length < 2) return validProducts.slice(0, 30);
+    
     const words = searchLower.split(/\s+/);
-    return allProducts
+    return validProducts
       .filter(p => {
         const desc = p.descricao.toLowerCase();
-        return words.every(w => desc.includes(w)) || p.cod.toLowerCase().includes(searchLower);
+        const cod = p.cod.toLowerCase();
+        return words.every(w => desc.includes(w)) || cod.includes(searchLower);
       })
       .slice(0, 50);
   }, [allProducts, productSearch]);
 
-  const handleSelectProduct = (p: NormalizedProduct) => {
+  const handleToggleCart = (p: NormalizedProduct) => {
     setCartProducts(prev => {
-      const already = prev.find(x => x.cod === p.cod);
-      return already ? prev.filter(x => x.cod !== p.cod) : [...prev, p];
+      const exists = prev.find(x => x.cod === p.cod);
+      if (exists) return prev.filter(x => x.cod !== p.cod);
+      return [...prev, { ...p, quantidade: 1 }];
     });
+  };
+
+  const handleUpdateQuantity = (cod: string, delta: number) => {
+    setCartProducts(prev => prev.map(p => {
+      if (p.cod === cod) {
+        const newQty = Math.max(1, (p.quantidade || 1) + delta);
+        return { ...p, quantidade: newQty };
+      }
+      return p;
+    }));
   };
 
   const handleInsertQuote = () => {
     if (cartProducts.length === 0) return;
-    const fmt = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-    const totalDebito = cartProducts.reduce((s, p) => s + p.debito, 0);
-    const totalCredito = cartProducts.reduce((s, p) => s + p.credito, 0);
 
-    const items = cartProducts
-      .map((p, i) => `${i + 1}. *${p.descricao}*\n   💵 Débito: R$ ${fmt(p.debito)} | 💳 Crédito: R$ ${fmt(p.credito)}`)
-      .join('\n\n');
+    const totalDebito = cartProducts.reduce((s, p) => s + (p.debito * (p.quantidade || 1)), 0);
+    const totalCredito = cartProducts.reduce((s, p) => s + (p.credito * (p.quantidade || 1)), 0);
 
-    const quote = `📋 *ORÇAMENTO*\n\n${items}\n\n${'─'.repeat(24)}\n💵 *Total Débito: R$ ${fmt(totalDebito)}*\n💳 *Total Crédito: R$ ${fmt(totalCredito)}*`;
+    let text = `📦 *ORÇAMENTO CARFLAX*\n\n`;
+    
+    cartProducts.forEach(p => {
+      const qty = p.quantidade || 1;
+      text += `🔹 *${p.descricao}*\n`;
+      text += `   Qtd: ${qty}\n`;
+      if (qty > 1) {
+        text += `   Unit: 💵 R$ ${p.debito.toLocaleString('pt-BR')} | 💳 R$ ${p.credito.toLocaleString('pt-BR')}\n`;
+      }
+      text += `   *Subtotal: 💵 R$ ${(p.debito * qty).toLocaleString('pt-BR')} | 💳 R$ ${(p.credito * qty).toLocaleString('pt-BR')}*\n\n`;
+    });
 
-    setInputText(quote);
-    setCartProducts([]);
+    text += `━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `💰 *TOTAL GERAL*\n`;
+    text += `💵 *DÉBITO/PIX: R$ ${totalDebito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n`;
+    text += `💳 *CRÉDITO 3X: R$ ${totalCredito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n\n`;
+    text += `_Valores sujeitos a alteração de estoque._`;
+
+    setInputText(prev => prev + text);
     setShowProductSelector(false);
-    setProductSearch("");
+    setCartProducts([]);
   };
 
   const handleTranscribe = async (msg: Message) => {
@@ -1924,7 +1956,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                               return (
                                 <button
                                   key={p.cod}
-                                  onClick={() => handleSelectProduct(p)}
+                                  onClick={() => handleToggleCart(p)}
                                   className={cn(
                                     "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all group",
                                     inCart ? "bg-primary/8" : "hover:bg-secondary/40"
@@ -1968,17 +2000,40 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                                     </div>
                                   </div>
 
-                                  {/* Botão +/✓ */}
-                                  <div className={cn(
-                                    "w-8 h-8 rounded-full shrink-0 flex items-center justify-center border-2 transition-all",
-                                    inCart
-                                      ? "bg-primary border-primary text-white"
-                                      : "border-border/50 text-muted-foreground group-hover:border-primary group-hover:text-primary"
-                                  )}>
-                                    {inCart
-                                      ? <Check className="w-4 h-4" />
-                                      : <span className="text-lg leading-none font-bold">+</span>
-                                    }
+                                  {/* Botão +/✓ e Controle de Quantidade */}
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {inCart && (
+                                      <div className="flex items-center bg-secondary/50 rounded-lg p-1 animate-in fade-in zoom-in-95 duration-200">
+                                        <button 
+                                          onClick={(e) => { e.stopPropagation(); handleUpdateQuantity(p.cod, -1); }}
+                                          className="w-6 h-6 flex items-center justify-center hover:bg-background rounded-md text-muted-foreground transition-colors"
+                                        >
+                                          -
+                                        </button>
+                                        <span className="w-8 text-center text-xs font-black">{cartProducts.find(x => x.cod === p.cod)?.quantidade || 1}</span>
+                                        <button 
+                                          onClick={(e) => { e.stopPropagation(); handleUpdateQuantity(p.cod, 1); }}
+                                          className="w-6 h-6 flex items-center justify-center hover:bg-background rounded-md text-muted-foreground transition-colors"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    )}
+                                    
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleToggleCart(p); }}
+                                      className={cn(
+                                        "w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all",
+                                        inCart
+                                          ? "bg-primary border-primary text-white"
+                                          : "border-border/50 text-muted-foreground hover:border-primary hover:text-primary"
+                                      )}
+                                    >
+                                      {inCart
+                                        ? <Check className="w-4 h-4" />
+                                        : <span className="text-lg leading-none font-bold">+</span>
+                                      }
+                                    </button>
                                   </div>
                                 </button>
                               );
@@ -2000,11 +2055,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                               <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">{cartProducts.length} {cartProducts.length === 1 ? 'produto' : 'produtos'} selecionados</span>
                               <div className="flex items-center gap-3 mt-0.5">
                                 <span className="text-xs font-bold text-foreground">
-                                  Débito: <span className="text-primary">R$ {cartProducts.reduce((s, p) => s + p.debito, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                  Débito: <span className="text-primary">R$ {cartProducts.reduce((s, p) => s + (p.debito * (p.quantidade || 1)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </span>
                                 <span className="text-muted-foreground">·</span>
                                 <span className="text-xs font-bold text-foreground">
-                                  Crédito: <span className="text-primary">R$ {cartProducts.reduce((s, p) => s + p.credito, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                  Crédito: <span className="text-primary">R$ {cartProducts.reduce((s, p) => s + (p.credito * (p.quantidade || 1)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </span>
                               </div>
                             </div>
