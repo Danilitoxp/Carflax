@@ -669,18 +669,18 @@ function DashboardContent({
         {/* Content Area */}
         <div className="flex flex-col h-full w-full mx-auto overflow-hidden">
           {["Calendário", "Eventos", "Férias"].includes(activeItem) ? (
-            <CalendarSection activeTab={activeItem} userProfile={userProfile} />
+            <CalendarSection activeTab={activeItem} userProfile={userProfile || undefined} />
           ) : isSettingsView ? (
             <SettingsSection
               externalTab={activeItem}
-              userProfile={userProfile}
+              userProfile={userProfile || undefined}
             />
           ) : isCrmView ? (
-            <CrmSection activeTab={activeItem} userProfile={userProfile} />
+            <CrmSection activeTab={activeItem} userProfile={userProfile || undefined} />
           ) : isMarketingView ? (
-            <MarketingView activeTab={activeItem} userProfile={userProfile} />
+            <MarketingView activeTab={activeItem} userProfile={userProfile || undefined} />
           ) : ["Entregas", "Romaneios"].includes(activeItem) ? (
-            <EntregasView activeTab={activeItem} userProfile={userProfile} />
+            <EntregasView activeTab={activeItem} userProfile={userProfile || undefined} />
           ) : ["Coletor", "Painel Coletor"].includes(activeItem) ? (
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <ColetorView />

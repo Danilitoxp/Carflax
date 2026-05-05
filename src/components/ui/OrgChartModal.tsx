@@ -198,28 +198,28 @@ export function OrgChartView() {
       });
 
       const traverse = (node: Record<string, unknown>, parentId: string | null = null, depth = 0, xOffset = 0, deptName?: string) => {
-        const id = node.id;
+        const id = String(node.id || "");
         const currentDept = node.level === 'B' ? node.title : deptName;
-        const matched = formattedUsers.filter(e => e.role === node.title);
-
+        const matched = formattedUsers.filter(e => String(e.role).toUpperCase() === String(node.title || "").toUpperCase());
+ 
         // Use saved position if available, otherwise use calculated spread
         const position = {
-            x: node.pos_x !== null ? node.pos_x : xOffset,
-            y: node.pos_y !== null ? node.pos_y : depth * verticalSpacing
+            x: (node.pos_x !== null && node.pos_x !== undefined) ? Number(node.pos_x) : xOffset,
+            y: (node.pos_y !== null && node.pos_y !== undefined) ? Number(node.pos_y) : depth * verticalSpacing
         };
-
+ 
         flattenedNodes.push({
           id,
           type: 'custom',
           position,
           data: { ...node, employees: matched, department: currentDept },
         });
-
+ 
         if (parentId) {
           flattenedEdges.push({
             id: `e-${parentId}-${id}`,
-            source: parentId,
-            target: id,
+            source: String(parentId),
+            target: String(id),
             animated: true,
             style: { stroke: '#cbd5e1', strokeWidth: 2 },
           });
