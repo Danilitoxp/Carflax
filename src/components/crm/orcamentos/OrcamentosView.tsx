@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
+import { useNotification } from "@/components/ui/NotificationProvider";
 import {
   User as UserIcon,
   FileCheck,
@@ -212,6 +213,7 @@ const OrcamentoRow = memo(({ item, onOpenItems, onOpenStatus, onOpenChat }: RowP
 });
 
 export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
+  const { showNotification } = useNotification();
   const [orçamentosData, setOrçamentosData] = useState<Orcamento[]>([]);
   const [loading, setLoading] = useState(false);
   const visibleCount = 50;
@@ -374,82 +376,105 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       }
     }
 
-    // 2. Salvar no Supabase
-    await upsertCrmStatus(payload);
+    try {
+      // 2. Salvar no Supabase
+      await upsertCrmStatus(payload);
 
-    // 2. Notificação Automática para o Centralizador
-    const triggerStatuses = ["ENVIADO", "NEGOCIAÇÃO", "LIB. CRÉDITO", "AGUARD. PEDIDO", "PERDIDO"];
-    if (triggerStatuses.includes(newStatus.toUpperCase())) {
-      try {
-        const { data: config } = await supabase
-          .from("crm_config")
-          .select("value")
-          .eq("key", "centralizer_user_id")
-          .maybeSingle();
-
-        if (config?.value) {
-          const statusEmblema: Record<string, string> = {
-            "ENVIADO": "🔵 ENVIADO",
-            "NEGOCIAÇÃO": "🤝 NEGOCIAÇÃO",
-            "LIB. CRÉDITO": "💳 LIB. CRÉDITO",
-            "AGUARD. PEDIDO": "⏳ AGUARD. PEDIDO",
-            "PERDIDO": "❌ PERDIDO"
-          };
-          
-          const lostItemsList = (lostItemsIds.length > 0 && selectedItem.items)
-            ? selectedItem.items
-                .filter(it => lostItemsIds.includes(String(it.COD_PRODUTO)))
-                .map(it => `  • ${it.PRODUTO}`)
-                .join("\n")
-            : "";
-          
-          const header = `━━━━━━━━━━━━━━━━━━━━━━━━\n   🔄  *ATUALIZAÇÃO DE STATUS*\n━━━━━━━━━━━━━━━━━━━━━━━━`;
-          const footer = `━━━━━━━━━━━━━━━━━━━━━━━━`;
-
-          const msgFormatada = [
-            header,
-            `📑 *ORÇAMENTO:*  #${selectedItem.id.replace("-OR", "")}`,
-            `🏢 *CLIENTE:*    ${selectedItem.client}`,
-            `👤 *VENDEDOR:*   ${selectedItem.seller}`,
-            ``,
-            `📢 *STATUS:*     ${statusEmblema[newStatus.toUpperCase()] || newStatus.toUpperCase()}`,
-            extra?.motivo_perda ? `📉 *MOTIVO:*     ${extra.motivo_perda.toUpperCase()}` : "",
-            lostItemsList ? `\n📦 *ITENS AFETADOS:*\n${lostItemsList}` : "",
-            statusObs && !lostItemsList ? `\n💬 *OBSERVAÇÃO:*\n${statusObs}` : "",
-            footer
-          ].filter(Boolean).join("\n");
-
-          // Notificação já salva o status no histórico de conversas abaixo
-
-          await addConversa({
-            documento: selectedItem.id,
-            empresa: selectedItem.empresa ?? "001",
-            obs: msgFormatada,
-            enviado_por_nome: "SISTEMA",
-            destino: config.value,
-            timestamp: new Date().toISOString(),
-          });
+      // 3. Cadastrar no Calendário de Eventos (Opcional se houver data de retorno)
+      const returnDate = extra?.lembrete_data || extra?.fechamento_previsto;
+      if (returnDate && /^\d{4}-\d{2}-\d{2}/.test(returnDate)) {
+        try {
+          const [y, m, d] = returnDate.split("-").map(Number);
+          await supabase.from("eventos_calendario").insert([{
+            title: `RETORNO: ${selectedItem.client.toUpperCase()} (#${selectedItem.id.replace("-OR", "")})`,
+            description: `Vendedor: ${selectedItem.seller}. Orçamento em status ${newStatus.toUpperCase()}.`,
+            type: "meeting",
+            day: d,
+            month: m,
+            year: y
+          }]);
+        } catch (calErr) {
+          console.error("Erro ao agendar no calendário:", calErr);
         }
-      } catch (err) {
-        console.error("Erro ao enviar notificação automática:", err);
       }
-    }
 
-    setOrçamentosData((prev) =>
-      prev.map((item) =>
-        item.id === selectedItem.id
-          ? { 
-              ...item, 
-              status: newStatus.toUpperCase(), 
-              lossReason: extra?.motivo_perda ?? item.lossReason,
-              lembreteData: extra?.lembrete_data ?? extra?.fechamento_previsto ?? item.lembreteData
-            }
-          : item
-      )
-    );
-    setIsStatusModalOpen(false);
-    setStatusObs(""); // Resetar obs após envio
-    setLostItemsIds([]); // Resetar itens selecionados
+      // 4. Notificação Automática para o Centralizador
+      const triggerStatuses = ["ENVIADO", "NEGOCIAÇÃO", "LIB. CRÉDITO", "AGUARD. PEDIDO", "PERDIDO"];
+      if (triggerStatuses.includes(newStatus.toUpperCase())) {
+        try {
+          const { data: config } = await supabase
+            .from("crm_config")
+            .select("value")
+            .eq("key", "centralizer_user_id")
+            .maybeSingle();
+
+          if (config?.value) {
+            const statusEmblema: Record<string, string> = {
+              "ENVIADO": "🔵 ENVIADO",
+              "NEGOCIAÇÃO": "🤝 NEGOCIAÇÃO",
+              "LIB. CRÉDITO": "💳 LIB. CRÉDITO",
+              "AGUARD. PEDIDO": "⏳ AGUARD. PEDIDO",
+              "PERDIDO": "❌ PERDIDO"
+            };
+            
+            const lostItemsList = (lostItemsIds.length > 0 && selectedItem.items)
+              ? selectedItem.items
+                  .filter(it => lostItemsIds.includes(String(it.COD_PRODUTO)))
+                  .map(it => `  • ${it.PRODUTO}`)
+                  .join("\n")
+              : "";
+            
+            const header = `━━━━━━━━━━━━━━━━━━━━━━━━\n   🔄  *ATUALIZAÇÃO DE STATUS*\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+            const footer = `━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+            const msgFormatada = [
+              header,
+              `📑 *ORÇAMENTO:*  #${selectedItem.id.replace("-OR", "")}`,
+              `🏢 *CLIENTE:*    ${selectedItem.client}`,
+              `👤 *VENDEDOR:*   ${selectedItem.seller}`,
+              ``,
+              `📢 *STATUS:*     ${statusEmblema[newStatus.toUpperCase()] || newStatus.toUpperCase()}`,
+              extra?.motivo_perda ? `📉 *MOTIVO:*     ${extra.motivo_perda.toUpperCase()}` : "",
+              lostItemsList ? `\n📦 *ITENS AFETADOS:*\n${lostItemsList}` : "",
+              statusObs && !lostItemsList ? `\n💬 *OBSERVAÇÃO:*\n${statusObs}` : "",
+              footer
+            ].filter(Boolean).join("\n");
+
+            await addConversa({
+              documento: selectedItem.id,
+              empresa: selectedItem.empresa ?? "001",
+              obs: msgFormatada,
+              enviado_por_nome: "SISTEMA",
+              destino: config.value,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        } catch (err) {
+          console.error("Erro ao enviar notificação automática:", err);
+        }
+      }
+
+      setOrçamentosData((prev) =>
+        prev.map((item) =>
+          item.id === selectedItem.id
+            ? { 
+                ...item, 
+                status: newStatus.toUpperCase(), 
+                lossReason: extra?.motivo_perda ?? item.lossReason,
+                lembreteData: extra?.lembrete_data ?? extra?.fechamento_previsto ?? item.lembreteData
+              }
+            : item
+        )
+      );
+      
+      showNotification("success", "Status Atualizado", "O status e lembretes foram salvos com sucesso.");
+      setIsStatusModalOpen(false);
+      setStatusObs(""); // Resetar obs após envio
+      setLostItemsIds([]); // Resetar itens selecionados
+    } catch (err) {
+      console.error("Erro ao atualizar status:", err);
+      showNotification("error", "Erro ao Salvar", "Não foi possível salvar a alteração. Tente novamente.");
+    }
   };
 
   const handleRangeSelect = (start: Date, end: Date | null) => {
