@@ -762,62 +762,15 @@ function App() {
       );
 
       if (response && response.length > 0) {
-        if (isManager && response.length > 1) {
-          // Agrega os dados de todos os vendedores
-          const metaTotal = response.reduce((acc, r) => acc + Number(r.META || 0), 0);
-          const totalTotal = response.reduce((acc, r) => acc + Number(r.TOTAL || 0), 0);
-          
-          const aggregated: VendedorResumo = {
-            COD_VENDEDOR: "TOTAL",
-            NOME_VENDEDOR: "TOTAL GERAL",
-            META: metaTotal,
-            FATURADO: response.reduce((acc, r) => acc + Number(r.FATURADO || 0), 0),
-            EM_ABERTO: response.reduce((acc, r) => acc + Number(r.EM_ABERTO || 0), 0),
-            TOTAL: totalTotal,
-            FALTANTE: metaTotal - totalTotal,
-            TOTAL_VENDIDO_HOJE: response.reduce(
-              (acc, r) => acc + Number(r.TOTAL_VENDIDO_HOJE || 0),
-              0,
-            ),
-            QTD_VENDAS: response.reduce(
-              (acc, r) => acc + Number(r.QTD_VENDAS || 0),
-              0,
-            ),
-            QTD_ORCAMENTOS: response.reduce(
-              (acc, r) => acc + Number(r.QTD_ORCAMENTOS || 0),
-              0,
-            ),
-            ORC_FECHADOS: response.reduce(
-              (acc, r) => acc + Number(r.ORC_FECHADOS || 0),
-              0,
-            ),
-            PRAZO_MEDIO_DIAS:
-              response.reduce(
-                (acc, r) => acc + Number(r.PRAZO_MEDIO_DIAS || 0),
-                0,
-              ) / response.length,
-            TICKET_MEDIO: 0,
-            TAXA_CONVERSAO: 0,
-            dias_trabalhados: response[0].dias_trabalhados,
-          };
+        if (isManager) {
+          // Procura a linha "MEDIA" que a API agora retorna como agregado
+          const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
+          const finalData = mediaRow || response[0];
 
-          // Cálculos derivados
-          aggregated.TICKET_MEDIO =
-            aggregated.QTD_VENDAS > 0
-              ? Number(aggregated.TOTAL) / aggregated.QTD_VENDAS
-              : 0;
-          aggregated.TAXA_CONVERSAO =
-            Number(aggregated.QTD_ORCAMENTOS) > 0
-              ? (Number(aggregated.ORC_FECHADOS) /
-                  Number(aggregated.QTD_ORCAMENTOS)) *
-                100
-              : 0;
-
-          // Só atualiza se for realmente diferente para evitar loops
           setVendedorMetrics((prev) => {
-            if (JSON.stringify(prev) === JSON.stringify(aggregated))
+            if (JSON.stringify(prev) === JSON.stringify(finalData))
               return prev;
-            return aggregated;
+            return finalData;
           });
         } else {
           const myData =

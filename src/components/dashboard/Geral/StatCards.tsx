@@ -19,10 +19,18 @@ export function StatCards({ userProfile, loading: externalLoading }: { userProfi
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const yyyy = now.getFullYear();
         const mesano = `${mm}${yyyy}`;
-        const codVendedor = userProfile?.operator_code || userProfile?.operatorCode || "049";
-        const response = await apiVendedores(mesano, codVendedor);
+        const role = userProfile?.role?.toUpperCase() || "";
+        const isManager = role.includes("GERENTE") || role === "ADMIN";
+        const codVendedor = userProfile?.operator_code || userProfile?.operatorCode;
+        
+        // Se for gerente, buscamos todos (para pegar a MEDIA), senão buscamos o específico
+        const response = await apiVendedores(mesano, isManager ? undefined : codVendedor || "049");
+        
         if (response && response.resumo) {
-          const myData = response.resumo.find(r => r.COD_VENDEDOR === codVendedor) || response.resumo[0];
+          // Se for gerente, o default é a linha MEDIA (Carflax Hidráulica)
+          // Senão, é o código do próprio vendedor
+          const targetCod = isManager ? "MEDIA" : (codVendedor || "049");
+          const myData = response.resumo.find(r => r.COD_VENDEDOR === targetCod) || response.resumo[0];
           setData(myData);
         }
       } catch (error) {
@@ -41,13 +49,13 @@ export function StatCards({ userProfile, loading: externalLoading }: { userProfi
     {
       title: "Total Vendido",
       value: formatBRL(Number(data.TOTAL || 0)),
-      change: `${Number(data.ATINGIMENTO_PCT || 0).toFixed(1)}% da meta`,
+      change: `${Number(data.ATINGIMENTO_PCT || (Number(data.META) > 0 ? (Number(data.TOTAL) / Number(data.META)) * 100 : 0)).toFixed(1)}% da meta`,
       icon: Wallet,
       color: "blue",
     },
     {
       title: "Taxa de Conversão",
-      value: `${Number(data.TAXA_CONVERSAO || 0).toFixed(1)}%`,
+      value: `${Number(data.TAXA_CONVERSAO_VALOR || data.TAXA_CONVERSAO || 0).toFixed(1)}%`,
       change: "Mensal",
       icon: ArrowUpRight,
       color: "emerald",
@@ -103,12 +111,12 @@ export function StatCards({ userProfile, loading: externalLoading }: { userProfi
                 <div className="mt-3 space-y-1.5">
                   <div className="flex items-center justify-between text-[10px] font-bold">
                     <span className="text-blue-500">Meta</span>
-                    <span className="text-slate-900">{Number(data.ATINGIMENTO_PCT || 0).toFixed(1)}%</span>
+                    <span className="text-slate-900">{Number(data.ATINGIMENTO_PCT || (Number(data.META) > 0 ? (Number(data.TOTAL) / Number(data.META)) * 100 : 0)).toFixed(1)}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                      style={{ width: `${Math.min(Number(data.ATINGIMENTO_PCT || 0), 100)}%` }}
+                      style={{ width: `${Math.min(Number(data.ATINGIMENTO_PCT || (Number(data.META) > 0 ? (Number(data.TOTAL) / Number(data.META)) * 100 : 0)), 100)}%` }}
                     />
                   </div>
                 </div>

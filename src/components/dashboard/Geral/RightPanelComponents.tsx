@@ -70,39 +70,21 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
           if (isManager) {
             setAllVendedores(response);
             
-            // Agrega os dados de todos os vendedores para o estado inicial "TOTAL"
-            const metaTotal = response.reduce((acc, r) => acc + Number(r.META || 0), 0);
-            const faturadoTotal = response.reduce((acc, r) => acc + Number(r.FATURADO || 0), 0);
-            const emAbertoTotal = response.reduce((acc, r) => acc + Number(r.EM_ABERTO || 0), 0);
-            const totalTotal = response.reduce((acc, r) => acc + Number(r.TOTAL || 0), 0);
-
-            const aggregated: VendedorResumo = {
-              COD_VENDEDOR: "TOTAL",
-              NOME_VENDEDOR: "TOTAL GERAL",
-              META: metaTotal,
-              FATURADO: faturadoTotal,
-              EM_ABERTO: emAbertoTotal,
-              TOTAL: totalTotal,
-              FALTANTE: Math.max(0, metaTotal - totalTotal),
-              TOTAL_VENDIDO_HOJE: response.reduce((acc, r) => acc + Number(r.TOTAL_VENDIDO_HOJE || 0), 0),
-              QTD_VENDAS: response.reduce((acc, r) => acc + Number(r.QTD_VENDAS || 0), 0),
-              QTD_ORCAMENTOS: response.reduce((acc, r) => acc + Number(r.QTD_ORCAMENTOS || 0), 0),
-              ORC_FECHADOS: response.reduce((acc, r) => acc + Number(r.ORC_FECHADOS || 0), 0),
-              PRAZO_MEDIO_DIAS: response.reduce((acc, r) => acc + Number(r.PRAZO_MEDIO_DIAS || 0), 0) / response.length,
-              TICKET_MEDIO: 0,
-              TAXA_CONVERSAO: 0,
-              dias_trabalhados: response[0].dias_trabalhados 
-            };
-
-            aggregated.TICKET_MEDIO = aggregated.QTD_VENDAS > 0 ? Number(aggregated.TOTAL) / aggregated.QTD_VENDAS : 0;
-            aggregated.TAXA_CONVERSAO = Number(aggregated.QTD_ORCAMENTOS) > 0 
-              ? (Number(aggregated.ORC_FECHADOS) / Number(aggregated.QTD_ORCAMENTOS)) * 100 
-              : 0;
-
-            setData(aggregated);
+            // Procura a linha "MEDIA" que a API agora retorna como agregado
+            const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
+            
+            if (mediaRow) {
+              setData(mediaRow);
+              setSelectedCod("MEDIA");
+            } else {
+              // Fallback caso não venha MEDIA (improvável agora)
+              setData(response[0]);
+              setSelectedCod(response[0].COD_VENDEDOR);
+            }
           } else {
             const myData = response.find(r => r.COD_VENDEDOR === codVendedor) || response[0];
             setData(myData);
+            setSelectedCod(myData.COD_VENDEDOR);
           }
         }
       } catch (error) {
@@ -175,14 +157,10 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     { label: m("Equilíbrio"), value: formatBRL(calculateEquilibrio()), icon: BarChart3, valueColor: "text-blue-600" },
     { label: m("Dias Restantes"), value: `${getDiasRestantes()}`, icon: Calendar, valueColor: "text-slate-900" },
     { label: m("Diário"), value: formatBRL(calculateDiarioNecessario()), icon: Zap, valueColor: "text-slate-900" },
-    { label: m("Tx Conversão"), value: `${
-      data.TAXA_CONVERSAO 
-        ? Number(typeof data.TAXA_CONVERSAO === 'string' ? parseFloat(data.TAXA_CONVERSAO) : data.TAXA_CONVERSAO).toFixed(2)
-        : ((Number(data.ORC_FECHADOS || 0) / Math.max(Number(data.QTD_ORCAMENTOS || 1), 1)) * 100).toFixed(2)
-    }%`, icon: PieChart, valueColor: "text-blue-600" },
+    { label: m("Tx Conversão"), value: `${Number(data.TAXA_CONVERSAO_VALOR || data.TAXA_CONVERSAO || 0).toFixed(2)}%`, icon: PieChart, valueColor: "text-blue-600" },
     { label: m("Ticket Médio"), value: formatBRL(data.TICKET_MEDIO), icon: DollarSign, valueColor: "text-slate-900" },
-    { label: m("Margem Real"), value: `${Number(typeof (data.MARGEM_REAL_PERC || data.MARGEM_PCT) === 'string' ? parseFloat((data.MARGEM_REAL_PERC || data.MARGEM_PCT) as string) : (data.MARGEM_REAL_PERC || data.MARGEM_PCT || 0)).toFixed(2)}%`, icon: TrendingUp, valueColor: "text-blue-600" },
-    { label: m("Prazo Médio"), value: `${Number(typeof data.PRAZO_MEDIO_DIAS === 'string' ? parseFloat(data.PRAZO_MEDIO_DIAS) : data.PRAZO_MEDIO_DIAS || 0).toFixed(0)} d`, icon: Clock, valueColor: "text-slate-900" },
+    { label: m("Margem Real"), value: `${Number(data.MARGEM_REAL_PERC || data.MARGEM_PCT || 0).toFixed(2)}%`, icon: TrendingUp, valueColor: "text-blue-600" },
+    { label: m("Prazo Médio"), value: `${Number(data.PRAZO_MEDIO_DIAS || 0).toFixed(0)} d`, icon: Clock, valueColor: "text-slate-900" },
   ] : [];
 
   function m(text: string) { return text; }
@@ -256,45 +234,24 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                 <div className="max-h-64 overflow-y-auto scrollbar-hide">
                   <button
                     onClick={() => {
-                      setSelectedCod("TOTAL");
-                      // Re-agregando (ou podemos salvar o aggregated num ref/state)
-                      const response = allVendedores;
-                      const metaTotal = response.reduce((acc, r) => acc + Number(r.META || 0), 0);
-                      const totalTotal = response.reduce((acc, r) => acc + Number(r.TOTAL || 0), 0);
-                      
-                      const aggregated: VendedorResumo = {
-                        COD_VENDEDOR: "TOTAL",
-                        NOME_VENDEDOR: "TOTAL GERAL",
-                        META: metaTotal,
-                        FATURADO: response.reduce((acc, r) => acc + Number(r.FATURADO || 0), 0),
-                        EM_ABERTO: response.reduce((acc, r) => acc + Number(r.EM_ABERTO || 0), 0),
-                        TOTAL: totalTotal,
-                        FALTANTE: Math.max(0, metaTotal - totalTotal),
-                        TOTAL_VENDIDO_HOJE: response.reduce((acc, r) => acc + Number(r.TOTAL_VENDIDO_HOJE || 0), 0),
-                        QTD_VENDAS: response.reduce((acc, r) => acc + Number(r.QTD_VENDAS || 0), 0),
-                        QTD_ORCAMENTOS: response.reduce((acc, r) => acc + Number(r.QTD_ORCAMENTOS || 0), 0),
-                        ORC_FECHADOS: response.reduce((acc, r) => acc + Number(r.ORC_FECHADOS || 0), 0),
-                        PRAZO_MEDIO_DIAS: response.reduce((acc, r) => acc + Number(r.PRAZO_MEDIO_DIAS || 0), 0) / Math.max(response.length, 1),
-                        TICKET_MEDIO: 0,
-                        TAXA_CONVERSAO: 0,
-                        dias_trabalhados: response[0]?.dias_trabalhados 
-                      };
-                      aggregated.TICKET_MEDIO = aggregated.QTD_VENDAS > 0 ? Number(aggregated.TOTAL) / aggregated.QTD_VENDAS : 0;
-                      aggregated.TAXA_CONVERSAO = Number(aggregated.QTD_ORCAMENTOS) > 0 ? (Number(aggregated.ORC_FECHADOS) / Number(aggregated.QTD_ORCAMENTOS)) * 100 : 0;
-                      
-                      setData(aggregated);
+                      const mediaRow = allVendedores.find(r => r.COD_VENDEDOR === "MEDIA");
+                      if (mediaRow) {
+                        setSelectedCod("MEDIA");
+                        setData(mediaRow);
+                      }
                       setIsDropdownOpen(false);
                     }}
                     className={cn(
                       "w-full px-4 py-2 text-left text-xs font-bold transition-colors hover:bg-secondary flex items-center justify-between",
-                      selectedCod === "TOTAL" ? "text-blue-600 bg-blue-50/50 dark:bg-blue-900/20" : "text-foreground"
+                      selectedCod === "MEDIA" ? "text-blue-600 bg-blue-50/50 dark:bg-blue-900/20" : "text-foreground"
                     )}
                   >
                     <span>Total Geral</span>
-                    {selectedCod === "TOTAL" && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
+                    {selectedCod === "MEDIA" && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
                   </button>
 
                   {allVendedores
+                    .filter(v => v.COD_VENDEDOR !== "MEDIA")
                     .sort((a, b) => (a.NOME_VENDEDOR || "").localeCompare(b.NOME_VENDEDOR || ""))
                     .map((v) => (
                       <button

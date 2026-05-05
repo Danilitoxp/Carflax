@@ -54,7 +54,8 @@ export interface VendedorResumo {
   CUSTO?: number | string;
   MARGEM_REAL?: number | string;
   MARGEM_REAL_PERC?: number | string;
-  QTD_VENDAS: number;
+  TAXA_CONVERSAO_VALOR?: number | string;
+  QTD_VENDAS: number | string;
   TICKET_MEDIO: number | string;
   CUSTO_EM_ABERTO?: number | string;
   QTD_ORCAMENTOS: number | string;
