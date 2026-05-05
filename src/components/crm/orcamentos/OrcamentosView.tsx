@@ -238,8 +238,13 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [statusMotivoPerdido, setStatusMotivoPerdido] = useState("");
   const [lostItemsIds, setLostItemsIds] = useState<string[]>([]);
 
-  const [startDate, setStartDate] = useState<Date | null>(new Date(2026, 3, 1));
-  const [endDate, setEndDate] = useState<Date | null>(new Date(2026, 3, 30));
+  // Filtro padrão: do dia 1 do mês atual até hoje
+  const [startDate, setStartDate] = useState<Date | null>(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d;
+  });
+  const [endDate, setEndDate] = useState<Date | null>(new Date());
 
   const cacheKey = useMemo(() => {
     if (!startDate || !endDate) return null;
@@ -319,7 +324,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       });
 
       setOrçamentosData(merged);
-      
+
       // Salvar no Cache
       if (cacheKey && merged.length > 0) {
         sessionStorage.setItem(cacheKey, JSON.stringify(merged));
