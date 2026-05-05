@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { uploadImage } from "@/lib/uploadImage";
 import { Button } from "@/components/ui/button";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
-import { useNotification } from "@/components/ui/NotificationProvider";
+import { useNotification } from "@/hooks/useNotification";
 
 const categories = ["Todos", "Empresa", "Social", "Eventos", "Avisos"];
 

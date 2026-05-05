@@ -8,11 +8,15 @@ import {
   Panel,
   useNodesState,
   useEdgesState,
+  applyNodeChanges,
+  applyEdgeChanges,
   Handle,
   Position,
   type Node,
   type Edge,
   type NodeProps,
+  type OnNodesChange,
+  type OnEdgesChange
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { cn } from "@/lib/utils";
@@ -105,13 +109,11 @@ function CustomOrgNode({ data }: NodeProps<Node<OrgNodeData>>) {
 
       <div className={cn(
         "relative w-[230px] bg-card/80 backdrop-blur-md rounded-3xl shadow-2xl border border-border border-l-[6px] p-6 pt-12 transition-all duration-300 group-hover:shadow-blue-500/10 group-hover:border-l-[10px]",
-        // @ts-ignore
-        levelColors[level] || "border-slate-300"
+        levelColors[level as keyof typeof levelColors] || "border-slate-300"
       )}>
         <div className={cn(
           "absolute top-4 right-0 px-3 py-1 flex items-center gap-1.5 rounded-l-full shadow-lg bg-blue-600/20",
-          // @ts-ignore
-          badgeColors[level]
+          badgeColors[level as keyof typeof badgeColors]
         )}>
            <span className="text-[7px] font-black text-white uppercase tracking-widest">Level {level}</span>
         </div>
@@ -140,12 +142,15 @@ const nodeTypes = {
   custom: CustomOrgNode,
 };
 
-import { useNotification } from "@/components/ui/NotificationProvider";
+import { useNotification } from "@/hooks/useNotification";
 
 export function OrgChartView() {
   const { showNotification } = useNotification();
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [nodes, setNodes] = useNodesState<Node>([]);
+  const [edges, setEdges] = useEdgesState<Edge>([]);
+  const onNodesChange: OnNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), [setNodes]);
+  const onEdgesChange: OnEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [allUsers, setAllUsers] = useState<Employee[]>([]);
   const [selectedNode, setSelectedNode] = useState<{id: string, databaseId: string, title: string, department: string, level: string} | null>(null);
@@ -183,7 +188,7 @@ export function OrgChartView() {
 
       const idMap = new Map();
       rolesData.forEach(r => idMap.set(r.id, { ...r, children: [] }));
-      const roots: any[] = [];
+      const roots: Record<string, unknown>[] = [];
       rolesData.forEach(r => {
         if (r.parent_id && idMap.has(r.parent_id)) {
             idMap.get(r.parent_id).children.push(idMap.get(r.id));
@@ -192,7 +197,7 @@ export function OrgChartView() {
         }
       });
 
-      const traverse = (node: any, parentId: string | null = null, depth = 0, xOffset = 0, deptName?: string) => {
+      const traverse = (node: Record<string, unknown>, parentId: string | null = null, depth = 0, xOffset = 0, deptName?: string) => {
         const id = node.id;
         const currentDept = node.level === 'B' ? node.title : deptName;
         const matched = formattedUsers.filter(e => e.role === node.title);
@@ -220,11 +225,11 @@ export function OrgChartView() {
           });
         }
 
-        if (node.children) {
+        if (Array.isArray(node.children)) {
           const totalWidth = (node.children.length - 1) * horizontalSpacing;
-          node.children.forEach((child: any, i: number) => {
+          (node.children as Record<string, unknown>[]).forEach((child: Record<string, unknown>, i: number) => {
             const childXOffset = xOffset - totalWidth / 2 + i * horizontalSpacing;
-            traverse(child, id, depth + 1, childXOffset, currentDept);
+            traverse(child, String(id), depth + 1, childXOffset, String(currentDept || ""));
           });
         }
       };
@@ -243,7 +248,7 @@ export function OrgChartView() {
     loadChart();
   }, [loadChart]);
 
-  const onNodeDragStop = useCallback(async (_: any, node: Node) => {
+  const onNodeDragStop = useCallback(async (_: unknown, node: Node) => {
     // Save position to DB when drag ends
     await supabase.from("organograma_cargos").update({
         pos_x: node.position.x,
@@ -251,7 +256,7 @@ export function OrgChartView() {
     }).eq("id", node.id);
   }, []);
 
-  const onNodeClick = (_: any, node: Node) => {
+  const onNodeClick = (_: unknown, node: Node) => {
     setSelectedNode({ 
         id: node.id, 
         databaseId: node.id, 

@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
-import { useNotification } from "@/components/ui/NotificationProvider";
+import { useNotification } from "@/hooks/useNotification";
 import {
   User as UserIcon,
   FileCheck,
@@ -329,7 +329,14 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
       // Salvar no Cache
       if (cacheKey && merged.length > 0) {
-        sessionStorage.setItem(cacheKey, JSON.stringify(merged));
+        try {
+          Object.keys(sessionStorage).forEach(key => {
+            if (key.startsWith("crm_orcamentos_")) sessionStorage.removeItem(key);
+          });
+          sessionStorage.setItem(cacheKey, JSON.stringify(merged));
+        } catch (err) {
+          console.warn("[CRM] Falha ao salvar cache (quota cheia):", err);
+        }
       }
     } catch (e) {
       console.error("CRM fetch:", e);
@@ -382,17 +389,34 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
       // 3. Cadastrar no Calendário de Eventos (Opcional se houver data de retorno)
       const returnDate = extra?.lembrete_data || extra?.fechamento_previsto;
-      if (returnDate && /^\d{4}-\d{2}-\d{2}/.test(returnDate)) {
+      if (returnDate) {
         try {
-          const [y, m, d] = returnDate.split("-").map(Number);
-          await supabase.from("eventos_calendario").insert([{
-            title: `RETORNO: ${selectedItem.client.toUpperCase()} (#${selectedItem.id.replace("-OR", "")})`,
-            description: `Vendedor: ${selectedItem.seller}. Orçamento em status ${newStatus.toUpperCase()}.`,
-            type: "meeting",
-            day: d,
-            month: m,
-            year: y
-          }]);
+          const dateParts = returnDate.includes("-") ? returnDate.split("-") : returnDate.split("/");
+          let y, m, d;
+          
+          if (dateParts.length === 3) {
+            if (dateParts[0].length === 4) {
+              [y, m, d] = dateParts.map(Number);
+            } else {
+              [d, m, y] = dateParts.map(Number);
+            }
+
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+              const { error: calError } = await supabase.from("eventos_calendario").insert([{
+                title: `FOLLOW-UP: ${selectedItem.client.toUpperCase()} - Vendedor: ${selectedItem.seller.split(' ')[0]}`,
+                description: `Vendedor: ${selectedItem.seller}. Orçamento: #${selectedItem.id.replace("-OR", "")}. Status: ${newStatus.toUpperCase()}.`,
+                type: "follow-up",
+                vendedor_codigo: selectedItem.sellerCode,
+                day: d,
+                month: m,
+                year: y
+              }]);
+              
+              if (calError) {
+                console.error("Erro Supabase Calendário:", calError.message);
+              }
+            }
+          }
         } catch (calErr) {
           console.error("Erro ao agendar no calendário:", calErr);
         }
@@ -580,8 +604,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     // Regra de Conversão: Excluir motivos consultivos (não penaliza o vendedor)
     const filteredForConv = filteredAndSortedItems.filter(o => {
       const reason = (o.lossReason || "").toUpperCase();
-      return !reason.includes("COMPARATIVO DE LINHAS") &&
-             !reason.includes("MÃO DE OBRA E MATERIAL") &&
+      return !reason.includes("MÃO DE OBRA E MATERIAL") &&
              !reason.includes("MAO DE OBRA E MATERIAL");
     });
 

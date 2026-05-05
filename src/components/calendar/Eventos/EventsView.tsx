@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
-import { Gift, Star, GraduationCap, Plus, Flag, Users, Trophy, DollarSign, AlertCircle, Rocket } from "lucide-react";
+import { Gift, Star, GraduationCap, Plus, Flag, Users, Trophy, DollarSign, AlertCircle, Rocket, Phone } from "lucide-react";
 
 interface CalendarEvent {
   id: number;
   day: number;
   title: string;
-  type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch";
+  type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch" | "follow-up";
   month?: number;
   year?: number;
 }
@@ -41,6 +41,7 @@ export function EventsView({ day, month, year, events, activeFilters, onEventCli
       case "important": return "bg-red-50/80 dark:bg-red-500/15 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-500/30 hover:bg-red-100 dark:hover:bg-red-500/20";
       case "launch": return "bg-cyan-50/80 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-200/50 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-500/20";
       case "video": return "bg-blue-50/80 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/30 hover:bg-blue-100 dark:hover:bg-blue-500/20";
+      case "follow-up": return "bg-emerald-50/80 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-500/20";
       default: return "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700";
     }
   };
@@ -57,6 +58,7 @@ export function EventsView({ day, month, year, events, activeFilters, onEventCli
       case "important": return <AlertCircle className="w-3 h-3" />;
       case "launch": return <Rocket className="w-3 h-3" />;
       case "video": return <Plus className="w-3 h-3" />;
+      case "follow-up": return <Phone className="w-3 h-3" />;
       default: return null;
     }
   };

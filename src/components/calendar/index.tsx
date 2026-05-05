@@ -10,7 +10,8 @@ import {
   Users,
   Trophy,
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  Phone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EventModal } from "./EventModal";
@@ -19,12 +20,23 @@ import { VacationsView } from "./Ferias/VacationsView";
 import { VacationModal } from "./Ferias/VacationModal";
 import { Button } from "@/components/ui/button";
 
+interface UserProfile {
+  id?: string;
+  name: string;
+  role: string;
+  avatar_url?: string;
+  seller_code?: string;
+  operator_code?: string; // Nome usado no App.tsx
+  permissions?: string[];
+}
+
 interface CalendarEvent {
   id: number;
   day: number;
   title: string;
-  type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch";
+  type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch" | "follow-up";
   description?: string;
+  vendedor_codigo?: string; // Novo campo
   month?: number;
   year?: number;
 }
@@ -40,7 +52,7 @@ interface Vacation {
 
 interface CalendarSectionProps {
   activeTab?: string;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 // Cache global para evitar delays entre trocas de meses
@@ -58,11 +70,11 @@ const calendarCache: {
 
 export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps) {
   const [viewMode, setViewMode] = useState<"events" | "vacations">(activeTab === "Férias" ? "vacations" : "events");
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)); // Abril 2026
+  const [currentDate, setCurrentDate] = useState(new Date()); // Mes Atual
   
   const canManageFerias = userProfile?.permissions?.includes("Gerenciar Férias") || userProfile?.role === "admin";
   const canManageEvents = userProfile?.permissions?.includes("Gerenciar Calendário") || userProfile?.role === "admin";
-  const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video", "holiday", "meeting", "celebration", "finance", "important", "launch"]);
+  const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video", "holiday", "meeting", "celebration", "finance", "important", "launch", "follow-up"]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [vacations, setVacations] = useState<Vacation[]>([]);
   const [employees, setEmployees] = useState<{ name: string; avatar?: string }[]>([]);
@@ -82,7 +94,7 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
   const [newEvent, setNewEvent] = useState<{
     title: string;
     description: string;
-    type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch";
+    type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch" | "follow-up";
   }>({
     title: "",
     description: "",
@@ -129,6 +141,7 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
         title: e.title,
         type: e.type as CalendarEvent["type"],
         description: e.description || "",
+        vendedor_codigo: e.vendedor_codigo // Capturar o código do vendedor
       }));
 
       // Processar Férias
@@ -198,13 +211,27 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
 
       const finalEvents = [...manualEvents, ...birthdayEvents, ...admissionEvents, ...currentHolidayEvents];
 
+      // 5. Filtro de Privacidade para Follow-ups
+      const visibleEvents = finalEvents.filter(ev => {
+        if (ev.type !== "follow-up") return true;
+        
+        const isAdmin = userProfile?.role === "admin" || userProfile?.permissions?.includes("Gerenciar Calendário");
+        if (isAdmin) return true;
+
+        // Comparação robusta (converte para número para ignorar zeros à esquerda ou tipos diferentes)
+        const evCode = String(ev.vendedor_codigo || "").replace(/^0+/, '');
+        const myCode = String(userProfile?.operator_code || userProfile?.seller_code || "").replace(/^0+/, '');
+        
+        return evCode !== "" && evCode === myCode;
+      });
+
       // Atualizar cache
-      calendarCache.events[cacheKey] = finalEvents;
+      calendarCache.events[cacheKey] = visibleEvents;
       calendarCache.vacations = loadedVacations;
       calendarCache.employees = emps;
 
       // Atualizar estado
-      setEvents(finalEvents);
+      setEvents(visibleEvents);
       setVacations(loadedVacations);
       setEmployees(emps);
     } catch (e) {
@@ -212,7 +239,7 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
     } finally {
       setLoading(false);
     }
-  }, [month, year]);
+  }, [month, year, userProfile?.role, userProfile?.permissions, userProfile?.seller_code, userProfile?.operator_code]);
 
   useEffect(() => {
     fetchAllData();
@@ -292,7 +319,7 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
   const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
 
   const toggleFilter = (filter: string) => {
-    setActiveFilters(prev => (prev.length === 1 && prev.includes(filter)) ? ["birthday", "star", "education", "video", "holiday", "meeting", "celebration", "finance", "important", "launch"] : [filter]);
+    setActiveFilters(prev => (prev.length === 1 && prev.includes(filter)) ? ["birthday", "star", "education", "video", "holiday", "meeting", "celebration", "finance", "important", "launch", "follow-up"] : [filter]);
   };
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -314,7 +341,6 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
 
   const handleEventClick = (e: React.MouseEvent, event: CalendarEvent) => {
     e.stopPropagation();
-    if (!canManageEvents) return;
     setEditingEventId(event.id);
     setSelectedDay(event.day);
     setNewEvent({ title: event.title, description: event.description || "", type: event.type });
@@ -358,7 +384,7 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
             {viewMode === "events" && (
               <div className="flex items-center gap-1">
                 {loading ? (
-                  Array.from({ length: 7 }).map((_, i) => (
+                  Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="h-8 w-12 bg-secondary rounded-md animate-pulse" />
                   ))
                 ) : (
@@ -370,6 +396,7 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
                     { id: "celebration", icon: Trophy, label: "Metas", color: "pink" },
                     { id: "birthday", icon: Gift, label: "Níver", color: "rose" },
                     { id: "star", icon: Star, label: "Jubileu", color: "amber" },
+                    { id: "follow-up", icon: Phone, label: "Follow-up", color: "emerald" },
                   ].map(f => (
                     <button 
                       key={f.id} 

@@ -12,7 +12,7 @@ interface EventModalProps {
   newEvent: {
     title: string;
     description: string;
-    type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch";
+    type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch" | "follow-up";
   };
   setNewEvent: (event: EventModalProps["newEvent"]) => void;
   canManage?: boolean;

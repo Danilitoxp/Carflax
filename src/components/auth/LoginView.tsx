@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/context/theme-provider";
 import { supabase } from "@/lib/supabase";
-import { useNotification } from "@/components/ui/NotificationProvider";
+import { useNotification } from "@/hooks/useNotification";
 
 interface LoginViewProps {
   onLogin: () => void;

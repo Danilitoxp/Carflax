@@ -147,7 +147,8 @@ async function checkAndPostEvents() {
     .select("*")
     .eq("year", year)
     .eq("month", month)
-    .eq("day", day);
+    .eq("day", day)
+    .neq("type", "follow-up");
 
   if (!events || events.length === 0) return 0;
 

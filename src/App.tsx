@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
+import { useNotification } from "@/hooks/useNotification";
 import { ThemeProvider } from "@/context/theme-provider";
 import { AppSidebar } from "@/components/ui/AppSidebar";
 import { ChatCenter } from "@/components/ui/ChatCenter";
@@ -56,6 +57,7 @@ function DashboardContent({
   vendedorMetrics,
   onLogout,
 }: DashboardContentProps) {
+  const { showNotification } = useNotification();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
@@ -212,6 +214,55 @@ function DashboardContent({
 
   const [isCentralizer, setIsCentralizer] = useState(false);
   const initialCheckPerformed = useRef(false);
+
+  // ── Notificações de Follow-ups do Dia ───────────────────────────
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    
+    async function checkTodayFollowUps() {
+      const now = new Date();
+      const { data: events } = await supabase
+        .from("eventos_calendario")
+        .select("*")
+        .eq("year", now.getFullYear())
+        .eq("month", now.getMonth() + 1)
+        .eq("day", now.getDate())
+        .eq("type", "follow-up");
+
+      if (events && events.length > 0) {
+        const myCode = String(userProfile?.operator_code || userProfile?.operatorCode || "").replace(/^0+/, '');
+        const dismissed = JSON.parse(localStorage.getItem("carflax-dismissed-notifs") || "[]");
+        const isAdmin = userProfile?.role === "admin" || userProfile?.permissions?.includes("Gerenciar Calendário");
+
+        const myEvents = events.filter(ev => {
+          // Ignorar se já foi fechado nesta sessão/dia
+          if (dismissed.includes(String(ev.id))) return false;
+
+          if (isAdmin) return true;
+          const evCode = String(ev.vendedor_codigo || "").replace(/^0+/, '');
+          return evCode !== "" && evCode === myCode;
+        });
+
+        myEvents.forEach(ev => {
+          // Lógica mais robusta para extrair o nome do cliente (ignora o traço de FOLLOW-UP)
+          const clientPart = ev.title.split('- Vendedor:')[0] || "";
+          const clientName = clientPart.replace(/^FOLLOW-UP:\s*/i, '').trim();
+          
+          showNotification(
+            "info", 
+            "⚠️ RETORNO PENDENTE", 
+            `Cliente: ${clientName}\n\n${ev.description || "Verifique os detalhes no orçamento."}`,
+            true, // PERSISTENTE
+            String(ev.id) // TAG para controle de fechamento
+          );
+        });
+      }
+    }
+
+    // Aguardar o carregamento inicial e disparar
+    const timeout = setTimeout(checkTodayFollowUps, 2000);
+    return () => clearTimeout(timeout);
+  }, [userProfile, showNotification]);
 
   // ── Notificações de Entregas (Realtime) ─────────────────────────────
   useEffect(() => {
