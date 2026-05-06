@@ -1189,94 +1189,26 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
 
     try {
-      // 1. Busca do Banco — todas as mensagens armazenadas (sem filtro de data)
       const dbMessages = await marketingService.getMessagesByJid(chat.id, 200);
-      
-      if (dbMessages.length > 0) {
-        const msgs: Message[] = dbMessages.map(m => ({
-          id: m.message_id,
-          text: m.texto || "",
-          time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          sender: m.sender,
-          status: (m.status as "sent" | "delivered" | "read") || "sent",
-          tipo: m.tipo,
-          mediaUrl: m.media_url,
-          reacao: m.reacao
-        }));
-        setMessages(msgs);
 
-        // Atualiza o lastMessageSender no chat da sidebar
-        const lastMsg = dbMessages[dbMessages.length - 1];
+      const msgs: Message[] = dbMessages.map(m => ({
+        id: m.message_id,
+        text: m.texto || "",
+        time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sender: m.sender,
+        status: (m.status as "sent" | "delivered" | "read") || "sent",
+        tipo: m.tipo,
+        mediaUrl: m.media_url,
+        reacao: m.reacao,
+      }));
+
+      setMessages(msgs);
+
+      if (msgs.length > 0) {
+        const lastMsg = msgs[msgs.length - 1];
         setChats(prev => prev.map(c =>
           c.id === chat.id ? { ...c, lastMessageSender: lastMsg.sender } : c
         ));
-
-        setLoadingMessages(false);
-      }
-
-      // 2. Busca da Evolution API para sincronizar o que falta (opcional/segundo plano)
-      const data = await evolutionApi.getMessages(chat.id) as Record<string, unknown>;
-      
-      const dataObj = data as Record<string, unknown>;
-      let rawMessages: EvoMessageResponse[] = [];
-
-      if (Array.isArray(data)) {
-        rawMessages = data as EvoMessageResponse[];
-      } else if (dataObj?.records && Array.isArray(dataObj.records)) {
-        rawMessages = dataObj.records as EvoMessageResponse[];
-      } else if (dataObj?.messages && Array.isArray(dataObj.messages)) {
-        rawMessages = dataObj.messages as EvoMessageResponse[];
-      } else if ((dataObj?.messages as Record<string, unknown>)?.records && Array.isArray((dataObj.messages as Record<string, unknown>).records)) {
-        rawMessages = (dataObj.messages as Record<string, unknown>).records as EvoMessageResponse[];
-      }
-
-      const MIN_SYNC_TIMESTAMP = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
-
-      const apiMsgs: Message[] = rawMessages
-        .filter((m: EvoMessageResponse) => {
-          // Filtra apenas mensagens deste contato específico
-          const msgJid = m.key?.remoteJid;
-          if (msgJid && msgJid !== chat.id) return false;
-          // Filtra mensagens antigas
-          if (m.messageTimestamp && (m.messageTimestamp as number) < MIN_SYNC_TIMESTAMP) return false;
-          return true;
-        })
-        .map((m: EvoMessageResponse) => {
-          const messageContent = m.message;
-          const text = 
-            messageContent?.conversation || 
-            messageContent?.extendedTextMessage?.text || 
-            messageContent?.imageMessage?.caption ||
-            messageContent?.videoMessage?.caption ||
-            (typeof messageContent === 'string' ? messageContent : "") ||
-            "Mídia";
-
-          const msgTimestamp = m.messageTimestamp ? new Date((m.messageTimestamp as number) * 1000).toISOString() : new Date().toISOString();
-          const msgId = (m.key?.id || m.id || Math.random().toString()) as string;
-
-          // Salva mensagens da API no banco de forma assíncrona
-          marketingService.saveMessage({
-            message_id: msgId,
-            remote_jid: chat.id,
-            texto: text as string,
-            sender: (m.key?.fromMe ? "me" : "contact") as "me" | "contact",
-            timestamp: msgTimestamp,
-            status: (m.status === "READ" ? "read" : "sent"),
-            ...(m.key?.fromMe ? { vendedor_id: vendedorId } : {})
-          });
-
-          return {
-            id: msgId,
-            text: text as string,
-            time: new Date(msgTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            sender: (m.key?.fromMe ? "me" : "contact") as "me" | "contact",
-            status: (m.status === "READ" ? "read" : "sent") as "sent" | "delivered" | "read"
-          };
-        }).reverse();
-      
-      // Se não tinha nada no banco, usa as da API
-      if (dbMessages.length === 0) {
-        setMessages(apiMsgs);
       }
     } catch (error) {
       console.error("Erro ao carregar mensagens:", error);
