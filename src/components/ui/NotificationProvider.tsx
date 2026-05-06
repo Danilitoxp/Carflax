@@ -9,7 +9,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const showNotification = useCallback((type: NotificationType, title: string, message: string, persistent?: boolean, tag?: string) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setNotifications((prev) => [...prev, { id, type, title, message, persistent, tag }]);
+    setNotifications((prev) => {
+      if (tag && prev.some((n) => n.tag === tag)) return prev;
+      return [...prev, { id, type, title, message, persistent, tag }];
+    });
 
     // Auto-remove after 5 seconds ONLY if not persistent
     if (!persistent) {
@@ -21,13 +24,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const removeNotification = (id: string, tag?: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-    
-    // Se for um follow-up com tag, salvamos que foi fechado
+
     if (tag) {
-      const dismissed = JSON.parse(localStorage.getItem("carflax-dismissed-notifs") || "[]");
-      if (!dismissed.includes(tag)) {
-        dismissed.push(tag);
-        localStorage.setItem("carflax-dismissed-notifs", JSON.stringify(dismissed));
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+      const raw = localStorage.getItem("carflax-dismissed-notifs-v2");
+      const stored = raw ? JSON.parse(raw) : null;
+      const ids: string[] = (stored?.date === todayKey) ? stored.ids : [];
+      if (!ids.includes(tag)) {
+        ids.push(tag);
+        localStorage.setItem("carflax-dismissed-notifs-v2", JSON.stringify({ date: todayKey, ids }));
       }
     }
   };

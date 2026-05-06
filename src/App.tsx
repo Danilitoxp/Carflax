@@ -221,42 +221,45 @@ function DashboardContent({
     
     async function checkTodayFollowUps() {
       const now = new Date();
+      const todayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+
+      // Dismissed com expiração por dia: { date: "YYYY-M-D", ids: [...] }
+      const raw = localStorage.getItem("carflax-dismissed-notifs-v2");
+      const stored = raw ? JSON.parse(raw) : null;
+      const dismissed: string[] = (stored?.date === todayKey) ? stored.ids : [];
+      if (stored?.date !== todayKey) {
+        localStorage.setItem("carflax-dismissed-notifs-v2", JSON.stringify({ date: todayKey, ids: [] }));
+      }
+
+      const myCode = String(userProfile?.operator_code || userProfile?.operatorCode || "").replace(/^0+/, '');
+      if (!myCode) return; // sem código de operador, sem notificações
+
       const { data: events } = await supabase
         .from("eventos_calendario")
         .select("*")
         .eq("year", now.getFullYear())
         .eq("month", now.getMonth() + 1)
         .eq("day", now.getDate())
-        .eq("type", "follow-up");
+        .eq("type", "follow-up")
+        .eq("vendedor_codigo", userProfile?.operator_code || userProfile?.operatorCode || "");
 
-      if (events && events.length > 0) {
-        const myCode = String(userProfile?.operator_code || userProfile?.operatorCode || "").replace(/^0+/, '');
-        const dismissed = JSON.parse(localStorage.getItem("carflax-dismissed-notifs") || "[]");
-        const isAdmin = userProfile?.role === "admin" || userProfile?.permissions?.includes("Gerenciar Calendário");
+      if (!events || events.length === 0) return;
 
-        const myEvents = events.filter(ev => {
-          // Ignorar se já foi fechado nesta sessão/dia
-          if (dismissed.includes(String(ev.id))) return false;
+      events.forEach(ev => {
+        const tag = String(ev.id);
+        if (dismissed.includes(tag)) return;
 
-          if (isAdmin) return true;
-          const evCode = String(ev.vendedor_codigo || "").replace(/^0+/, '');
-          return evCode !== "" && evCode === myCode;
-        });
+        const clientPart = ev.title.split('- Vendedor:')[0] || "";
+        const clientName = clientPart.replace(/^FOLLOW-UP:\s*/i, '').trim();
 
-        myEvents.forEach(ev => {
-          // Lógica mais robusta para extrair o nome do cliente (ignora o traço de FOLLOW-UP)
-          const clientPart = ev.title.split('- Vendedor:')[0] || "";
-          const clientName = clientPart.replace(/^FOLLOW-UP:\s*/i, '').trim();
-          
-          showNotification(
-            "info", 
-            "⚠️ RETORNO PENDENTE", 
-            `Cliente: ${clientName}\n\n${ev.description || "Verifique os detalhes no orçamento."}`,
-            true, // PERSISTENTE
-            String(ev.id) // TAG para controle de fechamento
-          );
-        });
-      }
+        showNotification(
+          "info",
+          "⚠️ RETORNO PENDENTE",
+          `Cliente: ${clientName}\n\n${ev.description || "Verifique os detalhes no orçamento."}`,
+          true,
+          tag
+        );
+      });
     }
 
     // Aguardar o carregamento inicial e disparar
