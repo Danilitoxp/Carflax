@@ -182,7 +182,7 @@ export const marketingService = {
   /**
    * Busca histórico de mensagens de um JID específico
    */
-  async getMessagesByJid(remoteJid: string, limit = 50, sinceDate?: string) {
+  async getMessagesByJid(remoteJid: string, limit = 200, sinceDate?: string) {
     let query = supabase
       .from("marketing_whatsapp")
       .select("*")
@@ -192,15 +192,16 @@ export const marketingService = {
       query = query.gte("timestamp", sinceDate);
     }
 
+    // Busca as mais recentes (DESC) e reverte no retorno para exibir do mais antigo ao mais novo
     const { data, error } = await query
-      .order("timestamp", { ascending: true })
+      .order("timestamp", { ascending: false })
       .limit(limit);
 
     if (error) {
       console.error("[MarketingService] Erro ao buscar mensagens:", error.message);
       return [];
     }
-    return data as MarketingMessage[];
+    return (data as MarketingMessage[]).reverse();
   },
 
   async togglePin(remoteJid: string, pin: boolean) {

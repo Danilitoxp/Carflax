@@ -167,7 +167,8 @@ export const evolutionApi = {
    */
   async getProfilePic(remoteJid: string): Promise<string | null> {
     try {
-      const data = await fetchEvo<{ profilePicUrl: string }>(`/chat/fetchProfilePicUrl/${EVO_CONFIG.instance}?number=${remoteJid}`);
+      const number = remoteJid.split('@')[0];
+      const data = await fetchEvo<{ profilePicUrl: string }>(`/chat/fetchProfilePicUrl/${EVO_CONFIG.instance}?number=${number}`);
       return data.profilePicUrl;
     } catch {
       return null;

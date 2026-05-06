@@ -374,8 +374,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification(title, {
         body,
-        icon: icon || "/favicon.ico",
-        badge: "/favicon.ico"
+        icon: icon || "/favicon.svg",
+        badge: "/favicon.svg"
       });
     }
   };
@@ -628,9 +628,22 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       const validPushName = !message.key?.fromMe && message.pushName ? message.pushName : null;
       const mediaUrl: string | undefined = undefined;
 
-      // NOTA: O salvamento no banco de dados (upsertCliente, saveMessage e uploadMedia)
-      // agora é processado pelo Webhook no Backend para garantir funcionamento 24/7.
-      // O Dashboard apenas reflete as mudanças em tempo real para a UI.
+      // Persiste a mensagem no Supabase para garantir que apareça após refresh
+      marketingService.saveMessage({
+        message_id: msgId,
+        remote_jid: remoteJid,
+        texto: text,
+        sender: message.key?.fromMe ? "me" : "contact",
+        timestamp,
+        tipo: tipoMsg,
+        status: "sent",
+        ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {}),
+      }).catch(() => null);
+
+      // Upsert do cliente para manter nome atualizado
+      if (validPushName) {
+        marketingService.upsertCliente({ remote_jid: remoteJid, nome: validPushName }).catch(() => null);
+      }
 
       setChats(prevChats => {
         // Desarquiva automaticamente se chegou nova mensagem
@@ -1176,9 +1189,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
 
     try {
-      // 1. Busca do Banco primeiro (últimos 7 dias)
-      const MIN_SYNC_DATE = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const dbMessages = await marketingService.getMessagesByJid(chat.id, 50, MIN_SYNC_DATE);
+      // 1. Busca do Banco — todas as mensagens armazenadas (sem filtro de data)
+      const dbMessages = await marketingService.getMessagesByJid(chat.id, 200);
       
       if (dbMessages.length > 0) {
         const msgs: Message[] = dbMessages.map(m => ({
