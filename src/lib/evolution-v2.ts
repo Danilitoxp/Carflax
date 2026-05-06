@@ -33,15 +33,23 @@ async function fetchEvo<T>(path: string, options: RequestInit = {}): Promise<T> 
   return response.json();
 }
 
+let _socket: Socket | null = null;
+
+function subscribeInstance(socket: Socket) {
+  socket.emit('subscribe', { instance: EVO_CONFIG.instance });
+  socket.emit('join', EVO_CONFIG.instance);
+}
+
 export const evolutionApi = {
   /**
-   * Conecta ao WebSocket da instância
+   * Conecta ao WebSocket da instância (singleton — subscribe feito uma única vez)
    */
   connectWebSocket(): Socket {
+    if (_socket && (_socket.connected || _socket.connecting)) {
+      return _socket;
+    }
     const wsUrl = getWsUrl();
-
-
-    return io(wsUrl, {
+    _socket = io(wsUrl, {
       transports: ['polling', 'websocket'],
       query: {
         apikey: EVO_CONFIG.apiKey,
@@ -51,6 +59,8 @@ export const evolutionApi = {
       reconnectionAttempts: 10,
       reconnectionDelay: 3000
     });
+    _socket.on('connect', () => subscribeInstance(_socket!));
+    return _socket;
   },
 
   /**

@@ -12,7 +12,8 @@
       "Bash(curl -s -X POST -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" -H \"Content-Type: application/json\" \"https://marketing-evolution-api.velbav.easypanel.host/message/sendText/Trafego\" -d '{\"number\":\"5511949470039\",\"text\":\"teste pos restart\"}')",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npx web-push *)"
     ]
   }
 }

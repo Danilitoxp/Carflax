@@ -32,6 +32,7 @@ import { OrgChartView } from "@/components/ui/OrgChartModal";
 import { SqlRunnerView } from "@/components/admin/SqlRunnerView";
 import { MarketingView } from "@/components/marketing/MarketingView";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
+import { evolutionApi } from "@/lib/evolution-v2";
 
 export interface UserProfile {
   id?: string;
@@ -299,6 +300,110 @@ function DashboardContent({
       
     return () => { supabase.removeChannel(channel); };
   }, [userProfile]);
+
+  // ── Notificações Globais do WhatsApp (fora da página de Marketing) ───
+  const activeItemRef = useRef(activeItem);
+  useEffect(() => { activeItemRef.current = activeItem; }, [activeItem]);
+
+  useEffect(() => {
+    if (!userProfile?.id) return;
+
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    const socket = evolutionApi.connectWebSocket();
+    const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
+
+    const handleGlobalMessage = (data: Record<string, unknown>) => {
+      if (activeItemRef.current === "Marketing") return;
+      if (data.instance && data.instance !== instanceName) return;
+
+      const raw = data.data ?? data;
+      const messages = Array.isArray(raw) ? raw : [raw];
+
+      for (const msg of messages as Array<Record<string, unknown>>) {
+        const key = msg.key as Record<string, unknown> | undefined;
+        if (!key || key.fromMe) continue;
+        if (!String(key.remoteJid ?? "").endsWith('@s.whatsapp.net')) continue;
+
+        const senderName = String(msg.pushName || String(key.remoteJid ?? "").split('@')[0]);
+        const msgContent = msg.message as Record<string, unknown> | undefined;
+        const text = String(
+          msgContent?.conversation ||
+          (msgContent?.extendedTextMessage as Record<string, unknown> | undefined)?.text ||
+          "Nova mensagem"
+        );
+
+        if (Notification.permission === "granted") {
+          const notif = new Notification(`💬 ${senderName}`, {
+            body: text,
+            icon: "/favicon.svg",
+            tag: `wpp-global-${String(key.remoteJid)}`,
+          });
+          notif.onclick = () => {
+            window.focus();
+            window.dispatchEvent(new CustomEvent("carflax-change-tab", { detail: "Marketing" }));
+          };
+        }
+      }
+    };
+
+    socket.on('messages.upsert', handleGlobalMessage);
+    socket.on('MESSAGES_UPSERT', handleGlobalMessage);
+    socket.on('message', handleGlobalMessage);
+    socket.on('message-received', handleGlobalMessage);
+
+    return () => {
+      socket.off('messages.upsert', handleGlobalMessage);
+      socket.off('MESSAGES_UPSERT', handleGlobalMessage);
+      socket.off('message', handleGlobalMessage);
+      socket.off('message-received', handleGlobalMessage);
+    };
+  }, [userProfile?.id]);
+
+  // ── Web Push — Service Worker + Subscrição persistente ──────────────
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    async function setupPush() {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+
+      // Ouve mensagens do SW (clique na notificação → navega para a seção)
+      navigator.serviceWorker.onmessage = (e) => {
+        if (e.data?.type === 'carflax-navigate') {
+          window.dispatchEvent(new CustomEvent('carflax-change-tab', { detail: e.data.section }));
+        }
+      };
+
+      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string;
+      const padding = '='.repeat((4 - (vapidKey.length % 4)) % 4);
+      const base64 = (vapidKey + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const applicationServerKey = new Uint8Array([...atob(base64)].map(c => c.charCodeAt(0)));
+
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+      }
+
+      const subJson = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
+
+      // Salva/atualiza a subscrição no Supabase vinculada ao usuário
+      await supabase.from('push_subscriptions').upsert({
+        user_id: userProfile!.id,
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys.p256dh,
+        auth: subJson.keys.auth,
+      }, { onConflict: 'endpoint' });
+    }
+
+    setupPush();
+  }, [userProfile?.id]);
 
   // 1. Cache Global de Usuários (Preload similar ao CRM Legado)
   useEffect(() => {

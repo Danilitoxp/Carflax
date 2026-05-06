@@ -211,18 +211,12 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
 
       const finalEvents = [...manualEvents, ...birthdayEvents, ...admissionEvents, ...currentHolidayEvents];
 
-      // 5. Filtro de Privacidade para Follow-ups
+      // 5. Filtro de Privacidade para Follow-ups — apenas o próprio vendedor vê
+      const myCode = String(userProfile?.operator_code || userProfile?.seller_code || "").replace(/^0+/, '');
       const visibleEvents = finalEvents.filter(ev => {
         if (ev.type !== "follow-up") return true;
-        
-        const isAdmin = userProfile?.role === "admin" || userProfile?.permissions?.includes("Gerenciar Calendário");
-        if (isAdmin) return true;
-
-        // Comparação robusta (converte para número para ignorar zeros à esquerda ou tipos diferentes)
         const evCode = String(ev.vendedor_codigo || "").replace(/^0+/, '');
-        const myCode = String(userProfile?.operator_code || userProfile?.seller_code || "").replace(/^0+/, '');
-        
-        return evCode !== "" && evCode === myCode;
+        return evCode !== "" && myCode !== "" && evCode === myCode;
       });
 
       // Atualizar cache

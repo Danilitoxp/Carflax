@@ -552,11 +552,6 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     // Conecta ao WebSocket para receber mensagens em tempo real
     const socket = evolutionApi.connectWebSocket();
 
-    socket.on('connect', () => {
-      socket.emit('subscribe', { instance: import.meta.env.VITE_EVO_INSTANCE });
-      socket.emit('join', import.meta.env.VITE_EVO_INSTANCE);
-    });
-
     const processMessage = async (message: EvoMessageResponse) => {
       const remoteJid = message.key?.remoteJid;
       if (!remoteJid || !remoteJid.endsWith('@s.whatsapp.net')) return;
@@ -842,7 +837,16 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     });
 
     return () => {
-      socket.disconnect();
+      socket.off('messages.upsert', handleIncomingMessage);
+      socket.off('MESSAGES_UPSERT', handleIncomingMessage);
+      socket.off('message', handleIncomingMessage);
+      socket.off('message-received', handleIncomingMessage);
+      socket.off('contacts.update', handleContactsUpdate);
+      socket.off('CONTACTS_UPDATE', handleContactsUpdate);
+      socket.off('presence.update', handlePresenceUpdate);
+      socket.off('PRESENCE_UPDATE', handlePresenceUpdate);
+      socket.off('chats.update', handleChatsUpdate);
+      socket.off('CHATS_UPDATE', handleChatsUpdate);
     };
   }, [fetchAvatar, vendedorId]);
 
