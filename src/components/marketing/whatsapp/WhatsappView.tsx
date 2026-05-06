@@ -622,75 +622,20 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
       const msgId = message.key?.id || Date.now().toString();
 
-      // Download de mídias (foto, vídeo, áudio, doc)
-      let mediaUrl: string | undefined = undefined;
-      let tipoMsg = "text";
-      const hasMedia = messageContent?.imageMessage || messageContent?.audioMessage || messageContent?.videoMessage || messageContent?.documentMessage || messageContent?.stickerMessage;
+      // Determinando o tipo da mensagem e dados básicos para a UI
+      const tipoMsg = messageContent?.stickerMessage ? "sticker"
+                    : messageContent?.imageMessage ? "image" 
+                    : messageContent?.audioMessage ? "audio"
+                    : messageContent?.videoMessage ? "video"
+                    : messageContent?.documentMessage ? "document"
+                    : "text";
 
-      if (hasMedia && message.key && message.key.id && message.key.remoteJid) {
-        tipoMsg = messageContent.stickerMessage ? "sticker"
-                : messageContent.imageMessage ? "image" 
-                : messageContent.audioMessage ? "audio"
-                : messageContent.videoMessage ? "video"
-                : "document";
-
-        try {
-          // Extrai o objeto de mídia específico para pegar o mimetype
-          const mediaObj = messageContent.imageMessage || messageContent.audioMessage || messageContent.videoMessage || messageContent.documentMessage || messageContent.stickerMessage;
-          const mimetype = mediaObj?.mimetype || "application/octet-stream";
-          
-          let base64String = messageContent.base64;
-
-          // Se o websocket já mandou o base64 (configuração da Evo API), usamos direto!
-          if (base64String) {
-            // Remove o prefixo data:mimetype;base64, se existir
-            if (base64String.includes('base64,')) {
-              base64String = base64String.split('base64,')[1];
-            }
-            
-            const ext = mimetype.split('/')[1]?.split(';')[0] || "bin";
-            const filename = `${msgId}.${ext}`;
-            const publicUrl = await marketingService.uploadMedia(base64String, mimetype, filename);
-            if (publicUrl) mediaUrl = publicUrl;
-          } else {
-            // Fallback: tenta baixar pela API
-            const mediaData = await evolutionApi.getMediaBase64(message);
-            if (mediaData) {
-               const ext = mediaData.mimetype.split('/')[1]?.split(';')[0] || "bin";
-               const filename = `${msgId}.${ext}`;
-               const publicUrl = await marketingService.uploadMedia(mediaData.base64, mediaData.mimetype, filename);
-               if (publicUrl) mediaUrl = publicUrl;
-            }
-          }
-        } catch (err: unknown) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          console.error("Erro ao processar mídia da Evo API:", errorMessage);
-        }
-      }
-
-      // pushName em mensagens recebidas (fromMe=false) é sempre o nome do contato
       const validPushName = !message.key?.fromMe && message.pushName ? message.pushName : null;
+      const mediaUrl: string | undefined = undefined;
 
-      // 1. Garante que o cliente existe ANTES de salvar a mensagem (evita FK constraint)
-      await marketingService.upsertCliente({
-        remote_jid: remoteJid,
-        ...(validPushName ? { push_name: validPushName } : {}),
-        ultima_mensagem: text,
-        ultima_conversa_em: timestamp
-      });
-
-      // 2. Salva a mensagem no Supabase
-      await marketingService.saveMessage({
-        message_id: msgId,
-        remote_jid: remoteJid,
-        texto: text,
-        sender: message.key?.fromMe ? "me" : "contact",
-        timestamp: timestamp,
-        status: message.status === "READ" ? "read" : "sent",
-        tipo: tipoMsg,
-        media_url: mediaUrl,
-        ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {})
-      });
+      // NOTA: O salvamento no banco de dados (upsertCliente, saveMessage e uploadMedia)
+      // agora é processado pelo Webhook no Backend para garantir funcionamento 24/7.
+      // O Dashboard apenas reflete as mudanças em tempo real para a UI.
 
       setChats(prevChats => {
         // Desarquiva automaticamente se chegou nova mensagem

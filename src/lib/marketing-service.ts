@@ -324,50 +324,85 @@ export const marketingService = {
   },
 
   /**
-   * Busca estatísticas de leads (hoje e mês)
+   * Busca estatísticas de leads (hoje e período) com suporte a filtros
    */
-  async getMarketingStats(date?: Date) {
-    const selectedDate = date || new Date();
-    const startOfSelectedDay = new Date(selectedDate);
-    startOfSelectedDay.setHours(0, 0, 0, 0);
-    const endOfSelectedDay = new Date(selectedDate);
-    endOfSelectedDay.setHours(23, 59, 59, 999);
+  async getMarketingStats(startDate: Date, endDate?: Date, filters?: { searchTerm?: string; status?: string; seller?: string; temperature?: string }) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    
+    const end = endDate ? new Date(endDate) : new Date(startDate);
+    end.setHours(23, 59, 59, 999);
 
-    const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1).toISOString();
+    // Para o comparativo mensal, pegamos sempre o mês inteiro da data inicial selecionada
+    const firstDayOfMonth = new Date(start.getFullYear(), start.getMonth(), 1).toISOString();
+    const lastDayOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
-    const { count: leadsToday } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const applyFilters = (query: any) => {
+      if (filters?.searchTerm) {
+        query = query.or(`nome.ilike.%${filters.searchTerm}%,remote_jid.ilike.%${filters.searchTerm}%`);
+      }
+      if (filters?.status && filters.status !== "Todos os Status") {
+        query = query.eq('status', filters.status);
+      }
+      if (filters?.seller && filters.seller !== "Todos os Vendedores") {
+        query = query.eq('vendedor_id', filters.seller);
+      }
+      if (filters?.temperature && filters.temperature !== "Todas as Temperaturas") {
+        query = query.eq('temperatura', filters.temperature);
+      }
+      return query;
+    };
+
+    // Contagem de leads no período selecionado
+    let leadsQuery = supabase
       .from('marketing_clientes')
       .select('*', { count: 'exact', head: true })
-      .gte('created_at', startOfSelectedDay.toISOString())
-      .lte('created_at', endOfSelectedDay.toISOString());
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString());
+    
+    leadsQuery = applyFilters(leadsQuery);
+    const { count: leadsInPeriod } = await leadsQuery;
 
-    const { count: leadsMonth } = await supabase
+    // Contagem de leads no mês inteiro (para o card de leads no mês)
+    let leadsMonthQuery = supabase
       .from('marketing_clientes')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', firstDayOfMonth)
-      .lte('created_at', endOfSelectedDay.toISOString());
+      .lte('created_at', lastDayOfMonth);
+    
+    leadsMonthQuery = applyFilters(leadsMonthQuery);
+    const { count: leadsMonth } = await leadsMonthQuery;
 
-    const { data: salesToday } = await supabase
+    // Faturamento no período selecionado (Vendas Hoje/Período)
+    let salesQuery = supabase
       .from('marketing_clientes')
       .select('valor_venda')
-      .gte('data_venda', startOfSelectedDay.toISOString())
-      .lte('data_venda', endOfSelectedDay.toISOString());
+      .gte('data_venda', start.toISOString())
+      .lte('data_venda', end.toISOString());
+    
+    salesQuery = applyFilters(salesQuery);
+    const { data: salesInPeriod } = await salesQuery;
 
-    const { data: salesMonth } = await supabase
+    // Faturamento no mês inteiro
+    let salesMonthQuery = supabase
       .from('marketing_clientes')
       .select('valor_venda')
       .gte('data_venda', firstDayOfMonth)
-      .lte('data_venda', endOfSelectedDay.toISOString());
+      .lte('data_venda', lastDayOfMonth);
+    
+    salesMonthQuery = applyFilters(salesMonthQuery);
+    const { data: salesMonth } = await salesMonthQuery;
 
-    const billingToday = (salesToday || []).reduce((acc, s) => acc + (s.valor_venda || 0), 0);
-    const billingMonth = (salesMonth || []).reduce((acc, s) => acc + (s.valor_venda || 0), 0);
+    const billingInPeriod = (salesInPeriod || []).reduce((acc, s) => acc + (Number(s.valor_venda) || 0), 0);
+    const billingMonth = (salesMonth || []).reduce((acc, s) => acc + (Number(s.valor_venda) || 0), 0);
 
     return {
-      leadsToday: leadsToday || 0,
+      leadsToday: leadsInPeriod || 0,
       leadsMonth: leadsMonth || 0,
-      billingToday,
+      billingToday: billingInPeriod,
       billingMonth,
-      salesCountToday: (salesToday || []).length,
+      salesCountToday: (salesInPeriod || []).length,
       salesCountMonth: (salesMonth || []).length
     };
   },
@@ -375,17 +410,32 @@ export const marketingService = {
   /**
    * Busca leads agrupados por hora para um gráfico de picos
    */
-  async getHourlyLeads(date: Date) {
-    const startOfSelectedDay = new Date(date);
-    startOfSelectedDay.setHours(0, 0, 0, 0);
-    const endOfSelectedDay = new Date(date);
-    endOfSelectedDay.setHours(23, 59, 59, 999);
+  async getHourlyLeads(startDate: Date, endDate?: Date, filters?: { searchTerm?: string; status?: string; seller?: string; temperature?: string }) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = endDate ? new Date(endDate) : new Date(startDate);
+    end.setHours(23, 59, 59, 999);
 
-    const { data } = await supabase
+    let query = supabase
       .from('marketing_clientes')
       .select('created_at')
-      .gte('created_at', startOfSelectedDay.toISOString())
-      .lte('created_at', endOfSelectedDay.toISOString());
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString());
+
+    if (filters?.searchTerm) {
+      query = query.or(`nome.ilike.%${filters.searchTerm}%,remote_jid.ilike.%${filters.searchTerm}%`);
+    }
+    if (filters?.status && filters.status !== "Todos os Status") {
+      query = query.eq('status', filters.status);
+    }
+    if (filters?.seller && filters.seller !== "Todos os Vendedores") {
+      query = query.eq('vendedor_id', filters.seller);
+    }
+    if (filters?.temperature && filters.temperature !== "Todas as Temperaturas") {
+      query = query.eq('temperatura', filters.temperature);
+    }
+
+    const { data } = await query;
 
     const hourlyCounts = new Array(24).fill(0);
     data?.forEach(lead => {

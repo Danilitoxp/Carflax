@@ -40,7 +40,7 @@ interface MenuItem {
   hasArrow?: boolean;
   isDropdown?: boolean;
   isOpen?: boolean;
-  subItems?: { label: string; icon?: LucideIcon }[];
+  subItems?: { label: string; icon?: LucideIcon; value?: string }[];
 }
 
 const menuItems: MenuItem[] = [
@@ -82,7 +82,7 @@ const menuItems: MenuItem[] = [
       { label: "Whatsapp", icon: Smartphone },
       { label: "Leads", icon: Users },
       { label: "Cronograma", icon: Calendar },
-      { label: "Relatórios Mkt", icon: FileBarChart },
+      { label: "Relatórios", value: "Relatórios Mkt", icon: FileBarChart },
     ],
   },
   {
@@ -283,7 +283,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                   const filteredSubItems = item.subItems?.filter(sub => isAllowed(sub.label));
                   
                   const isOpen = openMenus.includes(item.label);
-                  const isActive = activeItem === item.label || filteredSubItems?.some(s => s.label === activeItem);
+                  const isActive = activeItem === item.label || filteredSubItems?.some(s => (s.value || s.label) === activeItem);
 
                 return (
                   <div key={idx} className="space-y-1">
@@ -347,19 +347,19 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                             <div
                               key={i}
                               onClick={() => {
-                                onActiveItemChange(sub.label);
+                                onActiveItemChange(sub.value || sub.label);
                                 if (onMobileClose) onMobileClose();
                               }}
                               className={cn(
                                 "text-[11px] font-bold py-2 px-3 rounded-md cursor-pointer transition-all flex items-center gap-3",
-                                activeItem === sub.label
+                                activeItem === (sub.value || sub.label)
                                   ? "bg-primary/5 text-primary dark:bg-primary/10"
                                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-slate-800/50 dark:hover:text-slate-200",
                               )}
                             >
                               <div className={cn(
                                 "w-1 h-1 rounded-full",
-                                activeItem === sub.label ? "bg-primary" : "bg-muted-foreground/30"
+                                activeItem === (sub.value || sub.label) ? "bg-primary" : "bg-muted-foreground/30"
                               )} />
                               <span>{sub.label}</span>
                             </div>
@@ -455,19 +455,19 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                           <div
                             key={i}
                             onClick={() => {
-                              onActiveItemChange(sub.label);
+                              onActiveItemChange(sub.value || sub.label);
                               if (onMobileClose) onMobileClose();
                             }}
                             className={cn(
                               "text-[11px] font-bold py-2 px-3 rounded-md cursor-pointer transition-all flex items-center gap-3",
-                              activeItem === sub.label
+                              activeItem === (sub.value || sub.label)
                                 ? "bg-primary/5 text-primary dark:bg-primary/10"
                                 : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-slate-800/50 dark:hover:text-slate-200",
                             )}
                           >
                              <div className={cn(
                               "w-1 h-1 rounded-full",
-                              activeItem === sub.label ? "bg-primary" : "bg-muted-foreground/30"
+                              activeItem === (sub.value || sub.label) ? "bg-primary" : "bg-muted-foreground/30"
                             )} />
                             <span>{sub.label}</span>
                           </div>
