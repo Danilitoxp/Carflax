@@ -6,11 +6,14 @@ import {
   Clock,
   CheckCircle2,
   Trash2,
-  MessageSquare
+  MessageSquare,
+  LayoutGrid,
+  Flame
 } from "lucide-react";
 import { marketingService } from "@/lib/marketing-service";
 import type { MarketingCliente } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
+import { TinyDropdown } from "@/components/ui/TinyDropdown";
 
 const TEMP_CONFIG = {
   Quente: { color: "text-rose-500 bg-rose-500/10 border-rose-500/20", dot: "bg-rose-500" },
@@ -22,6 +25,8 @@ export function LeadsView() {
   const [leads, setLeads] = useState<MarketingCliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterPlatform, setFilterPlatform] = useState("Todas as Plataformas");
+  const [filterTemperature, setFilterTemperature] = useState("Todas as Temperaturas");
 
   useEffect(() => {
     let isMounted = true;
@@ -63,7 +68,12 @@ export function LeadsView() {
 
   const filtered = leads.filter(c => {
     const nome = (c.nome || c.push_name || c.remote_jid).toLowerCase();
-    return nome.includes(search.toLowerCase());
+    const matchSearch = nome.includes(search.toLowerCase());
+    const matchTemp = filterTemperature === "Todas as Temperaturas" || c.temperatura === filterTemperature;
+    // Como a plataforma ainda não está no banco, tratamos todos como WhatsApp por enquanto
+    const matchPlatform = filterPlatform === "Todas as Plataformas" || filterPlatform === "WhatsApp";
+    
+    return matchSearch && matchTemp && matchPlatform;
   });
 
   return (
@@ -80,12 +90,27 @@ export function LeadsView() {
             className="w-full bg-card border border-border/50 rounded-2xl pl-11 pr-4 py-3 text-sm font-bold outline-none focus:border-primary/50 transition-all shadow-sm"
           />
         </div>
-        <button 
-          onClick={refreshLeads}
-          className="px-4 bg-card border border-border/50 rounded-2xl hover:bg-secondary transition-colors"
-        >
-          <Clock className="w-4 h-4 text-muted-foreground" />
-        </button>
+
+        <div className="flex gap-2">
+          <TinyDropdown 
+            value={filterPlatform} 
+            options={["Todas as Plataformas", "WhatsApp", "Instagram", "Facebook", "Google"]} 
+            onChange={setFilterPlatform} 
+            icon={LayoutGrid} 
+            variant="slate" 
+            placeholder="Plataforma" 
+          />
+          
+          <TinyDropdown 
+            value={filterTemperature} 
+            options={["Todas as Temperaturas", "Quente", "Morno", "Frio"]} 
+            onChange={setFilterTemperature} 
+            icon={Flame} 
+            variant="amber" 
+            placeholder="Temperatura" 
+          />
+
+        </div>
       </div>
 
       {/* Lista Estilo Tabela/Inbox */}

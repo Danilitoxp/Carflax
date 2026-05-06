@@ -45,7 +45,7 @@ export const evolutionApi = {
    * Conecta ao WebSocket da instância (singleton — subscribe feito uma única vez)
    */
   connectWebSocket(): Socket {
-    if (_socket && (_socket.connected || _socket.connecting)) {
+    if (_socket && (_socket.connected || _socket.active)) {
       return _socket;
     }
     const wsUrl = getWsUrl();

@@ -16,10 +16,7 @@ import { MiniCalendar } from "@/components/ui/MiniCalendar";
 
 export function ReportsView() {
   const [loading, setLoading] = useState(true);
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  });
+  const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState<Date | null>(new Date());
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   
@@ -210,11 +207,11 @@ export function ReportsView() {
                   const height = (val / maxLeads) * 100;
                   // Mostra apenas horários úteis (07h as 22h) no mobile ou todos no desktop se preferir
                   return (
-                    <div key={h} className="flex-1 flex flex-col items-center gap-2 group">
+                    <div key={h} className="flex-1 h-full flex flex-col justify-end items-center gap-2 group">
                       <div 
                         className={cn(
                           "w-full rounded-t-lg transition-all relative",
-                          val > 0 ? "bg-primary shadow-[0_0_15px_rgba(59,130,246,0.5)]" : "bg-muted/10"
+                          val > 0 ? "bg-primary" : "bg-muted/10"
                         )} 
                         style={{ height: `${val > 0 ? Math.max(height, 8) : 4}%` }}
                       >
@@ -224,7 +221,7 @@ export function ReportsView() {
                            </div>
                          )}
                       </div>
-                      {[8, 12, 16, 20].includes(h) && (
+                      {[0, 4, 8, 12, 16, 20].includes(h) && (
                         <span className="text-[8px] font-bold opacity-40 uppercase">{h}h</span>
                       )}
                     </div>

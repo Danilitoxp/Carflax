@@ -337,6 +337,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const [showProductSelector, setShowProductSelector] = useState(false);
   const [allProducts, setAllProducts] = useState<NormalizedProduct[]>([]);
   const [productSearch, setProductSearch] = useState("");
+  const [chatSearch, setChatSearch] = useState("");
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [cartProducts, setCartProducts] = useState<NormalizedProduct[]>([]);
   const productsLoadedRef = useRef(false);
@@ -1069,6 +1070,16 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     if (showProductSelector) loadProducts();
   }, [showProductSelector, loadProducts]);
 
+  const filteredChats = useMemo(() => {
+    const searchLower = chatSearch.trim().toLowerCase();
+    if (!searchLower) return chats;
+    return chats.filter(c => 
+      c.name.toLowerCase().includes(searchLower) || 
+      c.id.toLowerCase().includes(searchLower) ||
+      c.lastMessage.toLowerCase().includes(searchLower)
+    );
+  }, [chats, chatSearch]);
+
   const filteredProducts = useMemo(() => {
     const searchLower = productSearch.trim().toLowerCase();
     
@@ -1382,7 +1393,13 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           </div>
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input type="text" placeholder="Buscar..." className="w-full bg-secondary/50 border border-border rounded-2xl pl-11 pr-4 py-3 text-xs font-bold" />
+            <input 
+              type="text" 
+              placeholder="Buscar..." 
+              value={chatSearch}
+              onChange={(e) => setChatSearch(e.target.value)}
+              className="w-full bg-secondary/50 border border-border rounded-2xl pl-11 pr-4 py-3 text-xs font-bold" 
+            />
           </div>
         </div>
 
@@ -1392,7 +1409,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando...</span>
             </div>
-          ) : chats.map((chat) => (
+          ) : filteredChats.map((chat) => (
             <button 
               key={chat.id} 
               onClick={() => handleSelectChat(chat)}
