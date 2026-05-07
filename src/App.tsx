@@ -843,7 +843,7 @@ function DashboardContent({
               ) : (
                 <>
                   <EmployeeOfMonthCard loading={geralLoading} />
-                  <UpcomingEventsCard loading={geralLoading} />
+                  <UpcomingEventsCard loading={geralLoading} operatorCode={userProfile?.operator_code || userProfile?.operatorCode} />
                 </>
               )}
 

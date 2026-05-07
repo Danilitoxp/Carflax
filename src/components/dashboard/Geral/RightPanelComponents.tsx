@@ -651,7 +651,7 @@ export function ActiveVacationsCard({ loading: externalLoading }: { loading?: bo
   );
 }
 
-export function UpcomingEventsCard({ loading: externalLoading }: { loading?: boolean }) {
+export function UpcomingEventsCard({ loading: externalLoading, operatorCode }: { loading?: boolean; operatorCode?: string }) {
   const [events, setEvents] = useState<{ id: string | number; title: string; day: number; month: number; year: number; type: string }[]>([]);
   const [internalLoading, setInternalLoading] = useState(true);
 
@@ -665,13 +665,21 @@ export function UpcomingEventsCard({ loading: externalLoading }: { loading?: boo
         const currentMonth = now.getMonth() + 1;
         const currentDay = now.getDate();
 
-        const { data, error } = await supabase
+        const myCode = String(operatorCode || "").replace(/^0+/, '');
+
+        let query = supabase
           .from("eventos_calendario")
           .select("*")
           .gte("year", currentYear)
           .order("year", { ascending: true })
           .order("month", { ascending: true })
           .order("day", { ascending: true });
+
+        if (myCode) {
+          query = query.or(`vendedor_codigo.eq.${myCode},vendedor_codigo.is.null`);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
 
