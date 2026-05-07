@@ -99,17 +99,14 @@ Deno.serve(async (req: Request) => {
           const ext = mimetype.split('/')[1]?.split(';')[0] || 'bin';
           const filename = `${msgId}.${ext}`;
           
-          // Decodifica o base64 para Uint8Array
-          const binaryString = atob(String(mediaBase64));
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-          }
+          // Usa fetch para converter o base64 confiavelmente em um Blob
+          const res = await fetch(`data:${mimetype};base64,${mediaBase64}`);
+          const blob = await res.blob();
 
           // Faz o upload pro bucket
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('whatsapp-media')
-            .upload(filename, bytes.buffer, {
+            .upload(filename, blob, {
               contentType: String(mimetype),
               upsert: true
             });
@@ -119,6 +116,9 @@ Deno.serve(async (req: Request) => {
               .from('whatsapp-media')
               .getPublicUrl(uploadData.path);
               
+            // Aguarda 2 segundos para evitar Race Condition com o Frontend
+            await new Promise(r => setTimeout(r, 2000));
+
             // Atualiza a tabela com a URL da mídia
             if (publicUrlData?.publicUrl) {
               await supabase

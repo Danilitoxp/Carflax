@@ -556,6 +556,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     const socket = evolutionApi.connectWebSocket();
 
     const processMessage = async (message: EvoMessageResponse) => {
+      console.log("🚀 PAYLOAD RECEBIDO NO FRONTEND VIA WEBSOCKET:", JSON.stringify(message, null, 2));
       const remoteJid = message.key?.remoteJid;
       if (!remoteJid || !remoteJid.endsWith('@s.whatsapp.net')) return;
 
@@ -646,16 +647,41 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
       // Download assíncrono de mídia — não bloqueia a renderização da mensagem
       if (isMediaMsg) {
-        evolutionApi.getMediaBase64(message).then(async (media) => {
-          if (!media?.base64) return;
-          const ext = media.mimetype?.split('/')[1]?.split(';')[0] || 'bin';
-          const publicUrl = await marketingService.uploadMedia(media.base64, media.mimetype, `${msgId}.${ext}`);
-          if (!publicUrl) return;
-          // Atualiza no DB (refresh do TS server)
-          await marketingService.updateMessageMediaUrl(msgId, publicUrl);
-          // Atualiza na UI se a conversa estiver aberta
-          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, mediaUrl: publicUrl } : m));
-        }).catch(() => null);
+        interface EvoMediaPayload {
+          base64?: string;
+          message?: {
+            base64?: string;
+            imageMessage?: { mimetype?: string };
+            videoMessage?: { mimetype?: string };
+            documentMessage?: { mimetype?: string };
+            audioMessage?: { mimetype?: string };
+          };
+        }
+        
+        const payload = message as unknown as EvoMediaPayload;
+        const mediaBase64 = payload.message?.base64 || payload.base64;
+        const mimetype = payload.message?.imageMessage?.mimetype || payload.message?.videoMessage?.mimetype || payload.message?.documentMessage?.mimetype || payload.message?.audioMessage?.mimetype || "application/octet-stream";
+
+        if (mediaBase64) {
+          // O Websocket já mandou a imagem pra gente, subimos direto!
+          const ext = mimetype.split('/')[1]?.split(';')[0] || 'bin';
+          marketingService.uploadMedia(mediaBase64, mimetype, `${msgId}.${ext}`).then(async (publicUrl) => {
+            if (publicUrl) {
+              await marketingService.updateMessageMediaUrl(msgId, publicUrl);
+              setMessages(prev => prev.map(m => m.id === msgId ? { ...m, mediaUrl: publicUrl } : m));
+            }
+          });
+        } else {
+          // Fallback
+          evolutionApi.getMediaBase64(message).then(async (media) => {
+            if (!media?.base64) return;
+            const ext = media.mimetype?.split('/')[1]?.split(';')[0] || 'bin';
+            const publicUrl = await marketingService.uploadMedia(media.base64, media.mimetype, `${msgId}.${ext}`);
+            if (!publicUrl) return;
+            await marketingService.updateMessageMediaUrl(msgId, publicUrl);
+            setMessages(prev => prev.map(m => m.id === msgId ? { ...m, mediaUrl: publicUrl } : m));
+          }).catch(() => null);
+        }
       }
 
       // Classificação automática de temperatura — só mensagens do contato
