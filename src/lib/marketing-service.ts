@@ -202,7 +202,7 @@ export const marketingService = {
       console.error("[MarketingService] Erro ao buscar mensagens:", error.message);
       return [];
     }
-    return (data as MarketingMessage[]).reverse();
+    return ((data as MarketingMessage[]) || []).reverse();
   },
 
   async togglePin(remoteJid: string, pin: boolean) {
