@@ -1,35 +1,37 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { type VendedorResumo, API_BASE } from "./api";
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_IA || "");
 
-export async function getCoachIaMessage(
-  metrics: VendedorResumo | null,
-  userRole: string,
-  userName: string
-): Promise<string> {
-  if (!metrics) return "Bora vender! 🚀";
+export async function classifyTemperature(
+  messages: Array<{ sender: "me" | "contact"; text: string }>
+): Promise<"Quente" | "Morno" | "Frio"> {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-  try {
-    // Agora chamamos o nosso PRÓPRIO servidor (db/server.js)
-    const response = await fetch(`${API_BASE}/api/coach-ia`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ metrics, userRole, userName }),
-    });
+  const transcript = messages
+    .filter(m => m.text && !m.text.startsWith("🎵") && !m.text.startsWith("📎"))
+    .slice(-10)
+    .map(m => `${m.sender === "me" ? "Vendedor" : "Cliente"}: ${m.text}`)
+    .join("\n");
 
-    if (!response.ok) {
-      throw new Error(`Erro no servidor: ${response.status}`);
-    }
+  const prompt = `Você é um analista de leads de vendas. Analise a conversa e classifique o interesse do cliente.
 
-    const data = await response.json();
-    return data.message || "Foco total no cliente! 🎯";
-  } catch (error) {
-    console.error("[CoachIA] Falha ao chamar o servidor:", error);
-    return "A consistência é o caminho para o sucesso! 🚀";
-  }
+Responda APENAS com uma das três palavras exatas, sem explicações:
+- Quente (cliente muito interessado, perguntou preço, prazo, disponibilidade ou demonstrou intenção clara de compra)
+- Morno (cliente com algum interesse, fez perguntas, mas sem intenção clara de compra ainda)
+- Frio (cliente sem interesse aparente, respostas curtas ou sem engajamento real)
+
+Conversa:
+${transcript}
+
+Classificação:`;
+
+  const result = await model.generateContent(prompt);
+  const response = result.response.text().trim();
+
+  if (response === "Quente" || response === "Morno" || response === "Frio") return response;
+  if (response.includes("Quente")) return "Quente";
+  if (response.includes("Morno")) return "Morno";
+  return "Frio";
 }
 
 export async function transcribeAudio(audioBase64: string, mimeType: string): Promise<string> {

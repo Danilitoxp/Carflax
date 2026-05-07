@@ -13,7 +13,12 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "Bash(npx tsc *)",
-      "Bash(npx web-push *)"
+      "Bash(npx web-push *)",
+      "Bash(xargs wc *)",
+      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Carflax HUB/db/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Danilo\\Desktop\\Desenvolvimento\\Carflax HUB\\db"
     ]
   }
 }

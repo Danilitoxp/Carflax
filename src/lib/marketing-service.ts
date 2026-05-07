@@ -84,12 +84,12 @@ export const marketingService = {
   /**
    * Busca apenas clientes que possuem mensagens no banco (CRM Ativo)
    */
-  async getActiveClientes(includeArchived = false) {
+  async getActiveClientes(includeArchived: boolean | 'all' = false) {
     const { data: activeJids } = await supabase
       .from('marketing_whatsapp')
       .select('remote_jid')
       .like('remote_jid', '%@s.whatsapp.net');
-    
+
     const uniqueJids = [...new Set((activeJids || []).map(m => m.remote_jid))];
 
     if (uniqueJids.length === 0) return [];
@@ -98,12 +98,13 @@ export const marketingService = {
       .from("marketing_clientes")
       .select("*")
       .in('remote_jid', uniqueJids);
-    
-    // Tenta filtrar por arquivado, mas ignora se a coluna não existir (evita quebrar o app)
-    if (!includeArchived) {
-      query = query.or('arquivado.eq.false,arquivado.is.null');
-    } else {
-      query = query.eq('arquivado', true);
+
+    if (includeArchived !== 'all') {
+      if (!includeArchived) {
+        query = query.or('arquivado.eq.false,arquivado.is.null');
+      } else {
+        query = query.eq('arquivado', true);
+      }
     }
 
     const { data, error } = await query.order("ultima_conversa_em", { ascending: false });
@@ -277,7 +278,7 @@ export const marketingService = {
   async registerSale(remoteJid: string, value: number) {
     const { error } = await supabase
       .from("marketing_clientes")
-      .update({ 
+      .update({
         valor_venda: value,
         data_venda: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -286,6 +287,18 @@ export const marketingService = {
 
     if (error) {
       console.error("[MarketingService] Erro ao registrar venda:", error);
+      throw error;
+    }
+  },
+
+  async deleteSale(remoteJid: string) {
+    const { error } = await supabase
+      .from("marketing_clientes")
+      .update({ valor_venda: null, data_venda: null, updated_at: new Date().toISOString() })
+      .eq("remote_jid", remoteJid);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao remover venda:", error);
       throw error;
     }
   },

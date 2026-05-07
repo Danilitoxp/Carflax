@@ -27,7 +27,7 @@ import { evolutionApi } from "@/lib/evolution-v2";
 import { marketingService } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
 import { apiDashboardProdutos } from "@/lib/api";
-import { transcribeAudio } from "@/lib/gemini-service";
+import { transcribeAudio, classifyTemperature } from "@/lib/gemini-service";
 import { Package } from "lucide-react";
 
 interface NormalizedProduct {
@@ -352,8 +352,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const lastSeenMap = useRef<Map<string, Date>>(new Map());
   const processedMsgIds = useRef<Set<string>>(new Set());
   const lidSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const manualOverrideRef = useRef<Map<string, number>>(new Map());
+  const tempClassifyTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const [presenceChats, setPresenceChats] = useState<Map<string, string>>(new Map());
+  const [isClassifyingTemp, setIsClassifyingTemp] = useState(false);
   const [myAvatar, setMyAvatar] = useState<string>("");
   const [viewMode, setViewMode] = useState<"active" | "archived">("active");
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -426,12 +429,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
   const loadChats = useCallback(async () => {
     try {
-      // Limpa e mostra loading imediatamente — sem delay visual ao trocar de modo
       setChats([]);
       setLoading(true);
 
-      // 1. Busca no Supabase
-      const dbClientes = await marketingService.getActiveClientes(viewMode === "archived");
+      // 1. Busca no Supabase — carrega ativas e arquivadas de uma só vez
+      const dbClientes = await marketingService.getActiveClientes('all');
       
       const mappedChats: Chat[] = dbClientes.map((item) => ({
         id: item.remote_jid,
@@ -446,7 +448,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           status: item.status || "Novo Lead",
           temperature: (item.temperatura as Temperature) || "Frio",
           source: "WhatsApp",
-          campaign: "Geral"
+          campaign: "Geral",
+          saleValue: item.valor_venda > 0
+            ? item.valor_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : undefined
         }
       }));
       
@@ -493,7 +498,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       console.error("Erro ao carregar chats:", error);
       setLoading(false);
     }
-  }, [viewMode]);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);
@@ -522,13 +527,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     const chatToArchive = contextMenu?.chat || selectedChat;
     if (!chatToArchive) return;
 
-    // Atualiza UI imediatamente, sem esperar o banco
-    setChats(prev => prev.filter(c => c.id !== chatToArchive.id));
+    setChats(prev => prev.map(c => c.id === chatToArchive.id ? { ...c, arquivado: true } : c));
     if (selectedChat?.id === chatToArchive.id) setSelectedChat(null);
     setShowArchiveModal(false);
     setContextMenu(null);
 
-    // Persiste em segundo plano
     marketingService.toggleArchived(chatToArchive.id, true, reason).catch(err =>
       console.error("Erro ao arquivar chat:", err)
     );
@@ -538,12 +541,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     const chatToUnarchive = contextMenu?.chat || selectedChat;
     if (!chatToUnarchive) return;
 
-    // Atualiza UI imediatamente
-    setChats(prev => prev.filter(c => c.id !== chatToUnarchive.id));
+    setChats(prev => prev.map(c => c.id === chatToUnarchive.id ? { ...c, arquivado: false } : c));
     if (selectedChat?.id === chatToUnarchive.id) setSelectedChat(null);
     setContextMenu(null);
 
-    // Persiste em segundo plano
     marketingService.toggleArchived(chatToUnarchive.id, false).catch(err =>
       console.error("Erro ao desarquivar chat:", err)
     );
@@ -640,6 +641,17 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         status: "sent",
         ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {}),
       }).catch(() => null);
+
+      // Classificação automática de temperatura — só mensagens do contato
+      if (!message.key?.fromMe) {
+        const existing = tempClassifyTimers.current.get(remoteJid);
+        if (existing) clearTimeout(existing);
+        const timer = setTimeout(() => {
+          tempClassifyTimers.current.delete(remoteJid);
+          triggerTempClassifyRef.current(remoteJid);
+        }, 5000);
+        tempClassifyTimers.current.set(remoteJid, timer);
+      }
 
       // Upsert do cliente para manter nome atualizado
       if (validPushName) {
@@ -861,13 +873,25 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       socket.off('PRESENCE_UPDATE', handlePresenceUpdate);
       socket.off('chats.update', handleChatsUpdate);
       socket.off('CHATS_UPDATE', handleChatsUpdate);
+      tempClassifyTimers.current.forEach(t => clearTimeout(t));
+      tempClassifyTimers.current.clear();
     };
   }, [fetchAvatar, vendedorId]);
 
   useEffect(() => {
-    loadChats(); // Ativado para carregar conversas do banco/API
+    loadChats();
     setLoading(false);
   }, [loadChats]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = Date.now();
+      manualOverrideRef.current.forEach((ts, jid) => {
+        if (now - ts > 10 * 60 * 1000) manualOverrideRef.current.delete(jid);
+      });
+    }, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -886,7 +910,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     if (selectedChat.arquivado) {
       marketingService.toggleArchived(selectedChat.id, false);
       setSelectedChat({ ...selectedChat, arquivado: false });
-      setChats(prev => prev.filter(c => c.id !== selectedChat.id));
+      setChats(prev => prev.map(c => c.id === selectedChat.id ? { ...c, arquivado: false } : c));
     }
 
     try {
@@ -1070,15 +1094,20 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     if (showProductSelector) loadProducts();
   }, [showProductSelector, loadProducts]);
 
+  const displayedChats = useMemo(() =>
+    chats.filter(c => viewMode === "archived" ? c.arquivado : !c.arquivado),
+    [chats, viewMode]
+  );
+
   const filteredChats = useMemo(() => {
     const searchLower = chatSearch.trim().toLowerCase();
-    if (!searchLower) return chats;
-    return chats.filter(c => 
-      c.name.toLowerCase().includes(searchLower) || 
+    if (!searchLower) return displayedChats;
+    return displayedChats.filter(c =>
+      c.name.toLowerCase().includes(searchLower) ||
       c.id.toLowerCase().includes(searchLower) ||
       c.lastMessage.toLowerCase().includes(searchLower)
     );
-  }, [chats, chatSearch]);
+  }, [displayedChats, chatSearch]);
 
   const filteredProducts = useMemo(() => {
     const searchLower = productSearch.trim().toLowerCase();
@@ -1230,19 +1259,19 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
   // Initial Auto-selection - MOVED BELOW handleSelectChat
   useEffect(() => {
-    if (chats.length > 0 && !selectedChat) {
+    if (displayedChats.length > 0 && !selectedChat) {
       const pendingChatJid = localStorage.getItem("carflax_pending_chat");
       if (pendingChatJid) {
-        const found = chats.find(c => c.id === pendingChatJid);
+        const found = displayedChats.find(c => c.id === pendingChatJid);
         if (found) {
           handleSelectChat(found);
-          localStorage.removeItem("carflax_pending_chat"); // Consome o evento
+          localStorage.removeItem("carflax_pending_chat");
           return;
         }
       }
-      handleSelectChat(chats[0]);
+      handleSelectChat(displayedChats[0]);
     }
-  }, [chats, selectedChat, handleSelectChat]);
+  }, [displayedChats, selectedChat, handleSelectChat]);
 
   const scheduleFollowUp = (label: string) => {
     if (!selectedChat || !selectedChat.leadInfo) return;
@@ -1252,27 +1281,82 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     });
   };
 
+  const handleTemperatureChange = useCallback((newTemp: Temperature) => {
+    if (!selectedChat) return;
+    manualOverrideRef.current.set(selectedChat.id, Date.now());
+    const updatedLeadInfo = { ...selectedChat.leadInfo!, temperature: newTemp };
+    setSelectedChat({ ...selectedChat, leadInfo: updatedLeadInfo });
+    setChats(prev => prev.map(c =>
+      c.id === selectedChat.id ? { ...c, leadInfo: updatedLeadInfo } : c
+    ));
+    setShowTempDropdown(false);
+    marketingService.upsertCliente({ remote_jid: selectedChat.id, temperatura: newTemp })
+      .catch(err => console.error("[Temp] Erro ao salvar temperatura:", err));
+  }, [selectedChat]);
+
+  const triggerTemperatureClassification = useCallback(async (remoteJid: string) => {
+    const OVERRIDE_TTL = 10 * 60 * 1000;
+    const lastOverride = manualOverrideRef.current.get(remoteJid);
+    if (lastOverride && Date.now() - lastOverride < OVERRIDE_TTL) return;
+
+    try {
+      setIsClassifyingTemp(true);
+      const dbMessages = await marketingService.getMessagesByJid(remoteJid, 15);
+      if (dbMessages.length < 3) return;
+
+      const newTemp = await classifyTemperature(
+        dbMessages.map(m => ({ sender: m.sender as "me" | "contact", text: m.texto || "" }))
+      );
+
+      await marketingService.upsertCliente({ remote_jid: remoteJid, temperatura: newTemp });
+
+      setChats(prev => prev.map(c =>
+        c.id === remoteJid ? { ...c, leadInfo: { ...c.leadInfo!, temperature: newTemp as Temperature } } : c
+      ));
+      setSelectedChat(cur => {
+        if (!cur || cur.id !== remoteJid) return cur;
+        return { ...cur, leadInfo: { ...cur.leadInfo!, temperature: newTemp as Temperature } };
+      });
+    } catch (err) {
+      console.error("[Temp] Falha na classificação automática:", err);
+    } finally {
+      setIsClassifyingTemp(false);
+    }
+  }, []);
+
+  const triggerTempClassifyRef = useRef(triggerTemperatureClassification);
+  useEffect(() => { triggerTempClassifyRef.current = triggerTemperatureClassification; }, [triggerTemperatureClassification]);
+
+  const handleDeleteSale = async () => {
+    if (!selectedChat) return;
+    try {
+      await marketingService.deleteSale(selectedChat.id);
+      const updatedLeadInfo = { ...selectedChat.leadInfo!, saleValue: undefined };
+      setSelectedChat({ ...selectedChat, leadInfo: updatedLeadInfo });
+      setChats(prev => prev.map(c => c.id === selectedChat.id ? { ...c, leadInfo: updatedLeadInfo } : c));
+      setShowSaleModal(false);
+      setSaleValue("");
+    } catch (error) {
+      console.error("Erro ao remover venda:", error);
+    }
+  };
+
   const handleConfirmSale = async () => {
     if (!selectedChat || !saleValue) return;
     
     try {
-      const val = parseFloat(saleValue.replace(',', '.'));
+      const val = parseFloat(saleValue.replace(/\./g, '').replace(',', '.'));
       if (isNaN(val)) return;
 
       await marketingService.registerSale(selectedChat.id, val);
-      
-      // Feedback visual
-      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const saleMsg: Message = {
-        id: "sale_" + Date.now(),
-        text: `💰 VENDA REGISTRADA: R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        time: time,
-        sender: "me",
-        status: "read",
-        tipo: "text"
-      };
-      
-      setMessages(prev => [...prev, saleMsg]);
+
+      const formatted = val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      // Atualiza o valor fixado no chat
+      const updatedLeadInfo = { ...selectedChat.leadInfo!, saleValue: formatted };
+      setSelectedChat({ ...selectedChat, leadInfo: updatedLeadInfo });
+      setChats(prev => prev.map(c => c.id === selectedChat.id ? { ...c, leadInfo: updatedLeadInfo } : c));
+
       setShowSaleModal(false);
       setSaleValue("");
     } catch (error) {
@@ -1317,26 +1401,42 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           <div className="bg-card border border-border rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div className="p-6 border-b border-border/50 flex items-center justify-between">
                <DollarSign className="w-5 h-5 text-emerald-500" />
-               <h3 className="font-black text-sm uppercase tracking-tighter">Registrar Venda</h3>
-               <button onClick={() => setShowSaleModal(false)}><X className="w-5 h-5"/></button>
+               <h3 className="font-black text-sm uppercase tracking-tighter">
+                 {selectedChat?.leadInfo?.saleValue ? "Editar Venda" : "Registrar Venda"}
+               </h3>
+               <button onClick={() => { setShowSaleModal(false); setSaleValue(""); }}><X className="w-5 h-5"/></button>
             </div>
             <div className="p-6 space-y-4">
                <div className="space-y-1">
                  <p className="text-[10px] font-black text-muted-foreground uppercase">Valor da Venda</p>
-                 <input 
-                   type="number" 
-                   placeholder="0,00" 
-                   value={saleValue} 
-                   onChange={(e)=>setSaleValue(e.target.value)} 
-                   className="w-full p-4 bg-secondary/50 border border-border rounded-2xl text-lg font-black text-primary outline-none focus:border-primary/50 transition-colors" 
+                 <input
+                   type="text"
+                   inputMode="numeric"
+                   placeholder="R$ 0,00"
+                   value={saleValue ? `R$ ${saleValue}` : ""}
+                   onChange={(e) => {
+                     const digits = e.target.value.replace(/\D/g, '');
+                     if (!digits) { setSaleValue(""); return; }
+                     const cents = parseInt(digits, 10);
+                     setSaleValue((cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                   }}
+                   className="w-full p-4 bg-secondary/50 border border-border rounded-2xl text-lg font-black text-primary outline-none focus:border-primary/50 transition-colors"
                  />
                </div>
-               <button 
-                 onClick={handleConfirmSale} 
+               <button
+                 onClick={handleConfirmSale}
                  className="w-full p-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                >
-                 Confirmar Venda
+                 {selectedChat?.leadInfo?.saleValue ? "Atualizar Venda" : "Confirmar Venda"}
                </button>
+               {selectedChat?.leadInfo?.saleValue && (
+                 <button
+                   onClick={handleDeleteSale}
+                   className="w-full p-4 border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                 >
+                   Excluir Venda
+                 </button>
+               )}
             </div>
           </div>
         </div>
@@ -1372,23 +1472,13 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               {viewMode === "active" ? "Mensagens" : "Arquivados"}
             </h2>
             <div className="flex gap-1">
-              {viewMode === "archived" && (
-                <button 
-                  onClick={() => setViewMode("active")}
-                  className="p-2 hover:bg-secondary rounded-xl transition-all text-primary font-black text-[10px] uppercase tracking-widest flex items-center gap-1"
-                >
-                  <X className="w-3.5 h-3.5" /> Sair
-                </button>
-              )}
-              {viewMode === "active" && (
-                <button 
-                  onClick={() => setViewMode("archived")} 
-                  className="p-2 hover:bg-secondary rounded-xl transition-colors text-muted-foreground hover:text-primary relative"
-                  title="Arquivados"
-                >
-                  <Archive className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                onClick={() => setViewMode(viewMode === "archived" ? "active" : "archived")}
+                className="p-2 hover:bg-secondary rounded-xl transition-colors relative"
+                title="Arquivados"
+              >
+                <Archive className={`w-4 h-4 transition-colors ${viewMode === "archived" ? "text-red-500" : "text-muted-foreground hover:text-primary"}`} />
+              </button>
             </div>
           </div>
           <div className="relative">
@@ -1507,7 +1597,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                     onClick={() => setShowTempDropdown(!showTempDropdown)}
                     className={cn("p-2.5 rounded-xl border flex items-center gap-2 transition-all", getTempColor(selectedChat.leadInfo?.temperature))}
                   >
-                    <Flame className="w-4 h-4 pointer-events-none" />
+                    {isClassifyingTemp
+                      ? <Sparkles className="w-4 h-4 pointer-events-none animate-pulse" />
+                      : <Flame className="w-4 h-4 pointer-events-none" />
+                    }
                     <span className="text-[10px] font-black uppercase pointer-events-none">{selectedChat.leadInfo?.temperature || "Frio"}</span>
                     <ChevronDown className="w-3 h-3 pointer-events-none" />
                   </button>
@@ -1516,13 +1609,23 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                       className="absolute top-12 right-0 w-32 bg-card border border-border rounded-xl shadow-2xl z-[9999] overflow-hidden"
                     >
                       {(["Quente", "Morno", "Frio"] as Temperature[]).map(t => (
-                        <button key={t} onClick={()=>{ setSelectedChat({...selectedChat, leadInfo: {...selectedChat.leadInfo!, temperature: t}}); setShowTempDropdown(false); }} className="w-full p-3 text-[10px] font-black uppercase hover:bg-secondary text-left">{t}</button>
+                        <button key={t} onClick={() => handleTemperatureChange(t)} className="w-full p-3 text-[10px] font-black uppercase hover:bg-secondary text-left">{t}</button>
                       ))}
                     </div>
                   )}
                 </div>
+                {selectedChat.leadInfo?.saleValue && (
+                  <button
+                    onClick={() => { setSaleValue(selectedChat.leadInfo!.saleValue!); setShowSaleModal(true); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+                    title="Venda registrada — clique para editar"
+                  >
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-black">R$ {selectedChat.leadInfo.saleValue}</span>
+                  </button>
+                )}
                 <button onClick={()=>setShowFollowUpModal(true)} className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"><Bell className="w-4 h-4"/></button>
-                <button onClick={()=>setShowSaleModal(true)} className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"><DollarSign className="w-4 h-4"/></button>
+                <button onClick={()=>setShowSaleModal(true)} className={cn("p-2.5 hover:bg-secondary rounded-xl transition-colors", selectedChat.leadInfo?.saleValue ? "text-emerald-500" : "text-muted-foreground")}><DollarSign className="w-4 h-4"/></button>
                 
                 {viewMode === "active" ? (
                   <button 

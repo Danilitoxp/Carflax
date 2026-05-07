@@ -19,7 +19,6 @@ import { type VendedorResumo, type CrmItem } from "@/lib/api";
 import { type CrmConversa } from "@/lib/crm-service";
 import { GeralView } from "@/components/dashboard/Geral/GeralView";
 import { LayoutGrid } from "lucide-react";
-import { CoachIa } from "@/components/ui/CoachIa";
 import { cn } from "@/lib/utils";
 import { SugestaoModal } from "@/components/sugestao";
 import { ColetorView } from "@/components/coletor/ColetorView";
@@ -877,15 +876,6 @@ function DashboardContent({
         }}
       />
 
-      {/* Floating Coach IA */}
-      <div className="fixed top-8 right-62 w-14 h-14 z-[9999] pointer-events-auto select-none drop-shadow-2xl">
-        <CoachIa 
-          metrics={vendedorMetrics} 
-          userRole={userProfile?.role} 
-          userName={userProfile?.name}
-          className="w-full h-full" 
-        />
-      </div>
     </div>
   );
 }
