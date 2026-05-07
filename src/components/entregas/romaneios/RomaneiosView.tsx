@@ -165,7 +165,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
         .in("id", newOrder.map(d => d.id))
         .order("created_at", { ascending: true });
 
-      if (currentTimestamps) {
+      if (currentTimestamps && currentTimestamps.length === newOrder.length) {
         const updates = newOrder.map((delivery, index) => ({
           id: delivery.id,
           created_at: currentTimestamps[index].created_at
