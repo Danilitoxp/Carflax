@@ -4,6 +4,11 @@ import { io, Socket } from "socket.io-client";
  * Evolution API v2 - Service Client
  */
 
+export interface EvoSendResponse {
+  key: { id: string; remoteJid: string; fromMe: boolean };
+  status: string;
+}
+
 const EVO_CONFIG = {
   url: import.meta.env.VITE_EVO_URL,
   apiKey: import.meta.env.VITE_EVO_API_KEY,
@@ -91,8 +96,8 @@ export const evolutionApi = {
   /**
    * Envia uma mensagem de texto
    */
-  async sendText(remoteJid: string, text: string): Promise<unknown> {
-    return fetchEvo<unknown>(`/message/sendText/${EVO_CONFIG.instance}`, {
+  async sendText(remoteJid: string, text: string): Promise<EvoSendResponse> {
+    return fetchEvo<EvoSendResponse>(`/message/sendText/${EVO_CONFIG.instance}`, {
       method: 'POST',
       body: JSON.stringify({
         number: remoteJid,
@@ -212,8 +217,8 @@ export const evolutionApi = {
   /**
    * Envia um documento (PDF, DOCX, etc.) em base64
    */
-  async sendDocument(remoteJid: string, base64: string, mimetype: string, filename: string, caption?: string): Promise<unknown> {
-    return fetchEvo<unknown>(`/message/sendMedia/${EVO_CONFIG.instance}`, {
+  async sendDocument(remoteJid: string, base64: string, mimetype: string, filename: string, caption?: string): Promise<EvoSendResponse> {
+    return fetchEvo<EvoSendResponse>(`/message/sendMedia/${EVO_CONFIG.instance}`, {
       method: 'POST',
       body: JSON.stringify({
         number: remoteJid,

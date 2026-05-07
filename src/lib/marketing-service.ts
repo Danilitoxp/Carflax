@@ -228,6 +228,17 @@ export const marketingService = {
     }
   },
 
+  async updateMessageStatus(messageId: string, status: string) {
+    const { error } = await supabase
+      .from("marketing_whatsapp")
+      .update({ status })
+      .eq("message_id", messageId);
+      
+    if (error) {
+      console.error("[MarketingService] Erro ao atualizar status da mensagem:", error.message);
+    }
+  },
+
   async incrementUnread(remoteJid: string) {
     // Incremento atômico via stored procedure — crie esta função no Supabase SQL Editor:
     // CREATE OR REPLACE FUNCTION increment_unread(jid TEXT) RETURNS void LANGUAGE sql AS

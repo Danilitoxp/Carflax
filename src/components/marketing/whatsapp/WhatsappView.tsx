@@ -21,7 +21,10 @@ import {
   Mic,
   FileText,
   Sparkles,
-  ShoppingBag
+  ShoppingBag,
+  Camera,
+  Video,
+  Smile
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { marketingService } from "@/lib/marketing-service";
@@ -96,6 +99,8 @@ interface Chat {
   name: string;
   lastMessage: string;
   lastMessageSender?: "me" | "contact";
+  lastMessageType?: string;
+  lastMessageStatus?: "sent" | "delivered" | "read";
   time: string;
   unreadCount: number;
   avatar?: string;
@@ -152,6 +157,16 @@ const getTempColor = (temp?: string) => {
 };
 
 const avatarCache = new Map<string, string>();
+
+function inferMsgType(text?: string): string | undefined {
+  if (!text) return undefined;
+  if (text.includes("🎵") || text === "Áudio") return "audio";
+  if (text.includes("📷") || text === "Foto") return "image";
+  if (text.includes("📹") || text === "Vídeo") return "video";
+  if (text.includes("📎") || text === "Documento") return "document";
+  if (text.includes("🖼️") || text === "Figurinha") return "sticker";
+  return "text";
+}
 
 function getFileExt(filename?: string): string {
   if (!filename) return "DOC";
@@ -309,9 +324,11 @@ function CustomAudioPlayer({
            <div className="flex items-center gap-1 opacity-70">
              <span className="text-[9px] font-bold">{msgTime}</span>
              {isMe && (
-               msgStatus === "read" 
-                ? <CheckCheck className="w-3.5 h-3.5 text-blue-400" /> 
-                : <Check className="w-3.5 h-3.5" />
+               msgStatus === "read"
+                ? <CheckCheck className="w-3.5 h-3.5" style={{ color: '#020817' }} />
+                : msgStatus === "delivered"
+                  ? <CheckCheck className="w-3.5 h-3.5 text-white" />
+                  : <Check className="w-3.5 h-3.5 text-white" />
              )}
            </div>
         </div>
@@ -439,6 +456,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         id: item.remote_jid,
         name: item.nome || item.push_name || item.remote_jid.split('@')[0],
         lastMessage: item.ultima_mensagem || "",
+        lastMessageType: inferMsgType(item.ultima_mensagem || ""),
         time: item.ultima_conversa_em ? new Date(item.ultima_conversa_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
         unreadCount: item.mensagens_nao_lidas || 0,
         avatar: item.foto_url || "",
@@ -641,7 +659,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         sender: message.key?.fromMe ? "me" : "contact",
         timestamp,
         tipo: tipoMsg,
-        status: "sent",
+        status: (message.status === "READ" || String(message.status) === "3") ? "read" : (message.status === "DELIVERY_ACK" || String(message.status) === "2") ? "delivered" : "sent",
         ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {}),
       }).catch(() => null);
 
@@ -716,6 +734,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
           chat.lastMessage = text;
           chat.lastMessageSender = message.key?.fromMe ? "me" : "contact";
+          chat.lastMessageType = tipoMsg;
+          chat.lastMessageStatus = message.key?.fromMe ? "sent" : undefined;
           chat.time = time;
 
           // Atualiza nome se ainda estiver como número de telefone e tiver push name válido
@@ -745,6 +765,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
             name: message.key?.fromMe ? remoteJid.split('@')[0] : (validPushName || "Novo Lead"),
             lastMessage: text,
             lastMessageSender: message.key?.fromMe ? "me" : "contact",
+            lastMessageType: tipoMsg,
+            lastMessageStatus: message.key?.fromMe ? "sent" : undefined,
             time: time,
             unreadCount: 1,
             avatar: avatarCache.get(remoteJid) || "",
@@ -798,6 +820,62 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     socket.on('MESSAGES_UPSERT', handleIncomingMessage);
     socket.on('message', handleIncomingMessage);
     socket.on('message-received', handleIncomingMessage);
+
+    const handleMessageUpdate = (data: Record<string, unknown>) => {
+      console.log("📬 messages.update RECEBIDO:", JSON.stringify(data, null, 2));
+      const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
+      if (data.instance && data.instance !== instanceName) {
+        console.log("📬 ignorado — instância diferente:", data.instance, "!=", instanceName);
+        return;
+      }
+
+      interface UpdateItemNested {
+        key?: { id?: string };
+        update?: { status?: string | number };
+      }
+      interface UpdateItemFlat {
+        keyId?: string;
+        status?: string | number;
+      }
+
+      const rawData = data.data;
+      const items: unknown[] = Array.isArray(rawData) ? rawData : (rawData ? [rawData] : [data]);
+
+      items.forEach((item) => {
+         const flat = item as UpdateItemFlat;
+         const nested = item as UpdateItemNested;
+
+         // Suporta formato plano { keyId, status } e formato aninhado { key: { id }, update: { status } }
+         const msgId = flat.keyId || nested.key?.id;
+         const rawStatus = flat.status ?? nested.update?.status;
+
+         console.log("📬 item — msgId:", msgId, "rawStatus:", rawStatus);
+         if (!msgId || rawStatus === undefined || rawStatus === null) return;
+
+         let newStatus: "sent" | "delivered" | "read" | undefined;
+         if (rawStatus === 2 || rawStatus === "DELIVERY_ACK") newStatus = "delivered";
+         if (rawStatus === 3 || rawStatus === "READ" || rawStatus === 4 || rawStatus === "PLAYED") newStatus = "read";
+
+         console.log("📬 rawStatus:", rawStatus, "→ newStatus:", newStatus);
+
+         if (newStatus) {
+            setMessages(prev => {
+              const found = prev.some(m => m.id === msgId);
+              console.log("📬 buscando msg id:", msgId, "— encontrou?", found);
+              return prev.map(m => m.id === msgId ? { ...m, status: newStatus as "sent" | "delivered" | "read" } : m);
+            });
+            // Atualiza status na sidebar para a última mensagem
+            setChats(prev => prev.map(c => {
+              const lastMsgIsThis = c.lastMessageSender === "me";
+              return lastMsgIsThis ? { ...c, lastMessageStatus: newStatus } : c;
+            }));
+            marketingService.updateMessageStatus(msgId, newStatus);
+         }
+      });
+    };
+
+    socket.on('messages.update', handleMessageUpdate);
+    socket.on('MESSAGES_UPDATE', handleMessageUpdate);
 
     // Usa profilePicUrl direto do evento contacts.update (sem chamada extra à API)
     const handleContactsUpdate = (data: Record<string, unknown>) => {
@@ -972,12 +1050,18 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       setMessages(prev => [...prev, newMsg]);
 
       // Atualiza o lastMessage no chat da sidebar
-      setChats(prev => prev.map(c => 
-        c.id === selectedChat.id ? { ...c, lastMessage: textToSend, lastMessageSender: "me", time: "Agora" } : c
+      setChats(prev => prev.map(c =>
+        c.id === selectedChat.id ? { ...c, lastMessage: textToSend, lastMessageSender: "me", lastMessageType: "text", lastMessageStatus: "sent", time: "Agora" } : c
       ));
 
-      await evolutionApi.sendText(selectedChat.id, textToSend);
-      
+      const sendResp = await evolutionApi.sendText(selectedChat.id, textToSend);
+      console.log("📤 sendText response:", JSON.stringify(sendResp, null, 2));
+      const realId = sendResp?.key?.id;
+      console.log("📤 fakeId:", msgId, "→ realId:", realId);
+      if (realId) {
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, id: realId } : m));
+      }
+
       await marketingService.upsertCliente({
         remote_jid: selectedChat.id,
         ultima_mensagem: textToSend,
@@ -985,7 +1069,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       });
 
       await marketingService.saveMessage({
-        message_id: msgId,
+        message_id: realId || msgId,
         remote_jid: selectedChat.id,
         texto: textToSend,
         sender: "me",
@@ -1042,7 +1126,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           setMessages(prev => prev.map(m => m.id === msgId ? { ...m, mediaUrl: publicUrl } : m));
         }
 
-        await evolutionApi.sendDocument(selectedChat.id, base64, file.type, file.name, caption);
+        const docResp = await evolutionApi.sendDocument(selectedChat.id, base64, file.type, file.name, caption);
+        const realDocId = docResp?.key?.id;
+        if (realDocId) {
+          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, id: realDocId } : m));
+        }
 
         await marketingService.upsertCliente({
           remote_jid: selectedChat.id,
@@ -1051,7 +1139,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         });
 
         await marketingService.saveMessage({
-          message_id: msgId,
+          message_id: realDocId || msgId,
           remote_jid: selectedChat.id,
           texto: caption || file.name,
           sender: "me",
@@ -1289,7 +1377,12 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       if (msgs.length > 0) {
         const lastMsg = msgs[msgs.length - 1];
         setChats(prev => prev.map(c =>
-          c.id === chat.id ? { ...c, lastMessageSender: lastMsg.sender } : c
+          c.id === chat.id ? {
+            ...c,
+            lastMessageSender: lastMsg.sender,
+            lastMessageType: lastMsg.tipo || inferMsgType(lastMsg.text),
+            lastMessageStatus: lastMsg.sender === "me" ? lastMsg.status : undefined,
+          } : c
         ));
       }
     } catch (error) {
@@ -1585,7 +1678,31 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                   )}>
                     {presenceChats.has(chat.id)
                       ? (presenceChats.get(chat.id) === 'recording' ? 'Gravando áudio...' : 'Digitando...')
-                      : <>{chat.lastMessageSender === "me" && <span className="font-bold">Você: </span>}{chat.lastMessage}</>
+                      : (
+                        <span className="flex items-center gap-1 min-w-0">
+                          {chat.lastMessageSender === "me" && (() => {
+                            const s = chat.lastMessageStatus;
+                            return s === "read"
+                              ? <CheckCheck className="w-3 h-3 shrink-0" style={{ color: '#020817' }} />
+                              : s === "delivered"
+                                ? <CheckCheck className="w-3 h-3 shrink-0 text-muted-foreground" />
+                                : <Check className="w-3 h-3 shrink-0 text-muted-foreground" />;
+                          })()}
+                          {chat.lastMessageType === "image" && <Camera className="w-3 h-3 shrink-0" />}
+                          {chat.lastMessageType === "video" && <Video className="w-3 h-3 shrink-0" />}
+                          {chat.lastMessageType === "audio" && <Mic className="w-3 h-3 shrink-0" />}
+                          {chat.lastMessageType === "document" && <Paperclip className="w-3 h-3 shrink-0" />}
+                          {chat.lastMessageType === "sticker" && <Smile className="w-3 h-3 shrink-0" />}
+                          <span className="truncate">
+                            {chat.lastMessageType === "image" ? "Foto"
+                              : chat.lastMessageType === "video" ? "Vídeo"
+                              : chat.lastMessageType === "audio" ? "Áudio"
+                              : chat.lastMessageType === "document" ? "Documento"
+                              : chat.lastMessageType === "sticker" ? "Figurinha"
+                              : chat.lastMessage}
+                          </span>
+                        </span>
+                      )
                     }
                   </p>
                 </div>
@@ -1864,8 +1981,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                                 )}>{msg.time}</span>
                                 {msg.sender === "me" && (
                                   msg.status === "read"
-                                    ? <CheckCheck className="w-3.5 h-3.5 text-blue-300" />
-                                    : <Check className="w-3.5 h-3.5 text-white/50" />
+                                    ? <CheckCheck className="w-3.5 h-3.5" style={{ color: '#020817' }} />
+                                    : msg.status === "delivered"
+                                      ? <CheckCheck className="w-3.5 h-3.5 text-white" />
+                                      : <Check className="w-3.5 h-3.5 text-white" />
                                 )}
                               </div>
                             </div>
@@ -1926,14 +2045,12 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                           )}>
                             <span className="text-[9px] font-bold mt-[1px]">{msg.time}</span>
                             {msg.sender === "me" && (
-                              <span className={cn(
-                                msg.status === "read" ? "text-blue-400" : "",
-                                (() => {
-                                  const hasRealText = msg.text && !["Mídia", "🎵 Áudio", "📎 Mídia", "📷 Imagem", "📹 Vídeo"].includes(msg.text);
-                                  return (isVisualMedia && !hasRealText && msg.status === "read") ? "text-blue-300" : "";
-                                })()
-                              )}>
-                                {msg.status === "read" ? <CheckCheck className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                              <span>
+                                {msg.status === "read"
+                                  ? <CheckCheck className="w-3.5 h-3.5" style={{ color: '#020817' }} />
+                                  : msg.status === "delivered"
+                                    ? <CheckCheck className="w-3.5 h-3.5 text-white" />
+                                    : <Check className="w-3.5 h-3.5 text-white" />}
                               </span>
                             )}
                           </div>
