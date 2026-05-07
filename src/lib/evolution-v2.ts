@@ -181,7 +181,6 @@ export const evolutionApi = {
    */
   async getMediaBase64(messagePayload: { key?: unknown; message?: unknown } | unknown): Promise<{ base64: string; mimetype: string } | null> {
     try {
-      const payload = messagePayload as { key?: unknown; message?: unknown };
       const data = await fetchEvo<{ base64: string; mimetype: string }>(`/chat/getBase64FromMediaMessage/${EVO_CONFIG.instance}`, {
         method: 'POST',
         body: JSON.stringify({
