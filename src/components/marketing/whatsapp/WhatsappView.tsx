@@ -551,6 +551,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   };
 
   useEffect(() => {
+    const currentTimers = tempClassifyTimers.current;
     // Conecta ao WebSocket para receber mensagens em tempo real
     const socket = evolutionApi.connectWebSocket();
 
@@ -629,6 +630,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
       const validPushName = !message.key?.fromMe && message.pushName ? message.pushName : null;
       const mediaUrl: string | undefined = undefined;
+      const isMediaMsg = ["audio", "image", "video", "document", "sticker"].includes(tipoMsg);
 
       // Persiste a mensagem no Supabase para garantir que apareça após refresh
       marketingService.saveMessage({
@@ -641,6 +643,20 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         status: "sent",
         ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {}),
       }).catch(() => null);
+
+      // Download assíncrono de mídia — não bloqueia a renderização da mensagem
+      if (isMediaMsg) {
+        evolutionApi.getMediaBase64(message).then(async (media) => {
+          if (!media?.base64) return;
+          const ext = media.mimetype?.split('/')[1]?.split(';')[0] || 'bin';
+          const publicUrl = await marketingService.uploadMedia(media.base64, media.mimetype, `${msgId}.${ext}`);
+          if (!publicUrl) return;
+          // Atualiza no DB (refresh do TS server)
+          await marketingService.updateMessageMediaUrl(msgId, publicUrl);
+          // Atualiza na UI se a conversa estiver aberta
+          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, mediaUrl: publicUrl } : m));
+        }).catch(() => null);
+      }
 
       // Classificação automática de temperatura — só mensagens do contato
       if (!message.key?.fromMe) {
@@ -873,8 +889,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       socket.off('PRESENCE_UPDATE', handlePresenceUpdate);
       socket.off('chats.update', handleChatsUpdate);
       socket.off('CHATS_UPDATE', handleChatsUpdate);
-      tempClassifyTimers.current.forEach(t => clearTimeout(t));
-      tempClassifyTimers.current.clear();
+      currentTimers.forEach(t => clearTimeout(t));
+      currentTimers.clear();
     };
   }, [fetchAvatar, vendedorId]);
 
@@ -1255,7 +1271,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     } finally {
       setLoadingMessages(false);
     }
-  }, [vendedorId]);
+  }, []);
 
   // Initial Auto-selection - MOVED BELOW handleSelectChat
   useEffect(() => {
@@ -1595,7 +1611,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                   <button
                     ref={tempBtnRef}
                     onClick={() => setShowTempDropdown(!showTempDropdown)}
-                    className={cn("p-2.5 rounded-xl border flex items-center gap-2 transition-all", getTempColor(selectedChat.leadInfo?.temperature))}
+                    className={cn("h-9 px-3 rounded-xl border flex items-center justify-center gap-2 transition-all", getTempColor(selectedChat.leadInfo?.temperature))}
                   >
                     {isClassifyingTemp
                       ? <Sparkles className="w-4 h-4 pointer-events-none animate-pulse" />
@@ -1617,7 +1633,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                 {selectedChat.leadInfo?.saleValue && (
                   <button
                     onClick={() => { setSaleValue(selectedChat.leadInfo!.saleValue!); setShowSaleModal(true); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+                    className="flex items-center justify-center gap-1.5 h-9 px-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-500 hover:bg-emerald-500/20 transition-colors"
                     title="Venda registrada — clique para editar"
                   >
                     <DollarSign className="w-3.5 h-3.5" />

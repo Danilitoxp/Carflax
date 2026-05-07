@@ -303,6 +303,13 @@ export const marketingService = {
     }
   },
 
+  async updateMessageMediaUrl(messageId: string, mediaUrl: string) {
+    await supabase
+      .from("marketing_whatsapp")
+      .update({ media_url: mediaUrl })
+      .eq("message_id", messageId);
+  },
+
   /**
    * Faz o upload de uma mídia em base64 para o Supabase Storage e retorna a URL pública
    */

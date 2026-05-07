@@ -78,6 +78,60 @@ Deno.serve(async (req: Request) => {
         ).catch(() => null) // ignora subscrições expiradas
       );
 
+      // Salva a mídia no Storage se o base64 estiver presente
+      interface EvoMsg {
+        base64?: string;
+        message?: {
+          base64?: string;
+          imageMessage?: { mimetype?: string };
+          videoMessage?: { mimetype?: string };
+          documentMessage?: { mimetype?: string };
+          audioMessage?: { mimetype?: string };
+        };
+      }
+      const msgParsed = msg as unknown as EvoMsg;
+      const mediaBase64 = msgParsed.base64 || msgParsed.message?.base64;
+      const mimetype = msgParsed.message?.imageMessage?.mimetype || msgParsed.message?.videoMessage?.mimetype || msgParsed.message?.documentMessage?.mimetype || msgParsed.message?.audioMessage?.mimetype;
+      const msgId = String(key.id);
+      
+      if (mediaBase64 && mimetype) {
+        try {
+          const ext = mimetype.split('/')[1]?.split(';')[0] || 'bin';
+          const filename = `${msgId}.${ext}`;
+          
+          // Decodifica o base64 para Uint8Array
+          const binaryString = atob(String(mediaBase64));
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          // Faz o upload pro bucket
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('whatsapp-media')
+            .upload(filename, bytes.buffer, {
+              contentType: String(mimetype),
+              upsert: true
+            });
+
+          if (!uploadError && uploadData) {
+            const { data: publicUrlData } = supabase.storage
+              .from('whatsapp-media')
+              .getPublicUrl(uploadData.path);
+              
+            // Atualiza a tabela com a URL da mídia
+            if (publicUrlData?.publicUrl) {
+              await supabase
+                .from('marketing_whatsapp')
+                .update({ media_url: publicUrlData.publicUrl })
+                .eq('message_id', msgId);
+            }
+          }
+        } catch (e) {
+          console.error("Erro ao fazer upload da mídia no webhook:", e);
+        }
+      }
+
       await Promise.all(sends);
     }
 

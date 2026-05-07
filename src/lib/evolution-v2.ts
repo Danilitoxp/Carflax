@@ -185,10 +185,7 @@ export const evolutionApi = {
       const data = await fetchEvo<{ base64: string; mimetype: string }>(`/chat/getBase64FromMediaMessage/${EVO_CONFIG.instance}`, {
         method: 'POST',
         body: JSON.stringify({
-          message: {
-            key: payload?.key,
-            message: payload?.message
-          }
+          message: messagePayload
         }),
       });
       return data;
