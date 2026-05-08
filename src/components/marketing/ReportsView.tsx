@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
-import { 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
+import {
+  TrendingUp,
+  Users,
+  DollarSign,
   Target,
   ArrowUpRight,
   ArrowDownRight,
   Calendar,
   ChevronDown,
-  Download
+  Download,
+  Timer
 } from "lucide-react";
 import { marketingService } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
@@ -27,7 +28,8 @@ export function ReportsView() {
     billingToday: 0,
     billingMonth: 0,
     avgTicket: 0,
-    conversionRate: 0
+    conversionRate: 0,
+    avgFirstResponseMinutes: null as number | null
   });
 
 
@@ -37,9 +39,10 @@ export function ReportsView() {
       try {
         const filters = {};
 
-        const [marketingData, hourlyLeads]: [{ leadsToday: number; leadsMonth: number; billingToday: number; billingMonth: number; salesCountToday: number; salesCountMonth: number }, number[]] = await Promise.all([
+        const [marketingData, hourlyLeads, avgResponseTime]: [{ leadsToday: number; leadsMonth: number; billingToday: number; billingMonth: number; salesCountToday: number; salesCountMonth: number }, number[], number | null] = await Promise.all([
           marketingService.getMarketingStats(startDate, endDate || undefined, filters),
-          marketingService.getHourlyLeads(startDate, endDate || undefined, filters)
+          marketingService.getHourlyLeads(startDate, endDate || undefined, filters),
+          marketingService.getAvgFirstResponseTime(startDate, endDate || undefined)
         ]);
 
         setHourlyData(hourlyLeads);
@@ -59,7 +62,8 @@ export function ReportsView() {
           billingToday: totalBillingToday,
           billingMonth: totalBillingMonth,
           avgTicket,
-          conversionRate
+          conversionRate,
+          avgFirstResponseMinutes: avgResponseTime
         });
       } catch (err) {
         console.error("Erro ao carregar relatórios:", err);
@@ -71,8 +75,17 @@ export function ReportsView() {
     loadData();
   }, [startDate, endDate]);
 
-  const formatCurrency = (val: number) => 
+  const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+  const formatResponseTime = (minutes: number | null): string => {
+    if (minutes === null) return "—";
+    if (minutes < 1) return "< 1 min";
+    if (minutes < 60) return `${Math.round(minutes)} min`;
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+    return m > 0 ? `${h}h ${m}min` : `${h}h`;
+  };
 
   if (loading) {
     return (
@@ -201,32 +214,51 @@ export function ReportsView() {
                 Fluxo de Leads por Horário
                 <span className="text-[10px] text-primary bg-primary/10 px-2 py-1 rounded-full">Picos de Hoje</span>
              </h3>
-             <div className="h-64 flex items-end gap-1.5 sm:gap-2">
-                {hourlyData.map((val, h) => {
-                  const maxLeads = Math.max(...hourlyData, 1);
-                  const height = (val / maxLeads) * 100;
-                  // Mostra apenas horários úteis (07h as 22h) no mobile ou todos no desktop se preferir
-                  return (
-                    <div key={h} className="flex-1 h-full flex flex-col justify-end items-center gap-2 group">
-                      <div 
-                        className={cn(
-                          "w-full rounded-t-lg transition-all relative",
-                          val > 0 ? "bg-primary" : "bg-muted/10"
-                        )} 
-                        style={{ height: `${val > 0 ? Math.max(height, 8) : 4}%` }}
-                      >
-                         {val > 0 && (
-                           <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded-lg text-[10px] font-black opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-xl whitespace-nowrap">
-                             {val} {val === 1 ? 'lead' : 'leads'} as {h}h
-                           </div>
-                         )}
+             <div className="h-64 flex items-end gap-1.5 sm:gap-3">
+                {(() => {
+                  const day = (startDate || new Date()).getDay();
+                  const isSaturday = day === 6;
+                  
+                  // Define o range de exibição
+                  const startH = isSaturday ? 8 : (day === 0 ? 0 : 7);
+                  const endH = isSaturday ? 12 : (day === 0 ? 23 : 17);
+
+                  const filteredData = hourlyData.map((val, h) => ({ val, h }))
+                    .filter(d => d.h >= startH && d.h <= endH);
+
+                  const maxLeads = Math.max(...filteredData.map(d => d.val), 1);
+
+                  return filteredData.map(({ val, h }) => {
+                    const height = (val / maxLeads) * 100;
+                    return (
+                      <div key={h} className="flex-1 h-full flex flex-col justify-end items-center gap-3 group">
+                        <div className="flex-1 w-full flex flex-col justify-end relative">
+                          <div 
+                            className={cn(
+                              "w-full rounded-full transition-all duration-500 relative min-h-[4px]",
+                              val > 0 
+                                ? "bg-gradient-to-t from-primary/80 to-primary shadow-[0_0_15px_rgba(59,130,246,0.3)]" 
+                                : "bg-secondary/20"
+                            )} 
+                            style={{ height: `${val > 0 ? Math.max(height, 8) : 4}%` }}
+                          >
+                             {val > 0 && (
+                               <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 border border-white/10 px-2 py-1 rounded-lg text-[9px] font-black text-white opacity-0 group-hover:opacity-100 transition-all transform group-hover:-translate-y-1 z-20 shadow-2xl whitespace-nowrap">
+                                 {val} {val === 1 ? 'lead' : 'leads'} • {h}h
+                               </div>
+                             )}
+                          </div>
+                        </div>
+                        <span className={cn(
+                          "text-[8px] font-black uppercase tracking-tighter transition-opacity",
+                          [7, 8, 10, 12, 14, 16, 17].includes(h) || isSaturday ? "opacity-60" : "opacity-0"
+                        )}>
+                          {h}h
+                        </span>
                       </div>
-                      {[0, 4, 8, 12, 16, 20].includes(h) && (
-                        <span className="text-[8px] font-bold opacity-40 uppercase">{h}h</span>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
              </div>
           </div>
 
@@ -245,6 +277,25 @@ export function ReportsView() {
                 <div className="flex items-center gap-1 text-rose-500 text-[10px] font-bold mt-2">
                    <ArrowDownRight className="w-3 h-3" /> -1.2% vs média histórica
                 </div>
+             </div>
+
+             <div className="bg-card border border-border rounded-3xl p-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <Timer className="w-3.5 h-3.5 text-amber-500" />
+                  <p className="text-xs font-bold text-muted-foreground uppercase">1ª Resposta Média</p>
+                </div>
+                <p className={cn("text-2xl font-bold", stats.avgFirstResponseMinutes === null && "text-muted-foreground")}>
+                  {formatResponseTime(stats.avgFirstResponseMinutes)}
+                </p>
+                <p className="text-[10px] font-bold text-muted-foreground mt-2 uppercase">
+                  {stats.avgFirstResponseMinutes === null
+                    ? "Sem dados no período"
+                    : stats.avgFirstResponseMinutes < 3
+                    ? "Excelente tempo de resposta"
+                    : stats.avgFirstResponseMinutes < 5
+                    ? "Atenção: tempo alto"
+                    : "Crítico: acima de 5 min"}
+                </p>
              </div>
           </div>
         </div>

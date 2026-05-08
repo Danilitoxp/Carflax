@@ -64,7 +64,7 @@ const menuItems: MenuItem[] = [
   },
   {
     icon: BarChart3,
-    label: "CRM",
+    label: "Comercial",
     isDropdown: true,
     subItems: [
       { label: "Orçamentos", icon: FileBadge },
@@ -171,15 +171,21 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const vendedorStandard = [
       "Geral", "Produtos", "Dashboard", 
       "Calendário", "Eventos", "Férias", 
-      "CRM", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", 
-      "Marketing", "Whatsapp", "Leads", "Cronograma", "Relatórios Mkt",
+      "Comercial", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", 
       "Logística", "Romaneios", "Entregas", 
       "Produtos", "Estoque", "Preços", "Eventos", "Férias"
     ];
     if (role.includes('VENDEDOR') && vendedorStandard.includes(label)) return true;
 
     // Permissões manuais (Database)
-    return userProfile?.permissions?.includes(label);
+    const hasManualPermission = userProfile?.permissions?.includes(label);
+    
+    // Se for VENDEDOR, ele só vê o que está na lista standard OU o que tem permissão manual
+    if (role.includes('VENDEDOR')) {
+      return vendedorStandard.includes(label) || hasManualPermission;
+    }
+
+    return hasManualPermission;
   };
 
   return (
@@ -275,12 +281,12 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
               menuItems
                 .filter(item => {
                   if (item.isDropdown && item.subItems) {
-                    return item.subItems.some(sub => isAllowed(sub.label));
+                    return item.subItems.some(sub => isAllowed(sub.value || sub.label));
                   }
                   return isAllowed(item.label);
                 })
                 .map((item, idx) => {
-                  const filteredSubItems = item.subItems?.filter(sub => isAllowed(sub.label));
+                  const filteredSubItems = item.subItems?.filter(sub => isAllowed(sub.value || sub.label));
                   
                   const isOpen = openMenus.includes(item.label);
                   const isActive = activeItem === item.label || filteredSubItems?.some(s => (s.value || s.label) === activeItem);

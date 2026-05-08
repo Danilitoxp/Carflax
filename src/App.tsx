@@ -100,23 +100,19 @@ function DashboardContent({
     if (!userProfile || geralLoading) return; // Aguarda o perfil carregar
 
     const role = userProfile?.role?.toUpperCase();
-    const isVendedorRole = role === "VENDEDOR";
+    const isVendedorRole = role?.includes("VENDEDOR");
     const sellerAllowedItems = [
       "Geral",
       "Produtos",
       "Calendário",
       "Eventos",
       "Férias",
-      "CRM",
+      "Comercial",
       "Orçamentos",
       "Clientes",
       "Ligações",
       "Campanhas",
       "Relatórios",
-      "Relatórios Mkt",
-      "Marketing",
-      "Whatsapp",
-      "Cronograma",
       "Coletor",
       "Logística",
       "Romaneios",
@@ -402,7 +398,7 @@ function DashboardContent({
     }
 
     setupPush();
-  }, [userProfile?.id]);
+  }, [userProfile]);
 
   // 1. Cache Global de Usuários (Preload similar ao CRM Legado)
   useEffect(() => {
@@ -429,14 +425,14 @@ function DashboardContent({
     }
 
     preloadUsers();
-  }, [userProfile?.id]);
+  }, [userProfile]);
 
   useEffect(() => {
     const role = userProfile?.role?.toUpperCase() || "";
     if (role === "ADMIN" || role.includes("GERENTE")) {
       runAnnouncementAutomation();
     }
-  }, [userProfile?.role]);
+  }, [userProfile]);
 
   // 0. Permissão para Notificações do Navegador
   useEffect(() => {
@@ -694,7 +690,7 @@ function DashboardContent({
   ].includes(activeItem);
   const isCrmView = [
     "Orçamentos",
-    "CRM",
+    "Comercial",
     "Produtos",
     "Clientes",
     "Campanhas",

@@ -432,7 +432,7 @@ const notifSections = [
   {
     key: "crm",
     icon: MessageSquare,
-    title: "Vendas & CRM",
+    title: "Vendas & Comercial",
     desc: "Atividades comerciais e leads",
     color: "blue",
     items: [

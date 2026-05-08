@@ -89,15 +89,40 @@ export function UsersView() {
     is_admin: false
   });
 
-  const availableModules = [
-    "Geral", "Produtos", "Eventos", "Férias",
-    "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", "Romaneios",
-    "Marketing", "Whatsapp", "Leads", "Cronograma",
-    "Usuários", "DB Admin", "Sugestões",
-    "Gerenciar Comunicados", "Gerenciar Férias", "Gerenciar Banners", "Gerenciar Calendário",
-    "Lançar Entrega",
-    "Criar Campanha"
+  const permissionGroups = [
+    {
+      name: "ESSENCIAL",
+      modules: ["Geral", "Sugestões"]
+    },
+    {
+      name: "DASHBOARD",
+      modules: ["Produtos", "Eventos", "Férias"]
+    },
+    {
+      name: "COMERCIAL",
+      modules: ["Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Criar Campanha"]
+    },
+    {
+      name: "MARKETING",
+      modules: ["Marketing", "Whatsapp", "Leads", "Cronograma"]
+    },
+    {
+      name: "LOGÍSTICA",
+      modules: ["Coletor", "Romaneios", "Lançar Entrega"]
+    },
+    {
+      name: "GESTÃO & ADMIN",
+      modules: ["Usuários", "DB Admin", "Gerenciar Comunicados", "Gerenciar Férias", "Gerenciar Banners", "Gerenciar Calendário"]
+    }
   ];
+
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+
+  const toggleGroup = (groupName: string) => {
+    setExpandedGroups(prev => 
+      prev.includes(groupName) ? prev.filter(g => g !== groupName) : [...prev, groupName]
+    );
+  };
 
   const companies = ["Carflax", "Zelex", "JCM"];
 
@@ -678,21 +703,50 @@ export function UsersView() {
               </div>
 
               {/* Permissions Section */}
-              <div className="space-y-3 pt-2">
+              <div className="space-y-4 pt-2">
                 <div className="flex items-center gap-2 mb-2">
                   <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span className="text-[10px] font-black text-foreground uppercase tracking-widest">Módulos do Sistema</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-1 scrollbar-hide">
-                  {availableModules.map((module) => {
-                    const hasAccess = newUser.permissions.includes(module);
+                
+                <div className="space-y-2">
+                  {permissionGroups.map((group) => {
+                    const isExpanded = expandedGroups.includes(group.name);
+                    const activeCount = group.modules.filter(m => newUser.permissions.includes(m)).length;
+                    
                     return (
-                      <div key={module} onClick={() => {
-                        const updated = hasAccess ? newUser.permissions.filter(p => p !== module) : [...newUser.permissions, module];
-                        setNewUser({ ...newUser, permissions: updated });
-                      }} className={cn("flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer", hasAccess ? "bg-blue-500/10 border-blue-600/30" : "bg-secondary/20 border-border")}>
-                        <span className={cn("text-[9px] font-black uppercase tracking-tight", hasAccess ? "text-blue-400" : "text-muted-foreground/40")}>{module}</span>
-                        <Switch enabled={hasAccess} onChange={() => { }} />
+                      <div key={group.name} className="border border-border rounded-2xl overflow-hidden bg-secondary/10">
+                        <button
+                          onClick={(e) => { e.preventDefault(); toggleGroup(group.name); }}
+                          className="w-full flex items-center justify-between p-3 hover:bg-secondary/20 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-foreground uppercase tracking-widest">{group.name}</span>
+                            {activeCount > 0 && (
+                              <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">{activeCount}</span>
+                            )}
+                          </div>
+                          <svg className={cn("w-3 h-3 text-muted-foreground transition-transform duration-200", isExpanded ? "rotate-180" : "")} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="p-3 pt-0 grid grid-cols-1 gap-2 border-t border-border/50 animate-in slide-in-from-top-2 duration-200">
+                            {group.modules.map((module) => {
+                              const hasAccess = newUser.permissions.includes(module);
+                              return (
+                                <div key={module} onClick={() => {
+                                  const updated = hasAccess ? newUser.permissions.filter(p => p !== module) : [...newUser.permissions, module];
+                                  setNewUser({ ...newUser, permissions: updated });
+                                }} className={cn("flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer", hasAccess ? "bg-blue-500/10 border-blue-600/30" : "bg-background border-border")}>
+                                  <span className={cn("text-[10px] font-bold uppercase tracking-tight", hasAccess ? "text-blue-500" : "text-muted-foreground/60")}>{module}</span>
+                                  <Switch enabled={hasAccess} onChange={() => { }} />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

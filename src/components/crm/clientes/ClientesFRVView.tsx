@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, memo } from "react";
+import { useState, useMemo, useEffect, memo, useCallback } from "react";
 import { 
   Search, 
   Users, 
@@ -106,9 +106,12 @@ export function ClientesFRVView() {
   const [activeView, setActiveView] = useState<"lista" | "analise">("lista");
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
-  const [clientesRaw, setClientesRaw] = useState<any[]>([]);
+  const [clientesRaw, setClientesRaw] = useState<ClienteFRV[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedSegment, setSelectedSegment] = useState<{ label: string; clients: any[] } | null>(null);
+  const [selectedSegment, setSelectedSegment] = useState<{ 
+    label: string; 
+    clients: (ClienteFRV & { recencia_score: number; fv_score: number })[] 
+  } | null>(null);
   
   // Ordenação
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
@@ -154,23 +157,23 @@ export function ClientesFRVView() {
     setShowCalendar(false);
   };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const startStr = dateRange.start.toISOString().split('T')[0];
       const endStr = dateRange.end.toISOString().split('T')[0];
       const data = await apiClientesFrv(startStr, endStr);
-      setClientesRaw(data as any[]);
+      setClientesRaw(data as ClienteFRV[]);
     } catch (err) {
       console.error("Erro ao carregar dados FRV:", err);
     } finally {
       setTimeout(() => setLoading(false), 300);
     }
-  };
+  }, [dateRange]);
 
   useEffect(() => {
     loadData();
-  }, [dateRange]);
+  }, [loadData]);
 
   const processedData = useMemo(() => {
     if (!clientesRaw || clientesRaw.length === 0) return [];
@@ -249,8 +252,7 @@ export function ClientesFRVView() {
 
   const rfvMatrixData = useMemo(() => {
     return processedData.map(c => ({
-      cliente_id: c.cliente_id,
-      nome_cliente: c.nome_cliente,
+      ...c,
       recencia_score: c.r_score || 1,
       fv_score: c.fv_score || 1
     }));
@@ -282,11 +284,8 @@ export function ClientesFRVView() {
               <div className="p-2 bg-primary/10 rounded-xl">
                 <Users className="w-6 h-6 text-primary" />
               </div>
-              Carteira de Clientes - FRV
+              Carteira de Clientes
             </h1>
-            <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.2em] mt-1 ml-14">
-              Análise de Recência, Frequência e Valor (RFV)
-            </p>
           </div>
 
           <div className="flex items-center bg-secondary/30 p-1 rounded-xl border border-border/50 ml-4 shadow-inner">
@@ -410,7 +409,7 @@ export function ClientesFRVView() {
           )}>
             <RFMMatrix 
               data={rfvMatrixData} 
-              onCellClick={(label, clients) => setSelectedSegment({ label, clients })}
+              onCellClick={(label, clients) => setSelectedSegment({ label, clients: clients as (ClienteFRV & { recencia_score: number; fv_score: number })[] })}
             />
           </div>
 

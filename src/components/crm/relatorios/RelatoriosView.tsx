@@ -18,8 +18,32 @@ interface UserProfile {
   avatar?: string;
 }
 
+interface OrcamentoItem {
+  COD_PRODUTO?: string | number;
+  cod?: string | number;
+  PRODUTO?: string;
+  nome?: string;
+  VALOR_TOTAL?: string | number;
+  total?: string | number;
+  QUANTIDADE?: string | number;
+  qtd?: string | number;
+  PRECO_UNITARIO?: string | number;
+}
+
+interface Orcamento {
+  id: string;
+  client: string;
+  seller: string;
+  numericValue: number;
+  value: string;
+  status: string;
+  lossReason: string;
+  items: OrcamentoItem[];
+  empresa: string;
+}
+
 interface RelatoriosViewProps {
-  orcamentos?: any[];
+  orcamentos?: Orcamento[];
   userProfile?: UserProfile;
 }
 
@@ -27,7 +51,7 @@ export function RelatoriosView({
   orcamentos: propsOrcamentos = [],
   userProfile 
 }: RelatoriosViewProps) {
-  const [localOrcamentos, setLocalOrcamentos] = useState<any[]>([]);
+  const [localOrcamentos, setLocalOrcamentos] = useState<Orcamento[]>([]);
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState("este-mes");
   const [searchTerm, setSearchTerm] = useState("");
@@ -75,7 +99,7 @@ export function RelatoriosView({
           const lossReason = (s?.motivo_perda || "").toUpperCase();
 
           // Lógica de Filtragem de Itens Perdidos (Fonte: Novas Colunas)
-          let itemsToCount: any[] = [];
+          let itemsToCount: OrcamentoItem[] = [];
           
           if (status === "PERDIDO") {
             const idsEstoque = s?.itens_estoque || [];
@@ -83,7 +107,7 @@ export function RelatoriosView({
             const allSpecificIds = [...(Array.isArray(idsEstoque) ? idsEstoque : []), ...(Array.isArray(idsPreco) ? idsPreco : [])];
 
             if (allSpecificIds.length > 1 || (allSpecificIds.length > 0)) {
-              itemsToCount = (o.PRODUTOS || []).filter((it: any) => 
+              itemsToCount = (o.PRODUTOS || []).filter((it: OrcamentoItem) => 
                 allSpecificIds.map(String).includes(String(it.COD_PRODUTO))
               );
             } 
@@ -130,11 +154,11 @@ export function RelatoriosView({
       // Precisamos garantir que usamos o o.items que foi filtrado no merged.
       const lostItems = o.items || [];
       
-      lostItems.forEach((item: any) => {
+      lostItems.forEach((item: OrcamentoItem) => {
         const cod = String(item.COD_PRODUTO || item.cod || "S/C");
         const nome = String(item.PRODUTO || item.nome || "PRODUTO NÃO IDENTIFICADO");
-        const valor = parseFloat(String(item.VALOR_TOTAL || item.total || (parseFloat(item.QUANTIDADE || 0) * parseFloat(item.PRECO_UNITARIO || 0)) || 0));
-        const qtd = parseFloat(String(item.QUANTIDADE || item.qtd || 1));
+        const valor = parseFloat(String(item.VALOR_TOTAL || item.total || (Number(item.QUANTIDADE || 0) * Number(item.PRECO_UNITARIO || 0)) || 0));
+        const qtd = Number(item.QUANTIDADE || item.qtd || 1);
 
         if (!ranking[cod]) {
           ranking[cod] = { 
@@ -162,7 +186,7 @@ export function RelatoriosView({
       fechados: number, 
       perdidos: number,
       valorPerdido: number,
-      items: any[]
+      items: Orcamento[]
     }> = {};
 
     orcamentos.forEach(o => {
@@ -229,7 +253,7 @@ export function RelatoriosView({
   }
 
   const handleExportCSV = () => {
-    const headers = ["Orçamento", "Vendedor", "Cliente", "Total (R$)", "Status CRM", "Motivo da Perda", "Empresa"];
+    const headers = ["Orçamento", "Vendedor", "Cliente", "Total (R$)", "Status Comercial", "Motivo da Perda", "Empresa"];
     const rows = orcamentos.map(o => [
       o.id,
       o.seller,

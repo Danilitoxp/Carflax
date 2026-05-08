@@ -24,7 +24,8 @@ import {
   ShoppingBag,
   Camera,
   Video,
-  Smile
+  Smile,
+  Printer
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { marketingService } from "@/lib/marketing-service";
@@ -357,6 +358,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const [chatSearch, setChatSearch] = useState("");
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [cartProducts, setCartProducts] = useState<NormalizedProduct[]>([]);
+  const [avgResponseTime, setAvgResponseTime] = useState<number | null>(null);
   const productsLoadedRef = useRef(false);
 
   const tempBtnRef = useRef<HTMLButtonElement>(null);
@@ -373,6 +375,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const tempClassifyTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const [presenceChats, setPresenceChats] = useState<Map<string, string>>(new Map());
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isClassifyingTemp, setIsClassifyingTemp] = useState(false);
   const [myAvatar, setMyAvatar] = useState<string>("");
   const [viewMode, setViewMode] = useState<"active" | "archived">("active");
@@ -1003,6 +1006,18 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     setLoading(false);
   }, [loadChats]);
 
+  // Tempo médio de 1ª resposta do dia (atualiza a cada 5 min)
+  useEffect(() => {
+    const fetchResponseTime = async () => {
+      const today = new Date();
+      const val = await marketingService.getAvgFirstResponseTime(today, today);
+      setAvgResponseTime(val);
+    };
+    fetchResponseTime();
+    const id = setInterval(fetchResponseTime, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => {
     const id = setInterval(() => {
       const now = Date.now();
@@ -1603,9 +1618,52 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       <div className="w-80 border-r border-border flex flex-col bg-card/50 backdrop-blur-md">
         <div className="p-6 space-y-4">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="font-black text-2xl tracking-tighter uppercase">
-              {viewMode === "active" ? "Mensagens" : "Arquivados"}
-            </h2>
+            <div className="flex flex-col gap-1">
+              <h2 className="font-black text-base tracking-tighter uppercase leading-none">
+                {viewMode === "active" ? "Mensagens" : "Arquivados"}
+              </h2>
+              {viewMode === "active" && (
+                <div className="flex items-center gap-1 group relative">
+                  <span className="text-[8px] font-black text-muted-foreground uppercase tracking-wider">Tempo médio:</span>
+                  <span className={cn(
+                    "text-[8px] font-black uppercase tracking-wider",
+                    avgResponseTime === null ? "text-muted-foreground" :
+                    avgResponseTime < 3 ? "text-emerald-500" :
+                    avgResponseTime < 5 ? "text-amber-500" : "text-rose-500"
+                  )}>
+                    {avgResponseTime === null ? "—" :
+                     avgResponseTime < 1 ? "< 1 min" :
+                     avgResponseTime < 60 ? `${Math.round(avgResponseTime)} min` :
+                     `${Math.floor(avgResponseTime / 60)}h ${Math.round(avgResponseTime % 60)}min`}
+                  </span>
+                  {/* Ícone de dica */}
+                  <button className="w-3.5 h-3.5 rounded-full bg-muted-foreground/20 text-muted-foreground flex items-center justify-center text-[8px] font-black leading-none hover:bg-primary/20 hover:text-primary transition-colors shrink-0">
+                    !
+                  </button>
+                  {/* Tooltip */}
+                  <div className="absolute left-0 top-full mt-2 w-56 bg-popover border border-border rounded-xl p-3 shadow-xl z-50 hidden group-hover:flex flex-col gap-1.5 pointer-events-none">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-foreground mb-1">Como melhorar</p>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-emerald-500 font-black text-[9px] shrink-0">●</span>
+                      <span className="text-[9px] text-muted-foreground leading-relaxed">Ative notificações no navegador para não perder mensagens</span>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-emerald-500 font-black text-[9px] shrink-0">●</span>
+                      <span className="text-[9px] text-muted-foreground leading-relaxed">Deixe a aba aberta durante o horário comercial</span>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-emerald-500 font-black text-[9px] shrink-0">●</span>
+                      <span className="text-[9px] text-muted-foreground leading-relaxed">Meta: responder em menos de 3 minutos</span>
+                    </div>
+                    <div className="mt-1 pt-1.5 border-t border-border flex gap-2 text-[8px] font-black uppercase tracking-widest">
+                      <span className="text-emerald-500">Verde &lt;3min</span>
+                      <span className="text-amber-500">Âmbar &lt;5min</span>
+                      <span className="text-rose-500">Vermelho ≥5min</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="flex gap-1">
               <button
                 onClick={() => setViewMode(viewMode === "archived" ? "active" : "archived")}
@@ -1655,7 +1713,18 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               )}
 
               <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
-                {chat.avatar ? <img src={chat.avatar} className="w-full h-full object-cover" /> : <User className="w-6 h-6" />}
+                {chat.avatar ? (
+                  <img 
+                    src={chat.avatar} 
+                    className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedImage(chat.avatar!);
+                    }}
+                  />
+                ) : (
+                  <User className="w-6 h-6" />
+                )}
               </div>
               
               <div className="flex-1 min-w-0 flex justify-between gap-2">
@@ -1728,7 +1797,15 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
             <div className="p-4 flex items-center justify-between border-b border-border bg-card/20 backdrop-blur-md z-40 relative">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border">
-                   {selectedChat.avatar ? <img src={selectedChat.avatar} className="w-full h-full object-cover" /> : <User className="w-5 h-5" />}
+                   {selectedChat.avatar ? (
+                     <img 
+                      src={selectedChat.avatar} 
+                      className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
+                      onClick={() => setSelectedImage(selectedChat.avatar!)}
+                    />
+                   ) : (
+                     <User className="w-5 h-5" />
+                   )}
                 </div>
                 <div>
                   <h4 className="font-bold text-base tracking-tight font-inter">
@@ -1845,15 +1922,18 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                         
                         {/* Mídia: Imagem ou Figurinha */}
                         {(msg.tipo === "image" || msg.tipo === "sticker") && msg.mediaUrl && (
-                          <img 
-                            src={msg.mediaUrl} 
-                            alt={isSticker ? "Figurinha" : "Imagem Recebida"} 
-                            className={cn(
-                              isSticker ? "w-40 sm:w-48 h-auto object-contain" : "w-72 max-w-full object-cover",
-                              msg.text && !["Mídia", "📷 Imagem", "🖼️ Figurinha"].includes(msg.text) ? "rounded-t-xl rounded-b-sm" : "rounded-xl",
-                              (msg.sender === "me" && !isSticker) ? "rounded-tr-none" : (!isSticker ? "rounded-tl-none" : "")
-                            )} 
-                          />
+                          <div className="relative group/img">
+                            <img 
+                              src={msg.mediaUrl} 
+                              alt={isSticker ? "Figurinha" : "Imagem Recebida"} 
+                              onClick={() => !isSticker && setSelectedImage(msg.mediaUrl!)}
+                              className={cn(
+                                isSticker ? "w-40 sm:w-48 h-auto object-contain" : "w-72 max-w-full object-cover cursor-pointer hover:opacity-95 transition-all duration-300",
+                                msg.text && !["Mídia", "📷 Imagem", "🖼️ Figurinha"].includes(msg.text) ? "rounded-t-xl rounded-b-sm" : "rounded-xl",
+                                (msg.sender === "me" && !isSticker) ? "rounded-tr-none" : (!isSticker ? "rounded-tl-none" : "")
+                              )} 
+                            />
+                          </div>
                         )}
                         
                         {/* Mídia: Vídeo */}
@@ -2451,6 +2531,53 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               <><RefreshCw className="w-4 h-4" /> Desarquivar</>
             )}
           </button>
+        </div>
+      )}
+      {/* Lightbox de Imagem */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="absolute top-8 right-8 flex items-center gap-4 z-[10000]">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                  printWindow.document.write(`
+                    <html>
+                      <head><title>Imprimir Imagem</title></head>
+                      <body style="margin:0;display:flex;justify-content:center;align-items:center;background:white;">
+                        <img src="${selectedImage}" style="max-width:100%;height:auto;" onload="window.print();setTimeout(() => window.close(), 500);">
+                      </body>
+                    </html>
+                  `);
+                  printWindow.document.close();
+                }
+              }}
+              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all group"
+              title="Imprimir Imagem"
+            >
+              <Printer className="w-6 h-6 group-hover:scale-110 transition-transform" />
+            </button>
+
+            <button 
+              onClick={() => setSelectedImage(null)}
+              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all group"
+              title="Fechar"
+            >
+              <X className="w-6 h-6 group-hover:scale-110 transition-transform" />
+            </button>
+          </div>
+          
+          <div className="relative max-w-7xl w-full h-full flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
+            <img 
+              src={selectedImage} 
+              alt="Preview" 
+              className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-500"
+            />
+          </div>
         </div>
       )}
     </div>

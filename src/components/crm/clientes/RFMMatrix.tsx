@@ -12,6 +12,7 @@ interface RFMDataPoint {
   nome_cliente: string;
   recencia_score: number; // 1-5
   fv_score: number; // 1-5 (average of F and V)
+  [key: string]: any;
 }
 
 interface RFMMatrixProps {
