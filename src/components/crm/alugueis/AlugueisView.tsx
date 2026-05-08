@@ -184,7 +184,7 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
         end_date: endDate,
         daily_value: parseFloat(dailyValue.replace(',', '.')),
         total_value: totalCalculation.total,
-        payment_status: "pending",
+        payment_status: "paid",
         salesperson: userProfile?.name || "Danilo",
         status: "active"
       };
@@ -285,12 +285,11 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
       </div>
 
       {/* Stats - More Compact */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {[
           { label: "Disponíveis", value: stats.available, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-50" },
           { label: "Em Uso", value: stats.rented, icon: Clock, color: "text-blue-500", bg: "bg-blue-50" },
           { label: "Manutenção", value: stats.maintenance, icon: AlertCircle, color: "text-amber-500", bg: "bg-amber-50" },
-          { label: "Pagtos Pendentes", value: stats.pendingPayments, icon: DollarSign, color: "text-rose-500", bg: "bg-rose-50" },
         ].map((stat, i) => (
           <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex items-center gap-3 shadow-sm">
             <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", stat.bg, "dark:bg-opacity-10")}>
@@ -372,16 +371,10 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
 
                   <div className="flex items-center justify-between p-3 bg-slate-900 dark:bg-slate-950 rounded-xl border border-white/5">
                     <div className="flex flex-col">
-                      <span className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em]">Total</span>
+                      <span className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em]">Total do Aluguel</span>
                       <span className="text-sm font-black text-white">
                         R$ {machine.currentRental.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
-                    </div>
-                    <div className={cn(
-                      "flex items-center gap-1 px-2 py-1 rounded-lg text-[8px] font-black uppercase",
-                      machine.currentRental.paymentStatus === "paid" ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
-                    )}>
-                      Pagamento {machine.currentRental.paymentStatus === "paid" ? "OK" : "Pendente"}
                     </div>
                   </div>
 
