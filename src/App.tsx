@@ -113,6 +113,7 @@ function DashboardContent({
       "Ligações",
       "Campanhas",
       "Relatórios",
+      "Alugueis",
       "Coletor",
       "Logística",
       "Romaneios",
@@ -695,6 +696,7 @@ function DashboardContent({
     "Clientes",
     "Campanhas",
     "Ligações",
+    "Alugueis",
     "Relatórios",
   ].includes(activeItem);
   const isMarketingView = [

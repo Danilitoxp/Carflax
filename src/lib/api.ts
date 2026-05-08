@@ -226,6 +226,9 @@ export const apiCrmOrcamentos = (params: { vendedor?: string, inicio?: string, f
 
 export const apiCrmStatus = (body: unknown) => post("/api/crm/status", body);
 
+export const apiCrmAlugueisClientes = () =>
+  get<{ value: string; label: string }[]>("/api/crm/alugueis/clientes");
+
 // ── Outros ────────────────────────────────────────────────────────────────────
 
 export interface ProductInfo {

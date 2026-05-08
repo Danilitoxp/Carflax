@@ -27,6 +27,7 @@ import {
   Smartphone,
   FileBarChart,
   Database,
+  Key,
   type LucideIcon,
 } from "lucide-react";
 import organogramaIcon from "@/assets/organograma.svg";
@@ -71,6 +72,7 @@ const menuItems: MenuItem[] = [
       { label: "Clientes", icon: Users },
       { label: "Ligações", icon: PhoneCall },
       { label: "Campanhas", icon: Megaphone },
+      { label: "Alugueis", icon: Key },
       { label: "Relatórios", icon: FileBarChart },
     ],
   },
@@ -171,7 +173,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const vendedorStandard = [
       "Geral", "Produtos", "Dashboard", 
       "Calendário", "Eventos", "Férias", 
-      "Comercial", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Coletor", 
+      "Comercial", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Alugueis", "Relatórios", "Coletor", 
       "Logística", "Romaneios", "Entregas", 
       "Produtos", "Estoque", "Preços", "Eventos", "Férias"
     ];

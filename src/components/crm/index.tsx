@@ -5,11 +5,25 @@ import { OrcamentosView } from "./orcamentos/OrcamentosView";
 import { RelatoriosView } from "./relatorios/RelatoriosView";
 import { LigacoesView } from "@/components/crm/ligacoes/LigacoesView";
 import { ClientesFRVView } from "./clientes/ClientesFRVView";
+import { AlugueisView } from "./alugueis/AlugueisView";
 import { cn } from "@/lib/utils";
+
+interface UserProfile {
+  id?: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string;
+  department?: string;
+  operator_code?: string;
+  operatorCode?: string;
+  permissions?: string[];
+  is_admin?: boolean;
+}
 
 interface CrmSectionProps {
   activeTab: string;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 export function CrmSection({ activeTab, userProfile }: CrmSectionProps) {
@@ -37,6 +51,8 @@ export function CrmSection({ activeTab, userProfile }: CrmSectionProps) {
             </div>
           ) : activeTab === "Relatórios" ? (
             <RelatoriosView orcamentos={[]} userProfile={userProfile} />
+          ) : activeTab === "Alugueis" ? (
+            <AlugueisView />
           ) : (
             <OrcamentosView userProfile={userProfile} />
           )}
