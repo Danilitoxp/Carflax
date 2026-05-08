@@ -85,9 +85,9 @@ interface Message {
 type Temperature = "Quente" | "Morno" | "Frio";
 
 interface LeadMetadata {
-  source: string;
-  campaign: string;
-  status: string;
+  source?: string;
+  campaign?: string;
+  status?: string;
   temperature?: Temperature;
   budgetId?: string;
   saleValue?: string;
@@ -1009,32 +1009,33 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   // Reclassifica leads sem temperatura definida (Frio padrão) ao carregar
   useEffect(() => {
     const reclassifyUnclassified = async () => {
-      const allClientes = await marketingService.getActiveClientes('all');
-      if (!allClientes || allClientes.length === 0) return;
-      // Processa apenas leads sem temperatura ou com "Frio" padrão, em lotes de 5
-      const targets = allClientes.filter(c => !c.temperatura || c.temperatura === 'Frio');
-      for (let i = 0; i < Math.min(targets.length, 30); i++) {
-        const cliente = targets[i];
-        const msgs = await marketingService.getMessagesByJid(cliente.remote_jid, 15);
-        if (msgs.length < 3) continue;
-        try {
-          const newTemp = await classifyTemperature(
-            msgs.map(m => ({ sender: m.sender as "me" | "contact", text: m.texto || "" }))
-          );
-          if (newTemp !== 'Frio') {
-            await marketingService.upsertCliente({ remote_jid: cliente.remote_jid, temperatura: newTemp });
-            setChats(prev => prev.map(c =>
-              c.id === cliente.remote_jid ? { ...c, leadInfo: { ...c.leadInfo!, temperature: newTemp as Temperature } } : c
-            ));
+      try {
+        const allClientes = await marketingService.getActiveClientes('all');
+        if (!allClientes || allClientes.length === 0) return;
+        const targets = allClientes.filter(c => !c.temperatura || c.temperatura === 'Frio');
+        for (let i = 0; i < Math.min(targets.length, 30); i++) {
+          try {
+            const cliente = targets[i];
+            const msgs = await marketingService.getMessagesByJid(cliente.remote_jid, 15);
+            if (!msgs || msgs.length < 3) continue;
+            const newTemp = await classifyTemperature(
+              msgs.map(m => ({ sender: m.sender as "me" | "contact", text: m.texto || "" }))
+            );
+            if (newTemp !== 'Frio') {
+              await marketingService.upsertCliente({ remote_jid: cliente.remote_jid, temperatura: newTemp });
+              setChats(prev => prev.map(c =>
+                c.id === cliente.remote_jid ? { ...c, leadInfo: { ...(c.leadInfo || {}), temperature: newTemp as Temperature } } : c
+              ));
+            }
+          } catch {
+            // silencia erros individuais para não interromper o lote
           }
-        } catch {
-          // silencia erros individuais para não interromper o lote
+          await new Promise(r => setTimeout(r, 300));
         }
-        // pequena pausa para não sobrecarregar a API do Gemini
-        await new Promise(r => setTimeout(r, 300));
+      } catch {
+        // silencia erros de rede no carregamento inicial
       }
     };
-    // Aguarda os chats carregarem antes de reclassificar
     const id = setTimeout(reclassifyUnclassified, 5000);
     return () => clearTimeout(id);
   }, []);
@@ -1042,9 +1043,13 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   // Tempo médio de 1ª resposta do dia (atualiza a cada 5 min)
   useEffect(() => {
     const fetchResponseTime = async () => {
-      const today = new Date();
-      const val = await marketingService.getAvgFirstResponseTime(today, today);
-      setAvgResponseTime(val);
+      try {
+        const today = new Date();
+        const val = await marketingService.getAvgFirstResponseTime(today, today);
+        setAvgResponseTime(val);
+      } catch {
+        // mantém o valor anterior em caso de erro de rede
+      }
     };
     fetchResponseTime();
     const id = setInterval(fetchResponseTime, 5 * 60 * 1000);
@@ -1469,7 +1474,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const handleTemperatureChange = useCallback((newTemp: Temperature) => {
     if (!selectedChat) return;
     manualOverrideRef.current.set(selectedChat.id, Date.now());
-    const updatedLeadInfo = { ...selectedChat.leadInfo!, temperature: newTemp };
+    const updatedLeadInfo = { ...(selectedChat.leadInfo || {}), temperature: newTemp };
     setSelectedChat({ ...selectedChat, leadInfo: updatedLeadInfo });
     setChats(prev => prev.map(c =>
       c.id === selectedChat.id ? { ...c, leadInfo: updatedLeadInfo } : c
@@ -1496,11 +1501,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       await marketingService.upsertCliente({ remote_jid: remoteJid, temperatura: newTemp });
 
       setChats(prev => prev.map(c =>
-        c.id === remoteJid ? { ...c, leadInfo: { ...c.leadInfo!, temperature: newTemp as Temperature } } : c
+        c.id === remoteJid ? { ...c, leadInfo: { ...(c.leadInfo || {}), temperature: newTemp as Temperature } } : c
       ));
       setSelectedChat(cur => {
         if (!cur || cur.id !== remoteJid) return cur;
-        return { ...cur, leadInfo: { ...cur.leadInfo!, temperature: newTemp as Temperature } };
+        return { ...cur, leadInfo: { ...(cur.leadInfo || {}), temperature: newTemp as Temperature } };
       });
     } catch (err) {
       console.error("[Temp] Falha na classificação automática:", err);
@@ -1516,7 +1521,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     if (!selectedChat) return;
     try {
       await marketingService.deleteSale(selectedChat.id);
-      const updatedLeadInfo = { ...selectedChat.leadInfo!, saleValue: undefined };
+      const updatedLeadInfo = { ...(selectedChat.leadInfo || {}), saleValue: undefined };
       setSelectedChat({ ...selectedChat, leadInfo: updatedLeadInfo });
       setChats(prev => prev.map(c => c.id === selectedChat.id ? { ...c, leadInfo: updatedLeadInfo } : c));
       setShowSaleModal(false);
@@ -1538,7 +1543,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       const formatted = val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
       // Atualiza o valor fixado no chat
-      const updatedLeadInfo = { ...selectedChat.leadInfo!, saleValue: formatted };
+      const updatedLeadInfo = { ...(selectedChat.leadInfo || {}), saleValue: formatted };
       setSelectedChat({ ...selectedChat, leadInfo: updatedLeadInfo });
       setChats(prev => prev.map(c => c.id === selectedChat.id ? { ...c, leadInfo: updatedLeadInfo } : c));
 

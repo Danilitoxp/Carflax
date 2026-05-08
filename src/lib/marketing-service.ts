@@ -475,62 +475,56 @@ export const marketingService = {
    * resposta nossa após ela. Retorna a média em minutos (ou null se sem dados).
    */
   async getAvgFirstResponseTime(startDate: Date, endDate?: Date): Promise<number | null> {
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = endDate ? new Date(endDate) : new Date(startDate);
-    end.setHours(23, 59, 59, 999);
+    try {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = endDate ? new Date(endDate) : new Date(startDate);
+      end.setHours(23, 59, 59, 999);
 
-    // Só considera mensagens recebidas em horário comercial: seg-sex, 07:30–17:30
-    const isBusinessHour = (date: Date): boolean => {
-      const dow = date.getDay(); // 0=dom, 6=sab
-      if (dow === 0 || dow === 6) return false;
-      const minutes = date.getHours() * 60 + date.getMinutes();
-      return minutes >= 7 * 60 + 30 && minutes <= 17 * 60 + 30;
-    };
+      const isBusinessHour = (date: Date): boolean => {
+        const dow = date.getDay();
+        if (dow === 0 || dow === 6) return false;
+        const minutes = date.getHours() * 60 + date.getMinutes();
+        return minutes >= 7 * 60 + 30 && minutes <= 17 * 60 + 30;
+      };
 
-    const { data, error } = await supabase
-      .from("marketing_whatsapp")
-      .select("remote_jid, sender, timestamp")
-      .gte("timestamp", start.toISOString())
-      .lte("timestamp", end.toISOString())
-      .order("timestamp", { ascending: true });
+      const { data, error } = await supabase
+        .from("marketing_whatsapp")
+        .select("remote_jid, sender, timestamp")
+        .gte("timestamp", start.toISOString())
+        .lte("timestamp", end.toISOString())
+        .order("timestamp", { ascending: true });
 
-    if (error || !data || data.length === 0) return null;
+      if (error || !data || data.length === 0) return null;
 
-    // Agrupar por conversa (ignora linhas com campos críticos ausentes)
-    const byJid: Record<string, { sender: string; timestamp: string }[]> = {};
-    for (const msg of data) {
-      if (!msg.remote_jid || !msg.sender || !msg.timestamp) continue;
-      if (!byJid[msg.remote_jid]) byJid[msg.remote_jid] = [];
-      byJid[msg.remote_jid].push({ sender: msg.sender, timestamp: msg.timestamp });
-    }
-
-    const deltas: number[] = [];
-    for (const msgs of Object.values(byJid)) {
-      // Primeira mensagem do cliente recebida EM horário comercial
-      const firstContactIdx = msgs.findIndex(m => {
-        if (m.sender !== "contact") return false;
-        return isBusinessHour(new Date(m.timestamp));
-      });
-      if (firstContactIdx === -1) continue;
-
-      const firstContactTime = new Date(msgs[firstContactIdx].timestamp).getTime();
-
-      // Primeira resposta nossa APÓS essa mensagem
-      const firstResponse = msgs.slice(firstContactIdx + 1).find(m => m.sender === "me");
-      if (!firstResponse) continue;
-
-      const responseTime = new Date(firstResponse.timestamp).getTime();
-      const diffMinutes = (responseTime - firstContactTime) / 60000;
-
-      // Ignorar valores absurdos (> 24h) que distorcem a média
-      if (diffMinutes >= 0 && diffMinutes <= 1440) {
-        deltas.push(diffMinutes);
+      const byJid: Record<string, { sender: string; timestamp: string }[]> = {};
+      for (const msg of data) {
+        if (!msg.remote_jid || !msg.sender || !msg.timestamp) continue;
+        if (!byJid[msg.remote_jid]) byJid[msg.remote_jid] = [];
+        byJid[msg.remote_jid].push({ sender: msg.sender, timestamp: msg.timestamp });
       }
-    }
 
-    if (deltas.length === 0) return null;
-    return deltas.reduce((a, b) => a + b, 0) / deltas.length;
+      const deltas: number[] = [];
+      for (const msgs of Object.values(byJid)) {
+        const firstContactIdx = msgs.findIndex(m => {
+          if (m.sender !== "contact") return false;
+          return isBusinessHour(new Date(m.timestamp));
+        });
+        if (firstContactIdx === -1) continue;
+
+        const firstContactTime = new Date(msgs[firstContactIdx].timestamp).getTime();
+        const firstResponse = msgs.slice(firstContactIdx + 1).find(m => m.sender === "me");
+        if (!firstResponse) continue;
+
+        const diffMinutes = (new Date(firstResponse.timestamp).getTime() - firstContactTime) / 60000;
+        if (diffMinutes >= 0 && diffMinutes <= 1440) deltas.push(diffMinutes);
+      }
+
+      if (deltas.length === 0) return null;
+      return deltas.reduce((a, b) => a + b, 0) / deltas.length;
+    } catch {
+      return null;
+    }
   },
 
   /**
