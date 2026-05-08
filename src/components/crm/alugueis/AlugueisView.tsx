@@ -39,7 +39,24 @@ interface Machine {
   currentRental?: Rental;
 }
 
-export function AlugueisView() {
+interface UserProfile {
+  id?: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string;
+  department?: string;
+  operator_code?: string;
+  operatorCode?: string;
+  permissions?: string[];
+  is_admin?: boolean;
+}
+
+interface AlugueisViewProps {
+  userProfile?: UserProfile;
+}
+
+export function AlugueisView({ userProfile }: AlugueisViewProps) {
   const [machines, setMachines] = useState<Machine[]>([
     {
       id: "TRM20905",
@@ -168,7 +185,7 @@ export function AlugueisView() {
         daily_value: parseFloat(dailyValue.replace(',', '.')),
         total_value: totalCalculation.total,
         payment_status: "pending",
-        salesperson: "Danilo",
+        salesperson: userProfile?.name || "Danilo",
         status: "active"
       };
 
@@ -207,7 +224,7 @@ export function AlugueisView() {
       console.error("Erro ao salvar aluguel:", err);
       alert("Erro ao salvar no banco de dados. Verifique a conexão.");
     }
-  }, [selectedMachine, search, startDate, endDate, dailyValue, totalCalculation.total, setMachines, setHistory, resetForm]);
+  }, [selectedMachine, search, startDate, endDate, dailyValue, totalCalculation.total, setMachines, setHistory, resetForm, userProfile?.name]);
 
   const handleFinishRental = useCallback(async (machineId: string, rentalId?: string) => {
     if (!rentalId) return;
@@ -369,10 +386,16 @@ export function AlugueisView() {
                   </div>
 
                   <button 
+                    disabled={machine.currentRental.salesperson !== userProfile?.name}
                     onClick={() => handleFinishRental(machine.id, machine.currentRental?.id)}
-                    className="w-full py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    className={cn(
+                      "w-full py-2 border rounded-lg text-[9px] font-black uppercase tracking-widest transition-colors",
+                      machine.currentRental.salesperson === userProfile?.name
+                        ? "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                        : "border-slate-100 dark:border-slate-800 text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-50"
+                    )}
                   >
-                    Finalizar
+                    {machine.currentRental.salesperson === userProfile?.name ? "Finalizar" : "Bloqueado (Apenas Vendedor)"}
                   </button>
                 </div>
               ) : machine.status === "available" ? (
@@ -426,7 +449,8 @@ export function AlugueisView() {
               <tr className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                 <th className="px-4 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest">Equipamento</th>
                 <th className="px-4 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest">Cliente</th>
-                <th className="px-4 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest">Período</th>
+                <th className="px-4 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-left">Período</th>
+                <th className="px-4 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-left">Vendedor</th>
                 <th className="px-4 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Valor</th>
                 <th className="px-4 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Status</th>
               </tr>
@@ -440,12 +464,16 @@ export function AlugueisView() {
                   <td className="px-4 py-3">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-black text-slate-700 dark:text-slate-300">{item.clientName}</span>
-                      <span className="text-[8px] font-bold text-slate-400 uppercase">{item.salesperson}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">
                       {new Date(item.startDate).toLocaleDateString('pt-BR')} - {item.endDate ? new Date(item.endDate).toLocaleDateString('pt-BR') : '...'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase">
+                      {item.salesperson}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -464,7 +492,7 @@ export function AlugueisView() {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center">
+                  <td colSpan={6} className="px-4 py-8 text-center">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nenhum histórico encontrado</span>
                   </td>
                 </tr>

@@ -52,7 +52,7 @@ export function CrmSection({ activeTab, userProfile }: CrmSectionProps) {
           ) : activeTab === "Relatórios" ? (
             <RelatoriosView orcamentos={[]} userProfile={userProfile} />
           ) : activeTab === "Alugueis" ? (
-            <AlugueisView />
+            <AlugueisView userProfile={userProfile} />
           ) : (
             <OrcamentosView userProfile={userProfile} />
           )}
