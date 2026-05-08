@@ -13,12 +13,19 @@ export async function classifyTemperature(
     .map(m => `${m.sender === "me" ? "Vendedor" : "Cliente"}: ${m.text}`)
     .join("\n");
 
-  const prompt = `Você é um analista de leads de vendas. Analise a conversa e classifique o interesse do cliente.
+  const prompt = `Você é um analista de leads de vendas de autopeças. Analise a conversa e classifique o interesse do cliente.
 
 Responda APENAS com uma das três palavras exatas, sem explicações:
-- Quente (cliente muito interessado, perguntou preço, prazo, disponibilidade ou demonstrou intenção clara de compra)
-- Morno (cliente com algum interesse, fez perguntas, mas sem intenção clara de compra ainda)
-- Frio (cliente sem interesse aparente, respostas curtas ou sem engajamento real)
+- Quente: cliente pediu preço, confirmou que quer comprar, pediu para reservar, perguntou sobre forma de pagamento, prazo de entrega ou disponibilidade de peça específica com intenção clara.
+- Morno: cliente fez perguntas sobre produtos, marcas ou compatibilidade mas ainda não demonstrou intenção de compra; ou iniciou conversa mas ainda está avaliando.
+- Frio: cliente enviou apenas "oi", "olá", mensagem sem contexto, parou de responder, ou claramente não tem interesse em comprar.
+
+Exemplos:
+- "Tem filtro de óleo para Gol 1.0?" → Morno
+- "Quanto custa o filtro e tem em estoque?" → Quente
+- "Oi" → Frio
+- "Preciso de um par de pastilhas, pode separar?" → Quente
+- "Qual a diferença entre a original e a paralela?" → Morno
 
 Conversa:
 ${transcript}

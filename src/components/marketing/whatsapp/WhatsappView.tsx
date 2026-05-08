@@ -1006,6 +1006,38 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     setLoading(false);
   }, [loadChats]);
 
+  // Reclassifica leads sem temperatura definida (Frio padrão) ao carregar
+  useEffect(() => {
+    const reclassifyUnclassified = async () => {
+      const allClientes = await marketingService.getActiveClientes('all');
+      // Processa apenas leads sem temperatura ou com "Frio" padrão, em lotes de 5
+      const targets = allClientes.filter(c => !c.temperatura || c.temperatura === 'Frio');
+      for (let i = 0; i < Math.min(targets.length, 30); i++) {
+        const cliente = targets[i];
+        const msgs = await marketingService.getMessagesByJid(cliente.remote_jid, 15);
+        if (msgs.length < 3) continue;
+        try {
+          const newTemp = await classifyTemperature(
+            msgs.map(m => ({ sender: m.sender as "me" | "contact", text: m.texto || "" }))
+          );
+          if (newTemp !== 'Frio') {
+            await marketingService.upsertCliente({ remote_jid: cliente.remote_jid, temperatura: newTemp });
+            setChats(prev => prev.map(c =>
+              c.id === cliente.remote_jid ? { ...c, leadInfo: { ...c.leadInfo!, temperature: newTemp as Temperature } } : c
+            ));
+          }
+        } catch {
+          // silencia erros individuais para não interromper o lote
+        }
+        // pequena pausa para não sobrecarregar a API do Gemini
+        await new Promise(r => setTimeout(r, 300));
+      }
+    };
+    // Aguarda os chats carregarem antes de reclassificar
+    const id = setTimeout(reclassifyUnclassified, 5000);
+    return () => clearTimeout(id);
+  }, []);
+
   // Tempo médio de 1ª resposta do dia (atualiza a cada 5 min)
   useEffect(() => {
     const fetchResponseTime = async () => {
@@ -1080,7 +1112,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       await marketingService.upsertCliente({
         remote_jid: selectedChat.id,
         ultima_mensagem: textToSend,
-        ultima_conversa_em: timestamp
+        ultima_conversa_em: timestamp,
+        status: "Em Contato"
       });
 
       await marketingService.saveMessage({
@@ -1151,6 +1184,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           remote_jid: selectedChat.id,
           ultima_mensagem: `📎 ${file.name}`,
           ultima_conversa_em: timestamp,
+          status: "Em Contato"
         });
 
         await marketingService.saveMessage({

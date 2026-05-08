@@ -406,6 +406,25 @@ export const marketingService = {
     leadsMonthQuery = applyFilters(leadsMonthQuery);
     const { count: leadsMonth } = await leadsMonthQuery;
 
+    // Contagens por temperatura no período
+    const getTempCount = async (temp: string) => {
+      let q = supabase
+        .from('marketing_clientes')
+        .select('*', { count: 'exact', head: true })
+        .eq('temperatura', temp)
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString());
+      q = applyFilters(q);
+      const { count } = await q;
+      return count || 0;
+    };
+
+    const [frio, morno, quente] = await Promise.all([
+      getTempCount('Frio'),
+      getTempCount('Morno'),
+      getTempCount('Quente')
+    ]);
+
     // Faturamento no período selecionado (Vendas Hoje/Período)
     let salesQuery = supabase
       .from('marketing_clientes')
@@ -432,6 +451,9 @@ export const marketingService = {
     return {
       leadsToday: leadsInPeriod || 0,
       leadsMonth: leadsMonth || 0,
+      frioToday: frio,
+      mornoToday: morno,
+      quenteToday: quente,
       billingToday: billingInPeriod,
       billingMonth,
       salesCountToday: (salesInPeriod || []).length,

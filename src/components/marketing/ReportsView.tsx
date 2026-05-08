@@ -9,7 +9,9 @@ import {
   Calendar,
   ChevronDown,
   Download,
-  Timer
+  Timer,
+  Filter,
+  X
 } from "lucide-react";
 import { marketingService } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
@@ -25,12 +27,16 @@ export function ReportsView() {
   const [stats, setStats] = useState({
     leadsToday: 0,
     leadsMonth: 0,
+    frioToday: 0,
+    mornoToday: 0,
+    quenteToday: 0,
     billingToday: 0,
     billingMonth: 0,
     avgTicket: 0,
     conversionRate: 0,
     avgFirstResponseMinutes: null as number | null
   });
+  const [showFunnel, setShowFunnel] = useState(false);
 
 
   useEffect(() => {
@@ -39,7 +45,7 @@ export function ReportsView() {
       try {
         const filters = {};
 
-        const [marketingData, hourlyLeads, avgResponseTime]: [{ leadsToday: number; leadsMonth: number; billingToday: number; billingMonth: number; salesCountToday: number; salesCountMonth: number }, number[], number | null] = await Promise.all([
+        const [marketingData, hourlyLeads, avgResponseTime]: [{ leadsToday: number; leadsMonth: number; frioToday: number; mornoToday: number; quenteToday: number; billingToday: number; billingMonth: number; salesCountToday: number; salesCountMonth: number }, number[], number | null] = await Promise.all([
           marketingService.getMarketingStats(startDate, endDate || undefined, filters),
           marketingService.getHourlyLeads(startDate, endDate || undefined, filters),
           marketingService.getAvgFirstResponseTime(startDate, endDate || undefined)
@@ -59,6 +65,9 @@ export function ReportsView() {
         setStats({
           leadsToday: marketingData.leadsToday,
           leadsMonth: marketingData.leadsMonth,
+          frioToday: marketingData.frioToday,
+          mornoToday: marketingData.mornoToday,
+          quenteToday: marketingData.quenteToday,
           billingToday: totalBillingToday,
           billingMonth: totalBillingMonth,
           avgTicket,
@@ -152,6 +161,17 @@ export function ReportsView() {
                 </>
               )}
             </div>
+
+            <button
+              onClick={() => setShowFunnel(true)}
+              className={cn(
+                "w-10 h-10 border rounded-xl transition-all active:scale-95 shadow-sm flex items-center justify-center group",
+                showFunnel ? "bg-primary border-primary text-white" : "bg-card border-border text-muted-foreground hover:bg-secondary"
+              )}
+              title="Ver Funil de Vendas"
+            >
+              <Filter className="w-4 h-4" />
+            </button>
 
             <button
               onClick={() => {}} // TODO: Implement export
@@ -300,6 +320,100 @@ export function ReportsView() {
           </div>
         </div>
       </div>
+
+      {/* Funnel Overlay */}
+      {showFunnel && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-xl animate-in fade-in duration-300 p-4">
+          <div className="bg-card border border-border w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-500">
+            <button 
+              onClick={() => setShowFunnel(false)}
+              className="absolute top-6 right-6 p-3 hover:bg-secondary rounded-2xl transition-all text-muted-foreground"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <div className="p-10 flex flex-col items-center">
+              <div className="text-center mb-12">
+                <h2 className="text-2xl font-black uppercase tracking-tight">Funil de Conversão</h2>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mt-2">Visão Geral do Tráfego</p>
+              </div>
+
+              {/* Funnel Visualization */}
+              <div className="w-full space-y-1.5 flex flex-col items-center">
+                
+                {/* Stage 1: Awareness */}
+                <div className="w-full h-16 bg-blue-500/10 border border-blue-500/20 rounded-[30px_30px_15px_15px] flex items-center justify-between px-10 group hover:bg-blue-500/15 transition-all">
+                   <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Leads Gerados</span>
+                      <span className="text-xl font-black text-foreground">{stats.leadsToday}</span>
+                   </div>
+                   <div className="text-right">
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase">100% Atração</span>
+                   </div>
+                </div>
+
+                <div className="w-20 h-2 bg-gradient-to-b from-blue-500/20 to-slate-500/20 blur-[2px]" />
+
+                {/* Stage 2: Frio */}
+                <div className="w-[90%] h-16 bg-slate-500/10 border border-slate-500/20 rounded-[15px_15px_10px_10px] flex items-center justify-between px-9 group hover:bg-slate-500/15 transition-all">
+                   <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Leads Frios</span>
+                      <span className="text-xl font-black text-foreground">{stats.frioToday}</span>
+                   </div>
+                   <div className="text-right">
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase">Descoberta</span>
+                   </div>
+                </div>
+
+                <div className="w-16 h-2 bg-gradient-to-b from-slate-500/20 to-amber-500/20 blur-[2px]" />
+
+                {/* Stage 3: Morno */}
+                <div className="w-[80%] h-16 bg-amber-500/10 border border-amber-500/20 rounded-[10px_10px_10px_10px] flex items-center justify-between px-8 group hover:bg-amber-500/15 transition-all">
+                   <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Leads Mornos</span>
+                      <span className="text-xl font-black text-foreground">{stats.mornoToday}</span>
+                   </div>
+                   <div className="text-right">
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase">Interesse</span>
+                   </div>
+                </div>
+
+                <div className="w-12 h-2 bg-gradient-to-b from-amber-500/20 to-rose-500/20 blur-[2px]" />
+
+                {/* Stage 4: Quente */}
+                <div className="w-[70%] h-16 bg-rose-500/10 border border-rose-500/20 rounded-[10px_10px_10px_10px] flex items-center justify-between px-7 group hover:bg-rose-500/15 transition-all">
+                   <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Leads Quentes</span>
+                      <span className="text-xl font-black text-foreground">{stats.quenteToday}</span>
+                   </div>
+                   <div className="text-right">
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase">Intenção</span>
+                   </div>
+                </div>
+
+                <div className="w-8 h-2 bg-gradient-to-b from-rose-500/20 to-emerald-500/20 blur-[2px]" />
+
+                {/* Stage 5: Conversion */}
+                <div className="w-[60%] h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-[10px_10px_30px_30px] flex items-center justify-between px-6 group hover:bg-emerald-500/15 transition-all">
+                   <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Vendas</span>
+                      <span className="text-xl font-black text-foreground">{stats.billingToday > 0 ? (stats.billingToday / stats.avgTicket || 0).toFixed(0) : 0}</span>
+                   </div>
+                   <div className="text-right">
+                      <span className="text-xs font-black text-emerald-600">
+                        {stats.conversionRate.toFixed(1)}%
+                      </span>
+                   </div>
+                </div>
+              </div>
+
+              <p className="mt-12 text-[10px] font-bold text-muted-foreground uppercase text-center max-w-sm leading-relaxed">
+                Este funil representa a jornada do lead desde a primeira interação no WhatsApp até o faturamento final no período selecionado.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
