@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiCrmAlugueisClientes } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 interface Rental {
   id: string;
@@ -39,7 +40,7 @@ interface Machine {
 }
 
 export function AlugueisView() {
-  const [machines] = useState<Machine[]>([
+  const [machines, setMachines] = useState<Machine[]>([
     {
       id: "TRM20905",
       name: "Termofusora Grande",
@@ -55,7 +56,7 @@ export function AlugueisView() {
       image: "https://images.tcdn.com.br/img/img_prod/1100542/90_termofusora_ppr_6_bocais_20_a_63mm_800w_220v_trm20633_topfusion_12979_2_786e8cd03e10868e40be143611963701.jpg"
     }
   ]);
-  const [history] = useState<Rental[]>([]);
+  const [history, setHistory] = useState<Rental[]>([]);
   const [showNewRentalModal, setShowNewRentalModal] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [clients, setClients] = useState<{ value: string; label: string }[]>([]);
@@ -64,6 +65,7 @@ export function AlugueisView() {
   const [dailyValue, setDailyValue] = useState("");
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const resetForm = useCallback(() => {
     setSearch("");
@@ -85,18 +87,54 @@ export function AlugueisView() {
     }
   }, []);
 
+  const loadHistory = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('crm_alugueis')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      if (data) {
+        // Map DB fields to Rental interface if necessary
+        const mappedData: Rental[] = data.map(item => ({
+          id: item.id,
+          machineId: item.machine_id,
+          clientName: item.client_name,
+          value: item.total_value,
+          startDate: item.start_date,
+          endDate: item.end_date,
+          paymentStatus: item.payment_status,
+          salesperson: item.salesperson,
+          status: item.status
+        }));
+        setHistory(mappedData);
+
+        // Also update machines status based on active rentals
+        const activeRentals = mappedData.filter(r => r.status === 'active');
+        setMachines(prev => prev.map(m => {
+          const rental = activeRentals.find(r => r.machineId === m.id);
+          if (rental) {
+            return { ...m, status: 'rented', currentRental: rental };
+          }
+          return { ...m, status: 'available', currentRental: undefined };
+        }));
+      }
+    } catch (err) {
+      console.error("Erro ao carregar histórico:", err);
+    }
+  }, [setHistory, setMachines]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
   useEffect(() => {
     if (showNewRentalModal) {
       loadClients();
     }
   }, [showNewRentalModal, loadClients]);
-
-  const filteredClients = useMemo(() => {
-    return clients.filter(c => 
-      c.label.toLowerCase().includes(search.toLowerCase()) || 
-      c.value.toString().includes(search)
-    ).slice(0, 5);
-  }, [clients, search]);
 
   const totalCalculation = useMemo(() => {
     if (!startDate || !endDate || !dailyValue) return { days: 0, total: 0 };
@@ -113,6 +151,95 @@ export function AlugueisView() {
       total: days * daily
     };
   }, [startDate, endDate, dailyValue]);
+
+  const handleConfirmRental = useCallback(async () => {
+    if (!selectedMachine || !search || !startDate || !endDate) {
+      alert("Por favor, preencha todos os campos.");
+      return;
+    }
+
+    try {
+      const newRentalData = {
+        machine_id: selectedMachine.id,
+        machine_name: selectedMachine.name,
+        client_name: search,
+        start_date: startDate,
+        end_date: endDate,
+        daily_value: parseFloat(dailyValue.replace(',', '.')),
+        total_value: totalCalculation.total,
+        payment_status: "pending",
+        salesperson: "Danilo",
+        status: "active"
+      };
+
+      const { data, error } = await supabase
+        .from('crm_alugueis')
+        .insert([newRentalData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const newRental: Rental = {
+          id: data.id,
+          machineId: data.machine_id,
+          clientName: data.client_name,
+          value: data.total_value,
+          startDate: data.start_date,
+          endDate: data.end_date,
+          paymentStatus: data.payment_status,
+          salesperson: data.salesperson,
+          status: data.status
+        };
+
+        setMachines(prev => prev.map(m => 
+          m.id === selectedMachine.id 
+            ? { ...m, status: "rented", currentRental: newRental } 
+            : m
+        ));
+
+        setHistory(prev => [newRental, ...prev]);
+        setShowNewRentalModal(false);
+        resetForm();
+      }
+    } catch (err) {
+      console.error("Erro ao salvar aluguel:", err);
+      alert("Erro ao salvar no banco de dados. Verifique a conexão.");
+    }
+  }, [selectedMachine, search, startDate, endDate, dailyValue, totalCalculation.total, setMachines, setHistory, resetForm]);
+
+  const handleFinishRental = useCallback(async (machineId: string, rentalId?: string) => {
+    if (!rentalId) return;
+
+    try {
+      const { error } = await supabase
+        .from('crm_alugueis')
+        .update({ status: 'completed' })
+        .eq('id', rentalId);
+
+      if (error) throw error;
+
+      setMachines(prev => prev.map(m => 
+        m.id === machineId 
+          ? { ...m, status: "available", currentRental: undefined } 
+          : m
+      ));
+
+      // Re-fetch history to show completed status
+      loadHistory();
+    } catch (err) {
+      console.error("Erro ao finalizar aluguel:", err);
+      alert("Erro ao atualizar no banco de dados.");
+    }
+  }, [setMachines, loadHistory]);
+
+  const filteredClients = useMemo(() => {
+    return clients.filter(c => 
+      c.label.toLowerCase().includes(search.toLowerCase()) || 
+      c.value.toString().includes(search)
+    ).slice(0, 5);
+  }, [clients, search]);
 
   const stats = useMemo(() => {
     return {
@@ -237,11 +364,14 @@ export function AlugueisView() {
                       "flex items-center gap-1 px-2 py-1 rounded-lg text-[8px] font-black uppercase",
                       machine.currentRental.paymentStatus === "paid" ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
                     )}>
-                      {machine.currentRental.paymentStatus === "paid" ? "Pago" : "Pendente"}
+                      Pagamento {machine.currentRental.paymentStatus === "paid" ? "OK" : "Pendente"}
                     </div>
                   </div>
 
-                  <button className="w-full py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <button 
+                    onClick={() => handleFinishRental(machine.id, machine.currentRental?.id)}
+                    className="w-full py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  >
                     Finalizar
                   </button>
                 </div>
@@ -324,8 +454,11 @@ export function AlugueisView() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-emerald-500/10 text-emerald-500">
-                      Concluído
+                    <span className={cn(
+                      "inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black uppercase",
+                      item.status === "active" ? "bg-blue-500/10 text-blue-500" : "bg-emerald-500/10 text-emerald-500"
+                    )}>
+                      {item.status === "active" ? "Ativo" : "Concluído"}
                     </span>
                   </td>
                 </tr>
@@ -365,35 +498,44 @@ export function AlugueisView() {
 
             <div className="p-5 space-y-4">
               <div className="space-y-3">
-                {!selectedMachine && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Equipamento</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {machines.map(m => (
-                        <button
-                          key={m.id}
-                          onClick={() => {
-                            setSelectedMachine(m);
-                            setDailyValue(m.id === "TRM20905" ? "200,00" : "150,00");
-                          }}
-                          className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 hover:bg-slate-100 p-2 rounded-xl border flex items-center gap-2 transition-all text-left"
-                        >
-                          <div className="w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-slate-100 dark:border-slate-700">
-                            <img src={m.image} alt="" className="w-full h-full object-cover" />
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[10px] font-black uppercase leading-none truncate text-slate-900 dark:text-white">
-                              {m.name.split(' ')[1]}
-                            </span>
-                            <span className="text-[8px] font-bold uppercase tracking-tighter truncate text-slate-400">
-                              {m.id}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Equipamento</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {machines.map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setSelectedMachine(m);
+                          setDailyValue(m.id === "TRM20905" ? "200,00" : "150,00");
+                        }}
+                        className={cn(
+                          "p-2 rounded-xl border flex items-center gap-2 transition-all text-left",
+                          selectedMachine?.id === m.id 
+                            ? "bg-slate-900 dark:bg-white border-slate-900 dark:border-white shadow-md" 
+                            : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 hover:bg-slate-100"
+                        )}
+                      >
+                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-slate-100 dark:border-slate-700">
+                          <img src={m.image} alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className={cn(
+                            "text-[10px] font-black uppercase leading-none truncate",
+                            selectedMachine?.id === m.id ? "text-white dark:text-slate-900" : "text-slate-900 dark:text-white"
+                          )}>
+                            {m.name.split(' ')[1]}
+                          </span>
+                          <span className={cn(
+                            "text-[8px] font-bold uppercase tracking-tighter truncate",
+                            selectedMachine?.id === m.id ? "text-white/60 dark:text-slate-500" : "text-slate-400"
+                          )}>
+                            {m.id}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
 
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Cliente</label>
@@ -403,16 +545,23 @@ export function AlugueisView() {
                       type="text" 
                       placeholder="Pesquisar cliente..." 
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        setShowDropdown(true);
+                      }}
+                      onFocus={() => setShowDropdown(true)}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold outline-none focus:border-primary/50 transition-all text-slate-900 dark:text-white"
                     />
                     
-                    {search && filteredClients.length > 0 && (
+                    {showDropdown && search && filteredClients.length > 0 && (
                       <div className="absolute z-10 w-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden">
                         {filteredClients.map((client) => (
                           <div 
                             key={client.value}
-                            onClick={() => { setSearch(client.label); }}
+                            onClick={() => { 
+                              setSearch(client.label); 
+                              setShowDropdown(false);
+                            }}
                             className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between group"
                           >
                             <div className="flex flex-col">
@@ -484,11 +633,7 @@ export function AlugueisView() {
               </div>
 
               <button 
-                onClick={() => {
-                  // Aqui seria a lógica de salvar no banco futuramente
-                  setShowNewRentalModal(false);
-                  resetForm();
-                }}
+                onClick={handleConfirmRental}
                 className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all"
               >
                 Confirmar Aluguel
