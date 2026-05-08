@@ -458,7 +458,7 @@ export function AlugueisView() {
                       "inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black uppercase",
                       item.status === "active" ? "bg-blue-500/10 text-blue-500" : "bg-emerald-500/10 text-emerald-500"
                     )}>
-                      {item.status === "active" ? "Ativo" : "Concluído"}
+                      {item.status === "active" ? "Em andamento" : "Concluído"}
                     </span>
                   </td>
                 </tr>
@@ -504,15 +504,17 @@ export function AlugueisView() {
                     {machines.map(m => (
                       <button
                         key={m.id}
+                        disabled={m.status !== "available"}
                         onClick={() => {
                           setSelectedMachine(m);
                           setDailyValue(m.id === "TRM20905" ? "200,00" : "150,00");
                         }}
                         className={cn(
-                          "p-2 rounded-xl border flex items-center gap-2 transition-all text-left",
+                          "p-2 rounded-xl border flex items-center gap-2 transition-all text-left relative",
                           selectedMachine?.id === m.id 
                             ? "bg-slate-900 dark:bg-white border-slate-900 dark:border-white shadow-md" 
-                            : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 hover:bg-slate-100"
+                            : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 hover:bg-slate-100",
+                          m.status !== "available" && "opacity-50 cursor-not-allowed grayscale"
                         )}
                       >
                         <div className="w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-slate-100 dark:border-slate-700">
@@ -529,7 +531,7 @@ export function AlugueisView() {
                             "text-[8px] font-bold uppercase tracking-tighter truncate",
                             selectedMachine?.id === m.id ? "text-white/60 dark:text-slate-500" : "text-slate-400"
                           )}>
-                            {m.id}
+                            {m.status === 'available' ? m.id : 'INDISPONÍVEL'}
                           </span>
                         </div>
                       </button>
