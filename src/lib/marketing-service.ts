@@ -181,19 +181,18 @@ export const marketingService = {
   },
 
   /**
-   * Busca histórico de mensagens de um JID específico
+   * Busca histórico de mensagens de um JID específico.
+   * Suporta paginação: `beforeDate` carrega mensagens ANTERIORES a esse timestamp (scroll infinito para cima).
    */
-  async getMessagesByJid(remoteJid: string, limit = 200, sinceDate?: string) {
+  async getMessagesByJid(remoteJid: string, limit = 50, sinceDate?: string, beforeDate?: string) {
     let query = supabase
       .from("marketing_whatsapp")
-      .select("*")
+      .select("message_id, remote_jid, sender, texto, tipo, status, timestamp, media_url, reacao, vendedor_id")
       .eq("remote_jid", remoteJid);
 
-    if (sinceDate) {
-      query = query.gte("timestamp", sinceDate);
-    }
+    if (sinceDate) query = query.gte("timestamp", sinceDate);
+    if (beforeDate) query = query.lt("timestamp", beforeDate);
 
-    // Busca as mais recentes (DESC) e reverte no retorno para exibir do mais antigo ao mais novo
     const { data, error } = await query
       .order("timestamp", { ascending: false })
       .limit(limit);

@@ -15,7 +15,8 @@
       "Bash(npx tsc *)",
       "Bash(npx web-push *)",
       "Bash(xargs wc *)",
-      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Carflax HUB/db/**)"
+      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Carflax HUB/db/**)",
+      "Read(//c/Users/Danilo/Desktop/Desenvolupador/Desktop/Desenvolupador/Carflax/src/components/marketing/whatsapp/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Danilo\\Desktop\\Desenvolvimento\\Carflax HUB\\db"

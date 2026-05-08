@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, startTransition } from "react";
 import { 
   Search, 
   Paperclip, 
@@ -72,6 +72,7 @@ interface Message {
   id: string;
   text: string;
   time: string;
+  rawTimestamp?: string; // ISO — usado para paginação (load more)
   sender: "me" | "contact";
   status: "sent" | "delivered" | "read";
   tipo?: string;
@@ -359,6 +360,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [cartProducts, setCartProducts] = useState<NormalizedProduct[]>([]);
   const [avgResponseTime, setAvgResponseTime] = useState<number | null>(null);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const productsLoadedRef = useRef(false);
 
   const tempBtnRef = useRef<HTMLButtonElement>(null);
@@ -577,7 +580,6 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     const socket = evolutionApi.connectWebSocket();
 
     const processMessage = async (message: EvoMessageResponse) => {
-      console.log("🚀 PAYLOAD RECEBIDO NO FRONTEND VIA WEBSOCKET:", JSON.stringify(message, null, 2));
       const remoteJid = message.key?.remoteJid;
       if (!remoteJid || !remoteJid.endsWith('@s.whatsapp.net')) return;
 
@@ -721,7 +723,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         marketingService.upsertCliente({ remote_jid: remoteJid, nome: validPushName }).catch(() => null);
       }
 
-      setChats(prevChats => {
+      startTransition(() => setChats(prevChats => {
         // Desarquiva automaticamente se chegou nova mensagem
         const existingChat = prevChats.find(c => c.id === remoteJid);
         if (existingChat?.arquivado) marketingService.toggleArchived(remoteJid, false);
@@ -782,7 +784,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           };
           return sortChats([newChat, ...prevChats]);
         }
-      });
+      }));
 
       setSelectedChat(currentSelected => {
         if (currentSelected?.id === remoteJid) {
@@ -825,12 +827,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     socket.on('message-received', handleIncomingMessage);
 
     const handleMessageUpdate = (data: Record<string, unknown>) => {
-      console.log("📬 messages.update RECEBIDO:", JSON.stringify(data, null, 2));
       const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
-      if (data.instance && data.instance !== instanceName) {
-        console.log("📬 ignorado — instância diferente:", data.instance, "!=", instanceName);
-        return;
-      }
+      if (data.instance && data.instance !== instanceName) return;
 
       interface UpdateItemNested {
         key?: { id?: string };
@@ -852,21 +850,14 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
          const msgId = flat.keyId || nested.key?.id;
          const rawStatus = flat.status ?? nested.update?.status;
 
-         console.log("📬 item — msgId:", msgId, "rawStatus:", rawStatus);
          if (!msgId || rawStatus === undefined || rawStatus === null) return;
 
          let newStatus: "sent" | "delivered" | "read" | undefined;
          if (rawStatus === 2 || rawStatus === "DELIVERY_ACK") newStatus = "delivered";
          if (rawStatus === 3 || rawStatus === "READ" || rawStatus === 4 || rawStatus === "PLAYED") newStatus = "read";
 
-         console.log("📬 rawStatus:", rawStatus, "→ newStatus:", newStatus);
-
          if (newStatus) {
-            setMessages(prev => {
-              const found = prev.some(m => m.id === msgId);
-              console.log("📬 buscando msg id:", msgId, "— encontrou?", found);
-              return prev.map(m => m.id === msgId ? { ...m, status: newStatus as "sent" | "delivered" | "read" } : m);
-            });
+            setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: newStatus as "sent" | "delivered" | "read" } : m));
             // Atualiza status na sidebar para a última mensagem
             setChats(prev => prev.map(c => {
               const lastMsgIsThis = c.lastMessageSender === "me";
@@ -1066,11 +1057,13 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     return () => clearInterval(id);
   }, []);
 
+  // Auto-scroll para o fim apenas quando NÃO estiver carregando mensagens antigas (load-more)
   useEffect(() => {
+    if (loadingMoreMessages) return;
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, loadingMoreMessages]);
 
 
   const handleSendMessage = async () => {
@@ -1108,9 +1101,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       ));
 
       const sendResp = await evolutionApi.sendText(selectedChat.id, textToSend);
-      console.log("📤 sendText response:", JSON.stringify(sendResp, null, 2));
       const realId = sendResp?.key?.id;
-      console.log("📤 fakeId:", msgId, "→ realId:", realId);
       if (realId) {
         setMessages(prev => prev.map(m => m.id === msgId ? { ...m, id: realId } : m));
       }
@@ -1317,6 +1308,17 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       .slice(0, 50);
   }, [allProducts, productSearch, cartProducts]);
 
+  const cartMap = useMemo(() => {
+    const m = new Map<string, NormalizedProduct>();
+    cartProducts.forEach(p => m.set(p.cod, p));
+    return m;
+  }, [cartProducts]);
+
+  const cartTotals = useMemo(() => ({
+    debito: cartProducts.reduce((s, p) => s + p.debito * (p.quantidade || 1), 0),
+    credito: cartProducts.reduce((s, p) => s + p.credito * (p.quantidade || 1), 0),
+  }), [cartProducts]);
+
   const handleToggleCart = (p: NormalizedProduct) => {
     setCartProducts(prev => {
       const exists = prev.find(x => x.cod === p.cod);
@@ -1413,13 +1415,17 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     evolutionApi.subscribePresence(chat.id);
 
 
+    setHasMoreMessages(false);
+    setLoadingMoreMessages(false);
+
     try {
-      const dbMessages = await marketingService.getMessagesByJid(chat.id, 200);
+      const dbMessages = await marketingService.getMessagesByJid(chat.id, 50);
 
       const msgs: Message[] = dbMessages.map(m => ({
         id: m.message_id,
         text: m.texto || "",
         time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        rawTimestamp: m.timestamp,
         sender: m.sender,
         status: (m.status as "sent" | "delivered" | "read") || "sent",
         tipo: m.tipo,
@@ -1428,6 +1434,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       }));
 
       setMessages(msgs);
+      setHasMoreMessages(dbMessages.length === 50);
 
       if (msgs.length > 0) {
         const lastMsg = msgs[msgs.length - 1];
@@ -1446,6 +1453,45 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       setLoadingMessages(false);
     }
   }, []);
+
+  const loadMoreMessages = useCallback(async () => {
+    if (!selectedChat || loadingMoreMessages || !hasMoreMessages) return;
+    const oldest = messages[0];
+    if (!oldest?.rawTimestamp) return;
+
+    setLoadingMoreMessages(true);
+    try {
+      const older = await marketingService.getMessagesByJid(selectedChat.id, 50, undefined, oldest.rawTimestamp);
+      if (older.length === 0) { setHasMoreMessages(false); return; }
+
+      const mapped: Message[] = older.map(m => ({
+        id: m.message_id,
+        text: m.texto || "",
+        time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        rawTimestamp: m.timestamp,
+        sender: m.sender,
+        status: (m.status as "sent" | "delivered" | "read") || "sent",
+        tipo: m.tipo,
+        mediaUrl: m.media_url,
+        reacao: m.reacao,
+      }));
+
+      // Preserva a posição do scroll ao inserir mensagens no topo
+      const container = scrollRef.current;
+      const prevHeight = container?.scrollHeight ?? 0;
+
+      setMessages(prev => [...mapped, ...prev]);
+      setHasMoreMessages(older.length === 50);
+
+      requestAnimationFrame(() => {
+        if (container) container.scrollTop = container.scrollHeight - prevHeight;
+      });
+    } catch (err) {
+      console.error("[loadMore] Erro:", err);
+    } finally {
+      setLoadingMoreMessages(false);
+    }
+  }, [selectedChat, messages, loadingMoreMessages, hasMoreMessages]);
 
   // Initial Auto-selection - MOVED BELOW handleSelectChat
   useEffect(() => {
@@ -1945,7 +1991,31 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                   <span className="text-[10px] font-black uppercase tracking-widest text-primary">Carregando...</span>
                 </div>
               ) : (
-                <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+                <div
+                  ref={scrollRef}
+                  className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4"
+                  onScroll={e => {
+                    if ((e.currentTarget as HTMLDivElement).scrollTop === 0 && hasMoreMessages && !loadingMoreMessages) {
+                      loadMoreMessages();
+                    }
+                  }}
+                >
+                  {/* Indicador de load-more no topo */}
+                  {loadingMoreMessages && (
+                    <div className="flex justify-center py-2">
+                      <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                  {hasMoreMessages && !loadingMoreMessages && (
+                    <div className="flex justify-center">
+                      <button
+                        onClick={loadMoreMessages}
+                        className="text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors py-1"
+                      >
+                        Carregar mensagens anteriores
+                      </button>
+                    </div>
+                  )}
                   {messages.map((msg) => {
                     const isVisualMedia = msg.tipo === "image" || msg.tipo === "video" || msg.tipo === "sticker";
                     const isDocumentMsg = msg.tipo === "document";
@@ -2343,7 +2413,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                         ) : filteredProducts.length > 0 ? (
                           <div className="flex flex-col divide-y divide-border/30">
                             {filteredProducts.map((p) => {
-                              const inCart = cartProducts.some(x => x.cod === p.cod);
+                              const inCart = cartMap.has(p.cod);
                               const [gradient] = getBrandStyle(p.marca || p.descricao);
                               const initials = getBrandInitials(p.marca || p.descricao);
                               return (
@@ -2403,7 +2473,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                                         >
                                           -
                                         </button>
-                                        <span className="w-8 text-center text-xs font-black">{cartProducts.find(x => x.cod === p.cod)?.quantidade || 1}</span>
+                                        <span className="w-8 text-center text-xs font-black">{cartMap.get(p.cod)?.quantidade || 1}</span>
                                         <button 
                                           onClick={(e) => { e.stopPropagation(); handleUpdateQuantity(p.cod, 1); }}
                                           className="w-6 h-6 flex items-center justify-center hover:bg-background rounded-md text-muted-foreground transition-colors"
@@ -2448,11 +2518,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                               <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">{cartProducts.length} {cartProducts.length === 1 ? 'produto' : 'produtos'} selecionados</span>
                               <div className="flex items-center gap-3 mt-0.5">
                                 <span className="text-xs font-bold text-foreground">
-                                  Débito: <span className="text-primary">R$ {cartProducts.reduce((s, p) => s + (p.debito * (p.quantidade || 1)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                  Débito: <span className="text-primary">R$ {cartTotals.debito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </span>
                                 <span className="text-muted-foreground">·</span>
                                 <span className="text-xs font-bold text-foreground">
-                                  Crédito (3x de R$ {(cartProducts.reduce((s, p) => s + (p.credito * (p.quantidade || 1)), 0) / 3).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} s/ juros): <span className="text-primary">R$ {cartProducts.reduce((s, p) => s + (p.credito * (p.quantidade || 1)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                  Crédito (3x de R$ {(cartTotals.credito / 3).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} s/ juros): <span className="text-primary">R$ {cartTotals.credito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </span>
                               </div>
                             </div>
