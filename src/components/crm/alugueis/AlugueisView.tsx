@@ -376,27 +376,16 @@ export function AlugueisView() {
                             setSelectedMachine(m);
                             setDailyValue(m.id === "TRM20905" ? "200,00" : "150,00");
                           }}
-                          className={cn(
-                            "p-2 rounded-xl border flex items-center gap-2 transition-all text-left",
-                            selectedMachine?.id === m.id 
-                              ? "bg-slate-900 dark:bg-white border-slate-900 dark:border-white shadow-md" 
-                              : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 hover:bg-slate-100"
-                          )}
+                          className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 hover:bg-slate-100 p-2 rounded-xl border flex items-center gap-2 transition-all text-left"
                         >
                           <div className="w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-slate-100 dark:border-slate-700">
                             <img src={m.image} alt="" className="w-full h-full object-cover" />
                           </div>
                           <div className="flex flex-col min-w-0">
-                            <span className={cn(
-                              "text-[10px] font-black uppercase leading-none truncate",
-                              selectedMachine?.id === m.id ? "text-white dark:text-slate-900" : "text-slate-900 dark:text-white"
-                            )}>
+                            <span className="text-[10px] font-black uppercase leading-none truncate text-slate-900 dark:text-white">
                               {m.name.split(' ')[1]}
                             </span>
-                            <span className={cn(
-                              "text-[8px] font-bold uppercase tracking-tighter truncate",
-                              selectedMachine?.id === m.id ? "text-white/60 dark:text-slate-500" : "text-slate-400"
-                            )}>
+                            <span className="text-[8px] font-bold uppercase tracking-tighter truncate text-slate-400">
                               {m.id}
                             </span>
                           </div>
