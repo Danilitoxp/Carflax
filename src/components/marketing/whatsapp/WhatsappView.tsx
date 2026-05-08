@@ -2539,7 +2539,15 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300"
           onClick={() => setSelectedImage(null)}
         >
-          <div className="absolute top-8 right-8 flex items-center gap-4 z-[10000]">
+          <div className="absolute top-8 right-8 flex flex-col items-center gap-4 z-[10000]">
+            <button 
+              onClick={() => setSelectedImage(null)}
+              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all group"
+              title="Fechar"
+            >
+              <X className="w-6 h-6 group-hover:scale-110 transition-transform" />
+            </button>
+
             <button 
               onClick={(e) => {
                 e.stopPropagation();
@@ -2560,14 +2568,6 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               title="Imprimir Imagem"
             >
               <Printer className="w-6 h-6 group-hover:scale-110 transition-transform" />
-            </button>
-
-            <button 
-              onClick={() => setSelectedImage(null)}
-              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all group"
-              title="Fechar"
-            >
-              <X className="w-6 h-6 group-hover:scale-110 transition-transform" />
             </button>
           </div>
           
