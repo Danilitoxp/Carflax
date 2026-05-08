@@ -1010,6 +1010,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   useEffect(() => {
     const reclassifyUnclassified = async () => {
       const allClientes = await marketingService.getActiveClientes('all');
+      if (!allClientes || allClientes.length === 0) return;
       // Processa apenas leads sem temperatura ou com "Frio" padrão, em lotes de 5
       const targets = allClientes.filter(c => !c.temperatura || c.temperatura === 'Frio');
       for (let i = 0; i < Math.min(targets.length, 30); i++) {

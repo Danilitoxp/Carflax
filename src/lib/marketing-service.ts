@@ -123,7 +123,7 @@ export const marketingService = {
       console.error("[MarketingService] Erro ao buscar clientes ativos:", error.message);
       return [];
     }
-    return data;
+    return data || [];
   },
 
   /**
@@ -229,11 +229,19 @@ export const marketingService = {
   },
 
   async updateMessageStatus(messageId: string, status: string) {
+    // Usa upsert via message_id para evitar CORS com PATCH em alguns ambientes
+    const { data: existing } = await supabase
+      .from("marketing_whatsapp")
+      .select("message_id, remote_jid, sender, timestamp")
+      .eq("message_id", messageId)
+      .single();
+
+    if (!existing) return;
+
     const { error } = await supabase
       .from("marketing_whatsapp")
-      .update({ status })
-      .eq("message_id", messageId);
-      
+      .upsert({ ...existing, status }, { onConflict: "message_id" });
+
     if (error) {
       console.error("[MarketingService] Erro ao atualizar status da mensagem:", error.message);
     }
@@ -489,9 +497,10 @@ export const marketingService = {
 
     if (error || !data || data.length === 0) return null;
 
-    // Agrupar por conversa
+    // Agrupar por conversa (ignora linhas com campos críticos ausentes)
     const byJid: Record<string, { sender: string; timestamp: string }[]> = {};
     for (const msg of data) {
+      if (!msg.remote_jid || !msg.sender || !msg.timestamp) continue;
       if (!byJid[msg.remote_jid]) byJid[msg.remote_jid] = [];
       byJid[msg.remote_jid].push({ sender: msg.sender, timestamp: msg.timestamp });
     }
