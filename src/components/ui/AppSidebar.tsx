@@ -28,85 +28,61 @@ import {
   FileBarChart,
   Database,
   Key,
+  Crosshair,
   type LucideIcon,
 } from "lucide-react";
 import organogramaIcon from "@/assets/organograma.svg";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/context/theme-provider";
+import { NAV_SECTIONS } from "@/lib/menu-config";
 
 interface MenuItem {
   icon: LucideIcon;
   label: string;
-  active?: boolean;
-  hasArrow?: boolean;
   isDropdown?: boolean;
-  isOpen?: boolean;
   subItems?: { label: string; icon?: LucideIcon; value?: string }[];
 }
 
-const menuItems: MenuItem[] = [
-  {
-    icon: LayoutGrid,
-    label: "Dashboard",
-    isDropdown: true,
-    subItems: [
-      { label: "Geral", icon: LayoutGrid },
-      { label: "Produtos", icon: Hexagon },
-    ],
-  },
-  { 
-    icon: Calendar, 
-    label: "Calendário",
-    isDropdown: true,
-    subItems: [
-      { label: "Eventos", icon: Calendar },
-      { label: "Férias", icon: Plane },
-    ]
-  },
-  {
-    icon: BarChart3,
-    label: "Comercial",
-    isDropdown: true,
-    subItems: [
-      { label: "Orçamentos", icon: FileBadge },
-      { label: "Clientes", icon: Users },
-      { label: "Ligações", icon: PhoneCall },
-      { label: "Campanhas", icon: Megaphone },
-      { label: "Alugueis", icon: Key },
-      { label: "Relatórios", icon: FileBarChart },
-    ],
-  },
-  {
-    icon: Megaphone,
-    label: "Marketing",
-    isDropdown: true,
-    subItems: [
-      { label: "Whatsapp", icon: Smartphone },
-      { label: "Leads", icon: Users },
-      { label: "Cronograma", icon: Calendar },
-      { label: "Relatórios", value: "Relatórios Mkt", icon: FileBarChart },
-    ],
-  },
-  {
-    icon: Smartphone,
-    label: "Coletor",
-    isDropdown: true,
-    subItems: [
-      { label: "Painel Coletor", icon: LayoutGrid },
-    ],
-  },
-  {
-    icon: Truck,
-    label: "Entregas",
-    isDropdown: true,
-    subItems: [
-      { label: "Romaneios", icon: FileText },
-    ],
-  },
-  { icon: Users, label: "Usuários" },
-  { icon: Database, label: "DB Admin" },
-  { icon: Lightbulb, label: "Sugestões" },
-];
+// Icon map — only place you need to add an icon when creating a new section
+const ICON_MAP: Record<string, LucideIcon> = {
+  Dashboard: LayoutGrid,
+  Geral: LayoutGrid,
+  Produtos: Hexagon,
+  Calendário: Calendar,
+  Eventos: Calendar,
+  Férias: Plane,
+  Comercial: BarChart3,
+  Orçamentos: FileBadge,
+  Clientes: Users,
+  Prospecções: Crosshair,
+  Ligações: PhoneCall,
+  Campanhas: Megaphone,
+  Alugueis: Key,
+  Relatórios: FileBarChart,
+  "Relatórios Mkt": FileBarChart,
+  Marketing: Megaphone,
+  Whatsapp: Smartphone,
+  Leads: Users,
+  Cronograma: Calendar,
+  Coletor: Smartphone,
+  "Painel Coletor": LayoutGrid,
+  Entregas: Truck,
+  Romaneios: FileText,
+  Usuários: Users,
+  "DB Admin": Database,
+  Sugestões: Lightbulb,
+};
+
+const menuItems: MenuItem[] = NAV_SECTIONS.map(section => ({
+  icon: ICON_MAP[section.label] ?? LayoutGrid,
+  label: section.label,
+  isDropdown: !!section.subItems?.length,
+  subItems: section.subItems?.map(sub => ({
+    label: sub.label,
+    value: sub.value,
+    icon: ICON_MAP[sub.value ?? sub.label] ?? LayoutGrid,
+  })),
+}));
 
 const settingsItems: MenuItem[] = [
   { 

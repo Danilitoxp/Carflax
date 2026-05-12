@@ -6,6 +6,7 @@ import { RelatoriosView } from "./relatorios/RelatoriosView";
 import { LigacoesView } from "@/components/crm/ligacoes/LigacoesView";
 import { ClientesFRVView } from "./clientes/ClientesFRVView";
 import { AlugueisView } from "./alugueis/AlugueisView";
+import { ProspeccoesView } from "./prospeccoes/ProspeccoesView";
 import { cn } from "@/lib/utils";
 
 interface UserProfile {
@@ -53,6 +54,8 @@ export function CrmSection({ activeTab, userProfile }: CrmSectionProps) {
             <RelatoriosView orcamentos={[]} userProfile={userProfile} />
           ) : activeTab === "Alugueis" ? (
             <AlugueisView userProfile={userProfile} />
+          ) : activeTab === "Prospecções" ? (
+            <ProspeccoesView userProfile={userProfile} />
           ) : (
             <OrcamentosView userProfile={userProfile} />
           )}

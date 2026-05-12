@@ -64,7 +64,7 @@ export function TinyDropdown({
     return opt ? (typeof opt === 'string' ? opt : opt.label) : val;
   };
 
-  const isActive = value !== placeholder && (typeof options[0] === 'string' ? value !== options[0] : value !== options[0].value);
+  const isActive = value !== placeholder && options.length > 0 && (typeof options[0] === 'string' ? value !== options[0] : value !== options[0].value);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

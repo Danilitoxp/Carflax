@@ -698,6 +698,7 @@ function DashboardContent({
     "Ligações",
     "Alugueis",
     "Relatórios",
+    "Prospecções",
   ].includes(activeItem);
   const isMarketingView = [
     "Marketing",

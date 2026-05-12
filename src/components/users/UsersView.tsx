@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { uploadImage } from "@/lib/uploadImage";
+import { PERMISSION_GROUPS } from "@/lib/menu-config";
 import {
   UserPlus,
   Search,
@@ -89,32 +90,7 @@ export function UsersView() {
     is_admin: false
   });
 
-  const permissionGroups = [
-    {
-      name: "ESSENCIAL",
-      modules: ["Geral", "Sugestões"]
-    },
-    {
-      name: "DASHBOARD",
-      modules: ["Produtos", "Eventos", "Férias"]
-    },
-    {
-      name: "COMERCIAL",
-      modules: ["Orçamentos", "Clientes", "Ligações", "Campanhas", "Relatórios", "Criar Campanha"]
-    },
-    {
-      name: "MARKETING",
-      modules: ["Marketing", "Whatsapp", "Leads", "Cronograma"]
-    },
-    {
-      name: "LOGÍSTICA",
-      modules: ["Coletor", "Romaneios", "Lançar Entrega"]
-    },
-    {
-      name: "GESTÃO & ADMIN",
-      modules: ["Usuários", "DB Admin", "Gerenciar Comunicados", "Gerenciar Férias", "Gerenciar Banners", "Gerenciar Calendário"]
-    }
-  ];
+  const permissionGroups = PERMISSION_GROUPS;
 
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
