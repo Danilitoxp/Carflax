@@ -96,9 +96,9 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
       : operatorCode || undefined;
 
     apiClientesFrv(undefined, undefined, vendedor)
-      .then((data: ClienteFRV[]) =>
+      .then((data) =>
         setClientes(
-          (data || []).map(c => ({
+          ((data as ClienteFRV[]) || []).map(c => ({
             ...c,
             recencia_dias: Number(c.recencia_dias),
             frequencia: Number(c.frequencia),
@@ -210,7 +210,7 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
                 <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Potencial total</span>
               </div>
               <span className="text-[15px] font-black text-emerald-700 dark:text-emerald-300 tabular-nums">
-                {loading ? <TinyLoader size="sm" variant="emerald" /> : fmt(totalPotencial)}
+                {loading ? <TinyLoader size="sm" /> : fmt(totalPotencial)}
               </span>
             </div>
           </div>

@@ -1,9 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { 
-  Key, 
-  User, 
-  DollarSign, 
-  CheckCircle2, 
+  Key,
+  User,
+  CheckCircle2,
   Clock, 
   AlertCircle,
   Plus,
