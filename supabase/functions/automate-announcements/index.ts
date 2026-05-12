@@ -38,7 +38,7 @@ Deno.serve(async () => {
     
     const [userResp, eventResp, holidayResp] = await Promise.all([
       supabase.from("usuarios").select("name, avatar, birth_date, admission_date"),
-      supabase.from("eventos_calendario").select("*").eq("year", year).eq("month", month).eq("day", day),
+      supabase.from("eventos_calendario").select("*").eq("year", year).eq("month", month).eq("day", day).neq("type", "follow-up"),
       fetch(`https://brasilapi.com.br/api/feriados/v1/${year}`).then(r => r.ok ? r.json() : [])
     ])
 
