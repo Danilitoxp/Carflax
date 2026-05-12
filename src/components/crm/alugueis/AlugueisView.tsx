@@ -14,8 +14,10 @@ import {
   ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiCrmAlugueisClientes } from "@/lib/api";
+import { apiCrmAlugueisClientes, apiCreatePaymentPreference } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
+import { QRCodeCanvas } from "qrcode.react";
+
 
 interface Rental {
   id: string;
@@ -82,6 +84,10 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [paymentLink, setPaymentLink] = useState("");
+  const [isWaitingPayment, setIsWaitingPayment] = useState(false);
+  const [isProcessingPreference, setIsProcessingPreference] = useState(false);
+
 
   const resetForm = useCallback(() => {
     setSearch("");
@@ -89,7 +95,11 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
     setEndDate("");
     setSelectedMachine(null);
     setDailyValue("");
+    setPaymentLink("");
+    setIsWaitingPayment(false);
+    setIsProcessingPreference(false);
   }, []);
+
 
   const loadClients = useCallback(async () => {
     setLoadingClients(true);
@@ -144,7 +154,23 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
 
   useEffect(() => {
     loadHistory();
-  }, [loadHistory]);
+
+    // Listen for new rentals to automatically close payment modal
+    const channel = supabase
+      .channel('public:crm_alugueis')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_alugueis' }, (payload) => {
+        console.log('Novo aluguel detectado:', payload);
+        loadHistory();
+        setShowNewRentalModal(false);
+        resetForm();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadHistory, resetForm]);
+
 
   useEffect(() => {
     if (showNewRentalModal) {
@@ -174,8 +200,9 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
       return;
     }
 
+    setIsProcessingPreference(true);
     try {
-      const newRentalData = {
+      const rentalData = {
         machine_id: selectedMachine.id,
         machine_name: selectedMachine.name,
         client_name: search,
@@ -183,47 +210,23 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
         end_date: endDate,
         daily_value: parseFloat(dailyValue.replace(',', '.')),
         total_value: totalCalculation.total,
-        payment_status: "paid",
+        payment_status: "pending",
         salesperson: userProfile?.name || "Danilo",
         status: "active"
       };
 
-      const { data, error } = await supabase
-        .from('crm_alugueis')
-        .insert([newRentalData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        const newRental: Rental = {
-          id: data.id,
-          machineId: data.machine_id,
-          clientName: data.client_name,
-          value: data.total_value,
-          startDate: data.start_date,
-          endDate: data.end_date,
-          paymentStatus: data.payment_status,
-          salesperson: data.salesperson,
-          status: data.status
-        };
-
-        setMachines(prev => prev.map(m => 
-          m.id === selectedMachine.id 
-            ? { ...m, status: "rented", currentRental: newRental } 
-            : m
-        ));
-
-        setHistory(prev => [newRental, ...prev]);
-        setShowNewRentalModal(false);
-        resetForm();
-      }
+      const response = await apiCreatePaymentPreference(rentalData);
+      setPaymentLink(response.init_point);
+      setIsWaitingPayment(true);
+      
     } catch (err) {
-      console.error("Erro ao salvar aluguel:", err);
-      alert("Erro ao salvar no banco de dados. Verifique a conexão.");
+      console.error("Erro ao gerar link de pagamento:", err);
+      alert("Erro ao gerar pagamento. Tente novamente.");
+    } finally {
+      setIsProcessingPreference(false);
     }
-  }, [selectedMachine, search, startDate, endDate, dailyValue, totalCalculation.total, setMachines, setHistory, resetForm, userProfile?.name]);
+  }, [selectedMachine, search, startDate, endDate, dailyValue, totalCalculation.total, userProfile?.name]);
+
 
   const handleFinishRental = useCallback(async (machineId: string, rentalId?: string) => {
     if (!rentalId) return;
@@ -654,12 +657,48 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
                 </div>
               </div>
 
-              <button 
-                onClick={handleConfirmRental}
-                className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all"
-              >
-                Confirmar Aluguel
-              </button>
+              {!isWaitingPayment ? (
+                <button 
+                  onClick={handleConfirmRental}
+                  disabled={isProcessingPreference}
+                  className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                >
+                  {isProcessingPreference && <div className="w-3 h-3 border-2 border-white dark:border-slate-900 border-t-transparent rounded-full animate-spin" />}
+                  Gerar Pagamento
+                </button>
+              ) : (
+                <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                    <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Escaneie para Pagar</p>
+                    <div className="p-3 bg-white rounded-xl shadow-sm">
+                      <QRCodeCanvas value={paymentLink} size={150} />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-600 dark:text-slate-400 mt-4 text-center">
+                      Aguardando confirmação do pagamento...
+                    </p>
+                    <div className="mt-2 w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-primary animate-[shimmer_2s_infinite_linear]" style={{ width: '40%' }} />
+                    </div>
+                  </div>
+
+                  <a 
+                    href={paymentLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="w-full py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                  >
+                    Abrir Link de Pagamento
+                  </a>
+                  
+                  <button 
+                    onClick={() => setIsWaitingPayment(false)}
+                    className="w-full py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                  >
+                    Voltar e Editar
+                  </button>
+                </div>
+              )}
+
             </div>
           </div>
         </div>

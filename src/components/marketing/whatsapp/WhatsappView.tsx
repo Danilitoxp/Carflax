@@ -1493,21 +1493,32 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     }
   }, [selectedChat, messages, loadingMoreMessages, hasMoreMessages]);
 
-  // Initial Auto-selection - MOVED BELOW handleSelectChat
+  // Initial Auto-selection & Pending Chat Handler
   useEffect(() => {
-    if (displayedChats.length > 0 && !selectedChat) {
-      const pendingChatJid = localStorage.getItem("carflax_pending_chat");
-      if (pendingChatJid) {
-        const found = displayedChats.find(c => c.id === pendingChatJid);
-        if (found) {
-          handleSelectChat(found);
-          localStorage.removeItem("carflax_pending_chat");
-          return;
+    const pendingChatJid = localStorage.getItem("carflax_pending_chat");
+    
+    // Prioridade 1: Chat vindo de outra tela (Leads/Clientes)
+    if (pendingChatJid && chats.length > 0) {
+      const found = chats.find(c => c.id === pendingChatJid);
+      if (found) {
+        // Se o chat estiver arquivado, muda a visualização para que ele apareça
+        if (found.arquivado && viewMode !== "archived") {
+          setViewMode("archived");
+        } else if (!found.arquivado && viewMode !== "active") {
+          setViewMode("active");
         }
+        
+        handleSelectChat(found);
+        localStorage.removeItem("carflax_pending_chat");
+        return;
       }
+    }
+
+    // Prioridade 2: Seleção automática inicial (se nada estiver aberto)
+    if (displayedChats.length > 0 && !selectedChat && !pendingChatJid) {
       handleSelectChat(displayedChats[0]);
     }
-  }, [displayedChats, selectedChat, handleSelectChat]);
+  }, [chats, displayedChats, selectedChat, handleSelectChat, viewMode]);
 
   const scheduleFollowUp = (label: string) => {
     if (!selectedChat || !selectedChat.leadInfo) return;

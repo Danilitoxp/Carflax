@@ -229,6 +229,10 @@ export const apiCrmStatus = (body: unknown) => post("/api/crm/status", body);
 export const apiCrmAlugueisClientes = () =>
   get<{ value: string; label: string }[]>("/api/crm/alugueis/clientes");
 
+export const apiCreatePaymentPreference = (rentalData: unknown) =>
+  post<{ id: string; init_point: string; sandbox_init_point: string }>("/api/payments/preference", { rentalData });
+
+
 // ── Outros ────────────────────────────────────────────────────────────────────
 
 export interface ProductInfo {
