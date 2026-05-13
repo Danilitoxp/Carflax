@@ -129,9 +129,16 @@ const OrcamentoRow = memo(({ item, onOpenItems, onOpenStatus, onOpenChat }: RowP
   return (
     <tr className="hover:bg-secondary/50 transition-colors group">
       <td className="px-6 py-4">
-        <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-          {item.id.replace("-OR", "")}
-        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+            {item.id.replace("-OR", "")}
+          </span>
+          {item.empresa && (
+            <span className="text-[9px] font-black text-muted-foreground uppercase tracking-tight">
+              {{ "001": "Carflax", "002": "Zelex", "003": "JCM" }[item.empresa] ?? item.empresa}
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-6 py-4"><span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">{item.seller}</span></td>
       <td className="px-6 py-4"><span className="text-[11px] font-black text-foreground uppercase tracking-tighter transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400">{item.client}</span></td>
