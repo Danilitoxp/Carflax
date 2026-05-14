@@ -49,12 +49,14 @@ export interface UserProfile {
 interface DashboardContentProps {
   userProfile: UserProfile | null;
   vendedorMetrics: VendedorResumo | null;
+  perdidoMap: Map<string, number>;
   onLogout: () => void;
 }
 
 function DashboardContent({
   userProfile,
   vendedorMetrics,
+  perdidoMap,
   onLogout,
 }: DashboardContentProps) {
   const { showNotification } = useNotification();
@@ -843,6 +845,7 @@ function DashboardContent({
                   userProfile={userProfile || undefined}
                   data={vendedorMetrics || undefined}
                   loading={geralLoading}
+                  perdidoMap={perdidoMap}
                 />
               ) : (
                 <>
@@ -891,6 +894,7 @@ function App() {
   const [vendedorMetrics, setVendedorMetrics] = useState<VendedorResumo | null>(
     null,
   );
+  const [perdidoMap, setPerdidoMap] = useState<Map<string, number>>(new Map());
 
   const fetchVendedorMetrics = useCallback(async (profile: UserProfile) => {
     try {
@@ -899,40 +903,68 @@ function App() {
       const mm = String(now.getMonth() + 1).padStart(2, "0");
       const dd = String(now.getDate()).padStart(2, "0");
       const dataStr = `${yyyy}-${mm}-${dd}`;
+      const primeiroDia = `${yyyy}-${mm}-01`;
 
-      const { apiDashboardGeral } = await import("@/lib/api");
+      const { apiDashboardGeral, apiCrmOrcamentos } = await import("@/lib/api");
+      const { getCrmStatusMap } = await import("@/lib/crm-service");
 
       const role = profile.role?.toUpperCase() || "";
       const isManager = role.includes("GERENTE") || role === "ADMIN";
       const codVendedor =
         profile.operator_code || profile.operatorCode || "049";
 
-      // Se for gerente, buscamos tudo (omitindo o código do vendedor)
-      // Senão, buscamos apenas o dele
-      const response = await apiDashboardGeral(
-        isManager ? undefined : codVendedor,
-        dataStr,
-      );
+      const [response, orcData] = await Promise.all([
+        apiDashboardGeral(isManager ? undefined : codVendedor, dataStr),
+        apiCrmOrcamentos({ inicio: primeiroDia, fim: dataStr }).catch(() => null),
+      ]);
 
+      // Calcula perdidoMap antes de setar qualquer estado, para evitar flash de 100%
+      let newPerdidoMap = new Map<string, number>();
+      if (orcData && orcData.length > 0) {
+        const docs = orcData.map((r) => r.ORCAMENTO);
+        const statusMap = await getCrmStatusMap(docs);
+        const map = new Map<string, number>();
+
+        for (const r of orcData) {
+          const crmStatus = statusMap.get(r.ORCAMENTO?.trim())?.status_crm;
+          let status = "EMITIDO";
+          if (r.MOTIVO_CANCELAMENTO !== "SEM MOTIVO") status = "PERDIDO";
+          else if (r.PEDIDO === "Sim" || r.NOTA_FISCAL || (r.DATA_BAIXA && r.DATA_BAIXA !== "SEM DATA")) status = "VENDA";
+          if (crmStatus) status = crmStatus;
+
+          if (status === "PERDIDO") {
+            const products = r.PRODUTOS || [];
+            const totalVenda = products.reduce((acc: number, p: { QUANTIDADE: number | string; PRECO_UNITARIO: number | string }) =>
+              acc + (parseFloat(String(p.QUANTIDADE)) || 0) * (parseFloat(String(p.PRECO_UNITARIO)) || 0), 0);
+            const total = parseFloat(r.VALOR_TOTAL_ORCAMENTO) || 0;
+            const valor = totalVenda || total;
+            const cod = String(r.COD_VENDEDOR || "").trim();
+            map.set(cod, (map.get(cod) || 0) + valor);
+          }
+        }
+
+        let totalPerdido = 0;
+        map.forEach((v) => { totalPerdido += v; });
+        map.set("MEDIA", totalPerdido);
+        newPerdidoMap = map;
+      }
+
+      // Seta ambos os estados juntos para renderizar uma única vez com dados completos
       if (response && response.length > 0) {
         if (isManager) {
-          // Procura a linha "MEDIA" que a API agora retorna como agregado
           const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
           const finalData = mediaRow || response[0];
-
           setVendedorMetrics((prev) => {
-            if (JSON.stringify(prev) === JSON.stringify(finalData))
-              return prev;
+            if (JSON.stringify(prev) === JSON.stringify(finalData)) return prev;
             return finalData;
           });
         } else {
           const myData =
-            response.find(
-              (r: VendedorResumo) => r.COD_VENDEDOR === codVendedor,
-            ) || response[0];
+            response.find((r: VendedorResumo) => r.COD_VENDEDOR === codVendedor) || response[0];
           setVendedorMetrics(myData);
         }
       }
+      setPerdidoMap(newPerdidoMap);
     } catch (error) {
       console.error("Erro ao buscar métricas:", error);
     }
@@ -1068,6 +1100,7 @@ function App() {
           <DashboardContent
             userProfile={profile}
             vendedorMetrics={vendedorMetrics}
+            perdidoMap={perdidoMap}
             onLogout={() => supabase.auth.signOut()}
           />
         ) : (

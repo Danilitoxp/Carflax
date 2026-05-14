@@ -34,7 +34,7 @@ interface UserProfileLite {
   role?: string;
 }
 
-export function SalesMetricsCard({ isCompact, userProfile, data: externalData, loading: externalLoading }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo, loading?: boolean }) {
+export function SalesMetricsCard({ isCompact, userProfile, data: externalData, loading: externalLoading, perdidoMap = new Map() }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo, loading?: boolean, perdidoMap?: Map<string, number> }) {
   const [internalLoading, setInternalLoading] = useState(!externalData);
   const [data, setData] = useState<VendedorResumo | null>(externalData || null);
   const [allVendedores, setAllVendedores] = useState<VendedorResumo[]>([]);
@@ -63,16 +63,15 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
         const isManager = role.includes("GERENTE") || role === "ADMIN";
         const codVendedor = userProfile?.operator_code || userProfile?.operatorCode || "049";
 
-        // Se for gerente, buscamos tudo
         const response = await apiDashboardGeral(isManager ? undefined : codVendedor, dataStr);
 
         if (response && response.length > 0) {
           if (isManager) {
             setAllVendedores(response);
-            
+
             // Procura a linha "MEDIA" que a API agora retorna como agregado
             const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
-            
+
             if (mediaRow) {
               setData(mediaRow);
               setSelectedCod("MEDIA");
@@ -87,6 +86,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             setSelectedCod(myData.COD_VENDEDOR);
           }
         }
+
       } catch (error) {
         console.error("Erro ao carregar métricas:", error);
       } finally {
@@ -157,7 +157,12 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     { label: m("Equilíbrio"), value: formatBRL(calculateEquilibrio()), icon: BarChart3, valueColor: "text-blue-600" },
     { label: m("Dias Restantes"), value: `${getDiasRestantes()}`, icon: Calendar, valueColor: "text-slate-900" },
     { label: m("Diário"), value: formatBRL(calculateDiarioNecessario()), icon: Zap, valueColor: "text-slate-900" },
-    { label: m("Tx Conversão"), value: `${Number(data.TAXA_CONVERSAO_VALOR || data.TAXA_CONVERSAO || 0).toFixed(2)}%`, icon: PieChart, valueColor: "text-blue-600" },
+    { label: m("Tx Conversão"), value: (() => {
+        const totalNum = typeof data.TOTAL === 'string' ? parseFloat(data.TOTAL) : (data.TOTAL || 0);
+        const perdido = perdidoMap.get(String(data.COD_VENDEDOR || "").trim()) || 0;
+        const taxa = totalNum + perdido > 0 ? (totalNum / (totalNum + perdido)) * 100 : 0;
+        return `${taxa.toFixed(2)}%`;
+      })(), icon: PieChart, valueColor: "text-blue-600" },
     { label: m("Ticket Médio"), value: formatBRL(data.TICKET_MEDIO), icon: DollarSign, valueColor: "text-slate-900" },
     { label: m("Margem Real"), value: `${Number(data.MARGEM_REAL_PERC || data.MARGEM_PCT || 0).toFixed(2)}%`, icon: TrendingUp, valueColor: "text-blue-600" },
     { label: m("Prazo Médio"), value: `${Number(data.PRAZO_MEDIO_DIAS || 0).toFixed(0)} d`, icon: Clock, valueColor: "text-slate-900" },

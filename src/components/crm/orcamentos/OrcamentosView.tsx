@@ -99,10 +99,10 @@ function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
       client: parseName(r.CLIENTE),
       date: dateBR,
       time: hora,
-      total: total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+      total: (totalVenda || total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       markup: `${avgMarkup.toFixed(1)}%`,
       status: defaultStatus,
-      totalValue: total,
+      totalValue: totalVenda || total,
       markupValue: avgMarkup,
       lossReason: r.MOTIVO_CANCELAMENTO !== "SEM MOTIVO" ? r.MOTIVO_CANCELAMENTO : undefined,
       empresa: r.EMPRESA,
@@ -604,9 +604,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     }, {});
     const vendas = statusCounts["VENDA"] || 0;
     const perdidos = statusCounts["PERDIDO"] || 0;
-    const pipeline = filteredAndSortedItems
-      .filter((o) => !["VENDA", "PERDIDO"].includes(o.status))
-      .reduce((s, o) => s + o.totalValue, 0);
+    const pipeline = filterStatus === "Perdido"
+      ? filteredAndSortedItems.reduce((s, o) => s + o.totalValue, 0)
+      : filteredAndSortedItems
+          .filter((o) => !["VENDA", "PERDIDO"].includes(o.status))
+          .reduce((s, o) => s + o.totalValue, 0);
 
     // Regra de Conversão: Excluir motivos consultivos (não penaliza o vendedor)
     const filteredForConv = filteredAndSortedItems.filter(o => {
@@ -629,7 +631,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       }, {});
 
     return { statusCounts, vendas, perdidos, pipeline, convQtd, total, reasonCounts };
-  }, [filteredAndSortedItems]);
+  }, [filteredAndSortedItems, filterStatus]);
 
   const requestSort = (key: string) => {
     let direction: "asc" | "desc" = "asc";
