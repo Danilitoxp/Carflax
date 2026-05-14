@@ -195,24 +195,27 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   const total = data ? (typeof data.TOTAL === 'string' ? parseFloat(data.TOTAL) : data.TOTAL) : 0;
   const percentageVsEquilibrio = equilibrio > 0 ? (Number(total) / equilibrio) * 100 : 0;
 
+  const canChangeSeller = userProfile?.role?.toUpperCase().includes("DIRETOR") || 
+                          userProfile?.role?.toUpperCase().includes("GERENTE DE VENDAS") || 
+                          userProfile?.role?.toUpperCase() === "ADMIN";
+
   return (
     <div className={cn(
       "bg-card border border-border rounded-xl shadow-sm flex flex-col",
       isCompact ? "p-4" : "p-5"
     )}>
       {/* 1. HEADER (Limpado) */}
-      <div className="flex items-center justify-between relative">
-        <div className="flex items-center gap-2">
-          {selectedCod !== "TOTAL" && (
-            <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-tighter truncate max-w-[150px]">
+      <div className="flex items-center justify-between relative mb-2">
+        <div className="flex-1" />
+        <div className="absolute inset-x-0 flex items-center justify-center pointer-events-none">
+          {canChangeSeller && selectedCod !== "TOTAL" && (
+            <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-tighter truncate max-w-[200px]">
               {data?.NOME_VENDEDOR}
             </span>
           )}
         </div>
-        <div className="relative">
-          {(userProfile?.role?.toUpperCase().includes("DIRETOR") || 
-            userProfile?.role?.toUpperCase().includes("GERENTE DE VENDAS") || 
-            userProfile?.role?.toUpperCase() === "ADMIN") && (
+        <div className="relative z-10 flex-shrink-0">
+          {canChangeSeller && (
             <button 
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className={cn(
