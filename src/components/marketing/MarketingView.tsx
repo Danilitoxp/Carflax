@@ -3,6 +3,7 @@ import { WhatsappView } from "./whatsapp/WhatsappView";
 import { ClientesView } from "./ClientesView";
 import { LeadsView } from "./LeadsView";
 import { ReportsView } from "./ReportsView";
+import { CronogramaView } from "./CronogramaView";
 
 interface UserProfile {
   id?: string;
@@ -28,6 +29,10 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
 
   if (activeTab === "Leads") {
     return <LeadsView />;
+  }
+
+  if (activeTab === "Cronograma") {
+    return <CronogramaView />;
   }
 
   if (activeTab.includes("Relatórios")) {

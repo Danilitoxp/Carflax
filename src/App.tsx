@@ -378,6 +378,11 @@ function DashboardContent({
       };
 
       const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string;
+      if (!vapidKey) {
+        console.warn("[Push] VITE_VAPID_PUBLIC_KEY não encontrada no .env. Notificações desativadas.");
+        return;
+      }
+
       const padding = '='.repeat((4 - (vapidKey.length % 4)) % 4);
       const base64 = (vapidKey + padding).replace(/-/g, '+').replace(/_/g, '/');
       const applicationServerKey = new Uint8Array([...atob(base64)].map(c => c.charCodeAt(0)));
