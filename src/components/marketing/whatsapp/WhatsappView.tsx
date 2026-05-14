@@ -1826,14 +1826,21 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               
               <div className="flex-1 min-w-0 flex justify-between gap-2">
                 <div className="flex-1 min-w-0 flex flex-col justify-start pt-1">
-                  <div className="flex items-center gap-2 mb-0.5">
+                  <div className="flex items-center gap-1.5 mb-0.5">
                     <span className={cn(
                       "font-bold text-sm truncate tracking-tight font-inter", 
                       selectedChat?.id === chat.id ? "text-primary" : "text-foreground"
                     )}>
                       {chat.name.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
                     </span>
-                    {chat.fixado && <Pin className="w-3 h-3 text-primary rotate-45" />}
+                    <span title={chat.leadInfo?.temperature || "Frio"}>
+                      <Flame className={cn("w-3.5 h-3.5 shrink-0", 
+                        (chat.leadInfo?.temperature || "Frio") === "Quente" ? "text-rose-500" : 
+                        (chat.leadInfo?.temperature || "Frio") === "Morno" ? "text-amber-500" : 
+                        "text-blue-500"
+                      )} />
+                    </span>
+                    {chat.fixado && <Pin className="w-3 h-3 text-primary rotate-45 shrink-0" />}
                   </div>
                   
                   <p className={cn(
