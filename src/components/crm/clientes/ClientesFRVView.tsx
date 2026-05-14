@@ -409,7 +409,7 @@ export function ClientesFRVView() {
           )}>
             <RFMMatrix 
               data={rfvMatrixData} 
-              onCellClick={(label, clients) => setSelectedSegment({ label, clients: clients as (ClienteFRV & { recencia_score: number; fv_score: number })[] })}
+              onCellClick={(label, clients) => setSelectedSegment({ label, clients: clients as unknown as (ClienteFRV & { recencia_score: number; fv_score: number })[] })}
             />
           </div>
 
