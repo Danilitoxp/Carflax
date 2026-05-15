@@ -66,11 +66,7 @@ function parseName(raw: string): string {
     ? raw.slice(raw.indexOf("-") + 1).trim() 
     : raw.trim();
   
-  // Se o resultado for apenas uma letra (ex: "G" de GERAL), retorna o original limpo
-  // mas vamos garantir que pegamos as palavras corretamente
-  const parts = clean.split(/\s+/).filter(p => p.length > 0);
-  if (parts.length <= 2) return clean;
-  return `${parts[0]} ${parts[1]}`;
+  return clean;
 }
 
 function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
@@ -142,8 +138,8 @@ const OrcamentoRow = memo(({ item, onOpenItems, onOpenStatus, onOpenChat }: RowP
           )}
         </div>
       </td>
-      <td className="px-6 py-4"><span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">{item.seller}</span></td>
-      <td className="px-6 py-4"><span className="text-[11px] font-black text-foreground uppercase tracking-tighter transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400">{item.client}</span></td>
+      <td className="px-6 py-4 max-w-[140px]"><span className="block truncate text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight" title={item.seller}>{item.seller}</span></td>
+      <td className="px-6 py-4 max-w-[200px]"><span className="block truncate text-[11px] font-black text-foreground uppercase tracking-tighter transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400" title={item.client}>{item.client}</span></td>
       <td className="px-6 py-4">
         <div className="flex items-baseline gap-2">
           <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">{item.date}</span>
