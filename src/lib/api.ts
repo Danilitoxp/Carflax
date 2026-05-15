@@ -282,6 +282,9 @@ export interface ProductInfo {
   PRECO_VENDA: number | string;
   TOTAL_DISPONIVEL: number | string;
   ULT_ALT: string;
+  TOTAL_VENDIDO?: number | string;
+  VALOR_CREDITO?: number | string;
+  VALOR_DEBITO?: string;
 }
 
 export const apiDashboardProdutos = (codigo?: string) =>

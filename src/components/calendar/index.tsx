@@ -211,10 +211,18 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
 
       const finalEvents = [...manualEvents, ...birthdayEvents, ...admissionEvents, ...currentHolidayEvents];
 
-      // 5. Filtro de Privacidade para Follow-ups — apenas o próprio vendedor vê
+      // 5. Filtro de Privacidade para Follow-ups — apenas o próprio vendedor vê e ocultar passados
       const myCode = String(userProfile?.operator_code || userProfile?.seller_code || "").replace(/^0+/, '');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
       const visibleEvents = finalEvents.filter(ev => {
         if (ev.type !== "follow-up") return true;
+        
+        // Ocultar follow-ups que já passaram
+        const evDate = new Date(ev.year, ev.month, ev.day);
+        if (evDate < today) return false;
+
         const evCode = String(ev.vendedor_codigo || "").replace(/^0+/, '');
         return evCode !== "" && myCode !== "" && evCode === myCode;
       });

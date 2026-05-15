@@ -2,7 +2,9 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Search,
   ArrowUpDown,
-  Tag
+  Tag,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
@@ -13,6 +15,7 @@ interface Product {
   cod: string;
   desc: string;
   stock: number;
+  sales: number;
   debit: number;
   credit: number;
   brand: string;
@@ -25,6 +28,16 @@ export function ProdutosView() {
   const [filterStock, setFilterStock] = useState("TODOS");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Product; direction: 'asc' | 'desc' } | null>({ key: 'cod', direction: 'asc' });
+
+  const requestSort = (key: keyof Product) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+    setVisibleCount(50);
+  };
 
   useEffect(() => {
     async function fetchProducts() {
@@ -39,12 +52,14 @@ export function ProdutosView() {
               cod: p.COD_ITEM,
               desc: p.DESCRICAO,
               stock: typeof p.TOTAL_DISPONIVEL === 'string' ? parseFloat(p.TOTAL_DISPONIVEL) : Number(p.TOTAL_DISPONIVEL || 0),
+              sales: typeof p.TOTAL_VENDIDO === 'string' ? parseFloat(p.TOTAL_VENDIDO) : Number(p.TOTAL_VENDIDO || 0),
               debit: precoVenda,
               credit: precoVenda * 1.0466,
               brand: p.MARCA || "GERAL",
               location: "---"
             };
-          }).filter((p) => p.cod !== "99999");
+          }).filter((p) => p.cod !== "99999")
+            .sort((a, b) => Number(a.cod) - Number(b.cod));
           setProducts(mapped);
         }
       } catch (error) {
@@ -60,21 +75,49 @@ export function ProdutosView() {
 
   const [visibleCount, setVisibleCount] = useState(50);
 
-  const filteredProducts = products.filter(p => {
-    const searchLower = searchTerm.trim().toLowerCase();
-    const words = searchLower.split(/\s+/).filter(Boolean);
-    
-    const matchesSearch = words.length === 0 || 
-      words.every(word => p.desc.toLowerCase().includes(word)) || 
-      p.cod.toLowerCase().includes(searchLower);
+  const filteredProducts = useMemo(() => {
+    const filtered = products.filter(p => {
+      const searchLower = searchTerm.trim().toLowerCase();
+      const words = searchLower.split(/\s+/).filter(Boolean);
+      
+      const matchesSearch = words.length === 0 || 
+        words.every(word => p.desc.toLowerCase().includes(word)) || 
+        p.cod.toLowerCase().includes(searchLower);
 
-    const matchesBrand = filterBrand === "Todas as Marcas" || p.brand === filterBrand;
-    const matchesStock = filterStock === "TODOS" ||
-      (filterStock === "COM ESTOQUE" && p.stock > 0) ||
-      (filterStock === "SEM ESTOQUE" && p.stock <= 0);
+      const matchesBrand = filterBrand === "Todas as Marcas" || p.brand === filterBrand;
+      const matchesStock = filterStock === "TODOS" ||
+        (filterStock === "COM ESTOQUE" && p.stock > 0) ||
+        (filterStock === "SEM ESTOQUE" && p.stock <= 0);
 
-    return matchesSearch && matchesBrand && matchesStock;
-  });
+      return matchesSearch && matchesBrand && matchesStock;
+    });
+
+    if (sortConfig !== null) {
+      filtered.sort((a, b) => {
+        const key = sortConfig.key;
+        const dir = sortConfig.direction;
+        
+        if (key === 'cod') {
+          return dir === 'asc' ? Number(a.cod) - Number(b.cod) : Number(b.cod) - Number(a.cod);
+        }
+        
+        const valA = a[key];
+        const valB = b[key];
+
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return dir === 'asc' ? valA - valB : valB - valA;
+        }
+
+        const strA = String(valA).toLowerCase();
+        const strB = String(valB).toLowerCase();
+        if (strA < strB) return dir === 'asc' ? -1 : 1;
+        if (strA > strB) return dir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [products, searchTerm, filterBrand, filterStock, sortConfig]);
 
   const visibleProducts = filteredProducts.slice(0, visibleCount);
 
@@ -151,14 +194,35 @@ export function ProdutosView() {
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-10 bg-secondary/50 backdrop-blur-md border-b border-border">
               <tr>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                  <div className="flex items-center gap-2">CÓDIGO <ArrowUpDown className="w-3 h-3 text-blue-500" /></div>
-                </th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">DESCRIÇÃO</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">MARCA</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">ESTOQUE</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">DÉBITO</th>
-                <th className="py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">CRÉDITO 3X</th>
+                {[
+                  { id: "cod", label: "CÓDIGO", align: "left" },
+                  { id: "desc", label: "DESCRIÇÃO", align: "left" },
+                  { id: "brand", label: "MARCA", align: "center" },
+                  { id: "stock", label: "ESTOQUE", align: "right" },
+                  { id: "sales", label: "VENDAS (MÊS)", align: "right" },
+                  { id: "debit", label: "DÉBITO", align: "right" },
+                  { id: "credit", label: "CRÉDITO 3X", align: "right" },
+                ].map((col) => (
+                  <th
+                    key={col.id}
+                    onClick={() => requestSort(col.id as keyof Product)}
+                    className={cn(
+                      "py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors",
+                      col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                    )}
+                  >
+                    <div className={cn("flex items-center gap-1.5", col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start")}>
+                      <span className="truncate">{col.label}</span>
+                      <div className="shrink-0">
+                        {sortConfig?.key === col.id ? (
+                          sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 text-blue-500" /> : <ChevronDown className="w-3 h-3 text-blue-500" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-20 group-hover:opacity-40 transition-opacity" />
+                        )}
+                      </div>
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -169,6 +233,7 @@ export function ProdutosView() {
                     <td className="py-4 px-6"><div className="h-2 w-full max-w-[250px] bg-secondary rounded" /></td>
                     <td className="py-4 px-6"><div className="h-5 w-16 bg-secondary/50 rounded-lg mx-auto" /></td>
                     <td className="py-4 px-6 text-right"><div className="h-2 w-12 bg-secondary rounded ml-auto" /></td>
+                    <td className="py-4 px-6 text-right"><div className="h-2 w-10 bg-secondary rounded ml-auto" /></td>
                     <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-secondary/50 rounded ml-auto" /></td>
                     <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-secondary rounded ml-auto" /></td>
                   </tr>
@@ -195,6 +260,11 @@ export function ProdutosView() {
                         </span>
                       </td>
                       <td className="py-3 px-6 text-right">
+                        <span className="text-[11px] font-black tracking-tighter text-blue-600 dark:text-blue-400">
+                          {(p.sales || 0).toFixed(3)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-6 text-right">
                         <span className="text-[11px] font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">
                           R$ {p.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
@@ -209,7 +279,7 @@ export function ProdutosView() {
                   
                   {visibleCount < filteredProducts.length && (
                     <tr>
-                      <td colSpan={6} className="py-6">
+                      <td colSpan={7} className="py-6">
                         <div className="flex justify-center w-full">
                           <TinyLoader size="sm" />
                         </div>
