@@ -203,6 +203,36 @@ export interface CrmItem {
   MARKUP_PERCENTUAL: string | number;
   MARCA: string;
   UN: string;
+  // Raw fields from legacy/database
+  FDO_CODITE?: string;
+  FDO_DESCRI?: string;
+  FDO_QTDITE?: string | number;
+  FDO_UNITAR?: string | number;
+  FDO_TOTCUS?: string | number;
+  FDO_UNIDAD?: string;
+  FDO_CODMAR?: string;
+  FDO_NUMDOC?: string;
+}
+
+export function mapCrmItem(p: any): CrmItem {
+  const qtd = parseFloat(String(p.QUANTIDADE || p.FDO_QTDITE || 0));
+  const unitar = parseFloat(String(p.PRECO_UNITARIO || p.FDO_UNITAR || 0));
+  const custoTotal = parseFloat(String(p.FDO_TOTCUS || (p.CUSTO_UNITARIO * qtd) || 0));
+  const custoUnitar = p.CUSTO_UNITARIO || (qtd > 0 ? custoTotal / qtd : 0);
+  
+  const mkp = p.MARKUP_PERCENTUAL || (custoUnitar > 0 ? ((unitar / custoUnitar) - 1) * 100 : 0);
+
+  return {
+    COD_PRODUTO: String(p.COD_PRODUTO || p.FDO_CODITE || ""),
+    PRODUTO: String(p.PRODUTO || p.FDO_DESCRI || ""),
+    QUANTIDADE: qtd,
+    PRECO_UNITARIO: unitar,
+    CUSTO_UNITARIO: custoUnitar,
+    MARKUP_PERCENTUAL: mkp,
+    UN: String(p.UN || p.FDO_UNIDAD || "UN"),
+    MARCA: String(p.MARCA || p.FDO_CODMAR || ""),
+    ...p
+  };
 }
 
 export interface CrmOrcamento {
@@ -216,13 +246,21 @@ export interface CrmOrcamento {
   CLIENTE: string;
   EMPRESA: string;
   VALOR_TOTAL_ORCAMENTO: string;
+  MARKUP_DOC?: number | null;
   DATA_BAIXA: string;
   MOTIVO_CANCELAMENTO: string;
   PRODUTOS: CrmItem[];
+  // Raw fields
+  FDO_NUMDOC?: string;
+  VENDEDOR_NOME?: string;
+  CLIENTE_NOME?: string;
 }
 
 export const apiCrmOrcamentos = (params: { vendedor?: string, inicio?: string, fim?: string }) =>
   get<CrmOrcamento[]>("/api/crm/orcamentos", params as Record<string, string>);
+
+export const apiCrmOrcamentoItens = (documento: string) =>
+  get<CrmItem[]>(`/api/crm/orcamentos/${encodeURIComponent(documento)}/itens`);
 
 export const apiCrmStatus = (body: unknown) => post("/api/crm/status", body);
 

@@ -905,7 +905,7 @@ function App() {
       const dataStr = `${yyyy}-${mm}-${dd}`;
       const primeiroDia = `${yyyy}-${mm}-01`;
 
-      const { apiDashboardGeral, apiCrmOrcamentos } = await import("@/lib/api");
+      const { apiDashboardGeral, apiCrmOrcamentos, mapCrmItem } = await import("@/lib/api");
       const { getCrmStatusMap } = await import("@/lib/crm-service");
 
       const role = profile.role?.toUpperCase() || "";
@@ -933,7 +933,7 @@ function App() {
           if (crmStatus) status = crmStatus;
 
           if (status === "PERDIDO") {
-            const products = r.PRODUTOS || [];
+            const products = (r.PRODUTOS || []).map(mapCrmItem);
             const totalVenda = products.reduce((acc: number, p: { QUANTIDADE: number | string; PRECO_UNITARIO: number | string }) =>
               acc + (parseFloat(String(p.QUANTIDADE)) || 0) * (parseFloat(String(p.PRECO_UNITARIO)) || 0), 0);
             const total = parseFloat(r.VALOR_TOTAL_ORCAMENTO) || 0;

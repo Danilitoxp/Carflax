@@ -3,7 +3,7 @@ import { X, Send, Loader2, Package, ShoppingBag, Maximize2, Minimize2 } from "lu
 import { cn } from "@/lib/utils";
 import { getConversas, addConversa, type CrmConversa } from "@/lib/crm-service";
 import { supabase } from "@/lib/supabase";
-import { apiCrmOrcamentos, type CrmItem } from "@/lib/api";
+import { apiCrmOrcamentos, mapCrmItem, type CrmOrcamento, type CrmItem } from "@/lib/api";
 
 interface UserProfile {
   id?: string;
@@ -378,7 +378,7 @@ export function ChatModal({
       );
 
       if (budget) {
-        setItems(budget.PRODUTOS || []);
+        setItems((budget.PRODUTOS || []).map(mapCrmItem));
       }
     } catch (e) {
       console.error("[Chat] Erro ao buscar produtos:", e);

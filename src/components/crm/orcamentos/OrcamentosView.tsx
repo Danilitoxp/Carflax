@@ -26,7 +26,7 @@ import {
   FileCheck,
   AlertCircle,
 } from "lucide-react";
-import { apiCrmOrcamentos, type CrmOrcamento, type CrmItem } from "@/lib/api";
+import { apiCrmOrcamentos, apiCrmOrcamentoItens, mapCrmItem, type CrmOrcamento, type CrmItem } from "@/lib/api";
 import {
   getCrmStatusMap,
   upsertCrmStatus,
@@ -78,10 +78,12 @@ function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
     const id = r.ORCAMENTO;
     const total = parseFloat(r.VALOR_TOTAL_ORCAMENTO) || 0;
     
-    const products = r.PRODUTOS || [];
+    const products = (r.PRODUTOS || []).map(mapCrmItem);
     const totalVenda = products.reduce((acc, p) => acc + (parseFloat(String(p.QUANTIDADE)) || 0) * (parseFloat(String(p.PRECO_UNITARIO)) || 0), 0);
     const totalCusto = products.reduce((acc, p) => acc + (parseFloat(String(p.QUANTIDADE)) || 0) * (parseFloat(String(p.CUSTO_UNITARIO)) || 0), 0);
-    const avgMarkup = totalCusto > 0 ? ((totalVenda / totalCusto) - 1) * 100 : 0;
+    const avgMarkup = totalCusto > 0
+      ? ((totalVenda / totalCusto) - 1) * 100
+      : (r.MARKUP_DOC != null ? Number(r.MARKUP_DOC) : 0);
 
     const dateStr = r.DATA_ORCAMENTO || "";
     const dateBR = dateStr.length >= 10
@@ -99,10 +101,10 @@ function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
       client: parseName(r.CLIENTE),
       date: dateBR,
       time: hora,
-      total: (totalVenda || total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+      total: total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       markup: `${avgMarkup.toFixed(1)}%`,
       status: defaultStatus,
-      totalValue: totalVenda || total,
+      totalValue: total,
       markupValue: avgMarkup,
       lossReason: r.MOTIVO_CANCELAMENTO !== "SEM MOTIVO" ? r.MOTIVO_CANCELAMENTO : undefined,
       empresa: r.EMPRESA,
@@ -910,10 +912,16 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     <OrcamentoRow 
                       key={item.id} 
                       item={item} 
-                      onOpenItems={(o) => {
+                      onOpenItems={async (o) => {
                         setSelectedItem(o);
                         setIsItemsModalOpen(true);
                         setItens(o.items);
+                        try {
+                          const fatdorItens = await apiCrmOrcamentoItens(o.id);
+                          setItens(fatdorItens.map(mapCrmItem));
+                        } catch {
+                          // mantém o.items como fallback
+                        }
                       }}
                       onOpenStatus={(o) => {
                         setSelectedItem(o);
