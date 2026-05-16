@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { type Session } from "@supabase/supabase-js";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { useNotification } from "@/hooks/useNotification";
 import { ThemeProvider } from "@/context/theme-provider";
@@ -888,7 +889,8 @@ function DashboardContent({
 }
 
 function App() {
-  const [session, setSession] = useState<unknown>(null); // From Supabase Auth
+  const [session, setSession] = useState<Session | null>(null); // From Supabase Auth
+  const sessionRef = useRef<Session | null>(null); // Ref para evitar re-execução do useEffect
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [vendedorMetrics, setVendedorMetrics] = useState<VendedorResumo | null>(
@@ -1054,6 +1056,7 @@ function App() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      sessionRef.current = session;
       if (session) {
         fetchProfile(session.user.id);
       } else {
@@ -1065,6 +1068,7 @@ function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      sessionRef.current = session;
       if (session) {
         fetchProfile(session.user.id);
       } else {
@@ -1074,8 +1078,18 @@ function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+    const handleProfileUpdate = () => {
+      // Usa a ref para não depender do estado 'session' (evita re-execução do efeito)
+      const currentSession = sessionRef.current;
+      if (currentSession) fetchProfile(currentSession.user.id);
+    };
+    window.addEventListener("carflax-profile-updated", handleProfileUpdate);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("carflax-profile-updated", handleProfileUpdate);
+    };
+  }, [fetchProfile]); // Removido 'session' da dependência para evitar loop de requisições
 
   if (loading) return <LoadingScreen />;
 

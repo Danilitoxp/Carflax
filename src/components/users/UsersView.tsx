@@ -243,11 +243,20 @@ export function UsersView() {
     let avatarUrl: string | null | undefined;
 
     if (avatarFile) {
-      console.log("[Users] Fazendo upload de avatar para bucket 'avatares'...");
-      avatarUrl = await uploadImage(avatarFile, "avatares");
-      console.log("[Users] Resultado do upload:", avatarUrl);
-      if (!avatarUrl) {
-        console.error("[Users] Upload falhou — verifique a policy de INSERT no bucket 'avatares'");
+      try {
+        console.log("[Users] Fazendo upload de avatar para bucket 'avatares'...");
+        avatarUrl = await uploadImage(avatarFile, "avatares");
+        console.log("[Users] Resultado do upload:", avatarUrl);
+        if (!avatarUrl) {
+          console.error("[Users] Upload falhou — verifique a policy de INSERT no bucket 'avatares'");
+        }
+      } catch (err: any) {
+        console.error("[Users] Erro no upload:", err);
+        if (err.message?.includes("Refresh Token Not Found")) {
+          alert("Sua sessão expirou. Por favor, saia e entre novamente para continuar.");
+          setSaving(false);
+          return;
+        }
       }
     }
 

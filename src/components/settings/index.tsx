@@ -267,24 +267,62 @@ function getStrength(pw: string): number {
    Foco em cards, hierarquia e organização
 ───────────────────────────────────────────── */
 function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
-  const [form, setForm] = useState({
-    nome: "",
-    email: "",
-    telefone: "",
-    cargo: "",
-  });
+  const [form, setForm] = useState(() => ({
+    nome: userProfile?.name || "",
+    email: userProfile?.email || "",
+    telefone: userProfile?.phone || userProfile?.whatsapp || "",
+    cargo: userProfile?.role || "",
+    avatar: userProfile?.avatar || "",
+  }));
   const [isSaved, setIsSaved] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // Sincronização de Props para Estado (Padrão recomendado pelo React para evitar useEffect)
-  const [prevUserId, setPrevUserId] = useState<string | undefined>(userProfile?.id);
-  if (userProfile?.id !== prevUserId) {
-    setPrevUserId(userProfile?.id);
+  // Sincroniza quando o perfil muda (ex: após update ou recarregamento)
+  useEffect(() => {
+    if (!userProfile?.id) return;
     setForm({
-      nome: userProfile?.name || "",
-      email: userProfile?.email || "",
-      telefone: userProfile?.phone || userProfile?.whatsapp || "",
-      cargo: userProfile?.role || "",
+      nome: userProfile.name || "",
+      email: userProfile.email || "",
+      telefone: userProfile.phone || userProfile.whatsapp || "",
+      cargo: userProfile.role || "",
+      avatar: userProfile.avatar || "",
     });
+  }, [userProfile?.id, userProfile?.avatar]);
+
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !userProfile?.id) return;
+
+    setIsUploading(true);
+    try {
+      const { uploadImage } = await import("@/lib/uploadImage");
+      const url = await uploadImage(file, "avatares");
+
+      if (url) {
+        const { error } = await supabase
+          .from("usuarios")
+          .update({ avatar: url })
+          .eq("id", userProfile.id);
+
+        if (error) throw error;
+
+        setForm(prev => ({ ...prev, avatar: url }));
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 3000);
+        
+        // Disparar evento para atualizar o perfil globalmente sem refresh
+        window.dispatchEvent(new CustomEvent("carflax-profile-updated"));
+      }
+    } catch (err: any) {
+      console.error("[Settings] Erro ao trocar foto:", err);
+      if (err.message?.includes("Refresh Token Not Found")) {
+        alert("Sua sessão expirou. Por favor, saia e entre novamente para continuar.");
+      } else {
+        alert("Erro ao enviar imagem. Verifique sua conexão ou tente novamente.");
+      }
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   function handleSave() {
@@ -299,9 +337,17 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
         <div className="flex flex-col md:flex-row items-center gap-8">
           {/* Avatar e Ação de Foto */}
           <div className="relative group shrink-0">
-            <div className="w-28 h-28 rounded-2xl border-2 border-slate-100 dark:border-white/10 shadow-sm overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center transition-all group-hover:shadow-md">
+            <div className={cn(
+              "w-28 h-28 rounded-2xl border-2 border-slate-100 dark:border-white/10 shadow-sm overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center transition-all group-hover:shadow-md relative",
+              isUploading && "animate-pulse"
+            )}>
+              {isUploading && (
+                <div className="absolute inset-0 bg-white/20 dark:bg-black/20 backdrop-blur-sm flex items-center justify-center z-10">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
               <img
-                src={userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}&backgroundColor=0053FC`}
+                src={form.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}&backgroundColor=0053FC`}
                 className="w-full h-full object-cover transition-transform group-hover:scale-105"
                 alt="Avatar"
               />
@@ -332,10 +378,19 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
             </p>
             
             <div className="flex justify-center md:justify-start pt-1">
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] font-bold text-slate-600 dark:text-slate-400 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all shadow-sm active:scale-95">
+              <label className={cn(
+                "inline-flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] font-bold text-slate-600 dark:text-slate-400 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all shadow-sm active:scale-95",
+                isUploading && "opacity-50 cursor-wait"
+              )}>
                 <Camera className="w-3.5 h-3.5" />
-                ALTERAR FOTO
-                <input type="file" className="hidden" />
+                {isUploading ? "ENVIANDO..." : "ALTERAR FOTO"}
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  disabled={isUploading}
+                />
               </label>
             </div>
           </div>
@@ -511,15 +566,56 @@ function buildDefault(): StateMap {
 function SecurityTab() {
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const strength = getStrength(pw.next);
   const match = pw.next === pw.confirm && pw.next.length > 0;
 
-  function handleSave() {
+  async function handleSave() {
     if (!pw.current || !pw.next || !match) return;
-    setSaved(true);
-    setPw({ current: "", next: "", confirm: "" });
-    setTimeout(() => setSaved(false), 3000);
+    setSaving(true);
+    setErrorMsg("");
+
+    try {
+      // 1. Buscar e-mail do usuário logado
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user?.email) {
+        setErrorMsg("Não foi possível identificar seu usuário. Faça login novamente.");
+        return;
+      }
+
+      // 2. Verificar a senha atual tentando um login silencioso
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: pw.current,
+      });
+
+      if (signInError) {
+        setErrorMsg("Senha atual incorreta. Verifique e tente novamente.");
+        return;
+      }
+
+      // 3. Atualizar para a nova senha
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: pw.next,
+      });
+
+      if (updateError) {
+        setErrorMsg("Erro ao atualizar a senha: " + updateError.message);
+        return;
+      }
+
+      // 4. Sucesso
+      setSaved(true);
+      setPw({ current: "", next: "", confirm: "" });
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      console.error("[Security] Erro ao trocar senha:", err);
+      setErrorMsg("Ocorreu um erro inesperado. Tente novamente.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -550,6 +646,13 @@ function SecurityTab() {
                 <span className="text-[10px] font-black text-rose-600 uppercase">As senhas não coincidem</span>
               </div>
             )}
+
+            {errorMsg && (
+              <div className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-500/10 rounded-xl border border-rose-100 dark:border-rose-500/20">
+                <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                <span className="text-[10px] font-black text-rose-600 dark:text-rose-400">{errorMsg}</span>
+              </div>
+            )}
           </div>
 
           <div className="mt-10 pt-6 border-t border-slate-50 dark:border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -558,7 +661,7 @@ function SecurityTab() {
             </p>
             <Button
               onClick={handleSave}
-              disabled={!pw.current || !pw.next || !match}
+              disabled={!pw.current || !pw.next || !match || saving}
               className={cn(
                 "h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-95 w-full md:w-auto",
                 saved
@@ -570,6 +673,11 @@ function SecurityTab() {
                 <span className="flex items-center gap-2">
                   <Check className="w-4 h-4" /> 
                   SENHA ATUALIZADA
+                </span>
+              ) : saving ? (
+                <span className="flex items-center gap-2">
+                  <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/></svg>
+                  ATUALIZANDO...
                 </span>
               ) : (
                 "ATUALIZAR SENHA"
