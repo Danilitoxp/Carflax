@@ -706,7 +706,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     .slice(0, 5)
     .map(([label, count]) => ({ label, count, value: insights.reasonValues[label] || 0 }));
   const fmtCurrency = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-  const maxReasonCount = Math.max(...reasonEntries.map((e) => e[1]), 1);
+  const maxReasonCount = Math.max(...reasonEntries.map((e) => e.count), 1);
 
   return (
     <div className="h-full flex flex-col pt-4 px-6 pb-2 overflow-y-auto scrollbar-hide bg-background">
