@@ -600,6 +600,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       acc[o.status] = (acc[o.status] || 0) + 1;
       return acc;
     }, {});
+    const statusValues = filteredAndSortedItems.reduce<Record<string, number>>((acc, o) => {
+      acc[o.status] = (acc[o.status] || 0) + o.totalValue;
+      return acc;
+    }, {});
     const vendas = statusCounts["VENDA"] || 0;
     const perdidos = statusCounts["PERDIDO"] || 0;
     const pipeline = filterStatus === "Perdido"
@@ -620,6 +624,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     const divisor = vFiltered + pFiltered;
     const convQtd = divisor > 0 ? ((vFiltered / divisor) * 100).toFixed(1) : "0.0";
 
+    const vValor = filteredForConv.filter(o => o.status === "VENDA").reduce((s, o) => s + o.totalValue, 0);
+    const pValor = filteredForConv.filter(o => o.status === "PERDIDO").reduce((s, o) => s + o.totalValue, 0);
+    const divisorValor = vValor + pValor;
+    const convValor = divisorValor > 0 ? ((vValor / divisorValor) * 100).toFixed(1) : "0.0";
+
     const reasonCounts = filteredAndSortedItems
       .filter((o) => o.status === "PERDIDO" && o.lossReason)
       .reduce<Record<string, number>>((acc, o) => {
@@ -627,8 +636,15 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         acc[r] = (acc[r] || 0) + 1;
         return acc;
       }, {});
+    const reasonValues = filteredAndSortedItems
+      .filter((o) => o.status === "PERDIDO" && o.lossReason)
+      .reduce<Record<string, number>>((acc, o) => {
+        const r = o.lossReason!;
+        acc[r] = (acc[r] || 0) + o.totalValue;
+        return acc;
+      }, {});
 
-    return { statusCounts, vendas, perdidos, pipeline, convQtd, total, reasonCounts };
+    return { statusCounts, statusValues, vendas, perdidos, pipeline, convQtd, convValor, total, reasonCounts, reasonValues };
   }, [filteredAndSortedItems, filterStatus]);
 
   const requestSort = (key: string) => {
@@ -685,7 +701,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   ];
   const maxStatusCount = Math.max(...statusBarData.map((s) => insights.statusCounts[s.key] || 0), 1);
 
-  const reasonEntries = Object.entries(insights.reasonCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const reasonEntries = Object.entries(insights.reasonCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([label, count]) => ({ label, count, value: insights.reasonValues[label] || 0 }));
+  const fmtCurrency = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
   const maxReasonCount = Math.max(...reasonEntries.map((e) => e[1]), 1);
 
   return (
@@ -772,11 +792,15 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
             ) : (
               statusBarData.map((s, i) => {
                 const val = insights.statusCounts[s.key] || 0;
+                const valMoney = insights.statusValues[s.key] || 0;
                 return (
                   <div key={i} className="space-y-1">
-                    <div className="flex justify-between items-center text-[9px] font-bold text-muted-foreground">
+                    <div className="flex justify-between items-start text-[9px] font-bold text-muted-foreground">
                       <span className="uppercase tracking-tight truncate pr-2">{s.label}</span>
-                      <span className="text-foreground">{val}</span>
+                        <div className="text-right shrink-0 leading-snug">
+                        <span className="text-foreground block">{val}</span>
+                        {valMoney > 0 && <span className="text-[10px] font-black text-emerald-500 dark:text-emerald-400">{fmtCurrency(valMoney)}</span>}
+                      </div>
                     </div>
                     <div className="h-1 bg-secondary dark:bg-slate-800 rounded-full overflow-hidden">
                       <div className={cn("h-full rounded-full", s.color)} style={{ width: `${(val / maxStatusCount) * 100}%` }} />
@@ -805,11 +829,14 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
             ) : reasonEntries.length === 0 ? (
               <p className="text-[10px] text-slate-400 italic">Nenhum registro ainda</p>
             ) : (
-              reasonEntries.map(([label, count], i) => (
+              reasonEntries.map(({ label, count, value }, i) => (
                 <div key={i} className="space-y-1">
-                  <div className="flex justify-between items-center text-[9px] font-bold text-muted-foreground">
+                  <div className="flex justify-between items-start text-[9px] font-bold text-muted-foreground">
                     <span className="uppercase tracking-tight truncate pr-2">{label}</span>
-                    <span className="text-foreground">{count}</span>
+                    <div className="text-right shrink-0 leading-snug">
+                      <span className="text-foreground block">{count}</span>
+                      {value > 0 && <span className="text-[10px] font-black text-rose-400">{fmtCurrency(value)}</span>}
+                    </div>
                   </div>
                   <div className="h-2.5 bg-secondary dark:bg-slate-800 rounded-sm overflow-hidden border border-border/50">
                     <div className="h-full rounded-r-sm bg-rose-500 transition-all duration-700" style={{ width: `${(count / maxReasonCount) * 100}%` }} />
@@ -821,12 +848,12 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         </div>
 
         {/* Resumo Geral */}
-        <div className="lg:col-span-4 bg-card border border-border rounded-xl p-4 shadow-sm">
-          <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">Resumo Geral</h3>
-          <div className="space-y-4">
+        <div className="lg:col-span-4 bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col">
+          <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2 shrink-0">Resumo Geral</h3>
+          <div className="flex flex-col flex-1">
             {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex justify-between items-center border-b border-border/50 pb-2 animate-pulse">
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex flex-1 justify-between items-center border-b border-border/50 last:border-0 animate-pulse py-2">
                   <div className="h-2 w-20 bg-secondary dark:bg-slate-800 rounded" />
                   <div className="h-3 w-24 bg-secondary dark:bg-slate-800 rounded" />
                 </div>
@@ -838,14 +865,13 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                 { label: "Vendas Fechadas", value: String(insights.vendas), color: "text-foreground" },
                 { label: "Perdidos", value: String(insights.perdidos), color: "text-rose-500 dark:text-rose-400" },
                 { label: "Conv. por Qtde.", value: `${insights.convQtd}%`, color: "text-emerald-600 dark:text-emerald-400", trend: "up" },
+                { label: "Conv. por Valor", value: `${insights.convValor}%`, color: "text-emerald-600 dark:text-emerald-400", trend: "up" },
               ].map((r, i) => (
-                <div key={i} className="flex flex-col border-b border-border pb-2 last:border-0 last:pb-0">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{r.label}</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className={cn("text-[12px] font-black", r.color)}>{r.value}</span>
-                      {r.trend === "up" && <span className="text-[10px] text-emerald-500 animate-pulse">↗</span>}
-                    </div>
+                <div key={i} className="flex flex-1 justify-between items-center border-b border-border/50 last:border-0">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{r.label}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn("text-[12px] font-black", r.color)}>{r.value}</span>
+                    {r.trend === "up" && <span className="text-[10px] text-emerald-500 animate-pulse">↗</span>}
                   </div>
                 </div>
               ))
