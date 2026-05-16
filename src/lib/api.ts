@@ -270,6 +270,52 @@ export const apiCrmAlugueisClientes = () =>
 export const apiCreatePaymentPreference = (rentalData: unknown) =>
   post<{ id: string; init_point: string; sandbox_init_point: string }>("/api/payments/preference", { rentalData });
 
+// ── Pix (Integração Direta) ──────────────────────────────────────────────────
+
+export interface PixResponse {
+  txidPix: string;
+  empresaPix: string;
+  status: string;
+  textoQrCode: string;
+  valor: number;
+  chavePix: string;
+  codigoBanco: string;
+  nomeBanco: string;
+  nomeEmpresaPix: string;
+  cnpjEmpresaPix: string;
+}
+
+export const apiGeraPix = async (data: { codigoCliente: string; solicitacaoPagador: string; valor: number }): Promise<PixResponse> => {
+  const res = await fetch("http://144.22.215.1:10150/Pix/gera_cobranca_pix", {
+    method: "POST",
+    headers: {
+      "accept": "application/json",
+      "authorization": "Basic VEVTVEU6MTIz",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorBody = await res.text();
+    console.error("Erro API Pix (Body):", errorBody);
+    throw new Error(`Erro ao gerar Pix: ${errorBody}`);
+  }
+  return res.json();
+};
+
+
+export const apiCancelaPix = async (codigoEmpresa: string, txIdPix: string): Promise<string> => {
+  const url = `http://144.22.215.1:10150/Pix/cancelar_cobranca_pix?codigoEmpresa=${codigoEmpresa}&txIdPix=${txIdPix}`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "accept": "application/json",
+      "authorization": "Basic VEVTVEU6MTIz"
+    }
+  });
+  if (!res.ok) throw new Error("Erro ao cancelar Pix");
+  return res.text();
+};
 
 // ── Outros ────────────────────────────────────────────────────────────────────
 
@@ -277,8 +323,6 @@ export interface ProductInfo {
   COD_ITEM: string;
   DESCRICAO: string;
   MARCA: string;
-  VALOR_CREDITO: number | string;
-  VALOR_DEBITO: string | null;
   PRECO_VENDA: number | string;
   TOTAL_DISPONIVEL: number | string;
   ULT_ALT: string;

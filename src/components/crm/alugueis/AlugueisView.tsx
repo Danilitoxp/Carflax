@@ -14,7 +14,9 @@ import {
   ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiCrmAlugueisClientes, apiCreatePaymentPreference } from "@/lib/api";
+import { apiCrmAlugueisClientes, apiGeraPix, apiCancelaPix } from "@/lib/api";
+import type { PixResponse } from "@/lib/api";
+
 import { supabase } from "@/lib/supabase";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -22,8 +24,10 @@ import { QRCodeCanvas } from "qrcode.react";
 interface Rental {
   id: string;
   machineId: string;
+  machineName: string;
   clientName: string;
   value: number;
+  dailyValue: number;
   startDate: string;
   endDate?: string;
   paymentStatus: "paid" | "pending";
@@ -39,6 +43,7 @@ interface Machine {
   image?: string;
   currentRental?: Rental;
 }
+
 
 interface UserProfile {
   id?: string;
@@ -87,6 +92,8 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
   const [paymentLink, setPaymentLink] = useState("");
   const [isWaitingPayment, setIsWaitingPayment] = useState(false);
   const [isProcessingPreference, setIsProcessingPreference] = useState(false);
+  const [pixData, setPixData] = useState<PixResponse | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<string>("ATIVA");
 
 
   const resetForm = useCallback(() => {
@@ -98,6 +105,8 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
     setPaymentLink("");
     setIsWaitingPayment(false);
     setIsProcessingPreference(false);
+    setPixData(null);
+    setPaymentStatus("ATIVA");
   }, []);
 
 
@@ -127,8 +136,10 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
         const mappedData: Rental[] = data.map(item => ({
           id: item.id,
           machineId: item.machine_id,
+          machineName: item.machine_name,
           clientName: item.client_name,
           value: item.total_value,
+          dailyValue: item.daily_value,
           startDate: item.start_date,
           endDate: item.end_date,
           paymentStatus: item.payment_status,
@@ -171,13 +182,6 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
     };
   }, [loadHistory, resetForm]);
 
-
-  useEffect(() => {
-    if (showNewRentalModal) {
-      loadClients();
-    }
-  }, [showNewRentalModal, loadClients]);
-
   const totalCalculation = useMemo(() => {
     if (!startDate || !endDate || !dailyValue) return { days: 0, total: 0 };
     
@@ -194,6 +198,95 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
     };
   }, [startDate, endDate, dailyValue]);
 
+  const saveRentalToDb = useCallback(async () => {
+    if (!selectedMachine || !search || !startDate || !endDate) return;
+
+    try {
+      const { error } = await supabase
+        .from('crm_alugueis')
+        .insert([{
+          machine_id: selectedMachine.id,
+          machine_name: selectedMachine.name,
+          client_name: search,
+          start_date: startDate,
+          end_date: endDate,
+          daily_value: parseFloat(dailyValue.replace(',', '.')),
+          total_value: totalCalculation.total,
+          payment_status: "paid",
+          salesperson: userProfile?.name || "Danilo",
+          status: "active"
+        }]);
+
+      if (error) throw error;
+      // The INSERT listener will handle closing the modal and refreshing
+    } catch (err) {
+      console.error("Erro ao salvar aluguel no banco:", err);
+      alert("Pagamento confirmado, mas erro ao registrar no banco.");
+    }
+  }, [selectedMachine, search, startDate, endDate, dailyValue, totalCalculation.total, userProfile?.name]);
+
+  useEffect(() => {
+    let controller: AbortController | null = null;
+
+    if (isWaitingPayment && pixData && paymentStatus !== "CONCLUIDA") {
+      controller = new AbortController();
+      
+      const startListening = async () => {
+        try {
+          const url = `http://144.22.215.1:10150/Pix/consulta_cobranca_pix?codigoEmpresa=${pixData.empresaPix}&txIdPix=${pixData.txidPix}`;
+          const response = await fetch(url, {
+            headers: {
+              "accept": "application/json",
+              "authorization": "Basic VEVTVEU6MTIz"
+            },
+            signal: controller?.signal
+          });
+
+          if (!response.body) return;
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            console.log("Pix Stream Chunk:", chunk);
+
+            // Tenta extrair o status do evento SSE (formato event:status \n data:{"status":"..."})
+            if (chunk.includes('"status":"CONCLUIDA"') || chunk.includes('"status":"PAGO"')) {
+              setPaymentStatus("CONCLUIDA");
+              await saveRentalToDb();
+              break; 
+            } else {
+              const statusMatch = chunk.match(/"status":"(.*?)"/);
+              if (statusMatch && statusMatch[1]) {
+                setPaymentStatus(statusMatch[1]);
+              }
+            }
+          }
+        } catch (err: any) {
+          if (err.name !== 'AbortError') {
+            console.error("Erro ao monitorar Pix:", err);
+          }
+        }
+      };
+
+      startListening();
+    }
+
+    return () => {
+      if (controller) controller.abort();
+    };
+  }, [isWaitingPayment, pixData, paymentStatus, saveRentalToDb]);
+
+
+  useEffect(() => {
+    if (showNewRentalModal) {
+      loadClients();
+    }
+  }, [showNewRentalModal, loadClients]);
+
   const handleConfirmRental = useCallback(async () => {
     if (!selectedMachine || !search || !startDate || !endDate) {
       alert("Por favor, preencha todos os campos.");
@@ -202,40 +295,68 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
 
     setIsProcessingPreference(true);
     try {
-      const rentalData = {
-        machine_id: selectedMachine.id,
-        machine_name: selectedMachine.name,
-        client_name: search,
-        start_date: startDate,
-        end_date: endDate,
-        daily_value: parseFloat(dailyValue.replace(',', '.')),
-        total_value: totalCalculation.total,
-        payment_status: "pending",
-        salesperson: userProfile?.name || "Danilo",
-        status: "active"
-      };
+      const selectedClient = clients.find(c => c.label === search);
+      const codigoCliente = selectedClient ? selectedClient.value : "00000003";
 
-      const response = await apiCreatePaymentPreference(rentalData);
-      setPaymentLink(response.init_point);
+      const response = await apiGeraPix({
+        codigoCliente: codigoCliente,
+        solicitacaoPagador: `ALUGUEL ${selectedMachine.name} - ${search}`,
+        valor: totalCalculation.total
+      });
+
+      setPixData(response);
+      setPaymentLink(response.textoQrCode);
       setIsWaitingPayment(true);
       
     } catch (err) {
-      console.error("Erro ao gerar link de pagamento:", err);
-      alert("Erro ao gerar pagamento. Tente novamente.");
+      console.error("Erro ao gerar Pix:", err);
+      alert("Erro ao gerar Pix. Tente novamente.");
     } finally {
       setIsProcessingPreference(false);
     }
-  }, [selectedMachine, search, startDate, endDate, dailyValue, totalCalculation.total, userProfile?.name]);
+  }, [selectedMachine, search, startDate, endDate, totalCalculation.total, clients]);
+
+  const handleCancelPix = useCallback(async () => {
+    if (!pixData) return;
+    
+    try {
+      await apiCancelaPix(pixData.empresaPix, pixData.txidPix);
+      setIsWaitingPayment(false);
+      setPixData(null);
+      setPaymentStatus("ATIVA");
+    } catch (err) {
+      console.error("Erro ao cancelar Pix:", err);
+      alert("Erro ao cancelar cobrança no servidor.");
+      // Even if server fails, we might want to allow user to go back
+      setIsWaitingPayment(false);
+    }
+  }, [pixData]);
 
 
   const handleFinishRental = useCallback(async (machineId: string, rentalId?: string) => {
     if (!rentalId) return;
 
+    const machine = machines.find(m => m.id === machineId);
+    if (!machine || !machine.currentRental) return;
+
+    const r = machine.currentRental;
+
     try {
       const { error } = await supabase
         .from('crm_alugueis')
-        .update({ status: 'completed' })
-        .eq('id', rentalId);
+        .upsert({ 
+          id: r.id,
+          machine_id: machine.id,
+          machine_name: r.machineName,
+          client_name: r.clientName,
+          total_value: r.value,
+          daily_value: r.dailyValue,
+          start_date: r.startDate,
+          end_date: r.endDate,
+          payment_status: r.paymentStatus,
+          salesperson: r.salesperson,
+          status: 'completed'
+        });
 
       if (error) throw error;
 
@@ -251,7 +372,7 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
       console.error("Erro ao finalizar aluguel:", err);
       alert("Erro ao atualizar no banco de dados.");
     }
-  }, [setMachines, loadHistory]);
+  }, [setMachines, loadHistory, machines]);
 
   const filteredClients = useMemo(() => {
     return clients.filter(c => 
@@ -405,7 +526,7 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
                   <button 
                     onClick={() => { 
                       setSelectedMachine(machine); 
-                      setDailyValue(machine.id === "TRM20905" ? "200,00" : "150,00");
+                      setDailyValue("0,01");
                       setShowNewRentalModal(true); 
                     }}
                     className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest hover:opacity-90 transition-all flex items-center gap-2 group/btn"
@@ -500,195 +621,256 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
       {/* New Rental Modal (Placeholder for the idea) */}
       {showNewRentalModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 dark:bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
-            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Key className="w-4 h-4 text-primary" />
+          <div className={cn(
+            "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full flex overflow-hidden transition-all duration-500",
+            isWaitingPayment ? "max-w-3xl" : "max-w-sm"
+          )}>
+            {/* Left Column: Form */}
+            <div className={cn(
+              "w-full max-w-sm flex flex-col shrink-0 transition-opacity duration-500",
+              isWaitingPayment && "opacity-40 pointer-events-none"
+            )}>
+              <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <Key className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="flex flex-col">
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Novo Registro</h3>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Aluguel de Equipamento</p>
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Novo Registro</h3>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Aluguel de Equipamento</p>
-                </div>
+                {!isWaitingPayment && (
+                  <button 
+                    onClick={() => { setShowNewRentalModal(false); resetForm(); }}
+                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    <Plus className="w-5 h-5 rotate-45 text-slate-400" />
+                  </button>
+                )}
               </div>
-              <button 
-                onClick={() => { setShowNewRentalModal(false); resetForm(); }}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              >
-                <Plus className="w-5 h-5 rotate-45 text-slate-400" />
-              </button>
+
+              <div className="p-5 space-y-4">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Equipamento</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {machines.map(m => (
+                        <button
+                          key={m.id}
+                          disabled={m.status !== "available"}
+                          onClick={() => {
+                            setSelectedMachine(m);
+                            setDailyValue("0,01");
+                          }}
+                          className={cn(
+                            "p-2 rounded-xl border flex items-center gap-2 transition-all text-left relative",
+                            selectedMachine?.id === m.id 
+                              ? "bg-slate-900 dark:bg-white border-slate-900 dark:border-white shadow-md" 
+                              : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 hover:bg-slate-100",
+                            m.status !== "available" && "opacity-50 cursor-not-allowed grayscale"
+                          )}
+                        >
+                          <div className="w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-slate-100 dark:border-slate-700">
+                            <img src={m.image} alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className={cn(
+                              "text-[10px] font-black uppercase leading-none truncate",
+                              selectedMachine?.id === m.id ? "text-white dark:text-slate-900" : "text-slate-900 dark:text-white"
+                            )}>
+                              {m.name.split(' ')[1]}
+                            </span>
+                            <span className={cn(
+                              "text-[8px] font-bold uppercase tracking-tighter truncate",
+                              selectedMachine?.id === m.id ? "text-white/60 dark:text-slate-500" : "text-slate-400"
+                            )}>
+                              {m.status === 'available' ? m.id : 'INDISPONÍVEL'}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Cliente</label>
+                    <div className="relative">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Pesquisar cliente..." 
+                        value={search}
+                        onChange={(e) => {
+                          setSearch(e.target.value);
+                          setShowDropdown(true);
+                        }}
+                        onFocus={() => setShowDropdown(true)}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold outline-none focus:border-primary/50 transition-all text-slate-900 dark:text-white"
+                      />
+                      
+                      {showDropdown && search && filteredClients.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden">
+                          {filteredClients.map((client) => (
+                            <div 
+                              key={client.value}
+                              onClick={() => { 
+                                setSearch(client.label); 
+                                setShowDropdown(false);
+                              }}
+                              className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between group"
+                            >
+                              <div className="flex flex-col">
+                                <span className="text-xs font-black text-slate-900 dark:text-white">{client.label}</span>
+                                <span className="text-[9px] font-bold text-slate-400 uppercase">{client.value}</span>
+                              </div>
+                              <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-primary transition-colors" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {loadingClients && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Retirada</label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input 
+                          type="date" 
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-2 py-2 text-xs font-bold outline-none focus:border-primary/50 transition-all text-slate-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Entrega</label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input 
+                          type="date" 
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-2 py-2 text-xs font-bold outline-none focus:border-primary/50 transition-all text-slate-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1">Valor da Diária</span>
+                          <span className="text-xs font-black text-slate-700 dark:text-slate-300">R$ {dailyValue || "0,00"}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1">Duração</span>
+                          <span className="text-[10px] font-black text-slate-600 dark:text-slate-400">{totalCalculation.days} {totalCalculation.days === 1 ? 'dia' : 'dias'}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                        <span className="text-[9px] font-black text-slate-900 dark:text-white uppercase tracking-[0.15em]">Total a Pagar</span>
+                        <span className="text-lg font-black text-slate-900 dark:text-white">
+                          R$ {totalCalculation.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {!isWaitingPayment && (
+                  <button 
+                    onClick={handleConfirmRental}
+                    disabled={isProcessingPreference}
+                    className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                  >
+                    {isProcessingPreference && <div className="w-3 h-3 border-2 border-white dark:border-slate-900 border-t-transparent rounded-full animate-spin" />}
+                    Gerar Pagamento
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="p-5 space-y-4">
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Equipamento</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {machines.map(m => (
-                      <button
-                        key={m.id}
-                        disabled={m.status !== "available"}
-                        onClick={() => {
-                          setSelectedMachine(m);
-                          setDailyValue(m.id === "TRM20905" ? "200,00" : "150,00");
-                        }}
-                        className={cn(
-                          "p-2 rounded-xl border flex items-center gap-2 transition-all text-left relative",
-                          selectedMachine?.id === m.id 
-                            ? "bg-slate-900 dark:bg-white border-slate-900 dark:border-white shadow-md" 
-                            : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 hover:bg-slate-100",
-                          m.status !== "available" && "opacity-50 cursor-not-allowed grayscale"
-                        )}
-                      >
-                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-slate-100 dark:border-slate-700">
-                          <img src={m.image} alt="" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className={cn(
-                            "text-[10px] font-black uppercase leading-none truncate",
-                            selectedMachine?.id === m.id ? "text-white dark:text-slate-900" : "text-slate-900 dark:text-white"
-                          )}>
-                            {m.name.split(' ')[1]}
-                          </span>
-                          <span className={cn(
-                            "text-[8px] font-bold uppercase tracking-tighter truncate",
-                            selectedMachine?.id === m.id ? "text-white/60 dark:text-slate-500" : "text-slate-400"
-                          )}>
-                            {m.status === 'available' ? m.id : 'INDISPONÍVEL'}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Cliente</label>
-                  <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Pesquisar cliente..." 
-                      value={search}
-                      onChange={(e) => {
-                        setSearch(e.target.value);
-                        setShowDropdown(true);
-                      }}
-                      onFocus={() => setShowDropdown(true)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold outline-none focus:border-primary/50 transition-all text-slate-900 dark:text-white"
-                    />
-                    
-                    {showDropdown && search && filteredClients.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden">
-                        {filteredClients.map((client) => (
-                          <div 
-                            key={client.value}
-                            onClick={() => { 
-                              setSearch(client.label); 
-                              setShowDropdown(false);
-                            }}
-                            className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between group"
-                          >
-                            <div className="flex flex-col">
-                              <span className="text-xs font-black text-slate-900 dark:text-white">{client.label}</span>
-                              <span className="text-[9px] font-bold text-slate-400 uppercase">{client.value}</span>
-                            </div>
-                            <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-primary transition-colors" />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {loadingClients && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Retirada</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                      <input 
-                        type="date" 
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-2 py-2 text-xs font-bold outline-none focus:border-primary/50 transition-all text-slate-900 dark:text-white"
-                      />
+            {/* Right Column: Pix */}
+            {isWaitingPayment && (
+              <div className="flex-1 border-l border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-6 flex flex-col animate-in slide-in-from-right-4 duration-500">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <div className="flex flex-col">
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Pagamento Pix</h3>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Aguardando Recebimento</p>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Entrega</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                      <input 
-                        type="date" 
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-2 py-2 text-xs font-bold outline-none focus:border-primary/50 transition-all text-slate-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
+                  <button 
+                    onClick={() => { setShowNewRentalModal(false); resetForm(); }}
+                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    <Plus className="w-5 h-5 rotate-45 text-slate-400" />
+                  </button>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1">Valor da Diária</span>
-                        <span className="text-xs font-black text-slate-700 dark:text-slate-300">R$ {dailyValue || "0,00"}</span>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1">Duração</span>
-                        <span className="text-[10px] font-black text-slate-600 dark:text-slate-400">{totalCalculation.days} {totalCalculation.days === 1 ? 'dia' : 'dias'}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                      <span className="text-[9px] font-black text-slate-900 dark:text-white uppercase tracking-[0.15em]">Total a Pagar</span>
-                      <span className="text-lg font-black text-slate-900 dark:text-white">
-                        R$ {totalCalculation.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {!isWaitingPayment ? (
-                <button 
-                  onClick={handleConfirmRental}
-                  disabled={isProcessingPreference}
-                  className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all flex items-center justify-center gap-2"
-                >
-                  {isProcessingPreference && <div className="w-3 h-3 border-2 border-white dark:border-slate-900 border-t-transparent rounded-full animate-spin" />}
-                  Gerar Pagamento
-                </button>
-              ) : (
-                <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                  <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                <div className="space-y-4 flex-1">
+                  <div className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Escaneie para Pagar</p>
-                    <div className="p-3 bg-white rounded-xl shadow-sm">
+                    <div className="p-3 bg-white rounded-xl shadow-inner">
                       <QRCodeCanvas value={paymentLink} size={150} />
                     </div>
-                    <p className="text-[10px] font-bold text-slate-600 dark:text-slate-400 mt-4 text-center">
-                      Aguardando confirmação do pagamento...
-                    </p>
+                    <div className="flex flex-col items-center gap-2 mt-4">
+                      <div className="flex items-center gap-2">
+                        {paymentStatus !== "CONCLUIDA" && (
+                          <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        )}
+                        <p className="text-[10px] font-bold text-slate-600 dark:text-slate-400 text-center">
+                          {paymentStatus === "CONCLUIDA" ? "Pagamento Confirmado!" : "Aguardando confirmação..."}
+                        </p>
+                      </div>
+                      <span className="text-[8px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded uppercase tracking-widest">
+                        Status: {paymentStatus}
+                      </span>
+                    </div>
                     <div className="mt-2 w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-primary animate-[shimmer_2s_infinite_linear]" style={{ width: '40%' }} />
+                      <div 
+                        className={cn(
+                          "h-full transition-all duration-500",
+                          paymentStatus === "CONCLUIDA" ? "bg-emerald-500 w-full" : "bg-primary animate-[shimmer_2s_infinite_linear] w-[40%]"
+                        )} 
+                      />
                     </div>
                   </div>
 
-                  <a 
-                    href={paymentLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-full py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all flex items-center justify-center gap-2"
-                  >
-                    Abrir Link de Pagamento
-                  </a>
+                  {paymentStatus !== "CONCLUIDA" && (
+                    <div className="space-y-2 mt-auto">
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(paymentLink);
+                          alert("Código Pix Copiado!");
+                        }}
+                        className="w-full py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                      >
+                        Copiar Código Pix
+                      </button>
+                      <button 
+                        onClick={handleCancelPix}
+                        className="w-full py-2 text-[9px] font-black text-red-500 uppercase tracking-widest hover:text-red-700 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <Plus className="w-3 h-3 rotate-45" />
+                        Cancelar Cobrança
+                      </button>
+                    </div>
+                  )}
                   
                   <button 
                     onClick={() => setIsWaitingPayment(false)}
@@ -697,9 +879,8 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
                     Voltar e Editar
                   </button>
                 </div>
-              )}
-
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
