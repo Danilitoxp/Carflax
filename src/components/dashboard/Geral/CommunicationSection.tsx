@@ -1,6 +1,6 @@
-import { Plus, ThumbsUp, Edit2, EyeOff, Image as ImageIcon, Tag } from "lucide-react";
+import { Plus, ThumbsUp, Edit2, EyeOff, Image as ImageIcon, Tag, MessageCircle, Send, Smile } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { uploadImage } from "@/lib/uploadImage";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,15 @@ export interface CommunicationPost {
   image: string;
   likes: number;
   likedBy: string[];
+}
+
+interface ComunicadoComment {
+  id: number;
+  content: string;
+  author: string;
+  authorAvatar: string;
+  date: string;
+  userId: string;
 }
 
 interface DbComunicado {
@@ -57,10 +66,30 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
   const [imageLoaded, setImageLoaded] = useState(false);
   const [likersAvatars, setLikersAvatars] = useState<string[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<ComunicadoComment[]>([]);
+  const [commentCount, setCommentCount] = useState(0);
+  const [newComment, setNewComment] = useState("");
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  const EMOJIS = ["😀","😂","😍","🥰","😎","🤔","😅","🙏","👏","🎉","🔥","❤️","👍","👎","😢","😡","🤣","😊","🥳","💪","✨","🚀","💯","🎯","😴","🤦","🙌","💡","⭐","🏆","😘","🫡","🤩","🥹","😤","🫶","🤝","👀","💬","🎊"];
+
+  const insertEmoji = (emoji: string) => {
+    const el = commentInputRef.current;
+    if (!el) { setNewComment(prev => prev + emoji); return; }
+    const start = el.selectionStart ?? newComment.length;
+    const end = el.selectionEnd ?? newComment.length;
+    const updated = newComment.slice(0, start) + emoji + newComment.slice(end);
+    setNewComment(updated);
+    setTimeout(() => { el.focus(); el.setSelectionRange(start + emoji.length, start + emoji.length); }, 0);
+  };
 
   const userAvatar = userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}`;
 
-  // Sincronizar estado local se os dados externos mudarem (Padrão recomendado para evitar useEffect desnecessário)
   const [lastDataId, setLastDataId] = useState(data.id);
   if (data.id !== lastDataId) {
     setLikes(data.likes);
@@ -74,80 +103,130 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
         setLikersAvatars([]);
         return;
       }
-      
-      // 1. Pegar os IDs mais recentes
       const sortedIds = [...data.likedBy].reverse().slice(0, 5);
-      
       const { data: users } = await supabase
         .from('usuarios')
         .select('id, avatar, name')
         .in('id', sortedIds);
-      
       let finalAvatars: string[] = [];
-
       if (users) {
         finalAvatars = sortedIds
           .map(id => users.find(u => String(u.id) === String(id)))
           .filter(Boolean)
           .map(u => u!.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u!.name}`);
       }
-
-      // 2. SEGURANÇA: Se eu curti e minha foto não apareceu na query por algum motivo (delay/cache)
-      // eu forço ela na primeira posição se eu estiver na lista de likes
       if (currentUserId && data.likedBy.includes(currentUserId)) {
         const alreadyIn = finalAvatars.includes(userAvatar);
         if (!alreadyIn) {
           finalAvatars = [userAvatar, ...finalAvatars].slice(0, 5);
         }
       }
-          
       setLikersAvatars(finalAvatars);
     };
     fetchAvatars();
   }, [data.likedBy, currentUserId, userAvatar]);
 
+  useEffect(() => {
+    const fetchCount = async () => {
+      const { count } = await supabase
+        .from("comunicado_comentarios")
+        .select("*", { count: "exact", head: true })
+        .eq("comunicado_id", data.dbId);
+      if (count !== null) setCommentCount(count);
+    };
+    fetchCount();
+  }, [data.dbId]);
+
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showEmojiPicker]);
+
+  const fetchComments = useCallback(async () => {
+    setLoadingComments(true);
+    const { data: rows } = await supabase
+      .from("comunicado_comentarios")
+      .select("id, content, created_at, user_id")
+      .eq("comunicado_id", data.dbId)
+      .order("created_at", { ascending: true });
+    if (rows && rows.length > 0) {
+      const userIds = [...new Set(rows.map((r: any) => r.user_id))];
+      const { data: users } = await supabase
+        .from("usuarios")
+        .select("id, name, avatar")
+        .in("id", userIds);
+      const userMap = new Map(users?.map((u: any) => [String(u.id), u]) || []);
+      const mapped = rows.map((c: any) => {
+        const user = userMap.get(String(c.user_id));
+        return {
+          id: c.id,
+          content: c.content,
+          author: user?.name || "Usuário",
+          authorAvatar: user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user_id}`,
+          date: new Date(c.created_at).toLocaleDateString("pt-BR"),
+          userId: c.user_id,
+        };
+      });
+      setComments(mapped);
+      setCommentCount(mapped.length);
+    } else {
+      setComments([]);
+      setCommentCount(rows?.length ?? 0);
+    }
+    setLoadingComments(false);
+  }, [data.dbId]);
+
+  const handleToggleComments = () => {
+    if (!showComments) fetchComments();
+    setShowComments(prev => !prev);
+    setTimeout(() => commentInputRef.current?.focus(), 100);
+  };
+
+  const handleAddComment = async () => {
+    if (!currentUserId || !newComment.trim() || submittingComment) return;
+    setSubmittingComment(true);
+    const { error } = await supabase
+      .from("comunicado_comentarios")
+      .insert([{ comunicado_id: data.dbId, user_id: currentUserId, content: newComment.trim() }]);
+    if (!error) {
+      setNewComment("");
+      await fetchComments();
+    }
+    setSubmittingComment(false);
+  };
+
   const handleLike = async () => {
     if (!currentUserId) return;
-    
     const isLiking = interaction !== "like";
     const newLikesCount = isLiking ? likes + 1 : Math.max(0, likes - 1);
-    
-    // UI OTIMISTA: Atualização Instantânea na Tela
     setLikes(newLikesCount);
     setInteraction(isLiking ? "like" : null);
-
     if (isLiking) {
       setLikersAvatars(prev => [userAvatar, ...prev.filter(a => a !== userAvatar)].slice(0, 5));
     } else {
       setLikersAvatars(prev => prev.filter(a => a !== userAvatar));
     }
-
-    // Processamento em Background no Supabase
     try {
-      // 1. Buscar estado atual para sincronização de array
       const { data: currentPost } = await supabase
         .from("comunicados")
         .select("liked_by")
         .eq("id", data.dbId)
         .maybeSingle();
-
       let newLikedBy = currentPost?.liked_by || [];
-      
       if (isLiking) {
-        if (!newLikedBy.includes(currentUserId)) {
-          newLikedBy.push(currentUserId);
-        }
+        if (!newLikedBy.includes(currentUserId)) newLikedBy.push(currentUserId);
       } else {
         newLikedBy = newLikedBy.filter((id: string) => id !== currentUserId);
       }
-      
-      // 2. Persistir no banco
       await supabase
         .from("comunicados")
-        .update({ 
-          likes: newLikesCount, 
-          liked_by: newLikedBy 
-        })
+        .update({ likes: newLikesCount, liked_by: newLikedBy })
         .eq("id", data.dbId);
     } catch (error) {
       console.error("Erro ao sincronizar curtida:", error);
@@ -161,68 +240,59 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
   };
 
   return (
-    <div className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col sm:flex-row transition-all duration-300 hover:shadow-lg h-auto sm:min-h-[220px] group">
-      <div className="w-full sm:w-64 bg-slate-100 dark:bg-slate-800/50 shrink-0 border-b sm:border-b-0 sm:border-r border-border overflow-hidden relative min-h-[160px]">
-        {!imageLoaded && (
-          <div className="absolute inset-0 bg-slate-200 animate-pulse flex items-center justify-center">
-            <div className="w-10 h-10 border-4 border-slate-300 border-t-slate-400 rounded-full animate-spin" />
-          </div>
-        )}
-        
-        <img
-          key={data.image}
-          src={data.image}
-          alt={data.title}
-          onLoad={() => setImageLoaded(true)}
-          onError={() => setImageLoaded(true)}
-          className={cn(
-            "w-full h-full object-cover",
-            "group-hover:scale-110 transition-transform duration-500"
+    <div className="bg-card border border-border rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-lg group">
+      <div className="flex flex-col sm:flex-row h-auto sm:min-h-[220px]">
+        <div className="w-full sm:w-64 bg-slate-100 dark:bg-slate-800/50 shrink-0 border-b sm:border-b-0 sm:border-r border-border overflow-hidden relative min-h-[160px]">
+          {!imageLoaded && (
+            <div className="absolute inset-0 bg-slate-200 animate-pulse flex items-center justify-center">
+              <div className="w-10 h-10 border-4 border-slate-300 border-t-slate-400 rounded-full animate-spin" />
+            </div>
           )}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      </div>
+          <img
+            key={data.image}
+            src={data.image}
+            alt={data.title}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageLoaded(true)}
+            className={cn("w-full h-full object-cover", "group-hover:scale-110 transition-transform duration-500")}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        </div>
 
-      <div className="flex-1 p-6 flex flex-col min-w-0">
-        <div className="flex justify-between items-start gap-4 mb-2">
-          <div className="flex items-center gap-3">
-             <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 uppercase tracking-widest">{data.category}</span>
-             <span className="text-xs text-slate-500 dark:text-slate-500 font-bold">{data.date}</span>
+        <div className="flex-1 p-6 flex flex-col min-w-0">
+          <div className="flex justify-between items-start gap-4 mb-2">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 uppercase tracking-widest">{data.category}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-500 font-bold">{data.date}</span>
+            </div>
+            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+              <button onClick={handleHide} className="p-2 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-secondary rounded-xl transition-all" title="Ocultar Comunicado">
+                <EyeOff className="w-4 h-4" />
+              </button>
+              {canManage && (
+                <button onClick={() => onEdit(data)} className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all" title="Editar">
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-            <button onClick={handleHide} className="p-2 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-secondary rounded-xl transition-all" title="Ocultar Comunicado">
-              <EyeOff className="w-4 h-4" />
-            </button>
-            {canManage && (
-              <button onClick={() => onEdit(data)} className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all" title="Editar">
-                <Edit2 className="w-4 h-4" />
+
+          <h3 className="text-lg font-black text-foreground tracking-tight mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase">{data.title}</h3>
+
+          <div onClick={() => setIsExpanded(!isExpanded)} className="cursor-pointer group/content">
+            <p className={cn("text-sm text-slate-600 dark:text-muted-foreground leading-relaxed font-medium mb-1 transition-all duration-300", !isExpanded && "line-clamp-3")}>
+              {data.content}
+            </p>
+            {data.content.length > 150 && (
+              <button className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 hover:underline mb-4">
+                {isExpanded ? "Ver menos" : "Ver mais..."}
               </button>
             )}
           </div>
-        </div>
 
-        <h3 className="text-lg font-black text-foreground tracking-tight mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase">{data.title}</h3>
-        
-        <div 
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="cursor-pointer group/content"
-        >
-          <p className={cn(
-            "text-sm text-slate-600 dark:text-muted-foreground leading-relaxed font-medium mb-1 transition-all duration-300",
-            !isExpanded && "line-clamp-3"
-          )}>
-            {data.content}
-          </p>
-          {data.content.length > 150 && (
-            <button className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 hover:underline mb-4">
-              {isExpanded ? "Ver menos" : "Ver mais..."}
-            </button>
-          )}
-        </div>
-
-        <div className="mt-auto flex items-center justify-between pt-4 border-t border-border">
-          <div className="flex items-center gap-6">
-             <button
+          <div className="mt-auto flex items-center justify-between pt-4 border-t border-border">
+            <div className="flex items-center gap-3">
+              <button
                 onClick={handleLike}
                 className={cn(
                   "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-3 py-1.5 rounded-xl",
@@ -230,10 +300,22 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
                     ? "bg-blue-600 dark:bg-blue-500/20 text-white dark:text-blue-400 shadow-lg shadow-blue-600/20 dark:shadow-none"
                     : "text-slate-400 dark:text-muted-foreground hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary"
                 )}
-             >
-               <ThumbsUp className={cn("w-4 h-4", interaction === "like" && "fill-white dark:fill-current")} />
-               {likes}
-             </button>
+              >
+                <ThumbsUp className={cn("w-4 h-4", interaction === "like" && "fill-white dark:fill-current")} />
+                {likes}
+              </button>
+              <button
+                onClick={handleToggleComments}
+                className={cn(
+                  "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-3 py-1.5 rounded-xl",
+                  showComments
+                    ? "bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300"
+                    : "text-slate-400 dark:text-muted-foreground hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary"
+                )}
+              >
+                <MessageCircle className={cn("w-4 h-4", showComments && "fill-slate-400 dark:fill-slate-400")} />
+                {commentCount}
+              </button>
               <div className="flex items-center -space-x-2">
                 {likersAvatars.map((url, i) => (
                   <div key={i} className="w-8 h-8 rounded-full border-2 border-card overflow-hidden bg-slate-100 dark:bg-slate-800 ring-1 ring-border shadow-sm transition-transform hover:scale-110 hover:z-10">
@@ -241,16 +323,103 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
                   </div>
                 ))}
               </div>
-          </div>
-          <div className="flex items-center gap-3 bg-secondary/50 px-3 py-1.5 rounded-xl border border-border">
-             <img src={data.authorAvatar} className="w-7 h-7 rounded-full shadow-sm object-cover" alt={data.author} />
-             <div className="flex flex-col leading-none text-left">
-               <span className="text-[10px] font-black text-foreground uppercase tracking-tighter truncate max-w-[80px]">{data.author}</span>
-               <span className="text-[9px] font-bold text-slate-500 dark:text-muted-foreground uppercase">Autor</span>
-             </div>
+            </div>
+            <div className="flex items-center gap-3 bg-secondary/50 px-3 py-1.5 rounded-xl border border-border">
+              <img src={data.authorAvatar} className="w-7 h-7 rounded-full shadow-sm object-cover" alt={data.author} />
+              <div className="flex flex-col leading-none text-left">
+                <span className="text-[10px] font-black text-foreground uppercase tracking-tighter truncate max-w-[80px]">{data.author}</span>
+                <span className="text-[9px] font-bold text-slate-500 dark:text-muted-foreground uppercase">Autor</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {showComments && (
+        <div className="border-t border-border bg-secondary/20 dark:bg-slate-800/20 px-6 py-5 flex flex-col gap-4">
+          {loadingComments ? (
+            <div className="flex flex-col gap-3">
+              {[1, 2].map(i => (
+                <div key={i} className="flex gap-3 animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-secondary dark:bg-slate-700 shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-24 bg-secondary dark:bg-slate-700 rounded" />
+                    <div className="h-4 w-full bg-secondary dark:bg-slate-700 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : comments.length > 0 ? (
+            <div className="flex flex-col gap-4 max-h-64 overflow-y-auto pr-1">
+              {comments.map(comment => (
+                <div key={comment.id} className="flex gap-3">
+                  <img src={comment.authorAvatar} className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm" alt={comment.author} />
+                  <div className="flex-1 bg-card rounded-xl px-4 py-2.5 border border-border">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-black text-foreground uppercase tracking-tight">{comment.author}</span>
+                      <span className="text-[9px] font-bold text-slate-400 dark:text-muted-foreground">{comment.date}</span>
+                    </div>
+                    <p className="text-xs font-medium text-slate-600 dark:text-muted-foreground leading-relaxed">{comment.content}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {currentUserId && (
+            <div className="flex items-center gap-3 pt-1">
+              <img src={userAvatar} className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm" alt={userProfile?.name} />
+              <div className="flex-1 flex gap-2">
+                <div className="flex-1 relative" ref={emojiPickerRef}>
+                  <div className="flex items-center bg-card border border-border rounded-xl focus-within:ring-1 focus-within:ring-blue-500">
+                    <textarea
+                      ref={commentInputRef}
+                      value={newComment}
+                      onChange={e => setNewComment(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment(); }}}
+                      placeholder="Escreva um comentário..."
+                      rows={1}
+                      disabled={submittingComment}
+                      className="flex-1 pl-4 py-2.5 bg-transparent text-xs font-medium text-foreground outline-none resize-none placeholder:text-muted-foreground/40 leading-relaxed"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker(prev => !prev)}
+                      className={cn(
+                        "shrink-0 px-2.5 py-2.5 rounded-r-xl transition-colors",
+                        showEmojiPicker ? "text-yellow-500" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                      )}
+                    >
+                      <Smile className="w-5 h-5" />
+                    </button>
+                  </div>
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-full right-0 mb-2 bg-card border border-border rounded-xl shadow-xl p-2 grid grid-cols-8 gap-0.5 z-50 w-64">
+                      {EMOJIS.map(emoji => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => insertEmoji(emoji)}
+                          className="text-base hover:bg-secondary rounded-lg p-1 transition-colors leading-none"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={handleAddComment}
+                  disabled={!newComment.trim() || submittingComment}
+                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-all active:scale-95 shrink-0"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

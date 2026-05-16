@@ -362,9 +362,12 @@ function DashboardContent({
   }, [userProfile?.id]);
 
   // ── Web Push — Service Worker + Subscrição persistente ──────────────
+  const pushSetupDone = useRef(false);
   useEffect(() => {
     if (!userProfile?.id) return;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (pushSetupDone.current) return; // Executa apenas uma vez por sessão
+    pushSetupDone.current = true;
 
     async function setupPush() {
       const permission = await Notification.requestPermission();
@@ -407,7 +410,7 @@ function DashboardContent({
     }
 
     setupPush();
-  }, [userProfile]);
+  }, [userProfile?.id]); // Usa apenas o ID para evitar re-execuções desnecessárias
 
   // 1. Cache Global de Usuários (Preload similar ao CRM Legado)
   useEffect(() => {
@@ -1067,14 +1070,21 @@ function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Quando a sessão expira e não pode ser renovada, o Supabase dispara SIGNED_OUT
+      // Isso limpa o estado e volta para a tela de login automaticamente
       setSession(session);
       sessionRef.current = session;
       if (session) {
         fetchProfile(session.user.id);
       } else {
+        // Token expirado ou logout → limpar tudo e voltar ao login
         setProfile(null);
         setVendedorMetrics(null);
         setLoading(false);
+        // Forçar limpeza do localStorage do Supabase para evitar loop de refresh
+        Object.keys(localStorage)
+          .filter(k => k.startsWith('sb-'))
+          .forEach(k => localStorage.removeItem(k));
       }
     });
 

@@ -560,10 +560,10 @@ const SqlAiAssistant = ({ isOpen, onClose, setQuery, onExecute }: { isOpen: bool
     setThinking(true);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GEMINI_IA;
       
       if (!apiKey) {
-        alert("Configuração Pendente: A chave VITE_GEMINI_API_KEY não foi encontrada no seu arquivo .env. Verifique o arquivo e reinicie o servidor (npm run dev).");
+        alert("Configuração Pendente: A chave VITE_GEMINI_IA não foi encontrada no seu arquivo .env. Verifique o arquivo e reinicie o servidor (npm run dev).");
         setThinking(false);
         return;
       }

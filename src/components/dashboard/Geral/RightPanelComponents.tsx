@@ -535,7 +535,7 @@ export function EmployeeOfMonthCard({ loading: externalLoading }: { loading?: bo
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Motivo do Prêmio</span>
           </div>
           
-          <p className="text-[11px] font-bold text-slate-700 dark:text-muted-foreground leading-relaxed italic relative z-10">
+          <p className="text-[11px] font-bold text-slate-700 dark:text-muted-foreground leading-relaxed italic relative z-10 line-clamp-3">
             "{employee.achievement}"
           </p>
         </div>
