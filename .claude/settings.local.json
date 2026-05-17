@@ -19,7 +19,8 @@
       "Read(//c/Users/Danilo/Desktop/Desenvolupador/Desktop/Desenvolupador/Carflax/src/components/marketing/whatsapp/**)",
       "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Carflax HUB/**)",
       "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Gestao-de-Tempo/backend/api/**)",
-      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Gestao-de-Tempo/backend/**)"
+      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Gestao-de-Tempo/backend/**)",
+      "Bash(npm install *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Danilo\\Desktop\\Desenvolvimento\\Carflax HUB\\db"
