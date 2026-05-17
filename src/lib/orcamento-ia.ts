@@ -19,8 +19,12 @@ export interface ItemOrcamento {
   encontrado: boolean;
 }
 
+const PRODUTOS_API_URL = import.meta.env.DEV
+  ? "https://marketing-carflax.velbav.easypanel.host/api/dashboard/produtos"
+  : "/api-marketing/api/dashboard/produtos";
+
 export async function fetchProdutosAPI(): Promise<ProdutoAPI[]> {
-  const res = await fetch("https://marketing-carflax.velbav.easypanel.host/api/dashboard/produtos");
+  const res = await fetch(PRODUTOS_API_URL);
   if (!res.ok) throw new Error("Falha ao buscar catálogo de produtos");
   return res.json();
 }
