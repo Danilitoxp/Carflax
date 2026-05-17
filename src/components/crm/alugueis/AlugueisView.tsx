@@ -526,7 +526,7 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
                   <button 
                     onClick={() => { 
                       setSelectedMachine(machine); 
-                      setDailyValue("0,01");
+                      setDailyValue(machine.id === "TRM20633" ? "150,00" : "0,01");
                       setShowNewRentalModal(true); 
                     }}
                     className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest hover:opacity-90 transition-all flex items-center gap-2 group/btn"
@@ -661,7 +661,7 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
                           disabled={m.status !== "available"}
                           onClick={() => {
                             setSelectedMachine(m);
-                            setDailyValue("0,01");
+                            setDailyValue(m.id === "TRM20633" ? "150,00" : "0,01");
                           }}
                           className={cn(
                             "p-2 rounded-xl border flex items-center gap-2 transition-all text-left relative",
