@@ -22,6 +22,7 @@ import { GeralView } from "@/components/dashboard/Geral/GeralView";
 import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SugestaoModal } from "@/components/sugestao";
+import { OrcamentoIAModal } from "@/components/ui/OrcamentoIAModal";
 import { ColetorView } from "@/components/coletor/ColetorView";
 import { EntregasView } from "@/components/entregas";
 import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
@@ -68,7 +69,20 @@ function DashboardContent({
     return localStorage.getItem("carflax-active-section") || "Geral";
   });
   const [isSugestaoModalOpen, setIsSugestaoModalOpen] = useState(false);
+  const [isOrcamentoIAOpen, setIsOrcamentoIAOpen] = useState(false);
   const [geralLoading, setGeralLoading] = useState(true);
+
+  // Ctrl+O → Orçamento IA
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        setIsOrcamentoIAOpen(prev => !prev);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // Listener para troca de abas via eventos customizados
   useEffect(() => {
@@ -867,6 +881,11 @@ function DashboardContent({
       <SugestaoModal
         isOpen={isSugestaoModalOpen}
         onClose={() => setIsSugestaoModalOpen(false)}
+      />
+
+      <OrcamentoIAModal
+        isOpen={isOrcamentoIAOpen}
+        onClose={() => setIsOrcamentoIAOpen(false)}
       />
 
       {/* Chat Center - Consolidated View */}

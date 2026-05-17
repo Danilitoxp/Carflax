@@ -23,7 +23,6 @@ export async function runAnnouncementAutomation() {
   };
 
   try {
-    results.birthdays = await checkAndPostBirthdays();
     results.workAnniversaries = await checkAndPostWorkAnniversaries();
     results.events = await checkAndPostEvents();
     results.goals = await checkAndPostGoalAchievements();
@@ -35,52 +34,6 @@ export async function runAnnouncementAutomation() {
   } finally {
     isAutomationRunning = false;
   }
-}
-
-async function checkAndPostBirthdays() {
-  const today = new Date();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-
-  const { data: allUsers } = await supabase
-    .from("usuarios")
-    .select("id, name, avatar, birth_date");
-
-  if (!allUsers || allUsers.length === 0) return 0;
-
-  const birthdayUsers = allUsers.filter(user => {
-    if (!user.birth_date) return false;
-    // birth_date is usually YYYY-MM-DD
-    return user.birth_date.includes(`-${month}-${day}`);
-  });
-
-  if (birthdayUsers.length === 0) return 0;
-
-  let postsCreated = 0;
-  for (const user of birthdayUsers) {
-    const postTitle = `FELIZ ANIVERSÁRIO, ${user.name.toUpperCase()}! 🎂`;
-    
-    const { data: existingPost } = await supabase
-      .from("comunicados")
-      .select("id")
-      .eq("titulo", postTitle)
-      .gte("created_at", `${today.getFullYear()}-${month}-${day}T00:00:00`)
-      .maybeSingle();
-
-    if (!existingPost) {
-      await supabase.from("comunicados").insert([{
-        titulo: postTitle,
-        descricao: `Hoje celebramos a vida da noss(o)a colega ${user.name}! A família Carflax se alegra em compartilhar esse momento especial ao seu lado, reconhecendo toda a dedicação, profissionalismo e energia que você contribui no dia a dia. Parabéns! 🎈✨`,
-        filtro: "Social",
-        image_url: user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`,
-        tag: "Sistema Carflax",
-        likes: 0,
-        liked_by: []
-      }]);
-      postsCreated++;
-    }
-  }
-  return postsCreated;
 }
 
 async function checkAndPostWorkAnniversaries() {
