@@ -58,6 +58,8 @@ interface UserProfile {
   name: string;
   role: string;
   avatar?: string;
+  operator_code?: string;
+  operatorCode?: string;
 }
 
 function parseName(raw: string): string {
@@ -292,12 +294,20 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
       // Vendedor só vê seus próprios orçamentos
       if (userProfile && !isGerente(userProfile.role)) {
-        const nomeUser = (userProfile.name || "").toUpperCase();
-        const palavras = nomeUser.split(" ").filter((p: string) => p.length > 2);
-        orcamentos = orcamentos.filter((o) => {
-          const vend = o.seller.toUpperCase();
-          return palavras.some((p: string) => vend.includes(p));
-        });
+        const myCode = String(userProfile.operator_code || userProfile.operatorCode || "").trim().replace(/^0+/, "");
+        if (myCode) {
+          orcamentos = orcamentos.filter((o) =>
+            String(o.sellerCode || "").trim().replace(/^0+/, "") === myCode
+          );
+        } else {
+          // Fallback por nome se não tiver código de operador
+          const nomeUser = (userProfile.name || "").toUpperCase();
+          const palavras = nomeUser.split(" ").filter((p: string) => p.length > 2);
+          orcamentos = orcamentos.filter((o) => {
+            const vend = o.seller.toUpperCase();
+            return palavras.some((p: string) => vend.includes(p));
+          });
+        }
       }
 
       // Overlay with Supabase CRM status
