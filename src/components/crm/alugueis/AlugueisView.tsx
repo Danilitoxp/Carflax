@@ -14,7 +14,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiCrmAlugueisClientes, apiGeraPix, apiCancelaPix } from "@/lib/api";
+import { apiCrmAlugueisClientes, apiGeraPix, apiCancelaPix, API_BASE } from "@/lib/api";
 import type { PixResponse } from "@/lib/api";
 
 import { supabase } from "@/lib/supabase";
@@ -233,7 +233,8 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
       
       const startListening = async () => {
         try {
-          const url = `/api/pix/consulta_cobranca_pix?codigoEmpresa=${pixData.empresaPix}&txIdPix=${pixData.txidPix}`;
+          const baseUrl = API_BASE.startsWith("http") ? API_BASE : window.location.origin + API_BASE;
+          const url = `${baseUrl}/api/pix/consulta_cobranca_pix?codigoEmpresa=${pixData.empresaPix}&txIdPix=${pixData.txidPix}`;
           const response = await fetch(url, {
             headers: { "accept": "application/json" },
             signal: controller?.signal

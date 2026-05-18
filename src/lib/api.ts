@@ -294,7 +294,8 @@ export interface PixResponse {
 }
 
 export const apiGeraPix = async (data: { codigoCliente: string; solicitacaoPagador: string; valor: number }): Promise<PixResponse> => {
-  const res = await fetch("/api/pix/gera_cobranca_pix", {
+  const baseUrl = API_BASE.startsWith("http") ? API_BASE : window.location.origin + API_BASE;
+  const res = await fetch(`${baseUrl}/api/pix/gera_cobranca_pix`, {
     method: "POST",
     headers: {
       "accept": "application/json",
@@ -312,7 +313,8 @@ export const apiGeraPix = async (data: { codigoCliente: string; solicitacaoPagad
 
 
 export const apiCancelaPix = async (codigoEmpresa: string, txIdPix: string): Promise<string> => {
-  const url = `/api/pix/cancelar_cobranca_pix?codigoEmpresa=${codigoEmpresa}&txIdPix=${txIdPix}`;
+  const baseUrl = API_BASE.startsWith("http") ? API_BASE : window.location.origin + API_BASE;
+  const url = `${baseUrl}/api/pix/cancelar_cobranca_pix?codigoEmpresa=${codigoEmpresa}&txIdPix=${txIdPix}`;
   const res = await fetch(url, {
     method: "DELETE",
     headers: { "accept": "application/json" }
