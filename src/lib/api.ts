@@ -214,13 +214,21 @@ export interface CrmItem {
   FDO_NUMDOC?: string;
 }
 
-export function mapCrmItem(p: any): CrmItem {
+export function mapCrmItem(p: Partial<CrmItem> & {
+  FDO_CODITE?: string;
+  FDO_DESCRI?: string;
+  FDO_QTDITE?: string | number;
+  FDO_UNITAR?: string | number;
+  FDO_TOTCUS?: string | number;
+  FDO_UNIDAD?: string;
+  FDO_CODMAR?: string;
+}): CrmItem {
   const qtd = parseFloat(String(p.QUANTIDADE || p.FDO_QTDITE || 0));
   const unitar = parseFloat(String(p.PRECO_UNITARIO || p.FDO_UNITAR || 0));
-  const custoTotal = parseFloat(String(p.FDO_TOTCUS || (p.CUSTO_UNITARIO * qtd) || 0));
+  const custoTotal = parseFloat(String(p.FDO_TOTCUS || (Number(p.CUSTO_UNITARIO || 0) * qtd) || 0));
   const custoUnitar = p.CUSTO_UNITARIO || (qtd > 0 ? custoTotal / qtd : 0);
   
-  const mkp = p.MARKUP_PERCENTUAL || (custoUnitar > 0 ? ((unitar / custoUnitar) - 1) * 100 : 0);
+  const mkp = p.MARKUP_PERCENTUAL || (Number(custoUnitar) > 0 ? ((unitar / Number(custoUnitar)) - 1) * 100 : 0);
 
   return {
     COD_PRODUTO: String(p.COD_PRODUTO || p.FDO_CODITE || ""),
@@ -232,7 +240,7 @@ export function mapCrmItem(p: any): CrmItem {
     UN: String(p.UN || p.FDO_UNIDAD || "UN"),
     MARCA: String(p.MARCA || p.FDO_CODMAR || ""),
     ...p
-  };
+  } as CrmItem;
 }
 
 export interface CrmOrcamento {
@@ -286,11 +294,10 @@ export interface PixResponse {
 }
 
 export const apiGeraPix = async (data: { codigoCliente: string; solicitacaoPagador: string; valor: number }): Promise<PixResponse> => {
-  const res = await fetch("http://144.22.215.1:10150/Pix/gera_cobranca_pix", {
+  const res = await fetch("/api/pix/gera_cobranca_pix", {
     method: "POST",
     headers: {
       "accept": "application/json",
-      "authorization": "Basic VEVTVEU6MTIz",
       "Content-Type": "application/json"
     },
     body: JSON.stringify(data)
@@ -305,13 +312,10 @@ export const apiGeraPix = async (data: { codigoCliente: string; solicitacaoPagad
 
 
 export const apiCancelaPix = async (codigoEmpresa: string, txIdPix: string): Promise<string> => {
-  const url = `http://144.22.215.1:10150/Pix/cancelar_cobranca_pix?codigoEmpresa=${codigoEmpresa}&txIdPix=${txIdPix}`;
+  const url = `/api/pix/cancelar_cobranca_pix?codigoEmpresa=${codigoEmpresa}&txIdPix=${txIdPix}`;
   const res = await fetch(url, {
     method: "DELETE",
-    headers: {
-      "accept": "application/json",
-      "authorization": "Basic VEVTVEU6MTIz"
-    }
+    headers: { "accept": "application/json" }
   });
   if (!res.ok) throw new Error("Erro ao cancelar Pix");
   return res.text();

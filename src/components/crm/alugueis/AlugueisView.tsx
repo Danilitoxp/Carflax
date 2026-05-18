@@ -233,12 +233,9 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
       
       const startListening = async () => {
         try {
-          const url = `http://144.22.215.1:10150/Pix/consulta_cobranca_pix?codigoEmpresa=${pixData.empresaPix}&txIdPix=${pixData.txidPix}`;
+          const url = `/api/pix/consulta_cobranca_pix?codigoEmpresa=${pixData.empresaPix}&txIdPix=${pixData.txidPix}`;
           const response = await fetch(url, {
-            headers: {
-              "accept": "application/json",
-              "authorization": "Basic VEVTVEU6MTIz"
-            },
+            headers: { "accept": "application/json" },
             signal: controller?.signal
           });
 
@@ -265,8 +262,8 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
               }
             }
           }
-        } catch (err: any) {
-          if (err.name !== 'AbortError') {
+        } catch (err) {
+          if (err instanceof Error && err.name !== 'AbortError') {
             console.error("Erro ao monitorar Pix:", err);
           }
         }

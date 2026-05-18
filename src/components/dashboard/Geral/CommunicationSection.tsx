@@ -155,14 +155,33 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
       .select("id, content, created_at, user_id")
       .eq("comunicado_id", data.dbId)
       .order("created_at", { ascending: true });
+
+    interface DbCommentRow {
+      id: number;
+      content: string;
+      created_at: string;
+      user_id: string;
+    }
+
+    interface DbUserRow {
+      id: string | number;
+      name: string;
+      avatar: string | null;
+    }
+
     if (rows && rows.length > 0) {
-      const userIds = [...new Set(rows.map((r: any) => r.user_id))];
+      const commentRows = rows as unknown as DbCommentRow[];
+      const userIds = [...new Set(commentRows.map((r) => r.user_id))];
       const { data: users } = await supabase
         .from("usuarios")
         .select("id, name, avatar")
         .in("id", userIds);
-      const userMap = new Map(users?.map((u: any) => [String(u.id), u]) || []);
-      const mapped = rows.map((c: any) => {
+      
+      const userRows = (users || []) as unknown as DbUserRow[];
+      const userMap = new Map<string, DbUserRow>(
+        userRows.map((u) => [String(u.id), u])
+      );
+      const mapped = commentRows.map((c) => {
         const user = userMap.get(String(c.user_id));
         return {
           id: c.id,
@@ -336,11 +355,11 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
       </div>
 
       {showComments && (
-        <div className="border-t border-border bg-secondary/20 dark:bg-slate-800/20 px-6 py-5 flex flex-col gap-4">
+        <div className="border-t border-border bg-secondary/20 dark:bg-slate-800/20 px-6 py-4 flex flex-col gap-3">
           {loadingComments ? (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
               {[1, 2].map(i => (
-                <div key={i} className="flex gap-3 animate-pulse">
+                <div key={i} className="flex gap-2 items-start animate-pulse">
                   <div className="w-8 h-8 rounded-full bg-secondary dark:bg-slate-700 shrink-0" />
                   <div className="flex-1 space-y-2">
                     <div className="h-3 w-24 bg-secondary dark:bg-slate-700 rounded" />
@@ -350,11 +369,11 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
               ))}
             </div>
           ) : comments.length > 0 ? (
-            <div className="flex flex-col gap-4 max-h-64 overflow-y-auto pr-1">
+            <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto pr-1">
               {comments.map(comment => (
-                <div key={comment.id} className="flex gap-3">
+                <div key={comment.id} className="flex gap-2 items-start">
                   <img src={comment.authorAvatar} className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm" alt={comment.author} />
-                  <div className="flex-1 bg-card rounded-xl px-4 py-2.5 border border-border">
+                  <div className="flex-1 bg-card rounded-xl px-4 py-2 border border-border">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[10px] font-black text-foreground uppercase tracking-tight">{comment.author}</span>
                       <span className="text-[9px] font-bold text-slate-400 dark:text-muted-foreground">{comment.date}</span>
@@ -367,7 +386,7 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
           ) : null}
 
           {currentUserId && (
-            <div className="flex items-center gap-3 pt-1">
+            <div className="flex items-center gap-2 pt-1">
               <img src={userAvatar} className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm" alt={userProfile?.name} />
               <div className="flex-1 flex gap-2">
                 <div className="flex-1 relative" ref={emojiPickerRef}>
