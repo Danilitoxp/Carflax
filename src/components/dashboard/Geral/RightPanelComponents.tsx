@@ -119,9 +119,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
 
   const getDiasUteisRestantes = () => {
     const d = new Date();
-    // Inicia a contagem a partir de amanhã (startOffset = 1 conforme Gestão de Tempo)
     const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    start.setDate(start.getDate() + 1);
     const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
     let count = 0;
     for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
