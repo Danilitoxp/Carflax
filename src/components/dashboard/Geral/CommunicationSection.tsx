@@ -30,6 +30,11 @@ interface ComunicadoComment {
   authorAvatar: string;
   date: string;
   userId: string;
+  likes: number;
+  liked_by: string[];
+  reactions: Record<string, string[]>;
+  parent_id: number | null;
+  replies: ComunicadoComment[];
 }
 
 interface DbComunicado {
@@ -57,6 +62,116 @@ export interface UserProfile {
   avatar?: string;
 }
 
+function CommentBubble({
+  comment,
+  currentUserId,
+  openReactionPicker,
+  setOpenReactionPicker,
+  reactionPickerRef,
+  onLike,
+  onReaction,
+  onReply,
+  replyingToId,
+  isReply = false,
+}: {
+  comment: ComunicadoComment;
+  currentUserId?: string;
+  openReactionPicker: number | null;
+  setOpenReactionPicker: (id: number | null) => void;
+  reactionPickerRef: React.RefObject<HTMLDivElement>;
+  onLike: (id: number, liked_by: string[], likes: number) => void;
+  onReaction: (id: number, emoji: string, reactions: Record<string, string[]>) => void;
+  onReply: (id: number, author: string) => void;
+  replyingToId: number | null;
+  isReply?: boolean;
+}) {
+  return (
+    <div className={cn("flex gap-2 items-start", isReply && "ml-10")}>
+      <img src={comment.authorAvatar} className={cn("rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm", isReply ? "w-7 h-7" : "w-8 h-8")} alt={comment.author} />
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="relative w-fit max-w-[95%]">
+          <div className={cn("bg-slate-100 dark:bg-slate-800/80 rounded-2xl px-3 py-2 w-fit max-w-full", replyingToId === comment.id && "ring-2 ring-blue-400 dark:ring-blue-600")}>
+            <span className="text-[11px] font-bold text-slate-900 dark:text-white block leading-none mb-1">{comment.author}</span>
+            <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug break-words">{comment.content}</span>
+          </div>
+          {(comment.likes > 0 || Object.keys(comment.reactions).length > 0) && (
+            <div className="absolute -bottom-2 -right-2 bg-card border border-border shadow-sm rounded-full px-1.5 py-0.5 flex items-center gap-1 z-10">
+              <div className="flex -space-x-1 pr-0.5">
+                {comment.likes > 0 && (
+                  <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center ring-2 ring-card z-20">
+                    <ThumbsUp className="w-2.5 h-2.5 text-white fill-current" />
+                  </div>
+                )}
+                {Object.keys(comment.reactions).slice(0, 2).map((emoji, idx) => (
+                  <div key={emoji} className={cn("w-4 h-4 rounded-full bg-secondary flex items-center justify-center ring-2 ring-card text-[10px] leading-none", idx === 0 ? "z-10" : "z-0")}>
+                    {emoji}
+                  </div>
+                ))}
+              </div>
+              <span className="text-[10px] text-muted-foreground font-medium pl-0.5 leading-none">
+                {comment.likes + Object.values(comment.reactions).reduce((acc, curr) => acc + curr.length, 0)}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 mt-1 ml-3">
+          <span>{comment.date}</span>
+          <div className="relative" ref={openReactionPicker === comment.id ? reactionPickerRef : undefined}>
+            <button
+              onClick={() => setOpenReactionPicker(openReactionPicker === comment.id ? null : comment.id)}
+              className={cn("hover:underline transition-colors", comment.liked_by.includes(currentUserId || '') ? "text-blue-600 dark:text-blue-500" : "")}
+            >
+              Curtir
+            </button>
+            {openReactionPicker === comment.id && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
+                <div className="bg-card border border-border shadow-[0_4px_12px_rgba(0,0,0,0.1)] rounded-full px-1.5 py-1 flex items-center gap-1">
+                  {["👍", "❤️", "😂", "👏", "😢", "🚀"].map(emoji => (
+                    <button
+                      key={emoji}
+                      onClick={(e) => { e.stopPropagation(); onReaction(comment.id, emoji, comment.reactions); setOpenReactionPicker(null); }}
+                      className={cn(
+                        "w-8 h-8 flex items-center justify-center text-xl hover:scale-125 hover:-translate-y-1 transition-transform origin-bottom",
+                        comment.reactions[emoji]?.includes(currentUserId || '') ? "opacity-100" : "opacity-90"
+                      )}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          {!isReply && (
+            <button onClick={() => onReply(comment.id, comment.author)} className="hover:underline">
+              Responder
+            </button>
+          )}
+        </div>
+        {comment.replies.length > 0 && (
+          <div className="flex flex-col gap-1.5 mt-1.5">
+            {comment.replies.map(reply => (
+              <CommentBubble
+                key={reply.id}
+                comment={reply}
+                currentUserId={currentUserId}
+                openReactionPicker={openReactionPicker}
+                setOpenReactionPicker={setOpenReactionPicker}
+                reactionPickerRef={reactionPickerRef}
+                onLike={onLike}
+                onReaction={onReaction}
+                onReply={onReply}
+                replyingToId={replyingToId}
+                isReply
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data: CommunicationPost; onEdit: (d: CommunicationPost) => void, onHide: (id: string | number) => void, userProfile?: UserProfile }) {
   const currentUserId = userProfile?.id;
   const canManage = userProfile?.permissions?.includes("Gerenciar Comunicados") || userProfile?.role === "admin";
@@ -75,6 +190,10 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [openReactionPicker, setOpenReactionPicker] = useState<number | null>(null);
+  const reactionPickerRef = useRef<HTMLDivElement>(null);
+  const [replyingTo, setReplyingTo] = useState<{ id: number; author: string } | null>(null);
+  const replyInputRef = useRef<HTMLTextAreaElement>(null);
 
   const EMOJIS = ["😀","😂","😍","🥰","😎","🤔","😅","🙏","👏","🎉","🔥","❤️","👍","👎","😢","😡","🤣","😊","🥳","💪","✨","🚀","💯","🎯","😴","🤦","🙌","💡","⭐","🏆","😘","🫡","🤩","🥹","😤","🫶","🤝","👀","💬","🎊"];
 
@@ -148,11 +267,22 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
     return () => document.removeEventListener("mousedown", handler);
   }, [showEmojiPicker]);
 
+  useEffect(() => {
+    if (openReactionPicker === null) return;
+    const handler = (e: MouseEvent) => {
+      if (reactionPickerRef.current && !reactionPickerRef.current.contains(e.target as Node)) {
+        setOpenReactionPicker(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openReactionPicker]);
+
   const fetchComments = useCallback(async () => {
     setLoadingComments(true);
     const { data: rows } = await supabase
       .from("comunicado_comentarios")
-      .select("id, content, created_at, user_id")
+      .select("id, content, created_at, user_id, likes, liked_by, reactions, parent_id")
       .eq("comunicado_id", data.dbId)
       .order("created_at", { ascending: true });
 
@@ -161,6 +291,10 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
       content: string;
       created_at: string;
       user_id: string;
+      likes?: number;
+      liked_by?: string[];
+      reactions?: Record<string, string[]>;
+      parent_id?: number | null;
     }
 
     interface DbUserRow {
@@ -176,12 +310,12 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
         .from("usuarios")
         .select("id, name, avatar")
         .in("id", userIds);
-      
+
       const userRows = (users || []) as unknown as DbUserRow[];
       const userMap = new Map<string, DbUserRow>(
         userRows.map((u) => [String(u.id), u])
       );
-      const mapped = commentRows.map((c) => {
+      const mapped: ComunicadoComment[] = commentRows.map((c) => {
         const user = userMap.get(String(c.user_id));
         return {
           id: c.id,
@@ -190,13 +324,30 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
           authorAvatar: user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user_id}`,
           date: new Date(c.created_at).toLocaleDateString("pt-BR"),
           userId: c.user_id,
+          likes: c.likes || 0,
+          liked_by: c.liked_by || [],
+          reactions: c.reactions || {},
+          parent_id: c.parent_id ?? null,
+          replies: [],
         };
       });
-      setComments(mapped);
+
+      // Agrupa respostas sob o comentário pai
+      const topLevel: ComunicadoComment[] = [];
+      const byId = new Map<number, ComunicadoComment>(mapped.map(c => [c.id, c]));
+      for (const c of mapped) {
+        if (c.parent_id !== null && byId.has(c.parent_id)) {
+          byId.get(c.parent_id)!.replies.push(c);
+        } else {
+          topLevel.push(c);
+        }
+      }
+
+      setComments(topLevel);
       setCommentCount(mapped.length);
     } else {
       setComments([]);
-      setCommentCount(rows?.length ?? 0);
+      setCommentCount(0);
     }
     setLoadingComments(false);
   }, [data.dbId]);
@@ -210,14 +361,103 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
   const handleAddComment = async () => {
     if (!currentUserId || !newComment.trim() || submittingComment) return;
     setSubmittingComment(true);
-    const { error } = await supabase
-      .from("comunicado_comentarios")
-      .insert([{ comunicado_id: data.dbId, user_id: currentUserId, content: newComment.trim() }]);
+    const payload: Record<string, unknown> = {
+      comunicado_id: data.dbId,
+      user_id: currentUserId,
+      content: newComment.trim(),
+    };
+    if (replyingTo) payload.parent_id = replyingTo.id;
+    const { error } = await supabase.from("comunicado_comentarios").insert([payload]);
     if (!error) {
       setNewComment("");
+      setReplyingTo(null);
       await fetchComments();
     }
     setSubmittingComment(false);
+  };
+
+  const handleCommentLike = async (commentId: number, currentLikedBy: string[], currentLikes: number) => {
+    if (!currentUserId) return;
+    
+    const isLiking = !currentLikedBy.includes(currentUserId);
+    const newLikedBy = isLiking 
+      ? [...currentLikedBy, currentUserId] 
+      : currentLikedBy.filter(id => id !== currentUserId);
+    const newLikes = isLiking ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+
+    // Remove the user from emoji reactions if they are liking
+    const comment = comments.find(c => c.id === commentId);
+    const newReactions = { ...(comment?.reactions || {}) };
+    if (isLiking) {
+      Object.keys(newReactions).forEach(e => {
+        if (newReactions[e].includes(currentUserId)) {
+          newReactions[e] = newReactions[e].filter(id => id !== currentUserId);
+          if (newReactions[e].length === 0) delete newReactions[e];
+        }
+      });
+    }
+
+    setComments(prev => prev.map(c => 
+      c.id === commentId 
+        ? { ...c, likes: newLikes, liked_by: newLikedBy, reactions: newReactions } 
+        : c
+    ));
+
+    try {
+      await supabase
+        .from("comunicado_comentarios")
+        .update({ likes: newLikes, liked_by: newLikedBy, reactions: newReactions })
+        .eq("id", commentId);
+    } catch (err) {
+      console.error("Erro ao curtir comentário:", err);
+    }
+  };
+
+  const handleCommentReaction = async (commentId: number, emoji: string, currentReactions: Record<string, string[]>) => {
+    if (!currentUserId) return;
+
+    const newReactions = { ...currentReactions };
+    let hadThisReactionAlready = false;
+    
+    // Remove o usuário de qualquer reação que ele já tenha dado
+    Object.keys(newReactions).forEach(e => {
+      if (newReactions[e].includes(currentUserId)) {
+        if (e === emoji) hadThisReactionAlready = true;
+        newReactions[e] = newReactions[e].filter(id => id !== currentUserId);
+        if (newReactions[e].length === 0) delete newReactions[e];
+      }
+    });
+
+    // Se ele não tinha essa reação específica, adiciona. Se tinha, já foi removida no passo acima (toggle).
+    if (!hadThisReactionAlready) {
+      if (!newReactions[emoji]) newReactions[emoji] = [];
+      newReactions[emoji].push(currentUserId);
+    }
+
+    // Removendo do Curtir (Likes normais) se ele estiver reagindo com emoji
+    const comment = comments.find(c => c.id === commentId);
+    let newLikedBy = [...(comment?.liked_by || [])];
+    let newLikes = comment?.likes || 0;
+    
+    if (!hadThisReactionAlready && newLikedBy.includes(currentUserId)) {
+       newLikedBy = newLikedBy.filter(id => id !== currentUserId);
+       newLikes = Math.max(0, newLikes - 1);
+    }
+
+    setComments(prev => prev.map(c => 
+      c.id === commentId 
+        ? { ...c, reactions: newReactions, likes: newLikes, liked_by: newLikedBy } 
+        : c
+    ));
+
+    try {
+      await supabase
+        .from("comunicado_comentarios")
+        .update({ reactions: newReactions, likes: newLikes, liked_by: newLikedBy })
+        .eq("id", commentId);
+    } catch (err) {
+      console.error("Erro ao reagir ao comentário:", err);
+    }
   };
 
   const handleLike = async () => {
@@ -369,71 +609,84 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
               ))}
             </div>
           ) : comments.length > 0 ? (
-            <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto pr-1">
+            <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
               {comments.map(comment => (
-                <div key={comment.id} className="flex gap-2 items-start">
-                  <img src={comment.authorAvatar} className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm" alt={comment.author} />
-                  <div className="flex-1 bg-card rounded-xl px-4 py-2 border border-border">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] font-black text-foreground uppercase tracking-tight">{comment.author}</span>
-                      <span className="text-[9px] font-bold text-slate-400 dark:text-muted-foreground">{comment.date}</span>
-                    </div>
-                    <p className="text-xs font-medium text-slate-600 dark:text-muted-foreground leading-relaxed">{comment.content}</p>
-                  </div>
-                </div>
+                <CommentBubble
+                  key={comment.id}
+                  comment={comment}
+                  currentUserId={currentUserId}
+                  openReactionPicker={openReactionPicker}
+                  setOpenReactionPicker={setOpenReactionPicker}
+                  reactionPickerRef={reactionPickerRef}
+                  onLike={handleCommentLike}
+                  onReaction={handleCommentReaction}
+                  onReply={(id, author) => {
+                    setReplyingTo({ id, author });
+                    setTimeout(() => replyInputRef.current?.focus(), 50);
+                  }}
+                  replyingToId={replyingTo?.id ?? null}
+                />
               ))}
             </div>
           ) : null}
 
           {currentUserId && (
-            <div className="flex items-center gap-2 pt-1">
-              <img src={userAvatar} className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm" alt={userProfile?.name} />
-              <div className="flex-1 flex gap-2">
-                <div className="flex-1 relative" ref={emojiPickerRef}>
-                  <div className="flex items-center bg-card border border-border rounded-xl focus-within:ring-1 focus-within:ring-blue-500">
-                    <textarea
-                      ref={commentInputRef}
-                      value={newComment}
-                      onChange={e => setNewComment(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment(); }}}
-                      placeholder="Escreva um comentário..."
-                      rows={1}
-                      disabled={submittingComment}
-                      className="flex-1 pl-4 py-2.5 bg-transparent text-xs font-medium text-foreground outline-none resize-none placeholder:text-muted-foreground/40 leading-relaxed"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowEmojiPicker(prev => !prev)}
-                      className={cn(
-                        "shrink-0 px-2.5 py-2.5 rounded-r-xl transition-colors",
-                        showEmojiPicker ? "text-yellow-500" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                      )}
-                    >
-                      <Smile className="w-5 h-5" />
-                    </button>
-                  </div>
-                  {showEmojiPicker && (
-                    <div className="absolute bottom-full right-0 mb-2 bg-card border border-border rounded-xl shadow-xl p-2 grid grid-cols-8 gap-0.5 z-50 w-64">
-                      {EMOJIS.map(emoji => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => insertEmoji(emoji)}
-                          className="text-base hover:bg-secondary rounded-lg p-1 transition-colors leading-none"
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+            <div className="flex flex-col gap-1.5 pt-1">
+              {replyingTo && (
+                <div className="flex items-center gap-2 ml-10 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <span className="text-[11px] text-blue-600 dark:text-blue-400 font-bold flex-1">Respondendo a {replyingTo.author}</span>
+                  <button onClick={() => setReplyingTo(null)} className="text-blue-400 hover:text-blue-600 text-xs font-black">✕</button>
                 </div>
-                <button
-                  onClick={handleAddComment}
-                  disabled={!newComment.trim() || submittingComment}
-                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-all active:scale-95 shrink-0"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+              )}
+              <div className="flex items-center gap-2">
+                <img src={userAvatar} className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm" alt={userProfile?.name} />
+                <div className="flex-1 flex gap-2">
+                  <div className="flex-1 relative" ref={emojiPickerRef}>
+                    <div className="flex items-center bg-card border border-border rounded-xl focus-within:ring-1 focus-within:ring-blue-500">
+                      <textarea
+                        ref={replyingTo ? replyInputRef : commentInputRef}
+                        value={newComment}
+                        onChange={e => setNewComment(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment(); }}}
+                        placeholder={replyingTo ? `Responder ${replyingTo.author}...` : "Escreva um comentário..."}
+                        rows={1}
+                        disabled={submittingComment}
+                        className="flex-1 pl-4 py-2.5 bg-transparent text-xs font-medium text-foreground outline-none resize-none placeholder:text-muted-foreground/40 leading-relaxed"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker(prev => !prev)}
+                        className={cn(
+                          "shrink-0 px-2.5 py-2.5 rounded-r-xl transition-colors",
+                          showEmojiPicker ? "text-yellow-500" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                        )}
+                      >
+                        <Smile className="w-5 h-5" />
+                      </button>
+                    </div>
+                    {showEmojiPicker && (
+                      <div className="absolute bottom-full right-0 mb-2 bg-card border border-border rounded-xl shadow-xl p-2 grid grid-cols-8 gap-0.5 z-50 w-64">
+                        {EMOJIS.map(emoji => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => insertEmoji(emoji)}
+                            className="text-base hover:bg-secondary rounded-lg p-1 transition-colors leading-none"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleAddComment}
+                    disabled={!newComment.trim() || submittingComment}
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-all active:scale-95 shrink-0"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           )}

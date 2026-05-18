@@ -20,7 +20,9 @@
       "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Carflax HUB/**)",
       "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Gestao-de-Tempo/backend/api/**)",
       "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Gestao-de-Tempo/backend/**)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/**)",
+      "Bash(xargs grep *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Danilo\\Desktop\\Desenvolvimento\\Carflax HUB\\db"
