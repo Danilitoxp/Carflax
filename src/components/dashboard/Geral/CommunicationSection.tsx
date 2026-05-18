@@ -78,7 +78,7 @@ function CommentBubble({
   currentUserId?: string;
   openReactionPicker: number | null;
   setOpenReactionPicker: (id: number | null) => void;
-  reactionPickerRef: React.RefObject<HTMLDivElement>;
+  reactionPickerRef: React.RefObject<HTMLDivElement | null>;
   onLike: (id: number, liked_by: string[], likes: number) => void;
   onReaction: (id: number, emoji: string, reactions: Record<string, string[]>) => void;
   onReply: (id: number, author: string) => void;
