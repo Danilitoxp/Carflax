@@ -377,8 +377,9 @@ function DashboardContent({
 
   // ── Web Push — Service Worker + Subscrição persistente ──────────────
   const pushSetupDone = useRef(false);
+  const pushUserId = userProfile?.id;
   useEffect(() => {
-    if (!userProfile?.id) return;
+    if (!pushUserId) return;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     if (pushSetupDone.current) return; // Executa apenas uma vez por sessão
     pushSetupDone.current = true;
@@ -416,7 +417,7 @@ function DashboardContent({
 
       // Salva/atualiza a subscrição no Supabase vinculada ao usuário
       await supabase.from('push_subscriptions').upsert({
-        user_id: userProfile!.id,
+        user_id: pushUserId,
         endpoint: subJson.endpoint,
         p256dh: subJson.keys.p256dh,
         auth: subJson.keys.auth,
@@ -424,7 +425,7 @@ function DashboardContent({
     }
 
     setupPush();
-  }, [userProfile?.id]); // Usa apenas o ID para evitar re-execuções desnecessárias
+  }, [pushUserId]);
 
   // 1. Cache Global de Usuários (Preload similar ao CRM Legado)
   useEffect(() => {
