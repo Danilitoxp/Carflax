@@ -1,31 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "mcp__Claude_in_Chrome__computer",
-      "mcp__Claude_in_Chrome__get_page_text",
-      "mcp__Claude_in_Chrome__read_page",
-      "Bash(curl -s -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" \"https://marketing-evolution-api.velbav.easypanel.host/instance/connectionState/Trafego\")",
-      "Bash(curl -s -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" \"https://marketing-evolution-api.velbav.easypanel.host/message/sendText/Trafego\" -X POST -H \"Content-Type: application/json\" -d '{\"number\":\"5511949470025\",\"text\":\"ping\"}')",
-      "Bash(curl -s -X POST -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" \"https://marketing-evolution-api.velbav.easypanel.host/instance/restart/Trafego\")",
-      "Bash(curl -s -X POST -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" -H \"Content-Type: application/json\" \"https://marketing-evolution-api.velbav.easypanel.host/message/sendText/Trafego\" -d '{\"number\":\"5511949470025\",\"text\":\"ping test\"}')",
-      "mcp__Claude_in_Chrome__navigate",
-      "Bash(curl -s -X POST -H \"apikey: 429683C4C977415CAAFCCE10F7D57E11\" -H \"Content-Type: application/json\" \"https://marketing-evolution-api.velbav.easypanel.host/message/sendText/Trafego\" -d '{\"number\":\"5511949470039\",\"text\":\"teste pos restart\"}')",
-      "WebSearch",
-      "WebFetch(domain:github.com)",
       "Bash(npx tsc *)",
-      "Bash(npx web-push *)",
-      "Bash(xargs wc *)",
-      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Carflax HUB/db/**)",
-      "Read(//c/Users/Danilo/Desktop/Desenvolupador/Desktop/Desenvolupador/Carflax/src/components/marketing/whatsapp/**)",
-      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Carflax HUB/**)",
-      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Gestao-de-Tempo/backend/api/**)",
-      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Gestao-de-Tempo/backend/**)",
-      "Bash(npm install *)",
-      "Read(//c/Users/Danilo/Desktop/Desenvolvimento/**)",
-      "Bash(xargs grep *)"
-    ],
-    "additionalDirectories": [
-      "C:\\Users\\Danilo\\Desktop\\Desenvolvimento\\Carflax HUB\\db"
+      "Bash(node -e \"const fs = require\\('fs'\\); const src = fs.readFileSync\\('src/App.tsx','utf8'\\); const lines = src.split\\('\\\\n'\\); console.log\\('Line 340:', lines[339]\\); console.log\\('Line 341:', lines[340]\\); console.log\\('Line 342:', lines[341]\\); console.log\\('Line 343:', lines[342]\\);\")"
     ]
   }
 }

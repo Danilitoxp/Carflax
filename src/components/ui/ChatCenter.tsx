@@ -213,11 +213,50 @@ export function ChatCenter({
             <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide">
               {filteredChats.map((chat) => {
                 const userCache = (window as unknown as { _carflaxUserCache: Record<string, UserProfileLite> })._carflaxUserCache || {};
-                const sellerName = chat.sellerName?.toUpperCase().trim();
-                const cachedUser = Object.values(userCache).find((u) => 
-                  u.name?.toUpperCase() === sellerName || (u.id && u.id === chat.sellerCode)
-                );
-                const avatarUrl = cachedUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${chat.sellerName || chat.doc}`;
+                const centralizerId = (window as any)._carflaxCentralizerId;
+                const myId = userProfile?.id;
+                const myNameUpper = userProfile?.name?.toUpperCase().trim();
+
+                let partnerName = "";
+                let partnerAvatar = "";
+
+                // Prioridade 1: sellerCode (ID) diferente de mim → busca no cache
+                if (chat.sellerCode && chat.sellerCode !== myId && chat.sellerCode !== centralizerId) {
+                  const cachedById = userCache[chat.sellerCode];
+                  if (cachedById) {
+                    partnerName = cachedById.name;
+                    partnerAvatar = cachedById.avatar || "";
+                  }
+                }
+
+                // Prioridade 2: sellerName diferente do meu nome
+                if (!partnerName && chat.sellerName) {
+                  const sellerUpper = chat.sellerName.toUpperCase().trim();
+                  const isMyName = myNameUpper && (sellerUpper === myNameUpper || sellerUpper.includes(myNameUpper) || myNameUpper.includes(sellerUpper));
+                  if (!isMyName) {
+                    const cachedByName = Object.values(userCache).find(u => u.name?.toUpperCase().trim() === sellerUpper);
+                    partnerName = cachedByName?.name || chat.sellerName;
+                    partnerAvatar = cachedByName?.avatar || "";
+                  }
+                }
+
+                // Prioridade 3: Se sou vendedor, mostro o centralizador
+                if (!partnerName && !amICentralizer) {
+                  const centralizerUser = centralizerId
+                    ? userCache[centralizerId]
+                    : Object.values(userCache).find(u => u.role?.toUpperCase() === "ADMIN" || u.role?.toUpperCase().includes("GERENTE"));
+                  if (centralizerUser) {
+                    partnerName = centralizerUser.name;
+                    partnerAvatar = centralizerUser.avatar || "";
+                  }
+                }
+
+                // Prioridade 4: fallback
+                if (!partnerName) {
+                  partnerName = chat.title || `#${chat.doc.replace("#", "")}`;
+                }
+
+                const avatarUrl = partnerAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${partnerName || chat.doc}`;
 
                 return (
                   <div 
@@ -234,14 +273,14 @@ export function ChatCenter({
                       <img 
                         src={avatarUrl}
                         className="w-full h-full object-cover"
-                        alt={chat.sellerName}
+                        alt={partnerName}
                       />
                     </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-0.5">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <p className="text-[11px] font-black text-foreground truncate uppercase tracking-tight">
-                          {chat.sellerName || "Vendedor"}
+                          {partnerName}
                         </p>
                         <span className="text-[9px] font-black text-blue-500 uppercase tracking-tighter opacity-80 shrink-0">
                           #{chat.doc.replace("#", "")}
@@ -271,11 +310,22 @@ export function ChatCenter({
                           {formatLastMessage(chat.lastMessage)}
                         </p>
                       </div>
-                      {chat.lastMessageTime && (
-                        <span className="text-[8px] font-black text-muted-foreground uppercase opacity-40 shrink-0">
-                          {new Date(chat.lastMessageTime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      )}
+                      {chat.lastMessageTime && (() => {
+                          const d = new Date(chat.lastMessageTime);
+                          const now = new Date();
+                          const isToday = d.toDateString() === now.toDateString();
+                          const yesterday = new Date(now);
+                          yesterday.setDate(now.getDate() - 1);
+                          const isYesterday = d.toDateString() === yesterday.toDateString();
+                          const dateLabel = isToday ? "Hoje" : isYesterday ? "Ontem" : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+                          const timeLabel = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                          return (
+                            <span className="text-[8px] font-black text-muted-foreground uppercase opacity-40 shrink-0 text-right leading-tight flex flex-col items-end gap-0.5">
+                              <span>{dateLabel}</span>
+                              <span>{timeLabel}</span>
+                            </span>
+                          );
+                        })()}
                     </div>
                   </div>
                   

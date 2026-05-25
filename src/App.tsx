@@ -217,7 +217,50 @@ function DashboardContent({
     localStorage.setItem("carflax-active-chats", JSON.stringify(activeChats));
   }, [activeChats]);
 
+  // ── Hidratação de lastMessage ao carregar do localStorage ─────────────
+  // Busca a última mensagem de cada chat ativo no banco para exibir no painel
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    if (activeChats.length === 0) return;
 
+    const docsParaHidratar = activeChats.filter(c => !c.lastMessage).map(c => c.doc);
+    if (docsParaHidratar.length === 0) return;
+
+    async function hidratarUltimasMensagens() {
+      try {
+        const { data } = await supabase
+          .from("crm_conversas")
+          .select("documento, obs, timestamp, enviado_por_nome")
+          .in("documento", docsParaHidratar)
+          .order("timestamp", { ascending: false });
+
+        if (!data || data.length === 0) return;
+
+        // Pega a mensagem mais recente de cada documento
+        const mapaUltimas: Record<string, { obs: string; timestamp: string }> = {};
+        for (const row of data) {
+          if (!mapaUltimas[row.documento]) {
+            mapaUltimas[row.documento] = { obs: row.obs, timestamp: row.timestamp };
+          }
+        }
+
+        setActiveChats(prev =>
+          prev.map(c => {
+            const ultima = mapaUltimas[c.doc];
+            if (ultima && !c.lastMessage) {
+              return { ...c, lastMessage: ultima.obs, lastMessageTime: ultima.timestamp };
+            }
+            return c;
+          })
+        );
+      } catch (e) {
+        console.error("[CRM] Falha ao hidratar últimas mensagens:", e);
+      }
+    }
+
+    hidratarUltimasMensagens();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.id]);
 
   // Reset de estado durante o render ao trocar de usuário (Recomendado pelo React 18+)
   const [prevUserId, setPrevUserId] = useState(userProfile?.id);
@@ -435,11 +478,11 @@ function DashboardContent({
       try {
         const { data } = await supabase
           .from("usuarios")
-          .select("id, name, avatar");
+          .select("id, name, avatar, role");
         if (data) {
           const cache: Record<
             string,
-            { id: string; name: string; avatar: string | null }
+            { id: string; name: string; avatar: string | null; role?: string }
           > = {};
           data.forEach((u) => (cache[u.id] = u));
           (
@@ -479,6 +522,200 @@ function DashboardContent({
   useEffect(() => {
     if (!userProfile?.id) return;
 
+    async function carregarTodasConversas() {
+      try {
+        const isManager = isCentRef.current || userProfile.role?.toUpperCase() === "ADMIN" || userProfile.role?.toUpperCase().includes("GERENTE");
+        const orConditions = [
+          `enviado_por.eq.${userProfile.id}`,
+          `destino.eq.${userProfile.id}`,
+        ];
+        if (isManager) {
+          orConditions.push(`destino.eq.todos`);
+        }
+
+        const allMsgs: CrmConversa[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data } = await supabase
+            .from("crm_conversas")
+            .select("*")
+            .or(orConditions.join(","))
+            .order("timestamp", { ascending: false })
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+          if (!data || data.length === 0) break;
+          allMsgs.push(...data);
+          if (data.length < pageSize) break;
+          page++;
+        }
+
+        if (!allMsgs || allMsgs.length === 0) return;
+
+        // Agrupa por documento
+        const byDoc: Record<string, CrmConversa[]> = {};
+        for (const msg of allMsgs) {
+          if (!byDoc[msg.documento]) byDoc[msg.documento] = [];
+          byDoc[msg.documento].push(msg);
+        }
+
+        setActiveChats((prev) => {
+          const existingDocs = new Set(prev.map((c) => c.doc));
+
+          // Função auxiliar para obter vendedor e título reais
+          const resolverDadosVendedor = (doc: string, msgs: CrmConversa[]) => {
+            const lastMsg = msgs[0];
+            const centralizerId = (window as any)._carflaxCentralizerId;
+            const myId = userProfile.id;
+
+            let sellerName: string | undefined = undefined;
+            let sellerCode: string | undefined = undefined;
+
+            // 1. Usa o campo "destino": mensagens endereçadas A MIM foram enviadas pelo vendedor
+            const msgToMe = msgs.find(m =>
+              m.destino === myId &&
+              m.enviado_por !== myId &&
+              m.enviado_por !== centralizerId &&
+              m.enviado_por_nome?.toUpperCase() !== "SISTEMA"
+            );
+            if (msgToMe) {
+              sellerName = msgToMe.enviado_por_nome;
+              sellerCode = msgToMe.enviado_por;
+            }
+
+            // 2. Busca reversa: mensagens que EU enviei para alguém (o destino é o vendedor)
+            if (!sellerName) {
+              const msgFromMe = msgs.find(m =>
+                m.enviado_por === myId &&
+                m.destino &&
+                m.destino !== "todos" &&
+                m.destino !== myId &&
+                m.destino !== centralizerId
+              );
+              if (msgFromMe) {
+                sellerCode = msgFromMe.destino;
+                const userCache = (window as unknown as { _carflaxUserCache?: Record<string, { name: string }> })._carflaxUserCache || {};
+                const cached = userCache[msgFromMe.destino];
+                if (cached) sellerName = cached.name;
+              }
+            }
+
+            // 3. Tenta extrair do texto de mensagens de sistema (contendo Vendedor:)
+            if (!sellerName) {
+              const systemMsg = msgs.find(m =>
+                m.obs && /Vendedor:/i.test(m.obs)
+              );
+              if (systemMsg) {
+                const vMatch = systemMsg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
+                if (vMatch) {
+                  sellerName = vMatch[1].replace(/\*/g, "").trim();
+                }
+              }
+            }
+
+            // 4. Qualquer mensagem de alguém que não sou eu nem sistema
+            if (!sellerName) {
+              const otherMsg = msgs.find(m =>
+                m.enviado_por &&
+                m.enviado_por !== myId &&
+                m.enviado_por !== centralizerId &&
+                m.enviado_por_nome?.toUpperCase() !== "SISTEMA"
+              );
+              if (otherMsg) {
+                sellerName = otherMsg.enviado_por_nome;
+                sellerCode = otherMsg.enviado_por;
+              }
+            }
+
+            let displayTitle = `#${doc}`;
+            const isSystem = lastMsg.enviado_por_nome?.toUpperCase() === "SISTEMA";
+
+            if (isSystem && lastMsg.obs) {
+              const vMatch = lastMsg.obs.match(
+                /Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i
+              );
+              if (vMatch) {
+                displayTitle = `Divergência: ${vMatch[1].replace(/\*/g, "").trim()}`;
+              }
+            } else if (sellerName && sellerName.toUpperCase() !== "SISTEMA") {
+              displayTitle = sellerName;
+            }
+
+            return { sellerName, sellerCode, displayTitle };
+          };
+
+          // Atualiza chats existentes com lastMessage, unreadCount, sellerName e title reais
+          const updatedPrev = prev.map((c) => {
+            const msgs = byDoc[c.doc];
+            if (!msgs) return c;
+            const lastMsg = msgs[0];
+            const unread = msgs.filter(
+              (m) =>
+                !m.lida &&
+                m.enviado_por !== userProfile.id &&
+                (m.destino === userProfile.id ||
+                  (isCentRef.current && m.destino === "todos"))
+            ).length;
+
+            const resolved = resolverDadosVendedor(c.doc, msgs);
+
+            return {
+              ...c,
+              sellerName: resolved.sellerName,
+              sellerCode: resolved.sellerCode || c.sellerCode,
+              title: resolved.displayTitle,
+              lastMessage: c.lastMessage || lastMsg.obs,
+              lastMessageTime: c.lastMessageTime || lastMsg.timestamp,
+              unreadCount: c.unreadCount || unread,
+            };
+          });
+
+          // Adiciona documentos novos (não estavam no localStorage)
+          const novosChats: ActiveChat[] = [];
+          for (const [doc, msgs] of Object.entries(byDoc)) {
+            if (existingDocs.has(doc)) continue;
+
+            const lastMsg = msgs[0];
+            const unreadCount = msgs.filter(
+              (m) =>
+                !m.lida &&
+                m.enviado_por !== userProfile.id &&
+                (m.destino === userProfile.id ||
+                  (isCentRef.current && m.destino === "todos"))
+            ).length;
+
+            const resolved = resolverDadosVendedor(doc, msgs);
+
+            novosChats.push({
+              id: Date.now() + Math.random(),
+              doc,
+              title: resolved.displayTitle,
+              sellerName: resolved.sellerName || undefined,
+              sellerCode: resolved.sellerCode || undefined,
+              unreadCount,
+              lastMessage: lastMsg.obs,
+              lastMessageTime: lastMsg.timestamp,
+            });
+          }
+
+          return [...updatedPrev, ...novosChats];
+        });
+
+        // Abre automaticamente o chat com a mensagem não lida mais recente
+        const primeiraComUnread = allMsgs.find(
+          (m) =>
+            !m.lida &&
+            m.enviado_por !== userProfile.id &&
+            (m.destino === userProfile.id ||
+              (isCentRef.current && m.destino === "todos"))
+        );
+        if (primeiraComUnread && !openChatDocRef.current) {
+          handleSelectChat(primeiraComUnread.documento);
+        }
+      } catch (e) {
+        console.error("[CRM] Falha ao carregar todas as conversas:", e);
+      }
+    }
+
     // Função para inicializar sessão e identidade
     async function initSession() {
       try {
@@ -490,6 +727,15 @@ function DashboardContent({
         const isCent = config?.value === userProfile?.id;
         isCentRef.current = isCent;
         setIsCentralizer(isCent);
+        if (config?.value) {
+          (window as any)._carflaxCentralizerId = config.value;
+        }
+
+        // Agora executa o carregamento inicial das conversas após a sessão estar 100% carregada
+        if (!initialCheckPerformed.current) {
+          initialCheckPerformed.current = true;
+          carregarTodasConversas();
+        }
       } catch (e) {
         console.error("[CRM] Erro ao resolver identidade:", e);
       }
@@ -518,41 +764,51 @@ function DashboardContent({
           if (isForMe) {
             const isSystem =
               newMsg.enviado_por_nome?.toUpperCase() === "SISTEMA";
-            let resolvedSellerName = newMsg.enviado_por_nome;
-            let displayTitle = isSystem
-              ? `Aviso: #${newMsg.documento}`
-              : `Mensagem de ${newMsg.enviado_por_nome}`;
 
-            if (isSystem && newMsg.obs) {
-              const vMatch = newMsg.obs.match(
-                /Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i,
-              );
+            // Resolve o vendedor real a partir da mensagem recebida
+            const senderIsNotMe = newMsg.enviado_por !== userProfile?.id &&
+              newMsg.enviado_por !== (window as any)._carflaxCentralizerId &&
+              !isSystem;
+
+            let resolvedSellerName = senderIsNotMe ? newMsg.enviado_por_nome : undefined;
+            let resolvedSellerCode = senderIsNotMe ? newMsg.enviado_por : undefined;
+
+            // Para mensagens de sistema, tenta extrair vendedor do texto
+            if (!resolvedSellerName && newMsg.obs) {
+              const vMatch = newMsg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
               if (vMatch) {
                 resolvedSellerName = vMatch[1].replace(/\*/g, "").trim();
-                displayTitle = `Divergência: ${resolvedSellerName}`;
               }
             }
+
+            let displayTitle = isSystem
+              ? (newMsg.obs?.includes("Divergência") ? `Divergência: ${resolvedSellerName || `#${newMsg.documento}`}` : `Aviso: #${newMsg.documento}`)
+              : (resolvedSellerName || `#${newMsg.documento}`);
 
             setActiveChats((prev) => {
               const existing = prev.find((c) => c.doc === newMsg.documento);
               if (existing) {
-                const updated = { 
-                  ...existing, 
+                const updated = {
+                  ...existing,
                   unreadCount: openChatDocRef.current !== newMsg.documento ? (existing.unreadCount || 0) + 1 : 0,
                   lastMessage: newMsg.obs,
-                  lastMessageTime: newMsg.timestamp
+                  lastMessageTime: newMsg.timestamp,
+                  // Corrige sellerName/sellerCode se o existente é incorreto
+                  ...(resolvedSellerName && resolvedSellerCode ? {
+                    sellerName: resolvedSellerName,
+                    sellerCode: resolvedSellerCode,
+                  } : {}),
                 };
-                // Remove o antigo e coloca o atualizado no topo
                 return [updated, ...prev.filter(c => c.doc !== newMsg.documento)];
               }
-              
+
               return [
                 {
                   id: Date.now(),
                   doc: newMsg.documento,
                   title: displayTitle,
-                  sellerName: resolvedSellerName,
-                  sellerCode: undefined,
+                  sellerName: resolvedSellerName || undefined,
+                  sellerCode: resolvedSellerCode || undefined,
                   unreadCount: 1,
                   lastMessage: newMsg.obs,
                   lastMessageTime: newMsg.timestamp
@@ -599,54 +855,6 @@ function DashboardContent({
         },
       )
       .subscribe();
-
-    // Verificação Inicial de Mensagens não lidas (Apenas uma vez ao carregar)
-    if (!initialCheckPerformed.current) {
-      initialCheckPerformed.current = true;
-      supabase
-        .from("crm_conversas")
-        .select("*")
-        .eq("destino", userProfile.id)
-        .eq("lida", false)
-        .order("timestamp", { ascending: false })
-        .limit(1)
-        .then(({ data: unread }) => {
-          if (unread && unread.length > 0) {
-            const msg = unread[0];
-            const isSystem = msg.enviado_por_nome?.toUpperCase() === "SISTEMA";
-            let resolvedSellerName = msg.enviado_por_nome;
-            let displayTitle = isSystem
-              ? `Aviso: #${msg.documento}`
-              : `Mensagem pendente: ${msg.enviado_por_nome}`;
-
-            if (isSystem && msg.obs) {
-              const vMatch = msg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
-              if (vMatch) {
-                resolvedSellerName = vMatch[1].replace(/\*/g, "").trim();
-                displayTitle = `Pendente: ${resolvedSellerName}`;
-              }
-            }
-
-            setActiveChats((prev) => {
-              if (prev.some((c) => c.doc === msg.documento)) {
-                setOpenChatDoc(msg.documento);
-                return prev;
-              }
-              setOpenChatDoc(msg.documento);
-              return [
-                ...prev,
-                {
-                  id: Date.now(),
-                  doc: msg.documento,
-                  title: displayTitle,
-                  sellerName: resolvedSellerName,
-                  sellerCode: undefined,
-                },
-              ];
-            });
-          }
-        });
-    }
 
     const handleOpenChat = (e: Event) => {
       const detail = (e as CustomEvent).detail;

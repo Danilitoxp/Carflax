@@ -311,24 +311,46 @@ export function ChatModal({
   // 3. Lógica de exibição no Header: Memoizada para performance
   const displayUser = useMemo(() => {
     if (conversas && conversas.length > 0) {
-      let otherMessage = null;
+      let otherMessageName = null;
+      let otherMessageAvatar = null;
+
       for (let i = conversas.length - 1; i >= 0; i--) {
         const m = conversas[i];
-        if (m.enviado_por && m.enviado_por !== userProfile?.id && m.enviado_por_nome?.toUpperCase() !== "SISTEMA") {
-          otherMessage = m;
+        let senderName = m.enviado_por_nome;
+
+        // Se for sistema, tentamos extrair o nome do vendedor
+        if (senderName?.toUpperCase() === "SISTEMA" && m.obs) {
+          const match = m.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
+          if (match) {
+            senderName = match[1].replace(/\*/g, "").trim();
+          }
+        }
+
+        // Se for outra pessoa que não eu e não sistema
+        if (senderName && senderName.toUpperCase() !== "SISTEMA" && senderName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim()) {
+          otherMessageName = senderName;
+          otherMessageAvatar = (m as CrmConversa & { enviado_por_foto?: string }).enviado_por_foto || null;
           break;
         }
       }
 
-      if (otherMessage && otherMessage.enviado_por_nome) {
+      if (otherMessageName) {
+        const userCache = (window as unknown as { _carflaxUserCache: Record<string, CacheUser> })._carflaxUserCache || {};
+        const lookup = otherMessageName.toUpperCase().trim();
+        const cachedMatch = Object.values(userCache).find(u => 
+          u.name?.toUpperCase() === lookup || lookup.includes(u.name?.toUpperCase())
+        );
+
         return {
-          name: otherMessage.enviado_por_nome,
-          avatar: (otherMessage as CrmConversa & { enviado_por_foto?: string }).enviado_por_foto || ownerProfile?.avatar || centralizer?.avatar || ""
+          name: otherMessageName,
+          avatar: cachedMatch?.avatar || otherMessageAvatar || ownerProfile?.avatar || centralizer?.avatar || ""
         };
       }
     }
 
-    if (amICentralizer) {
+    const isLoggedUserTheSeller = sellerName && sellerName.toUpperCase().trim() === userProfile?.name?.toUpperCase().trim();
+
+    if (amICentralizer || !isLoggedUserTheSeller) {
       const name = (ownerProfile?.name && ownerProfile.name.toUpperCase() !== "SISTEMA" && ownerProfile.name.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? ownerProfile.name : null) || 
                    (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? sellerName : null) || 
                    (title.toUpperCase().includes(userProfile?.name?.toUpperCase() || "---") ? `Orçamento #${documento.replace("#", "")}` : title);
