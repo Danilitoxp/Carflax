@@ -117,14 +117,25 @@ export function ChatModal({
       setBudgetOwner(null);
     }
 
-    // Buscar quem é a outra parte da conversa (Reforço no banco)
+    // Buscar quem é a outra parte da conversa (Prioriza cache, fallback no banco)
     async function fetchOwner() {
+      const centralizerId = (window as any)?._carflaxCentralizerId;
+
       // Se sou Vendedor, busca o perfil do Centralizador
       if (!amICentralizer) {
         try {
-          const { data: config } = await supabase.from("crm_config").select("value").eq("key", "centralizer_user_id").maybeSingle();
-          if (config?.value) {
-            const { data: user } = await supabase.from("usuarios").select("id, name, avatar").eq("id", config.value).maybeSingle();
+          // Tenta cache global primeiro (já resolvido pelo App.tsx)
+          if (centralizerId && userCache[centralizerId]) {
+            const cached = userCache[centralizerId];
+            setOwnerProfile({ name: cached.name, avatar: cached.avatar || "" });
+            setCentralizer({ id: centralizerId, name: cached.name, avatar: cached.avatar || "" });
+            setHeaderLoading(false);
+            return;
+          }
+          // Fallback: busca no banco
+          const cId = centralizerId || (await supabase.from("crm_config").select("value").eq("key", "centralizer_user_id").maybeSingle()).data?.value;
+          if (cId) {
+            const { data: user } = await supabase.from("usuarios").select("id, name, avatar").eq("id", cId).maybeSingle();
             if (user) {
               setOwnerProfile({ name: user.name, avatar: user.avatar || "" });
               setCentralizer(user);
@@ -133,57 +144,75 @@ export function ChatModal({
         } catch (e) {
           console.error("[Chat] Erro ao buscar centralizador:", e);
         } finally {
-          setTimeout(() => setHeaderLoading(false), 100);
+          setHeaderLoading(false);
         }
         return;
       }
 
       // Se sou Centralizador, busca o dono do orçamento (vendedor)
-      const docId = documento.replace("#", "").split("-")[0].trim();
-
       try {
-        const { data: status } = await supabase.from("crm_status").select("vendedor_codigo, vendedor").eq("documento", docId).maybeSingle();
-        
-        const vCode = sellerCode || status?.vendedor_codigo;
-        const vName = (status?.vendedor && status.vendedor.toUpperCase() !== "SISTEMA") ? status.vendedor : sellerName;
+        const vCode = sellerCode;
+        const vName = sellerName;
+
+        // Tenta resolver pelo cache global primeiro (instantâneo)
+        if (vCode) {
+          const cachedUser = Object.values(userCache).find((u) => u.operator_code === vCode);
+          if (cachedUser && cachedUser.id !== userProfile?.id) {
+            setBudgetOwner(cachedUser.id);
+            setOwnerProfile({ name: cachedUser.name, avatar: cachedUser.avatar || "" });
+            setHeaderLoading(false);
+            return;
+          }
+        }
 
         if (vName && vName.toUpperCase() !== "SISTEMA" && vName !== userProfile?.name) {
           setOwnerProfile(prev => ({ name: vName, avatar: prev?.avatar || "" }));
         }
 
+        // Fallback: busca no banco só se cache não resolveu
         if (vCode) {
-          const user = Object.values(userCache).find((u) => u.operator_code === vCode);
-          if (user && user.id !== userProfile?.id) {
-            setBudgetOwner(user.id);
-            setOwnerProfile({ name: user.name, avatar: user.avatar || "" });
-          } else {
-            const { data: dbUser } = await supabase.from("usuarios").select("id, name, avatar").eq("operator_code", vCode).maybeSingle();
+          const { data: dbUser } = await supabase.from("usuarios").select("id, name, avatar").eq("operator_code", vCode).maybeSingle();
+          if (dbUser && dbUser.id !== userProfile?.id) {
+            setBudgetOwner(dbUser.id);
+            setOwnerProfile({ name: dbUser.name, avatar: dbUser.avatar || "" });
+          }
+        } else {
+          // Sem sellerCode, tenta crm_status
+          const docId = documento.replace("#", "").split("-")[0].trim();
+          const { data: status } = await supabase.from("crm_status").select("vendedor_codigo, vendedor").eq("documento", docId).maybeSingle();
+          if (status?.vendedor_codigo) {
+            const { data: dbUser } = await supabase.from("usuarios").select("id, name, avatar").eq("operator_code", status.vendedor_codigo).maybeSingle();
             if (dbUser && dbUser.id !== userProfile?.id) {
               setBudgetOwner(dbUser.id);
               setOwnerProfile({ name: dbUser.name, avatar: dbUser.avatar || "" });
             }
+          } else if (status?.vendedor && status.vendedor.toUpperCase() !== "SISTEMA") {
+            setOwnerProfile(prev => ({ name: status.vendedor, avatar: prev?.avatar || "" }));
           }
         }
       } catch (e) {
         console.error("[Chat] Erro fetchOwner:", e);
       } finally {
-        setTimeout(() => setHeaderLoading(false), 200);
+        setHeaderLoading(false);
       }
     }
 
-    fetchOwner();
-
-    // Carregar mensagens iniciais
+    // Carregar mensagens e perfil em PARALELO (não sequencial)
     setLoading(true);
-    getConversas(documento).then(async (data) => {
+
+    const cleanDocForQuery = documento.replace("#", "").trim();
+
+    Promise.all([
+      fetchOwner(),
+      getConversas(cleanDocForQuery),
+    ]).then(([, data]) => {
       setConversas(data);
       setLoading(false);
-
       if (data.length > 0) {
         const last = data[data.length - 1];
         onUpdateLastMessage?.(last.obs, last.timestamp || new Date().toISOString());
       }
-    });
+    }).catch(() => setLoading(false));
 
     // Realtime para este documento (Filtragem manual estabilizada)
     const cleanDoc = documento.replace("#", "").trim();
@@ -439,8 +468,9 @@ export function ChatModal({
       }
     }
 
+    const cleanDoc = documento.replace("#", "").trim();
     const nova: Omit<CrmConversa, "id"> = {
-      documento,
+      documento: cleanDoc,
       empresa,
       obs: text,
       enviado_por: userProfile?.id,
@@ -461,8 +491,6 @@ export function ChatModal({
         enviado_por_nome: userProfile?.name || "Você"
       });
       onUpdateLastMessage?.(nova.obs, nova.timestamp || new Date().toISOString());
-      const updated = await getConversas(documento);
-      setConversas(updated);
     } catch (err) {
       console.error("[Chat] Erro no envio:", err);
     } finally {

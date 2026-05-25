@@ -542,7 +542,7 @@ function DashboardContent({
         while (true) {
           const { data } = await supabase
             .from("crm_conversas")
-            .select("*")
+            .select("id, documento, empresa, obs, enviado_por, enviado_por_nome, timestamp, lida, fechada, destino")
             .or(orConditions.join(","))
             .order("timestamp", { ascending: false })
             .range(page * pageSize, (page + 1) * pageSize - 1);
