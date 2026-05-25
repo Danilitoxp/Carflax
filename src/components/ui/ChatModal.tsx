@@ -60,6 +60,9 @@ export function ChatModal({
   const [messageText, setMessageText] = useState("");
   const [conversas, setConversas] = useState<CrmConversa[]>([]);
   const [loading, setLoading] = useState(false);
+  const [partnerTyping, setPartnerTyping] = useState(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingBroadcast = useRef(0);
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -186,22 +189,20 @@ export function ChatModal({
     const cleanDoc = documento.replace("#", "").trim();
     const channel = supabase
       .channel(`chat_room_${cleanDoc}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' }, 
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' },
         (payload) => {
           const newMsg = payload.new as CrmConversa;
-          
+
           const msgDoc = (newMsg.documento || "").replace("#", "").trim();
           if (msgDoc !== cleanDoc) return;
 
-          // Se fui eu quem enviou, ignoro o realtime (pois já adicionei localmente via update otimista)
           if (newMsg.enviado_por === userProfile?.id) return;
 
+          setPartnerTyping(false);
            setConversas((prev) => {
-            // Verifica se a mensagem já existe (por ID ou conteúdo exato recente)
             const exists = prev.some(m => m.id === newMsg.id || (m.obs === newMsg.obs && m.enviado_por === newMsg.enviado_por));
             if (exists) return prev;
-            
-            // Notificação do Chrome
+
             const senderName = newMsg.enviado_por_nome || "Mensagem no Chat";
             notifyMessage(`Carflax: ${senderName}`, newMsg.obs);
 
@@ -210,8 +211,22 @@ export function ChatModal({
         })
       .subscribe();
 
+    // Canal de broadcast para indicador "digitando"
+    const cleanDocTyping = documento.replace("#", "").trim();
+    const typingChannel = supabase.channel(`typing_${cleanDocTyping}`);
+    typingChannel
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        if (payload.payload?.userId === userProfile?.id) return;
+        setPartnerTyping(true);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 3000);
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(typingChannel);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, documento, userProfile?.id, userProfile?.name, itemsInitial, amICentralizer, sellerCode, sellerName]);
@@ -751,13 +766,30 @@ export function ChatModal({
                   </div>
                 </div>
               ))}
+              {partnerTyping && (
+                <div className="flex items-center gap-2 ml-1 mb-2 animate-pulse">
+                  <span className="text-[10px] font-bold text-emerald-500 italic">digitando...</span>
+                </div>
+              )}
               <div ref={bottomRef} />
             </div>
             <div className="p-4 border-t border-border bg-secondary/10">
               <div className="relative flex items-end gap-2">
-                <textarea 
-                  value={messageText} 
-                  onChange={(e) => setMessageText(e.target.value)} 
+                <textarea
+                  value={messageText}
+                  onChange={(e) => {
+                    setMessageText(e.target.value);
+                    const now = Date.now();
+                    if (now - lastTypingBroadcast.current > 2000) {
+                      lastTypingBroadcast.current = now;
+                      const cleanDocTyping = documento.replace("#", "").trim();
+                      supabase.channel(`typing_${cleanDocTyping}`).send({
+                        type: 'broadcast',
+                        event: 'typing',
+                        payload: { userId: userProfile?.id, userName: userProfile?.name },
+                      });
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
                       e.preventDefault();
