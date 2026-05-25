@@ -335,7 +335,7 @@ export function ChatModal({
       }
 
       if (otherMessageName) {
-        const userCache = (window as unknown as { _carflaxUserCache: Record<string, CacheUser> })._carflaxUserCache || {};
+        const userCache = (window as unknown as { _carflaxUserCache: Record<string, UserProfile> })._carflaxUserCache || {};
         const lookup = otherMessageName.toUpperCase().trim();
         const cachedMatch = Object.values(userCache).find(u => 
           u.name?.toUpperCase() === lookup || lookup.includes(u.name?.toUpperCase())

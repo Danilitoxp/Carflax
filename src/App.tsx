@@ -520,14 +520,17 @@ function DashboardContent({
   const isCentRef = useRef(false);
 
   useEffect(() => {
-    if (!userProfile?.id) return;
+    if (!userProfile || !userProfile.id) return;
+
+    const myId = userProfile.id;
+    const myRole = userProfile.role || "Membro";
 
     async function carregarTodasConversas() {
       try {
-        const isManager = isCentRef.current || userProfile.role?.toUpperCase() === "ADMIN" || userProfile.role?.toUpperCase().includes("GERENTE");
+        const isManager = isCentRef.current || myRole.toUpperCase() === "ADMIN" || myRole.toUpperCase().includes("GERENTE");
         const orConditions = [
-          `enviado_por.eq.${userProfile.id}`,
-          `destino.eq.${userProfile.id}`,
+          `enviado_por.eq.${myId}`,
+          `destino.eq.${myId}`,
         ];
         if (isManager) {
           orConditions.push(`destino.eq.todos`);
@@ -565,7 +568,6 @@ function DashboardContent({
           const resolverDadosVendedor = (doc: string, msgs: CrmConversa[]) => {
             const lastMsg = msgs[0];
             const centralizerId = (window as any)._carflaxCentralizerId;
-            const myId = userProfile.id;
 
             let sellerName: string | undefined = undefined;
             let sellerCode: string | undefined = undefined;
@@ -579,7 +581,7 @@ function DashboardContent({
             );
             if (msgToMe) {
               sellerName = msgToMe.enviado_por_nome;
-              sellerCode = msgToMe.enviado_por;
+              sellerCode = msgToMe.enviado_por || undefined;
             }
 
             // 2. Busca reversa: mensagens que EU enviei para alguém (o destino é o vendedor)
@@ -592,9 +594,9 @@ function DashboardContent({
                 m.destino !== centralizerId
               );
               if (msgFromMe) {
-                sellerCode = msgFromMe.destino;
+                sellerCode = msgFromMe.destino || undefined;
                 const userCache = (window as unknown as { _carflaxUserCache?: Record<string, { name: string }> })._carflaxUserCache || {};
-                const cached = userCache[msgFromMe.destino];
+                const cached = msgFromMe.destino ? userCache[msgFromMe.destino] : undefined;
                 if (cached) sellerName = cached.name;
               }
             }
@@ -622,7 +624,7 @@ function DashboardContent({
               );
               if (otherMsg) {
                 sellerName = otherMsg.enviado_por_nome;
-                sellerCode = otherMsg.enviado_por;
+                sellerCode = otherMsg.enviado_por || undefined;
               }
             }
 
@@ -651,8 +653,8 @@ function DashboardContent({
             const unread = msgs.filter(
               (m) =>
                 !m.lida &&
-                m.enviado_por !== userProfile.id &&
-                (m.destino === userProfile.id ||
+                m.enviado_por !== myId &&
+                (m.destino === myId ||
                   (isCentRef.current && m.destino === "todos"))
             ).length;
 
@@ -678,8 +680,8 @@ function DashboardContent({
             const unreadCount = msgs.filter(
               (m) =>
                 !m.lida &&
-                m.enviado_por !== userProfile.id &&
-                (m.destino === userProfile.id ||
+                m.enviado_por !== myId &&
+                (m.destino === myId ||
                   (isCentRef.current && m.destino === "todos"))
             ).length;
 
@@ -704,8 +706,8 @@ function DashboardContent({
         const primeiraComUnread = allMsgs.find(
           (m) =>
             !m.lida &&
-            m.enviado_por !== userProfile.id &&
-            (m.destino === userProfile.id ||
+            m.enviado_por !== myId &&
+            (m.destino === myId ||
               (isCentRef.current && m.destino === "todos"))
         );
         if (primeiraComUnread && !openChatDocRef.current) {
@@ -724,7 +726,7 @@ function DashboardContent({
           .select("value")
           .eq("key", "centralizer_user_id")
           .maybeSingle();
-        const isCent = config?.value === userProfile?.id;
+        const isCent = config?.value === myId;
         isCentRef.current = isCent;
         setIsCentralizer(isCent);
         if (config?.value) {
@@ -744,7 +746,7 @@ function DashboardContent({
     initSession();
 
     // Listener de Mensagens
-    const channelName = `global_crm_${userProfile.id}`;
+    const channelName = `global_crm_${myId}`;
     const channel = supabase.channel(channelName);
 
     channel
@@ -754,11 +756,11 @@ function DashboardContent({
         (payload) => {
           console.log("[CRM] Nova mensagem recebida em realtime:", payload.new);
           const newMsg = payload.new as CrmConversa;
-          if (newMsg.enviado_por === userProfile?.id) return;
+          if (newMsg.enviado_por === myId) return;
 
           // USA O REF que é atualizado pelo initSession
           const isForMe =
-            newMsg.destino === userProfile?.id ||
+            newMsg.destino === myId ||
             (isCentRef.current && newMsg.destino === "todos");
 
           if (isForMe) {
@@ -766,12 +768,12 @@ function DashboardContent({
               newMsg.enviado_por_nome?.toUpperCase() === "SISTEMA";
 
             // Resolve o vendedor real a partir da mensagem recebida
-            const senderIsNotMe = newMsg.enviado_por !== userProfile?.id &&
+            const senderIsNotMe = newMsg.enviado_por !== myId &&
               newMsg.enviado_por !== (window as any)._carflaxCentralizerId &&
               !isSystem;
 
             let resolvedSellerName = senderIsNotMe ? newMsg.enviado_por_nome : undefined;
-            let resolvedSellerCode = senderIsNotMe ? newMsg.enviado_por : undefined;
+            let resolvedSellerCode = senderIsNotMe ? newMsg.enviado_por || undefined : undefined;
 
             // Para mensagens de sistema, tenta extrair vendedor do texto
             if (!resolvedSellerName && newMsg.obs) {
