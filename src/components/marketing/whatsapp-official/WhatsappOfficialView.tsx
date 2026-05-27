@@ -18,19 +18,11 @@ import {
   Bot,
   ShoppingBag,
   CreditCard,
-  Globe,
   Search,
   Paperclip,
   X,
-  User,
   Flame,
-  ChevronDown,
   Smile,
-  Phone,
-  Video,
-  MoreVertical,
-  Image,
-  FileText,
   Mic
 } from "lucide-react";
 import { cn } from "@/lib/utils";

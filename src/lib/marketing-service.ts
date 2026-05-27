@@ -649,11 +649,6 @@ export const marketingService = {
       return date.toLocaleDateString('pt-BR');
     };
 
-    const formatCurrency = (v: number | undefined | null) => {
-      const val = v ?? 0;
-      return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    };
-
     const formatPhone = (jid: string) => {
       const num = jid.replace('@s.whatsapp.net', '');
       if (num.length >= 12) {

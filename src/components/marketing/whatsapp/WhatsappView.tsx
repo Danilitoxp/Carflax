@@ -482,8 +482,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           temperature: (item.temperatura as Temperature) || "Frio",
           source: "WhatsApp",
           campaign: "Geral",
-          saleValue: item.valor_venda > 0
-            ? item.valor_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          saleValue: (item.valor_venda ?? 0) > 0
+            ? item.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : undefined
         }
       }));
@@ -548,8 +548,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       temperature: (item.temperatura as Temperature) || "Frio",
       source: "WhatsApp",
       campaign: "Geral",
-      saleValue: item.valor_venda && item.valor_venda > 0
-        ? item.valor_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      saleValue: (item.valor_venda ?? 0) > 0
+        ? item.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : undefined
     }
   }), []);
