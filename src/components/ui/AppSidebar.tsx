@@ -151,7 +151,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const vendedorStandard = [
       "Geral", "Produtos", "Dashboard", 
       "Calendário", "Eventos", "Férias", 
-      "Comercial", "Orçamentos", "Clientes", "Ligações", "Campanhas", "Alugueis", "Relatórios", "Coletor", 
+      "Comercial", "Orçamentos", "Meus Pedidos", "Clientes", "Prospecções", "Ligações", "Campanhas", "Alugueis", "Relatórios", "Coletor",
       "Logística", "Romaneios", "Entregas", 
       "Produtos", "Estoque", "Preços", "Eventos", "Férias"
     ];
@@ -348,6 +348,14 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                                 activeItem === (sub.value || sub.label) ? "bg-primary" : "bg-muted-foreground/30"
                               )} />
                               <span>{sub.label}</span>
+                              {sub.label === "Meus Pedidos" && (
+                                <span className="relative ml-auto flex items-center">
+                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                                  <span className="relative inline-flex items-center rounded-full bg-emerald-500 px-1.5 py-0.5 text-[9px] font-black text-white tracking-wider leading-none">
+                                    NOVO
+                                  </span>
+                                </span>
+                              )}
                             </div>
                           ))}
                         </div>
