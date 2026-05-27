@@ -362,8 +362,12 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const [avgResponseTime, setAvgResponseTime] = useState<number | null>(null);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+  const [hasMoreChats, setHasMoreChats] = useState(false);
+  const [loadingMoreChats, setLoadingMoreChats] = useState(false);
+  const chatOffsetRef = useRef(0);
   const productsLoadedRef = useRef(false);
 
+  const chatListRef = useRef<HTMLDivElement>(null);
   const tempBtnRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -450,13 +454,18 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     return "";
   }, []);
 
+  const CHATS_PAGE = 50;
+
   const loadChats = useCallback(async () => {
     try {
       setChats([]);
       setLoading(true);
+      chatOffsetRef.current = 0;
 
-      // 1. Busca no Supabase — carrega ativas e arquivadas de uma só vez
-      const dbClientes = await marketingService.getActiveClientes('all');
+      // 1. Busca no Supabase — carrega primeira página
+      const dbClientes = await marketingService.getActiveClientes('all', CHATS_PAGE, 0);
+      chatOffsetRef.current = dbClientes.length;
+      setHasMoreChats(dbClientes.length === CHATS_PAGE);
       
       const mappedChats: Chat[] = dbClientes.map((item) => ({
         id: item.remote_jid,
@@ -523,6 +532,60 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       setLoading(false);
     }
   }, []);
+
+  const mapClienteToChat = useCallback((item: import("@/lib/marketing-service").MarketingCliente): Chat => ({
+    id: item.remote_jid,
+    name: item.nome || item.push_name || item.remote_jid.split('@')[0],
+    lastMessage: item.ultima_mensagem || "",
+    lastMessageType: inferMsgType(item.ultima_mensagem || ""),
+    time: item.ultima_conversa_em ? new Date(item.ultima_conversa_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
+    unreadCount: item.mensagens_nao_lidas || 0,
+    avatar: item.foto_url || "",
+    arquivado: item.arquivado,
+    fixado: item.fixado || false,
+    leadInfo: {
+      status: item.status || "Novo Lead",
+      temperature: (item.temperatura as Temperature) || "Frio",
+      source: "WhatsApp",
+      campaign: "Geral",
+      saleValue: item.valor_venda && item.valor_venda > 0
+        ? item.valor_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : undefined
+    }
+  }), []);
+
+  const loadMoreChats = useCallback(async () => {
+    if (loadingMoreChats || !hasMoreChats) return;
+    setLoadingMoreChats(true);
+    try {
+      const more = await marketingService.getActiveClientes('all', CHATS_PAGE, chatOffsetRef.current);
+      if (more.length === 0) { setHasMoreChats(false); return; }
+      chatOffsetRef.current += more.length;
+      setHasMoreChats(more.length === CHATS_PAGE);
+      const mapped = more.map(mapClienteToChat);
+      setChats(prev => {
+        const existingIds = new Set(prev.map(c => c.id));
+        const newChats = mapped.filter(c => !existingIds.has(c.id));
+        return sortChats([...prev, ...newChats]);
+      });
+    } catch (err) {
+      console.error("Erro ao carregar mais chats:", err);
+    } finally {
+      setLoadingMoreChats(false);
+    }
+  }, [loadingMoreChats, hasMoreChats, mapClienteToChat]);
+
+  useEffect(() => {
+    const container = chatListRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      if (container.scrollTop + container.clientHeight >= container.scrollHeight - 200) {
+        loadMoreChats();
+      }
+    };
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [loadMoreChats]);
 
   useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);
@@ -1001,7 +1064,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   useEffect(() => {
     const reclassifyUnclassified = async () => {
       try {
-        const allClientes = await marketingService.getActiveClientes('all');
+        const allClientes = await marketingService.getActiveClientes('all', 200, 0);
         if (!allClientes || allClientes.length === 0) return;
         const targets = allClientes.filter(c => !c.temperatura || c.temperatura === 'Frio');
         for (let i = 0; i < Math.min(targets.length, 30); i++) {
@@ -1783,7 +1846,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 space-y-1">
+        <div ref={chatListRef} className="flex-1 overflow-y-auto px-3 space-y-1">
           {loading ? (
             <div className="flex flex-col items-center py-12 gap-2 opacity-50">
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -1891,6 +1954,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               </div>
             </button>
           ))}
+          {loadingMoreChats && (
+            <div className="flex items-center justify-center py-4">
+              <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
         </div>
       </div>
 
