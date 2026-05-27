@@ -4,16 +4,12 @@ import {
   Search,
   Package,
   Clock,
-  Truck,
-  Store,
   RefreshCw,
   AlertTriangle,
   AlertCircle,
   CalendarClock,
-  Filter,
   List,
   Play,
-  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
