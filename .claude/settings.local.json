@@ -4,7 +4,9 @@
       "Bash(npx tsc *)",
       "Bash(node -e \"const fs = require\\('fs'\\); const src = fs.readFileSync\\('src/App.tsx','utf8'\\); const lines = src.split\\('\\\\n'\\); console.log\\('Line 340:', lines[339]\\); console.log\\('Line 341:', lines[340]\\); console.log\\('Line 342:', lines[341]\\); console.log\\('Line 343:', lines[342]\\);\")",
       "Read(//c/Users/Danilo/Desktop/Desenvolvimento/Coletor/**)",
-      "Bash(Get-ChildItem -Recurse -Directory -Name)"
+      "Bash(Get-ChildItem -Recurse -Directory -Name)",
+      "Bash(Get-Content package.json)",
+      "Bash(Select-String \"xlsx|exceljs|sheetjs\")"
     ]
   }
 }

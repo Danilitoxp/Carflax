@@ -37,6 +37,7 @@ export function ReportsView() {
     avgFirstResponseMinutes: null as number | null
   });
   const [showFunnel, setShowFunnel] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
 
   useEffect(() => {
@@ -174,11 +175,33 @@ export function ReportsView() {
             </button>
 
             <button
-              onClick={() => {}} // TODO: Implement export
-              className="w-10 h-10 bg-card border border-border hover:bg-secondary text-muted-foreground rounded-xl transition-all active:scale-95 shadow-sm flex items-center justify-center group"
-              title="Exportar CSV"
+              onClick={async () => {
+                if (exporting || !startDate || !endDate) return;
+                setExporting(true);
+                try {
+                  const result = await marketingService.exportLeadsXlsx(startDate, endDate);
+                  if (!result) {
+                    alert('Nenhum lead encontrado no período selecionado.');
+                  }
+                } catch (err) {
+                  console.error('Erro ao exportar:', err);
+                  alert('Erro ao gerar relatório. Tente novamente.');
+                } finally {
+                  setExporting(false);
+                }
+              }}
+              disabled={exporting}
+              className={cn(
+                "w-10 h-10 border rounded-xl transition-all active:scale-95 shadow-sm flex items-center justify-center group",
+                exporting ? "bg-blue-600/10 border-blue-600/20 cursor-wait" : "bg-card border-border hover:bg-secondary text-muted-foreground"
+              )}
+              title="Exportar Planilha de Leads"
             >
-              <Download className="w-4 h-4 group-hover:text-blue-600 transition-colors" />
+              {exporting ? (
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 group-hover:text-blue-600 transition-colors" />
+              )}
             </button>
           </div>
         </div>

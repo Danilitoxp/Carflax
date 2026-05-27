@@ -36,6 +36,13 @@ export interface MarketingMessage {
   created_at?: string;
 }
 
+export interface MarketingVenda {
+  id?: string;
+  remote_jid: string;
+  valor: number;
+  created_at?: string;
+}
+
 export const marketingService = {
   /**
    * Atualiza ou insere múltiplos clientes de uma vez (Batch Upsert)
@@ -290,35 +297,52 @@ export const marketingService = {
     }
   },
 
-  /**
-   * Registra uma venda manual para o lead
-   */
   async registerSale(remoteJid: string, value: number) {
-    const { error } = await supabase
+    const { error: vendaError } = await supabase
+      .from("marketing_vendas")
+      .insert({ remote_jid: remoteJid, valor: value });
+
+    if (vendaError) {
+      console.error("[MarketingService] Erro ao inserir venda:", vendaError);
+      throw vendaError;
+    }
+
+    const { data: vendas } = await supabase
+      .from("marketing_vendas")
+      .select("valor")
+      .eq("remote_jid", remoteJid);
+
+    const totalVendas = (vendas || []).reduce((acc, v) => acc + (Number(v.valor) || 0), 0);
+
+    await supabase
       .from("marketing_clientes")
       .update({
-        valor_venda: value,
+        valor_venda: totalVendas,
         data_venda: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq("remote_jid", remoteJid);
-
-    if (error) {
-      console.error("[MarketingService] Erro ao registrar venda:", error);
-      throw error;
-    }
   },
 
   async deleteSale(remoteJid: string) {
-    const { error } = await supabase
+    await supabase
+      .from("marketing_vendas")
+      .delete()
+      .eq("remote_jid", remoteJid);
+
+    await supabase
       .from("marketing_clientes")
       .update({ valor_venda: null, data_venda: null, updated_at: new Date().toISOString() })
       .eq("remote_jid", remoteJid);
+  },
 
-    if (error) {
-      console.error("[MarketingService] Erro ao remover venda:", error);
-      throw error;
-    }
+  async getSalesByJid(remoteJid: string): Promise<MarketingVenda[]> {
+    const { data } = await supabase
+      .from("marketing_vendas")
+      .select("*")
+      .eq("remote_jid", remoteJid)
+      .order("created_at", { ascending: false });
+    return (data || []) as MarketingVenda[];
   },
 
   async updateMessageMediaUrl(messageId: string, mediaUrl: string) {
@@ -432,28 +456,22 @@ export const marketingService = {
       getTempCount('Quente')
     ]);
 
-    // Faturamento no período selecionado (Vendas Hoje/Período)
-    let salesQuery = supabase
-      .from('marketing_clientes')
-      .select('valor_venda')
-      .gte('data_venda', start.toISOString())
-      .lte('data_venda', end.toISOString());
-    
-    salesQuery = applyFilters(salesQuery);
-    const { data: salesInPeriod } = await salesQuery;
+    // Faturamento no período (da tabela marketing_vendas)
+    const { data: salesInPeriod } = await supabase
+      .from('marketing_vendas')
+      .select('valor')
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString());
 
     // Faturamento no mês inteiro
-    let salesMonthQuery = supabase
-      .from('marketing_clientes')
-      .select('valor_venda')
-      .gte('data_venda', firstDayOfMonth)
-      .lte('data_venda', lastDayOfMonth);
-    
-    salesMonthQuery = applyFilters(salesMonthQuery);
-    const { data: salesMonth } = await salesMonthQuery;
+    const { data: salesMonth } = await supabase
+      .from('marketing_vendas')
+      .select('valor')
+      .gte('created_at', firstDayOfMonth)
+      .lte('created_at', lastDayOfMonth);
 
-    const billingInPeriod = (salesInPeriod || []).reduce((acc, s) => acc + (Number(s.valor_venda) || 0), 0);
-    const billingMonth = (salesMonth || []).reduce((acc, s) => acc + (Number(s.valor_venda) || 0), 0);
+    const billingInPeriod = (salesInPeriod || []).reduce((acc, s) => acc + (Number(s.valor) || 0), 0);
+    const billingMonth = (salesMonth || []).reduce((acc, s) => acc + (Number(s.valor) || 0), 0);
 
     return {
       leadsToday: leadsInPeriod || 0,
@@ -563,5 +581,185 @@ export const marketingService = {
     });
 
     return hourlyCounts;
+  },
+
+  async exportLeadsXlsx(startDate: Date, endDate?: Date) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = endDate ? new Date(endDate) : new Date(startDate);
+    end.setHours(23, 59, 59, 999);
+
+    const [{ data: leadsByCriacao }, { data: vendasNoPeriodo }] = await Promise.all([
+      supabase
+        .from('marketing_clientes')
+        .select('*')
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString()),
+      supabase
+        .from('marketing_vendas')
+        .select('remote_jid, valor, created_at')
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString())
+    ]);
+
+    const vendasByJid: Record<string, { valor: number; created_at: string }[]> = {};
+    (vendasNoPeriodo || []).forEach(v => {
+      if (!vendasByJid[v.remote_jid]) vendasByJid[v.remote_jid] = [];
+      vendasByJid[v.remote_jid].push({ valor: Number(v.valor) || 0, created_at: v.created_at });
+    });
+
+    const jidsComVenda = Object.keys(vendasByJid);
+    const jidsLeads = new Set((leadsByCriacao || []).map(l => l.remote_jid));
+    const jidsFaltando = jidsComVenda.filter(jid => !jidsLeads.has(jid));
+
+    let leadsFaltantes: typeof leadsByCriacao = [];
+    if (jidsFaltando.length > 0) {
+      const { data } = await supabase
+        .from('marketing_clientes')
+        .select('*')
+        .in('remote_jid', jidsFaltando);
+      leadsFaltantes = data || [];
+    }
+
+    const leadsMap = new Map<string, NonNullable<typeof leadsByCriacao>[0]>();
+    [...(leadsByCriacao || []), ...leadsFaltantes].forEach(l => {
+      if (!leadsMap.has(l.remote_jid)) leadsMap.set(l.remote_jid, l);
+    });
+    const leads = Array.from(leadsMap.values()).sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    if (leads.length === 0) return null;
+
+    const allJids = leads.map(l => l.remote_jid);
+    const messagesByJid: Record<string, { sender: string; timestamp: string }[]> = {};
+
+    const batchSize = 30;
+    for (let i = 0; i < allJids.length; i += batchSize) {
+      const batch = allJids.slice(i, i + batchSize);
+      const { data: msgs } = await supabase
+        .from('marketing_whatsapp')
+        .select('remote_jid, sender, timestamp')
+        .in('remote_jid', batch)
+        .order('timestamp', { ascending: true })
+        .limit(5000);
+      (msgs || []).forEach(m => {
+        if (!messagesByJid[m.remote_jid]) messagesByJid[m.remote_jid] = [];
+        messagesByJid[m.remote_jid].push(m);
+      });
+    }
+
+    const formatDate = (d: string | undefined | null) => {
+      if (!d) return '';
+      const date = new Date(d);
+      return date.toLocaleDateString('pt-BR');
+    };
+
+    const formatCurrency = (v: number | undefined | null) => {
+      const val = v ?? 0;
+      return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const formatPhone = (jid: string) => {
+      const num = jid.replace('@s.whatsapp.net', '');
+      if (num.length >= 12) {
+        const ddd = num.slice(2, 4);
+        const part1 = num.slice(4, 9);
+        const part2 = num.slice(9);
+        return `(${ddd}) ${part1}-${part2}`;
+      }
+      return num;
+    };
+
+    const calcResponseMinutes = (jid: string, createdAt: string): number | null => {
+      const msgs = messagesByJid[jid];
+      if (!msgs || msgs.length === 0) return null;
+      const firstContact = msgs.find(m => m.sender === 'contact');
+      if (!firstContact) {
+        const firstOur = msgs.find(m => m.sender === 'me');
+        if (!firstOur) return null;
+        const diff = (new Date(firstOur.timestamp).getTime() - new Date(createdAt).getTime()) / 60000;
+        return diff >= 0 && diff <= 1440 ? diff : null;
+      }
+      const firstResponse = msgs.find(m => m.sender === 'me' && m.timestamp > firstContact.timestamp);
+      if (!firstResponse) return null;
+      const diff = (new Date(firstResponse.timestamp).getTime() - new Date(firstContact.timestamp).getTime()) / 60000;
+      return diff >= 0 && diff <= 1440 ? diff : null;
+    };
+
+    const allMinutes = leads.map(l => calcResponseMinutes(l.remote_jid, l.created_at)).filter((v): v is number => v !== null);
+    const avgMinutes = allMinutes.length > 0 ? allMinutes.reduce((a, b) => a + b, 0) / allMinutes.length : 5;
+
+    const formatMinutes = (min: number): string => {
+      if (min < 1) return '< 1 min';
+      if (min < 60) return `${Math.round(min)} min`;
+      const h = Math.floor(min / 60);
+      const m = Math.round(min % 60);
+      return m > 0 ? `${h}h ${m}min` : `${h}h`;
+    };
+
+    const resolveStatus = (lead: typeof leads[0]) => {
+      if (lead.status === 'Convertido') return 'Convertido';
+      if (lead.status === 'Arquivado') return lead.motivo_arquivamento || 'Arquivado';
+      if (lead.status && lead.status !== 'Novo Lead') return lead.status;
+      const msgs = messagesByJid[lead.remote_jid];
+      if (!msgs || msgs.length === 0) return 'Cliente Curioso';
+      const hasOurReply = msgs.some(m => m.sender === 'me');
+      return hasOurReply ? 'Em Conversa' : 'Cliente Curioso';
+    };
+
+    const resolveName = (lead: typeof leads[0]) => {
+      if (lead.nome && lead.nome.trim()) return lead.nome.trim();
+      if (lead.push_name && lead.push_name.trim()) return lead.push_name.trim();
+      return formatPhone(lead.remote_jid);
+    };
+
+    const rows = leads.map((lead, idx) => {
+      const vendas = vendasByJid[lead.remote_jid] || [];
+      const totalVendas = vendas.reduce((acc, v) => acc + v.valor, 0);
+      const ultimaVenda = vendas.length > 0 ? vendas.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at : null;
+
+      return {
+        'ID Lead': String(idx + 1).padStart(4, '0'),
+        'Data de Entrada': formatDate(lead.created_at),
+        'Nome Cliente': resolveName(lead),
+        'WhatsApp/Telefone': formatPhone(lead.remote_jid),
+        'Status': resolveStatus(lead),
+        'Temperatura': lead.temperatura || '',
+        'Vendedor': 'Guilherme Santana',
+        'Última Interação': formatDate(lead.ultima_conversa_em),
+        'Qtd Vendas': vendas.length,
+        'Valor Venda (R$)': totalVendas,
+        'Data Última Venda': formatDate(ultimaVenda),
+        'Tempo Resposta': formatMinutes(calcResponseMinutes(lead.remote_jid, lead.created_at) ?? avgMinutes)
+      };
+    });
+
+    const XLSX = await import('xlsx');
+    const wb = XLSX.utils.book_new();
+
+    const title = [['REGISTRO DE LEADS — CARFLAX']];
+    const subtitle = [[`Período: ${formatDate(start.toISOString())} até ${formatDate(end.toISOString())}`]];
+    const blank = [['']];
+
+    const ws = XLSX.utils.aoa_to_sheet([...title, ...subtitle, ...blank]);
+    XLSX.utils.sheet_add_json(ws, rows, { origin: 'A4' });
+
+    const colWidths = [
+      { wch: 10 }, { wch: 16 }, { wch: 25 }, { wch: 20 },
+      { wch: 16 }, { wch: 12 }, { wch: 20 }, { wch: 16 },
+      { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 18 }
+    ];
+    ws['!cols'] = colWidths;
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } }
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Leads Tráfego');
+
+    const fileName = `Leads_Carflax_${start.toISOString().slice(0, 10)}_${end.toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    return fileName;
   }
 };
