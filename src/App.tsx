@@ -1280,6 +1280,18 @@ function App() {
     [fetchVendedorMetrics],
   );
 
+  const forceLogout = useCallback(() => {
+    setProfile(null);
+    setSession(null);
+    sessionRef.current = null;
+    setVendedorMetrics(null);
+    setLoading(false);
+    // Limpar localStorage do Supabase para evitar loop de refresh
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sb-'))
+      .forEach(k => localStorage.removeItem(k));
+  }, []);
+
   useEffect(() => {
     const isMotorista = window.location.pathname.includes("/motorista") || window.location.search.includes("v=");
     
@@ -1300,24 +1312,42 @@ function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       // Quando a sessão expira e não pode ser renovada, o Supabase dispara SIGNED_OUT
       // Isso limpa o estado e volta para a tela de login automaticamente
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        // Refresh falhou silenciosamente — forçar logout
+        console.warn('[Auth] Token refresh falhou, forçando logout');
+        forceLogout();
+        return;
+      }
       setSession(session);
       sessionRef.current = session;
       if (session) {
         fetchProfile(session.user.id);
       } else {
         // Token expirado ou logout → limpar tudo e voltar ao login
-        setProfile(null);
-        setVendedorMetrics(null);
-        setLoading(false);
-        // Forçar limpeza do localStorage do Supabase para evitar loop de refresh
-        Object.keys(localStorage)
-          .filter(k => k.startsWith('sb-'))
-          .forEach(k => localStorage.removeItem(k));
+        forceLogout();
       }
     });
+
+    // Interceptar erros de refresh token que o onAuthStateChange não captura
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const res = await originalFetch(...args);
+      const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url || '';
+      if (url.includes('/auth/v1/token') && res.status === 400) {
+        try {
+          const clone = res.clone();
+          const body = await clone.json();
+          if (body?.error_description?.includes('Refresh Token') || body?.msg?.includes('Refresh Token')) {
+            console.warn('[Auth] Refresh token inválido detectado, forçando logout');
+            forceLogout();
+          }
+        } catch {}
+      }
+      return res;
+    };
 
     const handleProfileUpdate = () => {
       // Usa a ref para não depender do estado 'session' (evita re-execução do efeito)
@@ -1329,8 +1359,9 @@ function App() {
     return () => {
       subscription.unsubscribe();
       window.removeEventListener("carflax-profile-updated", handleProfileUpdate);
+      window.fetch = originalFetch;
     };
-  }, [fetchProfile]); // Removido 'session' da dependência para evitar loop de requisições
+  }, [fetchProfile, forceLogout]); // Removido 'session' da dependência para evitar loop de requisições
 
   if (loading) return <LoadingScreen />;
 
