@@ -25,6 +25,8 @@ interface ChatModalProps {
   itemsInitial?: CrmItem[];
   onUpdateLastMessage?: (msg: string, time: string) => void;
   isMinimized?: boolean;
+  isForced?: boolean;
+  onForcedResolved?: () => void;
 }
 
 // ── NOTIFICAÇÕES ──────────────────────────────────────────────────────────
@@ -42,19 +44,21 @@ const notifyMessage = (title: string, body: string, avatar?: string) => {
   }
 };
 
-export function ChatModal({ 
-  isOpen, 
-  onClose, 
-  documento, 
-  empresa, 
-  title, 
+export function ChatModal({
+  isOpen,
+  onClose,
+  documento,
+  empresa,
+  title,
   userProfile,
   sellerName,
   sellerCode,
   amICentralizer,
   itemsInitial,
   onUpdateLastMessage,
-  isMinimized = false
+  isMinimized = false,
+  isForced = false,
+  onForcedResolved
 }: ChatModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [messageText, setMessageText] = useState("");
@@ -491,6 +495,7 @@ export function ChatModal({
         enviado_por_nome: userProfile?.name || "Você"
       });
       onUpdateLastMessage?.(nova.obs, nova.timestamp || new Date().toISOString());
+      if (isForced) onForcedResolved?.();
     } catch (err) {
       console.error("[Chat] Erro no envio:", err);
     } finally {
@@ -631,7 +636,7 @@ export function ChatModal({
   );
 
   const handleClose = async () => {
-    // Marcar como lida apenas ao fechar explicitamente
+    if (isForced) return;
     const unreadIds = conversas
       .filter(m => !m.lida && (m.destino === userProfile?.id || (amICentralizer && m.destino === "todos")))
       .map(m => m.id)
@@ -697,12 +702,20 @@ export function ChatModal({
                 <Package className="w-3.5 h-3.5" />
               </button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setIsMaximized(!isMaximized); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground" title={isMaximized ? "Restaurar" : "Maximizar"}>
-              {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="p-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors text-muted-foreground">
-              <X className="w-3.5 h-3.5" />
-            </button>
+            {isForced ? (
+              <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest animate-pulse px-2">
+                Responda para continuar
+              </span>
+            ) : (
+              <>
+                <button onClick={(e) => { e.stopPropagation(); setIsMaximized(!isMaximized); }} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground" title={isMaximized ? "Restaurar" : "Maximizar"}>
+                  {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="p-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors text-muted-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div className="flex-1 flex flex-col min-h-0 relative">

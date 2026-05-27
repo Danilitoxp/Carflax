@@ -516,6 +516,26 @@ function DashboardContent({
     }
   }, []);
 
+  // ── Forced chat (centralizador blocking modal) ─────────────────────────
+  const [forcedChatDoc, setForcedChatDoc] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem("carflax-forced-chat") || null;
+    } catch { return null; }
+  });
+  const forcedChatDocRef = useRef(forcedChatDoc);
+  useEffect(() => {
+    forcedChatDocRef.current = forcedChatDoc;
+    if (forcedChatDoc) {
+      localStorage.setItem("carflax-forced-chat", forcedChatDoc);
+    } else {
+      localStorage.removeItem("carflax-forced-chat");
+    }
+  }, [forcedChatDoc]);
+
+  const handleForcedChatResolved = useCallback(() => {
+    setForcedChatDoc(null);
+  }, []);
+
   // 2. Realtime e Verificação Inicial
   const isCentRef = useRef(false);
 
@@ -713,6 +733,30 @@ function DashboardContent({
         if (primeiraComUnread && !openChatDocRef.current) {
           handleSelectChat(primeiraComUnread.documento);
         }
+
+        // Se vendedor tem mensagem não respondida do centralizador, força o modal
+        const centralizerId = (window as any)._carflaxCentralizerId;
+        if (!isCentRef.current && centralizerId) {
+          for (const [doc, msgs] of Object.entries(byDoc)) {
+            const lastFromCentralizer = msgs.find(
+              (m) => m.enviado_por === centralizerId && m.destino === myId && !m.lida
+            );
+            if (lastFromCentralizer) {
+              const respondeuDepois = msgs.some(
+                (m) =>
+                  m.enviado_por === myId &&
+                  m.timestamp &&
+                  lastFromCentralizer.timestamp &&
+                  m.timestamp > lastFromCentralizer.timestamp
+              );
+              if (!respondeuDepois) {
+                setForcedChatDoc(doc);
+                handleSelectChat(doc);
+                break;
+              }
+            }
+          }
+        }
       } catch (e) {
         console.error("[CRM] Falha ao carregar todas as conversas:", e);
       }
@@ -820,9 +864,19 @@ function DashboardContent({
             });
 
             // CORREÇÃO REALTIME: Abre o modal se for sistema ou se não houver nada aberto
-            // Isso evita que o usuário tenha que atualizar a página para ver a mensagem
             if (isForMe && (isSystem || !openChatDocRef.current)) {
-              console.log("[CRM] Realtime: Abrindo modal automaticamente para:", newMsg.documento);
+              handleSelectChat(newMsg.documento);
+            }
+
+            // Centralizador → vendedor: bloqueia a tela até responder
+            const centralizerIdNow = (window as any)._carflaxCentralizerId;
+            if (
+              isForMe &&
+              !isCentRef.current &&
+              centralizerIdNow &&
+              newMsg.enviado_por === centralizerIdNow
+            ) {
+              setForcedChatDoc(newMsg.documento);
               handleSelectChat(newMsg.documento);
             }
 
@@ -940,6 +994,7 @@ function DashboardContent({
   const isMarketingView = [
     "Marketing",
     "Whatsapp",
+    "Whatsapp Oficial",
     "Cronograma",
     "Leads",
     "Relatórios Mkt",
@@ -1100,10 +1155,16 @@ function DashboardContent({
         onClose={() => setIsOrcamentoIAOpen(false)}
       />
 
+      {/* Blur overlay when centralizador forces chat */}
+      {forcedChatDoc && (
+        <div className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm pointer-events-auto" />
+      )}
+
       {/* Chat Center - Consolidated View */}
-      <ChatCenter 
+      <ChatCenter
         activeChats={activeChats}
         onCloseChat={(doc) => {
+          if (doc === forcedChatDoc) return;
           setActiveChats((prev) => prev.filter((c) => c.doc !== doc));
           if (openChatDoc === doc) setOpenChatDoc(null);
         }}
@@ -1116,6 +1177,8 @@ function DashboardContent({
             prev.map((c) => (c.doc === doc ? { ...c, ...data } : c)),
           );
         }}
+        forcedChatDoc={forcedChatDoc}
+        onForcedChatResolved={handleForcedChatResolved}
       />
 
     </div>

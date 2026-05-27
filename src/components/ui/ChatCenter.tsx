@@ -31,16 +31,20 @@ interface ChatCenterProps {
   openChatDoc: string | null;
   setOpenChatDoc: (doc: string | null) => void;
   onUpdateChat?: (doc: string, data: Partial<ActiveChat>) => void;
+  forcedChatDoc?: string | null;
+  onForcedChatResolved?: () => void;
 }
 
-export function ChatCenter({ 
-  activeChats, 
-  onCloseChat, 
-  userProfile, 
+export function ChatCenter({
+  activeChats,
+  onCloseChat,
+  userProfile,
   amICentralizer,
   openChatDoc,
   setOpenChatDoc,
-  onUpdateChat
+  onUpdateChat,
+  forcedChatDoc,
+  onForcedChatResolved
 }: ChatCenterProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -136,7 +140,10 @@ export function ChatCenter({
         <div className="pointer-events-auto">
           <ChatModal
             isOpen={true}
-            onClose={() => setOpenChatDoc(null)}
+            onClose={() => {
+              if (forcedChatDoc === openChatDoc) return;
+              setOpenChatDoc(null);
+            }}
             documento={activeChatData.doc}
             empresa="001"
             title={activeChatData.title}
@@ -147,6 +154,8 @@ export function ChatCenter({
             amICentralizer={amICentralizer}
             isMinimized={false}
             onUpdateLastMessage={handleUpdateLastMessage}
+            isForced={forcedChatDoc === openChatDoc}
+            onForcedResolved={onForcedChatResolved}
           />
         </div>
       )}
