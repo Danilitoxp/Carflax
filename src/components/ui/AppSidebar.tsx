@@ -29,6 +29,7 @@ import {
   Database,
   Key,
   Crosshair,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 import organogramaIcon from "@/assets/organograma.svg";
@@ -53,6 +54,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Férias: Plane,
   Comercial: BarChart3,
   Orçamentos: FileBadge,
+  "Meus Pedidos": Package,
   Clientes: Users,
   Prospecções: Crosshair,
   Ligações: PhoneCall,

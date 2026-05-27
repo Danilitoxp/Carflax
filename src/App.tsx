@@ -927,6 +927,7 @@ function DashboardContent({
   ].includes(activeItem);
   const isCrmView = [
     "Orçamentos",
+    "Meus Pedidos",
     "Comercial",
     "Produtos",
     "Clientes",

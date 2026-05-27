@@ -27,6 +27,7 @@ export const NAV_SECTIONS: NavSection[] = [
     permGroup: "COMERCIAL",
     subItems: [
       { label: "Orçamentos" },
+      { label: "Meus Pedidos" },
       { label: "Clientes" },
       { label: "Prospecções" },
       { label: "Ligações" },
