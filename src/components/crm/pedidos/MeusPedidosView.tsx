@@ -41,6 +41,7 @@ interface Order {
   separatorCode: string;
   qtdeSeparada: number;
   qtdeTotal: number;
+  divergencias: { codigo_produto: string; descricao_produto: string; quantidade_pedida: number; quantidade_separada: number }[];
 }
 
 interface UserProfile {
@@ -105,10 +106,11 @@ export function MeusPedidosView({ userProfile }: Props) {
 
   const fetchData = useCallback(async () => {
     try {
-      const [erpRes, supabaseRes, usersRes] = await Promise.all([
+      const [erpRes, supabaseRes, usersRes, faltasRes] = await Promise.all([
         fetch(`${API_SERVER}/api/pedidos-separacao`).then((r) => r.json()),
         supabase.from("coletor_separacao").select("*"),
         supabase.from("usuarios").select("operator_code,name,avatar"),
+        supabase.from("coletor_faltas").select("pedido,codigo_produto,descricao_produto,quantidade_pedida,quantidade_separada,resolvido").eq("resolvido", false),
       ]);
 
       // Build users cache
@@ -127,6 +129,15 @@ export function MeusPedidosView({ userProfile }: Props) {
 
       if (erpRes.success && erpRes.data) {
         const locks = supabaseRes.data || [];
+        const faltas = faltasRes.data || [];
+
+        // Agrupar faltas por pedido
+        const faltasPorPedido = new Map<string, typeof faltas>();
+        faltas.forEach((f: any) => {
+          const key = String(f.pedido).trim();
+          if (!faltasPorPedido.has(key)) faltasPorPedido.set(key, []);
+          faltasPorPedido.get(key)!.push(f);
+        });
 
         // Filtrar por vendedor do usuário logado
         const meuCodigo = String(userProfile?.operator_code || userProfile?.operatorCode || "").trim();
@@ -163,6 +174,9 @@ export function MeusPedidosView({ userProfile }: Props) {
             }
           }
 
+          const numDoc = String(order.FGO_NUMDOC).trim();
+          const pedidoFaltas = faltasPorPedido.get(numDoc) || faltasPorPedido.get(normalizedId) || [];
+
           return {
             ...order,
             isSeparating,
@@ -170,6 +184,7 @@ export function MeusPedidosView({ userProfile }: Props) {
             separatorCode,
             qtdeSeparada,
             qtdeTotal,
+            divergencias: pedidoFaltas,
           };
         });
 
@@ -217,11 +232,13 @@ export function MeusPedidosView({ userProfile }: Props) {
       );
     }
 
-    // separating first
+    // separating first, then most recent
     return [...list].sort((a, b) => {
       if (a.isSeparating && !b.isSeparating) return -1;
       if (!a.isSeparating && b.isSeparating) return 1;
-      return 0;
+      const dateA = `${a.FGO_DTAENT || ""} ${a.FGO_HORENT || ""}`;
+      const dateB = `${b.FGO_DTAENT || ""} ${b.FGO_HORENT || ""}`;
+      return dateB.localeCompare(dateA);
     });
   }, [orders, filterTab, search]);
 
@@ -367,6 +384,12 @@ function OrderCard({ order, usersCache }: { order: Order; usersCache: Map<string
                 ALTERADO
               </span>
             )}
+            {order.divergencias.length > 0 && (
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                <AlertTriangle className="w-3 h-3" />
+                {order.divergencias.length} FALTA{order.divergencias.length > 1 ? "S" : ""}
+              </span>
+            )}
           </div>
           <p className="text-sm font-semibold text-foreground mt-1 truncate">
             {order.NOME_CLIENTE}
@@ -433,6 +456,28 @@ function OrderCard({ order, usersCache }: { order: Order; usersCache: Map<string
           </>
         )}
       </div>
+
+      {/* Divergências */}
+      {order.divergencias.length > 0 && (
+        <div className="p-2.5 rounded-lg bg-orange-500/10 border border-orange-500/20 space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
+            <span className="text-[11px] font-bold text-orange-400">Itens em falta</span>
+          </div>
+          <div className="space-y-1">
+            {order.divergencias.map((d, i) => (
+              <div key={i} className="flex items-center justify-between text-[10px]">
+                <span className="text-orange-300/80 truncate flex-1 mr-2">
+                  {d.descricao_produto || d.codigo_produto}
+                </span>
+                <span className="text-orange-400 font-semibold whitespace-nowrap">
+                  {d.quantidade_separada}/{d.quantidade_pedida}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Observation */}
       {order.OBSERVACAO && order.OBSERVACAO.trim() && (
