@@ -10,6 +10,7 @@ import {
   CalendarClock,
   List,
   Play,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -456,9 +457,31 @@ function OrderCard({ order, usersCache }: { order: Order; usersCache: Map<string
       {/* Divergências */}
       {order.divergencias.length > 0 && (
         <div className="p-2.5 rounded-lg bg-orange-500/10 border border-orange-500/20 space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
-            <span className="text-[11px] font-bold text-orange-400">Itens em falta</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
+              <span className="text-[11px] font-bold text-orange-400">Itens em falta</span>
+            </div>
+            <button
+              onClick={() => {
+                const numDoc = String(order.FGO_NUMDOC).trim();
+                window.dispatchEvent(
+                  new CustomEvent("open-crm-chat", {
+                    detail: {
+                      doc: numDoc,
+                      title: order.NOME_CLIENTE,
+                      sellerName: order.separatorName || order.NOME_SEPARADOR || "Separador",
+                      sellerCode: order.separatorCode || order.CODIGO_SEPARADOR || "",
+                    },
+                  })
+                );
+              }}
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 text-[10px] font-semibold transition-colors"
+              title="Conversar com o separador"
+            >
+              <MessageSquare className="w-3 h-3" />
+              Mensagem
+            </button>
           </div>
           <div className="space-y-1">
             {order.divergencias.map((d, i) => (
