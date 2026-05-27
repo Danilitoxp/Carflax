@@ -92,45 +92,53 @@ export const marketingService = {
    * Busca apenas clientes que possuem mensagens no banco (CRM Ativo)
    */
   async getActiveClientes(includeArchived: boolean | 'all' = false) {
-    const { data: activeJids } = await supabase
-      .from('marketing_whatsapp')
-      .select('remote_jid')
-      .like('remote_jid', '%@s.whatsapp.net');
+    // Busca todos os contatos que possuem interação (ultima_conversa_em preenchido)
+    // Pagina para não ser cortado pelo limite padrão de 1000 do Supabase
+    const allClientes: MarketingCliente[] = [];
+    const PAGE = 1000;
+    let from = 0;
+    while (true) {
+      let query = supabase
+        .from("marketing_clientes")
+        .select("*")
+        .not('ultima_conversa_em', 'is', null)
+        .like('remote_jid', '%@s.whatsapp.net');
 
-    const uniqueJids = [...new Set((activeJids || []).map(m => m.remote_jid))];
-
-    if (uniqueJids.length === 0) return [];
-
-    let query = supabase
-      .from("marketing_clientes")
-      .select("*")
-      .in('remote_jid', uniqueJids);
-
-    if (includeArchived !== 'all') {
-      if (!includeArchived) {
-        query = query.or('arquivado.eq.false,arquivado.is.null');
-      } else {
-        query = query.eq('arquivado', true);
+      if (includeArchived !== 'all') {
+        if (!includeArchived) {
+          query = query.or('arquivado.eq.false,arquivado.is.null');
+        } else {
+          query = query.eq('arquivado', true);
+        }
       }
+
+      const { data, error } = await query
+        .order("ultima_conversa_em", { ascending: false })
+        .range(from, from + PAGE - 1);
+
+      if (error) {
+        if (error.message.includes("column") && error.message.includes("arquivado")) {
+          const { data: retryData } = await supabase
+            .from("marketing_clientes")
+            .select("*")
+            .not('ultima_conversa_em', 'is', null)
+            .like('remote_jid', '%@s.whatsapp.net')
+            .order("ultima_conversa_em", { ascending: false })
+            .range(from, from + PAGE - 1);
+          if (retryData) allClientes.push(...(retryData as MarketingCliente[]));
+          if (!retryData || retryData.length < PAGE) break;
+          from += PAGE;
+          continue;
+        }
+        console.error("[MarketingService] Erro ao buscar clientes ativos:", error.message);
+        break;
+      }
+      if (data) allClientes.push(...(data as MarketingCliente[]));
+      if (!data || data.length < PAGE) break;
+      from += PAGE;
     }
 
-    const { data, error } = await query.order("ultima_conversa_em", { ascending: false });
-
-    if (error) {
-      // Se o erro for de coluna inexistente, faz a busca sem o filtro
-      if (error.message.includes("column") && error.message.includes("arquivado")) {
-        console.warn("[MarketingService] Coluna 'arquivado' não encontrada. Buscando sem filtro.");
-        const { data: retryData } = await supabase
-          .from("marketing_clientes")
-          .select("*")
-          .in('remote_jid', uniqueJids)
-          .order("ultima_conversa_em", { ascending: false });
-        return retryData || [];
-      }
-      console.error("[MarketingService] Erro ao buscar clientes ativos:", error.message);
-      return [];
-    }
-    return data || [];
+    return allClientes;
   },
 
   /**
