@@ -195,6 +195,20 @@ function DashboardContent({
     }
   });
 
+  const [dismissedChatDocs, setDismissedChatDocs] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem("carflax-dismissed-chats");
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const dismissedChatDocsRef = useRef(dismissedChatDocs);
+  useEffect(() => {
+    dismissedChatDocsRef.current = dismissedChatDocs;
+    localStorage.setItem("carflax-dismissed-chats", JSON.stringify([...dismissedChatDocs]));
+  }, [dismissedChatDocs]);
+
   const [openChatDoc, setOpenChatDoc] = useState<string | null>(() => {
     return activeChats.length > 0 ? activeChats[0].doc : null;
   });
@@ -267,6 +281,7 @@ function DashboardContent({
   if (userProfile?.id !== prevUserId) {
     setPrevUserId(userProfile?.id);
     setActiveChats([]);
+    setDismissedChatDocs(new Set());
   }
 
   const [isCentralizer, setIsCentralizer] = useState(false);
@@ -691,10 +706,11 @@ function DashboardContent({
             };
           });
 
-          // Adiciona documentos novos (não estavam no localStorage)
+          // Adiciona documentos novos (não estavam no localStorage nem foram descartados)
           const novosChats: ActiveChat[] = [];
           for (const [doc, msgs] of Object.entries(byDoc)) {
             if (existingDocs.has(doc)) continue;
+            if (dismissedChatDocsRef.current.has(doc)) continue;
 
             const lastMsg = msgs[0];
             const unreadCount = msgs.filter(
@@ -839,7 +855,6 @@ function DashboardContent({
                   unreadCount: openChatDocRef.current !== newMsg.documento ? (existing.unreadCount || 0) + 1 : 0,
                   lastMessage: newMsg.obs,
                   lastMessageTime: newMsg.timestamp,
-                  // Corrige sellerName/sellerCode se o existente é incorreto
                   ...(resolvedSellerName && resolvedSellerCode ? {
                     sellerName: resolvedSellerName,
                     sellerCode: resolvedSellerCode,
@@ -847,6 +862,8 @@ function DashboardContent({
                 };
                 return [updated, ...prev.filter(c => c.doc !== newMsg.documento)];
               }
+
+              if (dismissedChatDocsRef.current.has(newMsg.documento)) return prev;
 
               return [
                 {
@@ -923,6 +940,13 @@ function DashboardContent({
 
         // Se for sistema, tentamos descobrir o vendedor real se houver contexto (itens ou mensagens anteriores)
         // No caso do open-crm-chat manual do OrcamentosView, o sellerName já vem preenchido.
+
+        setDismissedChatDocs((prev) => {
+          if (!prev.has(detail.doc)) return prev;
+          const next = new Set(prev);
+          next.delete(detail.doc);
+          return next;
+        });
 
         setActiveChats((prev) => {
           if (prev.some((c) => c.doc === detail.doc)) {
@@ -1166,6 +1190,7 @@ function DashboardContent({
         onCloseChat={(doc) => {
           if (doc === forcedChatDoc) return;
           setActiveChats((prev) => prev.filter((c) => c.doc !== doc));
+          setDismissedChatDocs((prev) => new Set(prev).add(doc));
           if (openChatDoc === doc) setOpenChatDoc(null);
         }}
         userProfile={userProfile || undefined}

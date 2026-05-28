@@ -13,7 +13,9 @@
       "mcp__Claude_in_Chrome__browser_batch",
       "PowerShell(cd \"C:\\\\Users\\\\Danilo\\\\Desktop\\\\Desenvolvimento\\\\Carflax HUB\\\\Carflax\"; \\(Get-Content \"src\\\\components\\\\marketing\\\\whatsapp\\\\WhatsappView.tsx\" | Measure-Object -Line\\).Lines)",
       "PowerShell(npx tsc --noEmit 2>&1)",
-      "Bash(git grep *)"
+      "Bash(git grep *)",
+      "Bash(Get-Item -Path .)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }
