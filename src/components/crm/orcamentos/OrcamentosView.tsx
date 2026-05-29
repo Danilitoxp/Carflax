@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, memo } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, memo } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   Search,
@@ -26,7 +26,7 @@ import {
   FileCheck,
   AlertCircle,
 } from "lucide-react";
-import { apiCrmOrcamentos, apiCrmOrcamentoItens, mapCrmItem, type CrmOrcamento, type CrmItem } from "@/lib/api";
+import { apiCrmOrcamentos, apiCrmOrcamentoItens, apiCrmFaturamento, mapCrmItem, type CrmOrcamento, type CrmItem, type FaturamentoResumo } from "@/lib/api";
 import {
   getCrmStatusMap,
   upsertCrmStatus,
@@ -223,6 +223,8 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const { showNotification } = useNotification();
   const [orçamentosData, setOrçamentosData] = useState<Orcamento[]>([]);
   const [loading, setLoading] = useState(false);
+  const [faturamento, setFaturamento] = useState<FaturamentoResumo | null>(null);
+  const sellerCodeRef = useRef<Map<string, string>>(new Map());
   const visibleCount = 50;
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "id", direction: "desc" });
@@ -292,6 +294,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       const raw = await apiCrmOrcamentos(params);
       let orcamentos = parseOrcamentos(raw);
 
+      // Atualizar mapa de sellerCode (ref, sem causar re-render)
+      const map = new Map<string, string>();
+      orcamentos.forEach((o) => { if (o.sellerCode) map.set(o.seller, o.sellerCode); });
+      sellerCodeRef.current = map;
+
       // Vendedor só vê seus próprios orçamentos
       if (userProfile && !isGerente(userProfile.role)) {
         const myCode = String(userProfile.operator_code || userProfile.operatorCode || "").trim().replace(/^0+/, "");
@@ -360,11 +367,35 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     }
   }, [startDate, endDate, userProfile, cacheKey]);
 
-  useEffect(() => { 
+  useEffect(() => {
     // Se já temos dados carregados via cache (useEffect acima), fazemos o fetch "silencioso"
     const hasCache = cacheKey ? !!sessionStorage.getItem(cacheKey) : false;
-    fetchData(hasCache); 
+    fetchData(hasCache);
   }, [fetchData, cacheKey]);
+
+  // Buscar faturamento (reage a datas, filtro de vendedor e perfil do usuário)
+  useEffect(() => {
+    if (!startDate || !endDate) return;
+    const toLocalDateStr = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+    const params: Record<string, string> = {
+      inicio: toLocalDateStr(startDate),
+      fim: toLocalDateStr(endDate),
+    };
+
+    // Vendedor não-gerente: sempre filtra pelo próprio código
+    if (userProfile && !isGerente(userProfile.role)) {
+      const myCode = String(userProfile.operator_code || userProfile.operatorCode || "").trim();
+      if (myCode) params.vendedor = myCode;
+    } else if (filterSeller !== "Todos os Vendedores") {
+      const code = sellerCodeRef.current.get(filterSeller);
+      if (code) params.vendedor = code;
+    }
+
+    apiCrmFaturamento(params).then(setFaturamento).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterSeller, startDate, endDate, userProfile]);
 
   // ── Status update ────────────────────────────────────────────────────────
 
@@ -614,48 +645,46 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       acc[o.status] = (acc[o.status] || 0) + o.totalValue;
       return acc;
     }, {});
-    const vendas = statusCounts["VENDA"] || 0;
+    // Usar dados reais de faturamento (VW_FATURAMENTO) quando disponíveis
+    const vendas = faturamento ? Number(faturamento.QTD_VENDAS) || 0 : (statusCounts["VENDA"] || 0);
+    const vendasValor = faturamento ? Number(faturamento.TOTAL_VENDIDO) || 0 : (statusValues["VENDA"] || 0);
+    if (faturamento) {
+      statusCounts["VENDA"] = vendas;
+      statusValues["VENDA"] = vendasValor;
+    }
+
     const perdidos = statusCounts["PERDIDO"] || 0;
+    const perdidosValor = statusValues["PERDIDO"] || 0;
     const pipeline = filterStatus === "Perdido"
       ? filteredAndSortedItems.reduce((s, o) => s + o.totalValue, 0)
       : filteredAndSortedItems
           .filter((o) => !["VENDA", "PERDIDO"].includes(o.status))
           .reduce((s, o) => s + o.totalValue, 0);
 
-    // Regra de Conversão: Excluir motivos consultivos (não penaliza o vendedor)
-    const filteredForConv = filteredAndSortedItems.filter(o => {
-      const reason = (o.lossReason || "").toUpperCase();
-      return !reason.includes("MÃO DE OBRA E MATERIAL") &&
-             !reason.includes("MAO DE OBRA E MATERIAL");
-    });
+    // Valor total de todos os orçamentos
+    const totalOrcamentosValor = filteredAndSortedItems.reduce((s, o) => s + o.totalValue, 0);
 
-    const vFiltered = filteredForConv.filter(o => o.status === "VENDA").length;
-    const pFiltered = filteredForConv.filter(o => o.status === "PERDIDO").length;
-    const divisor = vFiltered + pFiltered;
-    const convQtd = divisor > 0 ? ((vFiltered / divisor) * 100).toFixed(1) : "0.0";
-
-    const vValor = filteredForConv.filter(o => o.status === "VENDA").reduce((s, o) => s + o.totalValue, 0);
-    const pValor = filteredForConv.filter(o => o.status === "PERDIDO").reduce((s, o) => s + o.totalValue, 0);
-    const divisorValor = vValor + pValor;
-    const convValor = divisorValor > 0 ? ((vValor / divisorValor) * 100).toFixed(1) : "0.0";
+    // Taxa de conversão real = vendas / (vendas + perdidos)
+    const decididos = vendasValor + perdidosValor;
+    const convValor = decididos > 0 ? ((vendasValor / decididos) * 100) : 0;
 
     const reasonCounts = filteredAndSortedItems
       .filter((o) => o.status === "PERDIDO" && o.lossReason)
       .reduce<Record<string, number>>((acc, o) => {
-        const r = o.lossReason!;
+        const r = o.lossReason!.toUpperCase().trim();
         acc[r] = (acc[r] || 0) + 1;
         return acc;
       }, {});
     const reasonValues = filteredAndSortedItems
       .filter((o) => o.status === "PERDIDO" && o.lossReason)
       .reduce<Record<string, number>>((acc, o) => {
-        const r = o.lossReason!;
+        const r = o.lossReason!.toUpperCase().trim();
         acc[r] = (acc[r] || 0) + o.totalValue;
         return acc;
       }, {});
 
-    return { statusCounts, statusValues, vendas, perdidos, pipeline, convQtd, convValor, total, reasonCounts, reasonValues };
-  }, [filteredAndSortedItems, filterStatus]);
+    return { statusCounts, statusValues, vendas, vendasValor, perdidos, perdidosValor, pipeline, totalOrcamentosValor, convValor, total, reasonCounts, reasonValues };
+  }, [filteredAndSortedItems, filterStatus, faturamento]);
 
   const requestSort = (key: string) => {
     let direction: "asc" | "desc" = "asc";
@@ -860,33 +889,59 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         {/* Resumo Geral */}
         <div className="lg:col-span-4 bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col">
           <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2 shrink-0">Resumo Geral</h3>
-          <div className="flex flex-col flex-1">
-            {loading ? (
-              Array.from({ length: 6 }).map((_, i) => (
+          {loading ? (
+            <div className="flex flex-col flex-1">
+              {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex flex-1 justify-between items-center border-b border-border/50 last:border-0 animate-pulse py-2">
                   <div className="h-2 w-20 bg-secondary dark:bg-slate-800 rounded" />
                   <div className="h-3 w-24 bg-secondary dark:bg-slate-800 rounded" />
                 </div>
-              ))
-            ) : (
-              [
-                { label: "Valor em Pipeline", value: insights.pipeline.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), color: "text-emerald-600 dark:text-emerald-400" },
-                { label: "Qtde. Orçamentos", value: String(insights.total), color: "text-foreground" },
-                { label: "Vendas Fechadas", value: String(insights.vendas), color: "text-foreground" },
-                { label: "Perdidos", value: String(insights.perdidos), color: "text-rose-500 dark:text-rose-400" },
-                { label: "Conv. por Qtde.", value: `${insights.convQtd}%`, color: "text-emerald-600 dark:text-emerald-400", trend: "up" },
-                { label: "Conv. por Valor", value: `${insights.convValor}%`, color: "text-emerald-600 dark:text-emerald-400", trend: "up" },
-              ].map((r, i) => (
-                <div key={i} className="flex flex-1 justify-between items-center border-b border-border/50 last:border-0">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{r.label}</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn("text-[12px] font-black", r.color)}>{r.value}</span>
-                    {r.trend === "up" && <span className="text-[10px] text-emerald-500 animate-pulse">↗</span>}
+              ))}
+            </div>
+          ) : (() => {
+            const convPct = insights.convValor;
+            const clampedPct = Math.min(convPct, 200);
+            const radius = 54;
+            const circumference = 2 * Math.PI * radius;
+            const strokeOffset = circumference - (clampedPct / 200) * circumference;
+            return (
+              <div className="flex flex-col flex-1 gap-2">
+                {/* Donut chart */}
+                <div className="flex items-center justify-center py-1">
+                  <div className="relative w-[130px] h-[130px]">
+                    <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                      <circle cx="60" cy="60" r={radius} fill="none" stroke="currentColor" className="text-secondary dark:text-slate-800" strokeWidth="10" />
+                      <circle cx="60" cy="60" r={radius} fill="none" stroke="url(#convGradient)" strokeWidth="10" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={strokeOffset} className="transition-all duration-1000 ease-out" />
+                      <defs>
+                        <linearGradient id="convGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#3b82f6" />
+                          <stop offset="100%" stopColor="#60a5fa" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[22px] font-black text-foreground leading-none">{convPct.toFixed(1)}%</span>
+                    </div>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+                {/* Metrics */}
+                <div className="flex flex-col flex-1">
+                  {[
+                    { label: "Valor Total Orçamentos", value: fmtCurrency(insights.totalOrcamentosValor), color: "text-foreground" },
+                    { label: "Qtde. Orçamentos", value: String(insights.total), color: "text-foreground" },
+                    { label: "Valor em Aberto", value: fmtCurrency(insights.pipeline), color: "text-blue-500 dark:text-blue-400" },
+                    { label: "Valor Perdido", value: fmtCurrency(insights.perdidosValor), color: "text-rose-500 dark:text-rose-400" },
+                    { label: "Valor de Venda", value: fmtCurrency(insights.vendasValor), color: "text-emerald-600 dark:text-emerald-400" },
+                  ].map((r, i) => (
+                    <div key={i} className="flex flex-1 justify-between items-center border-b border-border/50 last:border-0">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{r.label}</span>
+                      <span className={cn("text-[12px] font-black", r.color)}>{r.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 

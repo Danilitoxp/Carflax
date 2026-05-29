@@ -270,6 +270,14 @@ export const apiCrmOrcamentos = (params: { vendedor?: string, inicio?: string, f
 export const apiCrmOrcamentoItens = (documento: string) =>
   get<CrmItem[]>(`/api/crm/orcamentos/${encodeURIComponent(documento)}/itens`);
 
+export interface FaturamentoResumo {
+  QTD_VENDAS: number;
+  TOTAL_VENDIDO: number;
+}
+
+export const apiCrmFaturamento = (params: { vendedor?: string, inicio?: string, fim?: string }) =>
+  get<FaturamentoResumo>("/api/crm/orcamentos/faturamento", params as Record<string, string>);
+
 export const apiCrmStatus = (body: unknown) => post("/api/crm/status", body);
 
 export const apiCrmAlugueisClientes = () =>
