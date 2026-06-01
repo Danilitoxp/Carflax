@@ -253,9 +253,14 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [startDate, setStartDate] = useState<Date | null>(() => {
     const d = new Date();
     d.setDate(1);
+    d.setHours(0, 0, 0, 0);
     return d;
   });
-  const [endDate, setEndDate] = useState<Date | null>(new Date());
+  const [endDate, setEndDate] = useState<Date | null>(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  });
 
   const cacheKey = useMemo(() => {
     if (!startDate || !endDate) return null;
@@ -548,6 +553,12 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   };
 
   const handleRangeSelect = (start: Date, end: Date | null) => {
+    if (start) {
+      start.setHours(0, 0, 0, 0);
+    }
+    if (end) {
+      end.setHours(23, 59, 59, 999);
+    }
     setStartDate(start);
     setEndDate(end);
     if (start && end) setIsDateModalOpen(false);
