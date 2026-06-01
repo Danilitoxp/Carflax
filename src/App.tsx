@@ -34,6 +34,7 @@ import { SqlRunnerView } from "@/components/admin/SqlRunnerView";
 import { MarketingView } from "@/components/marketing/MarketingView";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 import { evolutionApi } from "@/lib/evolution-v2";
+import { SorteioRealtimeModal } from "@/components/ui/SorteioRealtimeModal";
 
 export interface UserProfile {
   id?: string;
@@ -71,6 +72,28 @@ function DashboardContent({
   const [isSugestaoModalOpen, setIsSugestaoModalOpen] = useState(false);
   const [isOrcamentoIAOpen, setIsOrcamentoIAOpen] = useState(false);
   const [geralLoading, setGeralLoading] = useState(true);
+  const [activeSorteio, setActiveSorteio] = useState<{
+    mes: number;
+    ano: number;
+    elegiveis: {
+      COD_VENDEDOR: string;
+      NOME_VENDEDOR: string;
+      avatar?: string | null;
+      PERC_META_BATIDA?: string | number;
+    }[];
+    ganhador: {
+      COD_VENDEDOR: string;
+      NOME_VENDEDOR: string;
+      avatar?: string | null;
+      PERC_META_BATIDA?: string | number;
+    };
+    premio: {
+      nome: string;
+      descricao?: string | null;
+      valor?: number | null;
+      imagem?: string | null;
+    } | null;
+  } | null>(null);
 
   // Ctrl+O → Orçamento IA
   useEffect(() => {
@@ -372,6 +395,29 @@ function DashboardContent({
     return () => { supabase.removeChannel(channel); };
   }, [userProfile]);
 
+  // ── Sorteio Real-Time (Realtime Broadcast) ───────────────────────────
+  useEffect(() => {
+    if (!userProfile?.id) return;
+
+    const channel = supabase
+      .channel('sorteio_campanha', {
+        config: {
+          broadcast: { self: true }
+        }
+      })
+      .on('broadcast', { event: 'sorteio_iniciado' }, (response) => {
+        console.log('[Sorteio] Evento recebido via realtime:', response.payload);
+        if (response.payload) {
+          setActiveSorteio(response.payload);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userProfile?.id]);
+
   // ── Notificações Globais do WhatsApp (fora da página de Marketing) ───
   const activeItemRef = useRef(activeItem);
   useEffect(() => { activeItemRef.current = activeItem; }, [activeItem]);
@@ -602,7 +648,7 @@ function DashboardContent({
           // Função auxiliar para obter vendedor e título reais
           const resolverDadosVendedor = (doc: string, msgs: CrmConversa[]) => {
             const lastMsg = msgs[0];
-            const centralizerId = (window as any)._carflaxCentralizerId;
+            const centralizerId = (window as unknown as Record<string, unknown>)._carflaxCentralizerId as string | undefined;
 
             let sellerName: string | undefined = undefined;
             let sellerCode: string | undefined = undefined;
@@ -751,7 +797,7 @@ function DashboardContent({
         }
 
         // Se vendedor tem mensagem não respondida do centralizador, força o modal
-        const centralizerId = (window as any)._carflaxCentralizerId;
+        const centralizerId = (window as unknown as Record<string, unknown>)._carflaxCentralizerId as string | undefined;
         if (!isCentRef.current && centralizerId) {
           for (const [doc, msgs] of Object.entries(byDoc)) {
             const lastFromCentralizer = msgs.find(
@@ -790,7 +836,7 @@ function DashboardContent({
         isCentRef.current = isCent;
         setIsCentralizer(isCent);
         if (config?.value) {
-          (window as any)._carflaxCentralizerId = config.value;
+          (window as unknown as Record<string, unknown>)._carflaxCentralizerId = config.value;
         }
 
         // Agora executa o carregamento inicial das conversas após a sessão estar 100% carregada
@@ -829,11 +875,11 @@ function DashboardContent({
 
             // Resolve o vendedor real a partir da mensagem recebida
             const senderIsNotMe = newMsg.enviado_por !== myId &&
-              newMsg.enviado_por !== (window as any)._carflaxCentralizerId &&
+              newMsg.enviado_por !== (window as unknown as Record<string, unknown>)._carflaxCentralizerId &&
               !isSystem;
 
             let resolvedSellerName = senderIsNotMe ? newMsg.enviado_por_nome : undefined;
-            let resolvedSellerCode = senderIsNotMe ? newMsg.enviado_por || undefined : undefined;
+            const resolvedSellerCode = senderIsNotMe ? newMsg.enviado_por || undefined : undefined;
 
             // Para mensagens de sistema, tenta extrair vendedor do texto
             if (!resolvedSellerName && newMsg.obs) {
@@ -843,7 +889,7 @@ function DashboardContent({
               }
             }
 
-            let displayTitle = isSystem
+            const displayTitle = isSystem
               ? (newMsg.obs?.includes("Divergência") ? `Divergência: ${resolvedSellerName || `#${newMsg.documento}`}` : `Aviso: #${newMsg.documento}`)
               : (resolvedSellerName || `#${newMsg.documento}`);
 
@@ -886,7 +932,7 @@ function DashboardContent({
             }
 
             // Centralizador → vendedor: bloqueia a tela até responder
-            const centralizerIdNow = (window as any)._carflaxCentralizerId;
+            const centralizerIdNow = (window as unknown as Record<string, unknown>)._carflaxCentralizerId as string | undefined;
             if (
               isForMe &&
               !isCentRef.current &&
@@ -975,6 +1021,7 @@ function DashboardContent({
       supabase.removeChannel(channel);
       window.removeEventListener("open-crm-chat", handleOpenChat);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userProfile?.id, handleSelectChat]);
 
   const handleActiveItemChange = (item: string) => {
@@ -1179,6 +1226,18 @@ function DashboardContent({
         onClose={() => setIsOrcamentoIAOpen(false)}
       />
 
+      {activeSorteio && (
+        <SorteioRealtimeModal
+          isOpen={!!activeSorteio}
+          onClose={() => setActiveSorteio(null)}
+          mes={activeSorteio.mes}
+          ano={activeSorteio.ano}
+          elegiveis={activeSorteio.elegiveis}
+          ganhador={activeSorteio.ganhador}
+          premio={activeSorteio.premio}
+        />
+      )}
+
       {/* Blur overlay when centralizador forces chat */}
       {forcedChatDoc && (
         <div className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm pointer-events-auto" />
@@ -1346,6 +1405,35 @@ function App() {
         if (data) {
           setProfile(data);
           fetchVendedorMetrics(data);
+
+          // Script temporário para atualizar ganhadores antigos:
+          if (data.email === "marketing@carflax.com.br" || data.is_admin || data.role?.toUpperCase() === "ADMIN") {
+            const checkKey = "carflax-old-winners-updated-v2";
+            if (localStorage.getItem(checkKey) !== "true") {
+              const GUILHERME = {
+                vendedor_codigo: '002',
+                vendedor_nome: 'guilherme santana',
+                vendedor_avatar: 'https://zwfvrmqffxcqurxpfewi.supabase.co/storage/v1/object/public/avatares/1776523243004-o7ru51g3ft.jfif',
+                atualizado_em: new Date().toISOString()
+              };
+              const JULIANA = {
+                vendedor_codigo: '009',
+                vendedor_nome: 'Juliana Oliveira',
+                vendedor_avatar: 'https://zwfvrmqffxcqurxpfewi.supabase.co/storage/v1/object/public/avatares/1776523254956-dky9p1i6vvu.jfif',
+                atualizado_em: new Date().toISOString()
+              };
+              Promise.all([
+                supabase.from('premio_mes').update(GUILHERME).eq('id', '022026'),
+                supabase.from('premio_mes').update(JULIANA).eq('id', '032026'),
+                supabase.from('premio_mes').update(GUILHERME).eq('id', '052026')
+              ]).then(() => {
+                localStorage.setItem(checkKey, "true");
+                console.log("[Supabase] Vendedores premiados das campanhas antigas vinculados com sucesso!");
+              }).catch(err => {
+                console.error("[Supabase] Erro ao vincular vendedores das campanhas antigas:", err);
+              });
+            }
+          }
         } else {
           // Fallback total para não travar a UI se o usuário for novo no banco
           const {
@@ -1432,7 +1520,10 @@ function App() {
             console.warn('[Auth] Refresh token inválido detectado, forçando logout');
             forceLogout();
           }
-        } catch {}
+        } catch (e) {
+          // Ignorar erros de parse de JSON se a resposta não for JSON
+          void e;
+        }
       }
       return res;
     };

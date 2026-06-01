@@ -29,6 +29,9 @@ interface PremioMes {
   descricao: string | null;
   valor: number | null;
   imagem: string | null;
+  vendedor_codigo?: string | null;
+  vendedor_nome?: string | null;
+  vendedor_avatar?: string | null;
 }
 
 const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -77,7 +80,7 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
       try {
         const [campanhasRes, premioRes] = await Promise.all([
           supabase.from("campanhas").select("*"),
-          supabase.from("premio_mes").select("*").eq("mes", now.getMonth() + 1).eq("ano", now.getFullYear()).maybeSingle(),
+          supabase.from("premio_mes").select("*").eq("mes", now.getMonth() + 1).eq("ano", now.getFullYear()).limit(1).maybeSingle(),
         ]);
 
         if (campanhasRes.error) console.error("Campanhas erro:", campanhasRes.error);
@@ -128,7 +131,7 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
     const mesano = `${String(mes).padStart(2, "0")}${ano}`;
 
     const [{ data: premio, error: errP }, { data: proximos }] = await Promise.all([
-      supabase.from("premio_mes").select("*").eq("mes", mes).eq("ano", ano).maybeSingle(),
+      supabase.from("premio_mes").select("*").eq("mes", mes).eq("ano", ano).limit(1).maybeSingle(),
       supabase.from("premio_mes")
         .select("*")
         .or(`ano.gt.${anoAtual},and(ano.eq.${anoAtual},mes.gt.${mesAtual})`)
@@ -173,6 +176,84 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
     setMesSelecionado(ms);
     setIsPremioModalOpen(true);
     carregarPremio(ms.mes, ms.ano);
+  };
+
+  const triggerSorteio = async () => {
+    if (!premioAtual || !elegiveis || elegiveis.length === 0) return;
+    
+    const confirmSorteio = window.confirm(`Deseja realmente realizar o sorteio de ${premioAtual.nome}? Esta ação escolherá um dos ${elegiveis.length} vendedores elegíveis.`);
+    if (!confirmSorteio) return;
+
+    // Pick a random seller
+    const randomIndex = Math.floor(Math.random() * elegiveis.length);
+    const winner = elegiveis[randomIndex];
+    
+    try {
+      // Update Supabase DB
+      const { error: dbError } = await supabase
+        .from("premio_mes")
+        .update({
+          vendedor_codigo: winner.COD_VENDEDOR,
+          vendedor_nome: winner.NOME_VENDEDOR,
+          vendedor_avatar: winner.avatar || null,
+          atualizado_em: new Date().toISOString()
+        })
+        .eq("id", premioAtual.id);
+        
+      if (dbError) throw dbError;
+      
+      // Update states
+      setPremioAtual(prev => prev ? {
+        ...prev,
+        vendedor_codigo: winner.COD_VENDEDOR,
+        vendedor_nome: winner.NOME_VENDEDOR,
+        vendedor_avatar: winner.avatar || null
+      } : null);
+      
+      if (premioCard && premioCard.id === premioAtual.id) {
+        setPremioCard(prev => prev ? {
+          ...prev,
+          vendedor_codigo: winner.COD_VENDEDOR,
+          vendedor_nome: winner.NOME_VENDEDOR,
+          vendedor_avatar: winner.avatar || null
+        } : null);
+      }
+
+      // Broadcast via Supabase Realtime
+      const channel = supabase.channel('sorteio_campanha');
+      const sendPayload = async () => {
+        await channel.send({
+          type: 'broadcast',
+          event: 'sorteio_iniciado',
+          payload: {
+            mes: mesSelecionado.mes,
+            ano: mesSelecionado.ano,
+            elegiveis: elegiveis,
+            ganhador: {
+              COD_VENDEDOR: winner.COD_VENDEDOR,
+              NOME_VENDEDOR: winner.NOME_VENDEDOR,
+              avatar: winner.avatar || null
+            },
+            premio: premioAtual
+          }
+        });
+      };
+
+      // @ts-ignore
+      if (channel.state === 'joined') {
+        sendPayload();
+      } else {
+        channel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await sendPayload();
+          }
+        });
+      }
+      
+    } catch (err: any) {
+      console.error("Erro no sorteio:", err);
+      alert(`Erro ao realizar sorteio: ${err.message || err}`);
+    }
   };
 
   const navegarMes = (delta: number) => {
@@ -506,10 +587,33 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
                 </button>
               </div>
  
-               {/* Prêmio do Mês Selecionado */}
-               <div className="px-6 pb-5">
-                {loadingPremio ? (
-                  <div className="bg-secondary/40 rounded-xl p-6 flex items-center justify-center h-40">
+                {/* Prêmio do Mês Selecionado */}
+                <div className="px-6 pb-5">
+                  {!loadingPremio && premioAtual?.vendedor_codigo && (
+                    <div className="mb-5 bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-amber-500/10 border-2 border-amber-500/30 rounded-[24px] p-5 flex items-center justify-between shadow-lg relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl -mr-16 -mt-16" />
+                      <div className="flex items-center gap-4 relative z-10">
+                        <div className="w-14 h-14 rounded-full border-2 border-amber-500 shadow-xl overflow-hidden flex items-center justify-center bg-blue-600/10 shrink-0">
+                          {premioAtual.vendedor_avatar ? (
+                            <img src={premioAtual.vendedor_avatar} alt={premioAtual.vendedor_nome || ""} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-7 h-7 text-amber-500" />
+                          )}
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[9px] font-black text-amber-500 uppercase tracking-[0.25em]">Ganhador do Sorteio 🏆</p>
+                          <h4 className="text-sm font-black text-foreground uppercase tracking-tight">{premioAtual.vendedor_nome}</h4>
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">Código: {premioAtual.vendedor_codigo}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 relative z-10 shrink-0">
+                        <span className="text-[9px] font-black text-amber-600 bg-amber-500/15 border border-amber-500/20 px-2 py-0.5 rounded-md uppercase tracking-widest">Premiado</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {loadingPremio ? (
+                    <div className="bg-secondary/40 rounded-xl p-6 flex items-center justify-center h-40">
                     <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : premioAtual ? (
@@ -557,9 +661,20 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
                   <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Vendedores Elegíveis</h4>
                   <span className="text-[9px] font-bold text-muted-foreground/50">≥ 97% da meta</span>
                   {elegiveis && !loadingElegiveis && (
-                    <span className="ml-auto text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">
-                      {elegiveis.length} elegíveis
-                    </span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-950/30 rounded-full px-2 py-0.5">
+                        {elegiveis.length} elegíveis
+                      </span>
+                      {canManage && premioAtual && !premioAtual.vendedor_codigo && elegiveis.length > 0 && (
+                        <button
+                          onClick={triggerSorteio}
+                          className="h-8 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-md shadow-amber-500/10 flex items-center gap-1.5"
+                        >
+                          <Trophy className="w-3 h-3" />
+                          Sortear Ganhador
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 
