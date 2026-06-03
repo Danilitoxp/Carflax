@@ -451,6 +451,29 @@ export const apiSecullumTotais = async (params: {
 };
 
 export { API_BASE };
+
+// ── Campanha Amanco ───────────────────────────────────────────────────────────
+
+export interface AmancoVendedor {
+  COD_VENDEDOR: string;
+  NOME_VENDEDOR: string;
+  TOTAL_FATURADO: number;
+}
+
+export interface AmancoCliente {
+  COD_CLIENTE: string;
+  CLIENTE: string;
+  TOTAL_FATURADO: number;
+}
+
+export interface AmancoRankingResponse {
+  rankingVendedores: AmancoVendedor[];
+  rankingClientes: AmancoCliente[];
+}
+
+export const apiAmancoRanking = () =>
+  get<AmancoRankingResponse>("/api/crm/campanhas/amanco-ranking");
+
 export const apiClientesFrv = async (dataInicio?: string, dataFim?: string, vendedor?: string) => {
   const params = new URLSearchParams();
   if (dataInicio) params.append("dataInicio", dataInicio);

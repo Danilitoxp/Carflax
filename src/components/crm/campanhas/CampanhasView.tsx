@@ -4,6 +4,7 @@ import { apiElegiveisParaSorteio, apiCampaignRanking, type MetaVendedor, type Ra
 import { uploadImage } from "@/lib/uploadImage";
 import { Target, Plus, X, Trophy, ChevronLeft, ChevronRight, Gift, Star, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AmancoModal } from "./AmancoModal";
 
 export interface Campaign {
   id: string | number;
@@ -73,6 +74,9 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
 
   // Card do mês atual (visível no grid)
   const [premioCard, setPremioCard] = useState<PremioMes | null>(null);
+
+  // Modal Amanco
+  const [isAmancoModalOpen, setIsAmancoModalOpen] = useState(false);
 
   useEffect(() => {
     const now = new Date();
@@ -436,6 +440,33 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
       {/* Grid */}
       <div className="flex-1 overflow-y-auto scrollbar-hide pr-1">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 pb-6">
+
+          {/* Card Campanha Amanco — Seleção de Prêmios */}
+          <div
+            onClick={() => setIsAmancoModalOpen(true)}
+            className="aspect-[4/5] rounded-[32px] p-6 flex flex-col border border-cyan-500/30 transition-all duration-500 cursor-pointer group relative overflow-hidden bg-card/60 backdrop-blur-xl shadow-2xl shadow-cyan-600/10 hover:shadow-cyan-500/20 hover:scale-[1.02]"
+          >
+            <div className="absolute inset-0 z-0 pointer-events-none">
+              <div className="absolute inset-0 border-2 border-cyan-500 rounded-[32px] animate-border-trace opacity-40 shadow-[0_0_15px_rgba(6,182,212,0.2)]" />
+              <div className="absolute inset-0 bg-gradient-to-b from-cyan-600/5 via-blue-600/5 to-transparent" />
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-3 relative z-10">
+              <div className="w-20 h-20 rounded-[28px] bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center shadow-2xl shadow-cyan-600/40 group-hover:scale-110 transition-all duration-700 group-hover:rotate-6">
+                <span className="text-white font-black text-[11px] uppercase tracking-tight leading-tight text-center px-1">AMANCO</span>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[9px] font-black text-cyan-500 uppercase tracking-[0.2em] opacity-80">Campanha Especial</p>
+                <h3 className="text-[11px] font-black text-foreground tracking-tight leading-tight uppercase">
+                  Seleção de Prêmios
+                </h3>
+                <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">Amanco</p>
+              </div>
+              <div className="px-4 py-1.5 rounded-2xl bg-cyan-600/10 border border-cyan-500/20 flex items-center gap-2 group-hover:bg-cyan-600 group-hover:text-white transition-all">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-ping" />
+                <span className="text-[9px] font-black tracking-[0.1em] uppercase">Ver Ranking</span>
+              </div>
+            </div>
+          </div>
 
           {/* Card Prêmio do Mês — sempre visível, abre modal */}
           <div
@@ -831,6 +862,9 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
           </div>
         </div>
       )}
+
+      {/* ── MODAL AMANCO ── */}
+      {isAmancoModalOpen && <AmancoModal onClose={() => setIsAmancoModalOpen(false)} />}
 
       {/* ── MODAL NOVA / EDITAR CAMPANHA ── */}
       {(isNewCampaignModalOpen || editingCampaign) && (() => {
