@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { Trophy, X, Volume2, VolumeX, Sparkles, Star } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface Seller {
   COD_VENDEDOR: string;
