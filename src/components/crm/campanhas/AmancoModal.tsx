@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Trophy, Users, Award, TrendingUp, Loader2, AlertCircle, Medal, Building2, Shuffle, CheckCircle2, XCircle } from "lucide-react";
+import { X, Trophy, Users, Award, TrendingUp, Loader2, AlertCircle, Medal, Building2, Shuffle, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiAmancoRanking, type AmancoVendedor, type AmancoCliente } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -98,7 +98,7 @@ export function AmancoModal({ onClose }: AmancoModalProps) {
         ]);
 
         setVendedores(erpData.rankingVendedores ?? []);
-        setClientes(erpData.rankingClientes ?? []);
+        setClientes((erpData.rankingClientes ?? []).filter(c => c.CLIENTE?.toUpperCase() !== "CONSUMIDOR"));
         setFuncionarios((supabaseResult.data as SupabaseUser[]) ?? []);
 
         if (erpData.rankingVendedores?.length) {
@@ -301,6 +301,29 @@ export function AmancoModal({ onClose }: AmancoModalProps) {
           {/* ── Tab: Clientes ── */}
           {!loading && !error && tab === "clientes" && (
             <div className="space-y-1.5">
+              {/* World Cup Mode banner */}
+              <div className="p-4 mb-4 bg-gradient-to-r from-emerald-500/10 via-yellow-500/5 to-blue-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-yellow-400 to-blue-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+                    <span className="text-xl">🇧🇷</span>
+                  </div>
+                  <div>
+                    <h4 className="text-[11px] font-black text-foreground uppercase tracking-tight flex items-center gap-1.5">
+                      Painel Copa do Mundo 2026
+                      <span className="px-1 py-0.5 rounded text-[8px] bg-yellow-500/20 text-yellow-500 font-bold border border-yellow-500/30">NOVO</span>
+                    </h4>
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">Visualização em tela cheia com a Camisa do Brasil</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => window.open(window.location.origin + window.location.pathname + "?view=ranking-copa", "_blank")}
+                  className="px-3.5 py-2 bg-gradient-to-r from-emerald-500 to-yellow-400 hover:from-emerald-600 hover:to-yellow-500 text-slate-950 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 shrink-0"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-950" />
+                  Abrir Painel
+                </button>
+              </div>
+
               <div className="grid grid-cols-12 px-3 mb-1 text-[8px] font-black text-muted-foreground/50 uppercase tracking-widest">
                 <div className="col-span-1">Pos</div>
                 <div className="col-span-7 pl-3">Cliente</div>

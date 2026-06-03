@@ -35,6 +35,7 @@ import { MarketingView } from "@/components/marketing/MarketingView";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { SorteioRealtimeModal } from "@/components/ui/SorteioRealtimeModal";
+import { RankingCopaView } from "@/components/crm/campanhas/RankingCopaView";
 
 export interface UserProfile {
   id?: string;
@@ -1553,6 +1554,20 @@ function App() {
       <ThemeProvider defaultTheme="light" storageKey="carflax-theme">
         <NotificationProvider>
           <MotoristaView />
+        </NotificationProvider>
+      </ThemeProvider>
+    );
+  }
+
+  const isCopaRankingRoute =
+    window.location.pathname.includes("/ranking-copa") ||
+    window.location.search.includes("view=ranking-copa");
+
+  if (isCopaRankingRoute) {
+    return (
+      <ThemeProvider defaultTheme="dark" storageKey="carflax-theme">
+        <NotificationProvider>
+          <RankingCopaView />
         </NotificationProvider>
       </ThemeProvider>
     );
