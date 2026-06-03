@@ -309,7 +309,7 @@ export function AmancoModal({ onClose }: AmancoModalProps) {
                   </div>
                   <div>
                     <h4 className="text-[11px] font-black text-foreground uppercase tracking-tight flex items-center gap-1.5">
-                      Painel Copa do Mundo 2026
+                      Painel Seleção Amanco
                       <span className="px-1 py-0.5 rounded text-[8px] bg-yellow-500/20 text-yellow-500 font-bold border border-yellow-500/30">NOVO</span>
                     </h4>
                     <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">Visualização em tela cheia com a Camisa do Brasil</p>

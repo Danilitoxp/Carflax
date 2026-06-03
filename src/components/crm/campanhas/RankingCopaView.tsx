@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Trophy, Building2, Loader2, AlertCircle, RefreshCw, Star } from "lucide-react";
+import { Building2, Loader2, AlertCircle, Star } from "lucide-react";
 import { apiAmancoRanking, type AmancoCliente } from "@/lib/api";
 
 const MEDAL_COLORS = [
@@ -28,13 +28,10 @@ export function RankingCopaView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [clientes, setClientes] = useState<AmancoCliente[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchData = async (silent = false) => {
     if (!silent) setLoading(true);
     setError(false);
-    setIsRefreshing(true);
     try {
       const erpData = await apiAmancoRanking();
       // Filter out CONSUMIDOR
@@ -42,13 +39,11 @@ export function RankingCopaView() {
         c => c.CLIENTE?.toUpperCase() !== "CONSUMIDOR"
       );
       setClientes(filteredClientes);
-      setLastUpdated(new Date());
     } catch (e) {
       console.error(e);
       if (!silent) setError(true);
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
     }
   };
 
@@ -59,49 +54,17 @@ export function RankingCopaView() {
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col font-sans overflow-y-auto relative select-none pb-12">
+    <div className="min-h-screen w-full bg-[#070B16] text-slate-100 flex flex-col font-sans overflow-y-auto relative select-none pt-16 pb-12">
       {/* ── Background Glows ── */}
       <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-green-950/20 via-blue-950/10 to-transparent pointer-events-none" />
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-yellow-500/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-green-500/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute top-1/2 left-1/3 w-80 h-80 bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* ── Header ── */}
-      <header className="max-w-7xl mx-auto w-full px-8 pt-8 pb-4 flex items-center justify-between z-10 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500 via-yellow-400 to-blue-600 flex items-center justify-center shadow-xl shadow-green-500/25 rotate-3">
-            <Trophy className="w-8 h-8 text-slate-950 -rotate-3" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-lg bg-green-500/20 border border-green-500/30 text-green-400 text-[10px] font-black uppercase tracking-widest">
-                COPA DO MUNDO CARFLAX 🇧🇷
-              </span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            </div>
-            <h1 className="text-2xl font-black text-white uppercase tracking-tight mt-0.5">
-              Seleção de Clientes <span className="text-yellow-400">Amanco</span>
-            </h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
-              Período: <span className="text-yellow-400">01/06/2026</span> até <span className="text-yellow-400">30/06/2026</span>
-            </p>
-          </div>
-        </div>
 
-        {/* Refresh Indicator */}
-        <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-2">
-          <RefreshCw className={`w-3.5 h-3.5 text-slate-400 ${isRefreshing ? "animate-spin text-yellow-400" : ""}`} />
-          <div className="text-left">
-            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sincronizado</p>
-            <p className="text-[10px] font-bold text-slate-300">
-              {lastUpdated.toLocaleTimeString("pt-BR")}
-            </p>
-          </div>
-        </div>
-      </header>
 
       {/* ── Main Layout ── */}
-      <main className="max-w-7xl mx-auto w-full px-8 flex-1 grid grid-cols-12 gap-8 items-start z-10">
+      <main className="max-w-7xl mx-auto w-full px-8 flex-1 grid grid-cols-12 gap-8 items-stretch z-10">
         
         {/* Loading / Error States */}
         {loading && (
@@ -130,13 +93,18 @@ export function RankingCopaView() {
           <>
             {/* Left Column: Ranking List (7 Cols) */}
             <section className="col-span-12 lg:col-span-7 space-y-4">
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/80 rounded-[32px] p-6 shadow-2xl flex flex-col">
+              <div className="bg-[#0B1124] border border-slate-800/80 rounded-[32px] p-6 shadow-2xl flex flex-col h-full">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                    Parceiros de Destaque
-                  </h3>
-                  <span className="text-[10px] font-black text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                      Parceiros de Destaque
+                    </h3>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">
+                      Período: <span className="text-yellow-400">01/06/2026</span> até <span className="text-yellow-400">30/06/2026</span>
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-black text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
                     {clientes.length} Clientes Ativos
                   </span>
                 </div>
@@ -198,37 +166,42 @@ export function RankingCopaView() {
 
             {/* Right Column: Brazil Shirt Display (5 Cols) */}
             <section className="col-span-12 lg:col-span-5">
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/80 rounded-[32px] p-6 shadow-2xl flex flex-col items-center text-center relative overflow-hidden">
-                {/* Neon shadow borders */}
-                <div className="absolute -top-24 -right-24 w-48 h-48 bg-yellow-500/10 rounded-full blur-2xl" />
-                <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-green-500/10 rounded-full blur-2xl" />
-
+              <div className="bg-[#0B1124] border border-slate-800/80 rounded-[32px] p-6 shadow-2xl flex flex-col h-full justify-between items-center text-center relative overflow-hidden">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-1.5">
                   🏆 Grande Prêmio da Campanha
                 </h3>
 
-                {/* High-res Shirt Card */}
-                <div className="relative w-full aspect-[4/5] max-w-[340px] bg-slate-950/60 rounded-2xl border border-slate-800 flex items-center justify-center p-6 shadow-inner group">
-                  {/* Subtle golden halo behind shirt */}
-                  <div className="absolute inset-0 bg-radial-gradient from-yellow-500/15 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                  
-                  <img
-                    src="https://static.netshoes.com.br/produtos/camisa-brasil-nike-i-202627-fa-masculina/46/SGL-052E-046/SGL-052E-046_zoom1.jpg?ts=1776337483"
-                    alt="Manto Sagrado Seleção Brasileira"
-                    className="max-h-full object-contain rounded-lg drop-shadow-[0_15px_30px_rgba(234,179,8,0.25)] group-hover:scale-105 transition-all duration-700"
+                {/* High-res Shirt Video */}
+                <div className="relative w-full max-w-[420px] flex items-center justify-center">
+                  <video
+                    src="/camisa.MOV"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="max-h-[52vh] w-full object-contain mix-blend-screen"
+                    style={{ filter: "brightness(1.25) contrast(1.15) saturate(1.1)" }}
                   />
                 </div>
 
-                {/* Highlighted Call-to-Action Badge */}
-                <div className="mt-4 text-center z-10">
-                  <h4 className="text-base font-black text-white uppercase tracking-tight">
-                    Manto Oficial do Brasil 🇧🇷
-                  </h4>
-                </div>
+                {/* Bottom group container */}
+                <div className="flex flex-col items-center gap-4 w-full">
+                  {/* Highlighted Prize Label */}
+                  <div className="text-center z-10 flex items-center justify-center gap-2">
+                    <img
+                      src="https://static.vecteezy.com/system/resources/thumbnails/034/211/381/small/blue-checkmark-validation-social-media-png.png"
+                      alt="Verificado"
+                      className="w-5 h-5 object-contain"
+                    />
+                    <h4 className="text-base font-black text-white uppercase tracking-tight">
+                      Manto Oficial do Brasil
+                    </h4>
+                  </div>
 
-                <div className="mt-4 z-10">
-                  <div className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-gradient-to-r from-yellow-400 via-green-500 to-yellow-500 text-slate-950 font-black text-[14px] uppercase tracking-widest shadow-2xl shadow-yellow-500/20 border border-yellow-300/40 animate-pulse">
-                    <span>🏆 Compre Amanco e Concorra! 🇧🇷</span>
+                  <div className="z-10 w-full">
+                    <div className="inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-2xl bg-gradient-to-r from-yellow-400 via-green-500 to-yellow-500 text-slate-950 font-black text-[14px] uppercase tracking-widest shadow-2xl shadow-yellow-500/20 border border-yellow-300/40 animate-pulse w-full">
+                      <span>🏆 Compre Amanco e Concorra! 🇧🇷</span>
+                    </div>
                   </div>
                 </div>
               </div>
