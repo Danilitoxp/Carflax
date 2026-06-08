@@ -23,6 +23,7 @@ import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SugestaoModal } from "@/components/sugestao";
 import { OrcamentoIAModal } from "@/components/ui/OrcamentoIAModal";
+import { SugestoesAdminView } from "@/components/admin/SugestoesAdminView";
 import { ColetorView } from "@/components/coletor/ColetorView";
 import { EntregasView } from "@/components/entregas";
 import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
@@ -1038,7 +1039,14 @@ function DashboardContent({
 
   const handleActiveItemChange = (item: string) => {
     if (item === "Sugestões") {
-      setIsSugestaoModalOpen(true);
+      const role = userProfile?.role?.toUpperCase() || "";
+      const isAdmin = ["DIRETOR", "DIRETORA"].includes(role);
+      if (isAdmin) {
+        setActiveItem(item);
+        localStorage.setItem("carflax-active-section", item);
+      } else {
+        setIsSugestaoModalOpen(true);
+      }
     } else {
       setActiveItem(item);
       localStorage.setItem("carflax-active-section", item);
@@ -1169,6 +1177,10 @@ function DashboardContent({
           ) : activeItem === "Usuários" ? (
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <UsersView />
+            </div>
+          ) : activeItem === "Sugestões" ? (
+            <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
+              <SugestoesAdminView />
             </div>
           ) : activeItem === "DB Admin" ? (
             <SqlRunnerView />
