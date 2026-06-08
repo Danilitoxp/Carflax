@@ -345,6 +345,7 @@ function DashboardContent({
 
       if (!events || events.length === 0) return;
 
+      let delay = 0;
       events.forEach(ev => {
         const tag = String(ev.id);
         if (dismissed.includes(tag)) return;
@@ -352,13 +353,18 @@ function DashboardContent({
         const clientPart = ev.title.split('- Vendedor:')[0] || "";
         const clientName = clientPart.replace(/^FOLLOW-UP:\s*/i, '').trim();
 
-        showNotification(
-          "info",
-          "⚠️ RETORNO PENDENTE",
-          `Cliente: ${clientName}\n\n${ev.description || "Verifique os detalhes no orçamento."}`,
-          true,
-          tag
-        );
+        setTimeout(() => {
+          showNotification(
+            "info",
+            "⚠️ RETORNO PENDENTE",
+            `Cliente: ${clientName}\n\n${ev.description || "Verifique os detalhes no orçamento."}`,
+            false,
+            tag,
+            3000
+          );
+        }, delay);
+        
+        delay += 3500;
       });
     }
 

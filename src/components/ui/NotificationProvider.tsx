@@ -7,18 +7,20 @@ import { NotificationContext, type Notification, type NotificationType } from "@
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const showNotification = useCallback((type: NotificationType, title: string, message: string, persistent?: boolean, tag?: string) => {
+  const showNotification = useCallback((type: NotificationType, title: string, message: string, persistent?: boolean, tag?: string, duration?: number) => {
     const id = Math.random().toString(36).substring(2, 9);
+    const notifDuration = duration || 5000;
+    
     setNotifications((prev) => {
       if (tag && prev.some((n) => n.tag === tag)) return prev;
-      return [...prev, { id, type, title, message, persistent, tag }];
+      return [...prev, { id, type, title, message, persistent, tag, duration: notifDuration }];
     });
 
-    // Auto-remove after 5 seconds ONLY if not persistent
+    // Auto-remove after duration ONLY if not persistent
     if (!persistent) {
       setTimeout(() => {
         setNotifications((prev) => prev.filter((n) => n.id !== id));
-      }, 5000);
+      }, notifDuration);
     }
   }, []);
 
@@ -94,7 +96,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                 <motion.div 
                     initial={{ width: "100%" }}
                     animate={{ width: "0%" }}
-                    transition={{ duration: 5, ease: "linear" }}
+                    transition={{ duration: (n.duration || 5000) / 1000, ease: "linear" }}
                     className={cn(
                         "absolute bottom-0 left-0 h-[3px]",
                         n.type === "success" && "bg-emerald-500/30",

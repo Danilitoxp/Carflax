@@ -9,10 +9,11 @@ export interface Notification {
   message: string;
   persistent?: boolean;
   tag?: string; 
+  duration?: number;
 }
 
 interface NotificationContextType {
-  showNotification: (type: NotificationType, title: string, message: string, persistent?: boolean, tag?: string) => void;
+  showNotification: (type: NotificationType, title: string, message: string, persistent?: boolean, tag?: string, duration?: number) => void;
 }
 
 export const NotificationContext = createContext<NotificationContextType | undefined>(undefined);

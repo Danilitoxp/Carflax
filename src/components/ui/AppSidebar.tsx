@@ -141,7 +141,12 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     if (role.includes('ADMIN') || role.includes('GERENTE')) return true;
 
     // Itens padrão (que todos vêem)
-    const alwaysAllowed = ["Meu Perfil", "Aparência", "Notificações", "Segurança", "Relatórios", "Coletor"];
+    const alwaysAllowed = [
+      "Meu Perfil", "Aparência", "Notificações", "Segurança", "Relatórios", "Coletor",
+      "Dashboard", "Geral", "Produtos",
+      "Calendário", "Eventos", "Férias",
+      "Sugestões"
+    ];
     if (alwaysAllowed.includes(label)) return true;
 
     // Permissões específicas do departamento de MARKETING

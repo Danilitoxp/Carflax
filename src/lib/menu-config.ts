@@ -25,6 +25,11 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: "Calendário",
+    permGroup: "CALENDÁRIO",
+    subItems: [{ label: "Eventos" }, { label: "Férias" }],
+  },
+  {
     label: "Comercial",
     permGroup: "COMERCIAL",
     subItems: [
@@ -59,6 +64,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   { label: "Usuários", permGroup: "GESTÃO & ADMIN" },
   { label: "DB Admin", permGroup: "GESTÃO & ADMIN" },
+  { label: "Sugestões", permGroup: "ESSENCIAL" },
 ];
 
 // Extra action-level permissions not tied to sidebar sections.
@@ -96,7 +102,7 @@ function buildPermissionGroups() {
   });
 
   return Array.from(map.entries())
-    .filter(([name, modules]) => modules.length > 0 && name !== "DASHBOARD")
+    .filter(([name, modules]) => modules.length > 0 && name !== "DASHBOARD" && name !== "CALENDÁRIO" && name !== "ESSENCIAL")
     .map(([name, modules]) => ({ name, modules }));
 }
 
