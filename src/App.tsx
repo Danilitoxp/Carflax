@@ -169,12 +169,16 @@ function DashboardContent({
     const isPublic = [
       "Geral",
       "Dashboard",
+      "Produtos",
+      "Calendário",
+      "Eventos",
+      "Férias",
+      "Sugestões",
       "Meu Perfil",
       "Notificações",
       "Segurança",
       "Aparência",
       "Organograma",
-      "Sugestões",
       "Relatórios",
       "Relatórios Mkt",
       "Coletor",
@@ -790,6 +794,7 @@ function DashboardContent({
           (m) =>
             !m.lida &&
             m.enviado_por !== myId &&
+            !dismissedChatDocsRef.current.has(m.documento) &&
             (m.destino === myId ||
               (isCentRef.current && m.destino === "todos"))
         );
@@ -1247,11 +1252,30 @@ function DashboardContent({
       {/* Chat Center - Consolidated View */}
       <ChatCenter
         activeChats={activeChats}
-        onCloseChat={(doc) => {
+        onCloseChat={async (doc) => {
           if (doc === forcedChatDoc) return;
           setActiveChats((prev) => prev.filter((c) => c.doc !== doc));
           setDismissedChatDocs((prev) => new Set(prev).add(doc));
           if (openChatDoc === doc) setOpenChatDoc(null);
+
+          // Marca como lida no banco para não voltar a notificar/abrir no reload
+          if (userProfile?.id) {
+            try {
+              let query = supabase
+                .from("crm_conversas")
+                .update({ lida: true })
+                .eq("documento", doc)
+                .eq("lida", false)
+                .neq("enviado_por", userProfile.id);
+                
+              if (!isCentralizer) {
+                 query = query.eq("destino", userProfile.id);
+              }
+              await query;
+            } catch (err) {
+              console.error("[ChatCenter] Falha ao marcar lidas no fechamento da lista:", err);
+            }
+          }
         }}
         userProfile={userProfile || undefined}
         amICentralizer={isCentralizer}

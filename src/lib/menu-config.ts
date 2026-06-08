@@ -11,16 +11,18 @@ export interface NavSection {
 
 // Single source of truth for sidebar navigation + permission groups.
 // Adding a new subItem here automatically makes it appear in the UsersView permissions panel.
+// Módulos liberados para todos (não aparecem no painel de permissões):
+// - Dashboard > Geral e Produtos
+// - Calendário (Eventos, Férias)
+// - Sugestões
 export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Dashboard",
     permGroup: "DASHBOARD",
-    subItems: [{ label: "Geral" }, { label: "Produtos" }],
-  },
-  {
-    label: "Calendário",
-    permGroup: "CALENDÁRIO",
-    subItems: [{ label: "Eventos" }, { label: "Férias" }],
+    subItems: [
+      { label: "Geral" },
+      { label: "Produtos" },
+    ],
   },
   {
     label: "Comercial",
@@ -28,9 +30,7 @@ export const NAV_SECTIONS: NavSection[] = [
     subItems: [
       { label: "Orçamentos" },
       { label: "Meus Pedidos" },
-      { label: "Clientes" },
       { label: "Prospecções" },
-      { label: "Ligações" },
       { label: "Campanhas" },
       { label: "Alugueis" },
       { label: "Relatórios" },
@@ -59,7 +59,6 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   { label: "Usuários", permGroup: "GESTÃO & ADMIN" },
   { label: "DB Admin", permGroup: "GESTÃO & ADMIN" },
-  { label: "Sugestões", permGroup: "ESSENCIAL" },
 ];
 
 // Extra action-level permissions not tied to sidebar sections.
@@ -78,7 +77,7 @@ function buildPermissionGroups() {
   const map = new Map<string, string[]>();
 
   // Define group order
-  const ORDER = ["ESSENCIAL", "DASHBOARD", "CALENDÁRIO", "COMERCIAL", "MARKETING", "LOGÍSTICA", "GESTÃO & ADMIN"];
+  const ORDER = ["COMERCIAL", "MARKETING", "LOGÍSTICA", "GESTÃO & ADMIN"];
   ORDER.forEach(g => map.set(g, []));
 
   NAV_SECTIONS.forEach(section => {
@@ -97,7 +96,7 @@ function buildPermissionGroups() {
   });
 
   return Array.from(map.entries())
-    .filter(([, modules]) => modules.length > 0)
+    .filter(([name, modules]) => modules.length > 0 && name !== "DASHBOARD")
     .map(([name, modules]) => ({ name, modules }));
 }
 

@@ -142,7 +142,7 @@ export function ChatCenter({
             isOpen={true}
             onClose={() => {
               if (forcedChatDoc === openChatDoc) return;
-              setOpenChatDoc(null);
+              if (openChatDoc) onCloseChat(openChatDoc);
             }}
             documento={activeChatData.doc}
             empresa="001"
@@ -222,7 +222,7 @@ export function ChatCenter({
             <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide">
               {filteredChats.map((chat) => {
                 const userCache = (window as unknown as { _carflaxUserCache: Record<string, UserProfileLite> })._carflaxUserCache || {};
-                const centralizerId = (window as any)._carflaxCentralizerId;
+                const centralizerId = (window as unknown as Record<string, unknown>)._carflaxCentralizerId as string | undefined;
                 const myId = userProfile?.id;
                 const myNameUpper = userProfile?.name?.toUpperCase().trim();
 

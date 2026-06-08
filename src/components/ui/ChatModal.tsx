@@ -123,7 +123,7 @@ export function ChatModal({
 
     // Buscar quem é a outra parte da conversa (Prioriza cache, fallback no banco)
     async function fetchOwner() {
-      const centralizerId = (window as any)?._carflaxCentralizerId;
+      const centralizerId = (window as unknown as Record<string, unknown>)?._carflaxCentralizerId as string | undefined;
 
       // Se sou Vendedor, busca o perfil do Centralizador
       if (!amICentralizer) {
@@ -414,7 +414,7 @@ export function ChatModal({
             "Centralizador Carflax", 
       avatar: centralizer?.avatar || "" 
     };
-  }, [conversas, userProfile?.id, userProfile?.name, ownerProfile, centralizer, amICentralizer, sellerName, title, documento]);
+  }, [conversas, userProfile?.name, ownerProfile, centralizer, amICentralizer, sellerName, title, documento]);
 
   if (!isOpen) return null;
 
@@ -643,11 +643,14 @@ export function ChatModal({
       .filter(Boolean);
 
     if (unreadIds.length > 0) {
-      try {
-        await supabase.from("crm_conversas").update({ lida: true }).in("id", unreadIds);
-      } catch (err) {
-        console.error("[Chat] Falha ao marcar como lidas no fechamento:", err);
-      }
+      // Executa a atualização no banco em background sem travar a interface
+      supabase
+        .from("crm_conversas")
+        .update({ lida: true })
+        .in("id", unreadIds)
+        .then(({ error }) => {
+          if (error) console.error("[Chat] Falha ao marcar como lidas:", error);
+        });
     }
     onClose();
   };

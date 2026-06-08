@@ -13,8 +13,7 @@ import {
   UserCog,
   Building2,
   Briefcase,
-  Camera,
-  Smartphone
+  Camera
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
@@ -131,37 +130,33 @@ export function UsersView() {
     setNewUser(u => ({ ...u, avatar: URL.createObjectURL(file), _avatarFile: file }));
   };
 
-  const roles = [
-    // Diretoria
-    "Diretor",
-    // Gerências
-    "Gerente de Estoque", "Gerente de Manutenção", "Gerente de Segurança",
-    "Gerente de Vendas", "Gerente de Compras", "Gerente de Marketing",
-    "Gerente de RH", "Gerente Contábil", "Gerente Administrativo",
-    "Gerente de TI", "Gerente de Limpeza",
-    // Vendas
-    "Vendedor B2B", "Vendedor B2C", "Auxiliar de Vendas",
-    // Estoque / Expedição
-    "Conferente", "Conferente de Estoque", "Conferente Balcão",
-    "Motorista", "Ajudante",
-    "Auxiliar de Conferência", "Auxiliar de Expedição",
-    "Auxiliar de Expedição Vendedor Separador",
-    // Auxiliares gerais
-    "Auxiliar de Manutenção", "Auxiliar de Segurança", "Auxiliar de Compras",
-    "Auxiliar de Marketing", "Auxiliar de RH", "Auxiliar Contábil",
-    "Assistente Administrativo", "Auxiliar de TI", "Auxiliar de Limpeza",
-    // Administrativo / Financeiro
-    "Faturista", "Caixa",
-    // TI / Admin sistema
-    "admin",
-    // Externos
-    "Consultor",
-  ];
+  // Mapa setor → cargos disponíveis
+  const ROLES_BY_DEPARTMENT: Record<string, string[]> = {
+    "Estoque":      ["Gerente de Estoque", "Conferente", "Auxiliar de Expedição", "Motorista"],
+    "Segurança":    ["Gerente de Segurança", "Auxiliar de Segurança"],
+    "Vendas":       ["Gerente de Vendas", "Vendedor B2B", "Vendedor B2C", "Auxiliar de Vendas", "Check-out"],
+    "Compras":      ["Gerente de Compras", "Auxiliar de Compras"],
+    "Marketing":    ["Gerente de Marketing", "Auxiliar de Marketing"],
+    "Recursos H":   ["Gerente de RH", "Auxiliar de RH"],
+    "Financeiro":   ["Gerente Administrativo", "Assistente Administrativo", "Gerente Contábil", "Auxiliar Contábil", "Faturista", "Caixa"],
+    "Tecnologia":   ["Gerente de TI", "Auxiliar de TI", "admin"],
+    "Limpeza":      ["Gerente de Limpeza", "Auxiliar de Limpeza"],
+    "Consultoria":  ["Consultor"],
+    "Diretoria":    ["Diretor", "Diretora"],
+  };
+
   const departments = [
-    "Estoque", "Manutenção", "Segurança", "Vendas", "Compras",
-    "Marketing", "RH", "Contabilidade", "Administrativo", "TI", "Limpeza",
-    "Consultoria",
+    "Estoque", "Segurança", "Vendas", "Compras",
+    "Marketing", "Recursos H", "Financeiro", "Tecnologia", "Limpeza",
+    "Consultoria", "Diretoria",
   ];
+
+  // Cargos filtrados pelo setor selecionado (ou todos se não mapeado)
+  const allRoles = [...new Set(Object.values(ROLES_BY_DEPARTMENT).flat())].sort();
+  const rolesForDepartment = (dept: string): string[] =>
+    ROLES_BY_DEPARTMENT[dept] ?? allRoles;
+
+
 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -250,9 +245,9 @@ export function UsersView() {
         if (!avatarUrl) {
           console.error("[Users] Upload falhou — verifique a policy de INSERT no bucket 'avatares'");
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("[Users] Erro no upload:", err);
-        if (err.message?.includes("Refresh Token Not Found")) {
+        if (err instanceof Error && err.message?.includes("Refresh Token Not Found")) {
           alert("Sua sessão expirou. Por favor, saia e entre novamente para continuar.");
           setSaving(false);
           return;
@@ -299,9 +294,27 @@ export function UsersView() {
           coletorPermissions: newUser.coletorPermissions,
         } : u));
       } else {
-        const { error } = await supabase.from("usuarios").insert({ ...finalPayload, status: "ativo" });
-        if (error) { console.error("[Users] Erro ao criar:", error); return; }
-        
+        const { data: inserted, error: insertError } = await supabase
+          .from("usuarios")
+          .insert({ ...finalPayload, status: "ativo" })
+          .select("id")
+          .single();
+        if (insertError) { console.error("[Users] Erro ao criar:", insertError); setSaving(false); return; }
+
+        // Cria automaticamente a conta no Auth do Supabase (senha: @carflax@)
+        if (newUser.email) {
+          supabase.functions.invoke("create-auth-user", {
+            body: {
+              email: newUser.email,
+              name: newUser.name,
+              hub_user_id: inserted?.id ?? null,
+            },
+          }).then(({ error: fnError }) => {
+            if (fnError) console.warn("[Users] Aviso: não foi possível criar conta no Auth:", fnError.message);
+            else console.log("[Users] Conta no Auth criada automaticamente para:", newUser.email);
+          });
+        }
+
         const { data: all } = await supabase.from("usuarios").select("*").order("name");
         if (all) setUsers(all.map(u => ({
           id: u.id, name: u.name, email: u.email, role: u.role,
@@ -313,6 +326,7 @@ export function UsersView() {
           coletorPermissions: u.coletor_permissions || {},
           is_admin: u.is_admin || false
         })));
+
       }
       setIsAddModalOpen(false);
       setEditingUser(null);
@@ -323,9 +337,23 @@ export function UsersView() {
 
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
+
+    // Busca o email antes de excluir
+    const userToDelete = users.find(u => u.id === id);
+
     const { error } = await supabase.from("usuarios").delete().eq("id", id);
     if (error) { console.error("[Users] Erro ao excluir:", error); return; }
     setUsers(prev => prev.filter(u => u.id !== id));
+
+    // Remove também do Auth do Supabase (em segundo plano)
+    if (userToDelete?.email) {
+      supabase.functions.invoke("delete-auth-user", {
+        body: { email: userToDelete.email },
+      }).then(({ error: fnError }) => {
+        if (fnError) console.warn("[Users] Aviso: não foi possível remover do Auth:", fnError.message);
+        else console.log("[Users] Conta removida do Auth para:", userToDelete.email);
+      });
+    }
   };
 
   const getRoleBadge = (role: string) => {
@@ -436,7 +464,7 @@ export function UsersView() {
 
           <TinyDropdown
             value={filterRole}
-            options={["Todos os Cargos", ...roles]}
+          options={["Todos os Cargos", ...allRoles]}
             onChange={setFilterRole}
             icon={Shield}
             variant="emerald"
@@ -627,7 +655,10 @@ export function UsersView() {
                   <TinyDropdown
                     value={newUser.department}
                     options={departments}
-                    onChange={(val) => setNewUser({ ...newUser, department: val })}
+                    onChange={(val) => {
+                      const firstRole = rolesForDepartment(val)[0] ?? "";
+                      setNewUser({ ...newUser, department: val, role: firstRole });
+                    }}
                     icon={Briefcase}
                     variant="slate"
                     className="w-full"
@@ -638,7 +669,7 @@ export function UsersView() {
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cargo</label>
                   <TinyDropdown
                     value={newUser.role}
-                    options={roles}
+                    options={rolesForDepartment(newUser.department)}
                     onChange={(val) => setNewUser({ ...newUser, role: val })}
                     icon={Shield}
                     variant="emerald"
@@ -669,23 +700,7 @@ export function UsersView() {
                 </div>
               </div>
 
-              {/* Admin Toggle */}
-              <div className="p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20">
-                    <Shield className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h5 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-1">
-                      Acesso Administrativo
-                    </h5>
-                    <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                      Permissão total e acesso a configurações globais
-                    </p>
-                  </div>
-                </div>
-                <Switch enabled={newUser.is_admin || false} onChange={() => setNewUser({ ...newUser, is_admin: !newUser.is_admin })} />
-              </div>
+
 
               {/* Permissions Section */}
               <div className="space-y-4 pt-2">
@@ -739,37 +754,7 @@ export function UsersView() {
               </div>
 
               {/* Coletor Permissions Section */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-[10px] font-black text-foreground uppercase tracking-widest">Módulos do Coletor</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-1 scrollbar-hide">
-                  {Object.entries(newUser.coletorPermissions).map(([key, enabled]) => {
-                    const labels: Record<string, string> = {
-                      can_conferencia: "Conferência",
-                      can_separacao: "Separação",
-                      can_consulta_estoque: "Estoque",
-                      can_armazenamento: "Armazenamento",
-                      can_etiquetas: "Etiquetas",
-                      can_localizacao: "Localização",
-                      can_embalagens: "Embalagens",
-                      can_inventario: "Inventário"
-                    };
-                    return (
-                      <div key={key} onClick={() => {
-                        setNewUser({ 
-                          ...newUser, 
-                          coletorPermissions: { ...newUser.coletorPermissions, [key]: !enabled } 
-                        });
-                      }} className={cn("flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer", enabled ? "bg-emerald-500/10 border-emerald-600/30" : "bg-secondary/20 border-border")}>
-                        <span className={cn("text-[9px] font-black uppercase tracking-tight", enabled ? "text-emerald-400" : "text-muted-foreground/40")}>{labels[key] || key}</span>
-                        <Switch enabled={enabled} onChange={() => { }} />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+
             </div>
 
             <div className="p-4 border-t border-border flex gap-2">
