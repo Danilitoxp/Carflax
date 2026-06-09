@@ -79,7 +79,7 @@ async function checkAndPostWorkAnniversaries() {
         descricao: `Hoje comemoramos os ${years} ${years === 1 ? 'ano' : 'anos'} de dedicação e história do(a) ${user.name} na Carflax! 🚀\n\nÉ um orgulho ter você em nosso time. Obrigado por toda a parceria, empenho e por fazer parte da nossa trajetória. Que venham muitos outros anos de sucesso juntos! 🥂✨`,
         filtro: "Empresa",
         image_url: user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`,
-        tag: "Sistema Carflax",
+        tag: "Carflax",
         likes: 0,
         liked_by: []
       }]);

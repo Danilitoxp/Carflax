@@ -62,6 +62,73 @@ export interface UserProfile {
   avatar?: string;
 }
 
+/** Renderiza o conteúdo de comunicados de alteração de preço como linhas estruturadas */
+function PriceChangeContent({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const productLines = lines.filter(l => l.startsWith('\u2022'));
+  const footerLine = lines.find(l => l.startsWith('Total'));
+
+  const parseProductLine = (line: string) => {
+    // Para antes de qualquer horário residual: captura apenas R$ seguido de dígitos/vírgula/ponto
+    const match = line.match(/^\u2022 \[(\w+)\] (.+) \u2014 de (R\$\s*[\d.,]+) para (R\$\s*[\d.,]+)/);
+    if (!match) return null;
+
+    const fromStr = match[3].trim();
+    const toStr   = match[4].trim();
+
+    // Converte "R$ 1.234,56" → 1234.56
+    const parseBR = (s: string) =>
+      parseFloat(s.replace(/R\$\s*/, '').replace(/\./g, '').replace(',', '.'));
+
+    const fromNum = parseBR(fromStr);
+    const toNum   = parseBR(toStr);
+    const pct     = fromNum > 0 ? ((toNum - fromNum) / fromNum) * 100 : 0;
+
+    return { code: match[1], name: match[2], from: fromStr, to: toStr, pct };
+  };
+
+  return (
+    <div className="flex flex-col gap-1 mb-1">
+      <div className="max-h-36 overflow-y-auto flex flex-col gap-1 pr-1">
+        {productLines.map((line, i) => {
+          const product = parseProductLine(line);
+          if (!product) return (
+            <p key={i} className="text-xs text-muted-foreground">{line}</p>
+          );
+          const isIncrease = product.pct >= 0;
+          return (
+            <div key={i} className="flex items-center gap-2 py-1 px-2 rounded-lg bg-secondary/40 hover:bg-secondary/70 transition-colors">
+              <span className="font-black text-muted-foreground shrink-0 text-[9px] bg-secondary border border-border px-1.5 py-0.5 rounded-md leading-none">
+                {product.code}
+              </span>
+              <span className="flex-1 font-semibold text-foreground text-[11px] truncate" title={product.name}>
+                {product.name}
+              </span>
+              <span className="shrink-0 text-muted-foreground/50 line-through text-[10px] font-medium">
+                {product.from}
+              </span>
+              <span className="shrink-0 font-black text-foreground text-[11px]">
+                {product.to}
+              </span>
+              <span className={cn(
+                "shrink-0 font-black text-[10px] px-1.5 py-0.5 rounded-md min-w-[40px] text-center",
+                isIncrease
+                  ? "text-red-500 bg-red-500/10 dark:bg-red-500/15"
+                  : "text-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/15"
+              )}>
+                {isIncrease ? '+' : ''}{product.pct.toFixed(1)}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {footerLine && (
+        <p className="text-[10px] text-muted-foreground/50 font-medium mt-0.5">{footerLine}</p>
+      )}
+    </div>
+  );
+}
+
 function CommentBubble({
   comment,
   currentUserId,
@@ -538,16 +605,22 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
 
           <h3 className="text-lg font-black text-foreground tracking-tight mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase">{data.title}</h3>
 
-          <div onClick={() => setIsExpanded(!isExpanded)} className="cursor-pointer group/content">
-            <p className={cn("text-sm text-slate-600 dark:text-muted-foreground leading-relaxed font-medium mb-1 transition-all duration-300", !isExpanded && "line-clamp-3")}>
-              {data.content}
-            </p>
-            {data.content.length > 150 && (
-              <button className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 hover:underline mb-4">
-                {isExpanded ? "Ver menos" : "Ver mais..."}
-              </button>
-            )}
-          </div>
+          {data.title.includes("ALTERACOES DE PRECO") ? (
+            /* Comunicado de alteração de preço: renderização estruturada por produto */
+            <PriceChangeContent content={data.content} />
+          ) : (
+            /* Comunicados normais: expandir/recolher ao clicar */
+            <div onClick={() => setIsExpanded(!isExpanded)} className="cursor-pointer group/content">
+              <p className={cn("text-sm text-slate-600 dark:text-muted-foreground leading-relaxed font-medium mb-1 transition-all duration-300 whitespace-pre-wrap", !isExpanded && "line-clamp-3")}>
+                {data.content}
+              </p>
+              {data.content.length > 150 && (
+                <button className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 hover:underline mb-4">
+                  {isExpanded ? "Ver menos" : "Ver mais..."}
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="mt-auto flex items-center justify-between pt-4 border-t border-border">
             <div className="flex items-center gap-3">
