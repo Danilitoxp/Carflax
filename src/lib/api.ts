@@ -302,6 +302,11 @@ export interface PixResponse {
 }
 
 export const apiGeraPix = async (data: { codigoCliente: string; solicitacaoPagador: string; valor: number }): Promise<PixResponse> => {
+  const payload = {
+    codigoCliente: data.codigoCliente,
+    solicitacaoPagador: data.solicitacaoPagador,
+    valor: parseFloat(data.valor.toFixed(2))
+  };
   const baseUrl = API_BASE.startsWith("http") ? API_BASE : window.location.origin + API_BASE;
   const res = await fetch(`${baseUrl}/api/pix/gera_cobranca_pix`, {
     method: "POST",
@@ -309,10 +314,7 @@ export const apiGeraPix = async (data: { codigoCliente: string; solicitacaoPagad
       "accept": "application/json",
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      ...data,
-      valor: data.valor.toFixed(2)
-    })
+    body: JSON.stringify(payload)
   });
   if (!res.ok) {
     const errorBody = await res.text();
