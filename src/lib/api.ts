@@ -309,7 +309,10 @@ export const apiGeraPix = async (data: { codigoCliente: string; solicitacaoPagad
       "accept": "application/json",
       "Content-Type": "application/json"
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify({
+      ...data,
+      valor: data.valor.toFixed(2)
+    })
   });
   if (!res.ok) {
     const errorBody = await res.text();

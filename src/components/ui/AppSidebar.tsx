@@ -30,7 +30,6 @@ import {
   Key,
   Crosshair,
   Package,
-  Shield,
   type LucideIcon,
 } from "lucide-react";
 import organogramaIcon from "@/assets/organograma.svg";
@@ -65,7 +64,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "Relatórios Mkt": FileBarChart,
   Marketing: Megaphone,
   Whatsapp: Smartphone,
-  "Whatsapp Oficial": Shield,
   Leads: Users,
   Cronograma: Calendar,
   Coletor: Smartphone,
@@ -151,7 +149,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
 
     // Permissões específicas do departamento de MARKETING
     const isMarketingDept = userProfile?.department?.toUpperCase() === 'MARKETING';
-    const marketingItems = ["Marketing", "Whatsapp", "Whatsapp Oficial", "Leads", "Cronograma", "Relatórios Mkt"];
+    const marketingItems = ["Marketing", "Whatsapp", "Leads", "Cronograma", "Relatórios Mkt"];
     if (isMarketingDept && marketingItems.includes(label)) return true;
 
     // Permissões específicas do VENDEDOR
