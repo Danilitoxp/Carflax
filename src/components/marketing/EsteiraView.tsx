@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Plus, Trash2, Pencil, Calendar, Tag,
-  User, Check, X
+  User, Check, X, Eye
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -54,16 +54,27 @@ const COLUMNS: { id: KanbanCard["column_id"]; title: string; bgClass: string; bo
 ];
 
 const TAG_OPTIONS = [
-  { name: "Mídias Sociais",   color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/20" },
-  { name: "Tráfego Pago",     color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20" },
-  { name: "Design / Peças",   color: "bg-pink-500/10 text-pink-400 border-pink-500/20 hover:bg-pink-500/20" },
-  { name: "Institucional",    color: "bg-sky-500/10 text-sky-400 border-sky-500/20 hover:bg-sky-500/20" },
-  { name: "Vídeos / Reels",   color: "bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20" },
-  { name: "Campanha Interna", color: "bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20" },
+  { name: "Baixa",    color: "bg-slate-500/10 text-slate-400 border-slate-500/20 hover:bg-slate-500/20" },
+  { name: "Média",    color: "bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20" },
+  { name: "Alta",     color: "bg-orange-500/10 text-orange-400 border-orange-500/20 hover:bg-orange-500/20" },
+  { name: "Urgente",  color: "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20" },
 ];
+
+const getCardCreator = (createdByField?: string) => {
+  if (!createdByField) return "Marketing";
+  return createdByField.split(" | ")[0] || "Marketing";
+};
+
+const getCardResponsible = (createdByField?: string) => {
+  if (!createdByField) return "Marketing";
+  const parts = createdByField.split(" | ");
+  return parts[1] || parts[0] || "Marketing";
+};
 
 export function EsteiraView({ userProfile }: EsteiraViewProps) {
   const [cards, setCards] = useState<KanbanCard[]>([]);
+  const [usersList, setUsersList] = useState<{ id: string; name: string; avatar?: string }[]>([]);
+  const [isViewOnly, setIsViewOnly] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -74,10 +85,32 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
 
   const creatorName = userProfile?.name || "Marketing";
 
-  // ── Load cards from Supabase ─────────────────────────────────────────────
+  // ── Load cards and users ──────────────────────────────────────────────────
   useEffect(() => {
     loadCards();
+    fetchUsers();
   }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("id, name, avatar")
+        .eq("status", "ativo")
+        .order("name");
+
+      if (error) throw error;
+      setUsersList(data || []);
+    } catch (err) {
+      console.error("[EsteiraView] Erro ao carregar usuários do hub:", err);
+      try {
+        const { data } = await supabase.from("usuarios").select("id, name, avatar").order("name");
+        setUsersList(data || []);
+      } catch (fallbackErr) {
+        console.error("[EsteiraView] Falha no fallback de usuários:", fallbackErr);
+      }
+    }
+  };
 
   const loadCards = async () => {
     setLoading(true);
@@ -104,6 +137,10 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     try {
       if (!cardData.id) {
         // INSERT
+        const selectedResp = cardData.created_by_name || creatorName;
+        const respName = getCardResponsible(selectedResp);
+        const compositeCreatedBy = `${creatorName} | ${respName}`;
+
         const payload = {
           title: cardData.title.trim(),
           description: cardData.description?.trim() || "",
@@ -112,7 +149,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
           tag_name: cardData.tag_name || null,
           tag_color: cardData.tag_color || null,
           due_date: cardData.due_date || null,
-          created_by_name: creatorName,
+          created_by_name: compositeCreatedBy,
         };
 
         const { data, error } = await supabase
@@ -125,6 +162,12 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
         if (data) setCards(prev => [...prev, data]);
       } else {
         // UPDATE
+        const origCard = cards.find(c => c.id === cardData.id);
+        const origCreator = getCardCreator(origCard?.created_by_name);
+        const selectedResp = cardData.created_by_name || creatorName;
+        const respName = getCardResponsible(selectedResp);
+        const compositeCreatedBy = `${origCreator} | ${respName}`;
+
         const payload = {
           title: cardData.title.trim(),
           description: cardData.description?.trim() || "",
@@ -132,6 +175,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
           tag_name: cardData.tag_name || null,
           tag_color: cardData.tag_color || null,
           due_date: cardData.due_date || null,
+          created_by_name: compositeCreatedBy,
         };
 
         const { error } = await supabase
@@ -153,6 +197,15 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const deleteCard = async (cardId: string) => {
+    const card = cards.find(c => c.id === cardId);
+    if (!card) return;
+
+    const creator = getCardCreator(card.created_by_name);
+    if (creator !== creatorName) {
+      alert("Apenas o criador da tarefa pode excluí-la.");
+      return;
+    }
+
     if (!confirm("Deseja realmente excluir este card?")) return;
 
     try {
@@ -234,7 +287,8 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   };
 
   const openNewCard = (columnId: KanbanCard["column_id"] = "A FAZER") => {
-    setSelectedCard({ column_id: columnId });
+    setSelectedCard({ column_id: columnId, created_by_name: `${creatorName} | ${creatorName}` });
+    setIsViewOnly(false);
     setIsCardModalOpen(true);
   };
 
@@ -307,20 +361,32 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                           )}
 
                           <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => { setSelectedCard(card); setIsCardModalOpen(true); }}
-                              className="p-1 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors"
-                              title="Editar"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => deleteCard(card.id)}
-                              className="p-1 hover:bg-red-500/10 rounded-md text-muted-foreground hover:text-red-500 transition-colors"
-                              title="Excluir"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {getCardCreator(card.created_by_name) === creatorName ? (
+                              <>
+                                <button
+                                  onClick={() => { setSelectedCard(card); setIsViewOnly(false); setIsCardModalOpen(true); }}
+                                  className="p-1 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors"
+                                  title="Editar"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => deleteCard(card.id)}
+                                  className="p-1 hover:bg-red-500/10 rounded-md text-muted-foreground hover:text-red-500 transition-colors"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => { setSelectedCard(card); setIsViewOnly(true); setIsCardModalOpen(true); }}
+                                className="p-1 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors"
+                                title="Visualizar Detalhes"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -329,7 +395,10 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
 
                         {/* Description */}
                         {card.description && (
-                          <p className="text-[11px] text-muted-foreground line-clamp-2 mb-3 leading-relaxed break-words">
+                          <p 
+                            className="text-[11px] text-muted-foreground line-clamp-2 mb-3 leading-relaxed break-words whitespace-pre-line"
+                            title={card.description}
+                          >
                             {card.description}
                           </p>
                         )}
@@ -343,12 +412,33 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                             </div>
                           ) : <div className="w-1" />}
 
-                          <div className="flex items-center gap-1 bg-secondary/50 px-2 py-0.5 rounded-md border border-border/40 shrink-0">
-                            <User className="w-3 h-3 text-muted-foreground/70" />
-                            <span className="truncate max-w-[60px] text-[9px] uppercase tracking-wider">
-                              {card.created_by_name?.split(" ")[0]}
-                            </span>
-                          </div>
+                           {(() => {
+                             const userObj = usersList.find(u => u.name === card.created_by_name);
+                             const userAvatar = userObj?.avatar;
+                             return (
+                               <div 
+                                 className="flex items-center gap-1.5 bg-secondary/50 pl-1 pr-2 py-0.5 rounded-md border border-border/40 shrink-0"
+                                 title={card.created_by_name || "Sem responsável"}
+                               >
+                                 {userAvatar ? (
+                                   <img 
+                                     src={userAvatar} 
+                                     alt={card.created_by_name} 
+                                     className="w-4 h-4 rounded-full object-cover shrink-0 border border-border/40" 
+                                     onError={(e) => {
+                                       // Fallback para caso o link da imagem quebre
+                                       (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                     }}
+                                   />
+                                 ) : (
+                                   <User className="w-3 h-3 text-muted-foreground/70" />
+                                 )}
+                                 <span className="truncate max-w-[60px] text-[9px] uppercase tracking-wider">
+                                   {card.created_by_name?.split(" ")[0]}
+                                 </span>
+                               </div>
+                             );
+                           })()}
                         </div>
                       </div>
                     );
@@ -398,7 +488,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                   <div className="flex items-center gap-2">
                     <Tag className="w-5 h-5 text-primary" />
                     <h3 className="text-lg font-black uppercase tracking-tighter">
-                      {selectedCard.id ? "Editar Card" : "Novo Card"}
+                      {isViewOnly ? "Detalhes da Atividade" : selectedCard.id ? "Editar Card" : "Novo Card"}
                     </h3>
                   </div>
                   <button
@@ -415,9 +505,10 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Título *</label>
                     <input
                       required
+                      disabled={isViewOnly}
                       type="text"
                       placeholder="Ex: Criar banner de Dia dos Pais"
-                      className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-semibold"
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-semibold disabled:opacity-75 disabled:cursor-not-allowed"
                       value={selectedCard.title || ""}
                       onChange={(e) => setSelectedCard({ ...selectedCard, title: e.target.value })}
                     />
@@ -428,44 +519,47 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Descrição / Tarefas</label>
                     <textarea
                       rows={3}
+                      disabled={isViewOnly}
                       placeholder="Detalhes, links de referências ou roteiros..."
-                      className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none disabled:opacity-75 disabled:cursor-not-allowed"
                       value={selectedCard.description || ""}
                       onChange={(e) => setSelectedCard({ ...selectedCard, description: e.target.value })}
                     />
                   </div>
 
-                  {/* Column + Date */}
-                  <div className={selectedCard.id ? "grid grid-cols-2 gap-4" : "grid grid-cols-1"}>
-                    {selectedCard.id && (
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quadro</label>
-                        <select
-                          className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all appearance-none"
-                          value={selectedCard.column_id || "A FAZER"}
-                          onChange={(e) => setSelectedCard({ ...selectedCard, column_id: e.target.value as KanbanCard["column_id"] })}
-                        >
-                          <option value="A FAZER">A Fazer</option>
-                          <option value="FAZENDO">Fazendo</option>
-                          <option value="CONCLUIDOS">Concluídos</option>
-                        </select>
-                      </div>
-                    )}
+                  {/* Responsável */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Responsável</label>
+                    <select
+                      disabled={isViewOnly}
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all appearance-none disabled:opacity-75 disabled:cursor-not-allowed"
+                      value={getCardResponsible(selectedCard.created_by_name)}
+                      onChange={(e) => setSelectedCard({ ...selectedCard, created_by_name: e.target.value })}
+                    >
+                      <option value="">Selecione o responsável...</option>
+                      {usersList.map((user) => (
+                        <option key={user.id} value={user.name}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Prazo</label>
-                      <input
-                        type="date"
-                        className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                        value={selectedCard.due_date ? selectedCard.due_date.split("T")[0] : ""}
-                        onChange={(e) => setSelectedCard({ ...selectedCard, due_date: e.target.value || undefined })}
-                      />
-                    </div>
+                  {/* Prazo */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Prazo</label>
+                    <input
+                      type="date"
+                      disabled={isViewOnly}
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
+                      value={selectedCard.due_date ? selectedCard.due_date.split("T")[0] : ""}
+                      onChange={(e) => setSelectedCard({ ...selectedCard, due_date: e.target.value || undefined })}
+                    />
                   </div>
 
                   {/* Tags */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Tag da Atividade</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Prioridade</label>
                     <div className="flex flex-wrap gap-2 pt-1">
                       {TAG_OPTIONS.map(opt => {
                         const isSelected = selectedCard.tag_name === opt.name;
@@ -473,14 +567,18 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                           <button
                             key={opt.name}
                             type="button"
-                            onClick={() => setSelectedCard({
-                              ...selectedCard,
-                              tag_name: isSelected ? "" : opt.name,
-                              tag_color: isSelected ? "" : opt.color
-                            })}
+                            disabled={isViewOnly}
+                            onClick={() => {
+                              if (isViewOnly) return;
+                              setSelectedCard({
+                                ...selectedCard,
+                                tag_name: isSelected ? "" : opt.name,
+                                tag_color: isSelected ? "" : opt.color
+                              });
+                            }}
                             className={`px-3 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1.5 ${opt.color} ${
                               isSelected ? "ring-2 ring-primary/40 font-black" : "opacity-75"
-                            }`}
+                            } disabled:cursor-not-allowed`}
                           >
                             {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
                             {opt.name}
@@ -493,29 +591,40 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
 
                 {/* Actions */}
                 <div className="mt-8 flex gap-3">
-                  {selectedCard.id && (
+                  {isViewOnly ? (
                     <button
-                      type="button"
-                      onClick={() => deleteCard(selectedCard.id!)}
-                      className="px-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold text-xs rounded-2xl border border-red-500/20 transition-all flex items-center justify-center gap-1.5"
+                      onClick={() => { setIsCardModalOpen(false); setSelectedCard(null); }}
+                      className="w-full py-3 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs rounded-2xl border border-border transition-all flex items-center justify-center"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      Excluir
+                      Fechar
                     </button>
+                  ) : (
+                    <>
+                      {selectedCard.id && (
+                        <button
+                          type="button"
+                          onClick={() => deleteCard(selectedCard.id!)}
+                          className="px-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold text-xs rounded-2xl border border-red-500/20 transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Excluir
+                        </button>
+                      )}
+                      <button
+                        onClick={() => { setIsCardModalOpen(false); setSelectedCard(null); }}
+                        className="flex-1 py-3 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs rounded-2xl border border-border transition-all"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={() => saveCard(selectedCard)}
+                        disabled={saving || !selectedCard.title?.trim()}
+                        className="flex-1 py-3 bg-primary text-primary-foreground font-black text-xs rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {saving ? "Salvando..." : "Salvar"}
+                      </button>
+                    </>
                   )}
-                  <button
-                    onClick={() => { setIsCardModalOpen(false); setSelectedCard(null); }}
-                    className="flex-1 py-3 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs rounded-2xl border border-border transition-all"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={() => saveCard(selectedCard)}
-                    disabled={saving || !selectedCard.title?.trim()}
-                    className="flex-1 py-3 bg-primary text-primary-foreground font-black text-xs rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {saving ? "Salvando..." : "Salvar"}
-                  </button>
                 </div>
               </div>
             </motion.div>
