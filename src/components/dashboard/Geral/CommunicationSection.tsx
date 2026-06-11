@@ -1,4 +1,14 @@
-import { Plus, ThumbsUp, Edit2, EyeOff, Image as ImageIcon, Tag, MessageCircle, Send, Smile } from "lucide-react";
+import {
+  Plus,
+  ThumbsUp,
+  Edit2,
+  EyeOff,
+  Image as ImageIcon,
+  Tag,
+  MessageCircle,
+  Send,
+  Smile,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
@@ -64,25 +74,32 @@ export interface UserProfile {
 
 /** Renderiza o conteúdo de comunicados de alteração de preço como linhas estruturadas */
 function PriceChangeContent({ content }: { content: string }) {
-  const lines = content.split('\n');
-  const productLines = lines.filter(l => l.startsWith('\u2022'));
-  const footerLine = lines.find(l => l.startsWith('Total'));
+  const lines = content.split("\n");
+  const productLines = lines.filter((l) => l.startsWith("\u2022"));
+  const footerLine = lines.find((l) => l.startsWith("Total"));
 
   const parseProductLine = (line: string) => {
     // Para antes de qualquer horário residual: captura apenas R$ seguido de dígitos/vírgula/ponto
-    const match = line.match(/^\u2022 \[(\w+)\] (.+) \u2014 de (R\$\s*[\d.,]+) para (R\$\s*[\d.,]+)/);
+    const match = line.match(
+      /^\u2022 \[(\w+)\] (.+) \u2014 de (R\$\s*[\d.,]+) para (R\$\s*[\d.,]+)/,
+    );
     if (!match) return null;
 
     const fromStr = match[3].trim();
-    const toStr   = match[4].trim();
+    const toStr = match[4].trim();
 
     // Converte "R$ 1.234,56" → 1234.56
     const parseBR = (s: string) =>
-      parseFloat(s.replace(/R\$\s*/, '').replace(/\./g, '').replace(',', '.'));
+      parseFloat(
+        s
+          .replace(/R\$\s*/, "")
+          .replace(/\./g, "")
+          .replace(",", "."),
+      );
 
     const fromNum = parseBR(fromStr);
-    const toNum   = parseBR(toStr);
-    const pct     = fromNum > 0 ? ((toNum - fromNum) / fromNum) * 100 : 0;
+    const toNum = parseBR(toStr);
+    const pct = fromNum > 0 ? ((toNum - fromNum) / fromNum) * 100 : 0;
 
     return { code: match[1], name: match[2], from: fromStr, to: toStr, pct };
   };
@@ -92,16 +109,25 @@ function PriceChangeContent({ content }: { content: string }) {
       <div className="max-h-36 overflow-y-auto flex flex-col gap-1 pr-1">
         {productLines.map((line, i) => {
           const product = parseProductLine(line);
-          if (!product) return (
-            <p key={i} className="text-xs text-muted-foreground">{line}</p>
-          );
+          if (!product)
+            return (
+              <p key={i} className="text-xs text-muted-foreground">
+                {line}
+              </p>
+            );
           const isIncrease = product.pct >= 0;
           return (
-            <div key={i} className="flex items-center gap-2 py-1 px-2 rounded-lg bg-secondary/40 hover:bg-secondary/70 transition-colors">
+            <div
+              key={i}
+              className="flex items-center gap-2 py-1 px-2 rounded-lg bg-secondary/40 hover:bg-secondary/70 transition-colors"
+            >
               <span className="font-black text-muted-foreground shrink-0 text-[9px] bg-secondary border border-border px-1.5 py-0.5 rounded-md leading-none">
                 {product.code}
               </span>
-              <span className="flex-1 font-semibold text-foreground text-[11px] truncate" title={product.name}>
+              <span
+                className="flex-1 font-semibold text-foreground text-[11px] truncate"
+                title={product.name}
+              >
                 {product.name}
               </span>
               <span className="shrink-0 text-muted-foreground/50 line-through text-[10px] font-medium">
@@ -110,20 +136,25 @@ function PriceChangeContent({ content }: { content: string }) {
               <span className="shrink-0 font-black text-foreground text-[11px]">
                 {product.to}
               </span>
-              <span className={cn(
-                "shrink-0 font-black text-[10px] px-1.5 py-0.5 rounded-md min-w-[40px] text-center",
-                isIncrease
-                  ? "text-red-500 bg-red-500/10 dark:bg-red-500/15"
-                  : "text-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/15"
-              )}>
-                {isIncrease ? '+' : ''}{product.pct.toFixed(1)}%
+              <span
+                className={cn(
+                  "shrink-0 font-black text-[10px] px-1.5 py-0.5 rounded-md min-w-[40px] text-center",
+                  isIncrease
+                    ? "text-red-500 bg-red-500/10 dark:bg-red-500/15"
+                    : "text-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/15",
+                )}
+              >
+                {isIncrease ? "+" : ""}
+                {product.pct.toFixed(1)}%
               </span>
             </div>
           );
         })}
       </div>
       {footerLine && (
-        <p className="text-[10px] text-muted-foreground/50 font-medium mt-0.5">{footerLine}</p>
+        <p className="text-[10px] text-muted-foreground/50 font-medium mt-0.5">
+          {footerLine}
+        </p>
       )}
     </div>
   );
@@ -147,19 +178,40 @@ function CommentBubble({
   setOpenReactionPicker: (id: number | null) => void;
   reactionPickerRef: React.RefObject<HTMLDivElement | null>;
   onLike: (id: number, liked_by: string[], likes: number) => void;
-  onReaction: (id: number, emoji: string, reactions: Record<string, string[]>) => void;
+  onReaction: (
+    id: number,
+    emoji: string,
+    reactions: Record<string, string[]>,
+  ) => void;
   onReply: (id: number, author: string) => void;
   replyingToId: number | null;
   isReply?: boolean;
 }) {
   return (
     <div className={cn("flex gap-2 items-start", isReply && "ml-10")}>
-      <img src={comment.authorAvatar} className={cn("rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm", isReply ? "w-7 h-7" : "w-8 h-8")} alt={comment.author} />
+      <img
+        src={comment.authorAvatar}
+        className={cn(
+          "rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm",
+          isReply ? "w-7 h-7" : "w-8 h-8",
+        )}
+        alt={comment.author}
+      />
       <div className="flex-1 flex flex-col min-w-0">
         <div className="relative w-fit max-w-[95%]">
-          <div className={cn("bg-slate-100 dark:bg-slate-800/80 rounded-2xl px-3 py-2 w-fit max-w-full", replyingToId === comment.id && "ring-2 ring-blue-400 dark:ring-blue-600")}>
-            <span className="text-[11px] font-bold text-slate-900 dark:text-white block leading-none mb-1">{comment.author}</span>
-            <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug break-words">{comment.content}</span>
+          <div
+            className={cn(
+              "bg-slate-100 dark:bg-slate-800/80 rounded-2xl px-3 py-2 w-fit max-w-full",
+              replyingToId === comment.id &&
+                "ring-2 ring-blue-400 dark:ring-blue-600",
+            )}
+          >
+            <span className="text-[11px] font-bold text-slate-900 dark:text-white block leading-none mb-1">
+              {comment.author}
+            </span>
+            <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug break-words">
+              {comment.content}
+            </span>
           </div>
           {(comment.likes > 0 || Object.keys(comment.reactions).length > 0) && (
             <div className="absolute -bottom-2 -right-2 bg-card border border-border shadow-sm rounded-full px-1.5 py-0.5 flex items-center gap-1 z-10">
@@ -169,37 +221,69 @@ function CommentBubble({
                     <ThumbsUp className="w-2.5 h-2.5 text-white fill-current" />
                   </div>
                 )}
-                {Object.keys(comment.reactions).slice(0, 2).map((emoji, idx) => (
-                  <div key={emoji} className={cn("w-4 h-4 rounded-full bg-secondary flex items-center justify-center ring-2 ring-card text-[10px] leading-none", idx === 0 ? "z-10" : "z-0")}>
-                    {emoji}
-                  </div>
-                ))}
+                {Object.keys(comment.reactions)
+                  .slice(0, 2)
+                  .map((emoji, idx) => (
+                    <div
+                      key={emoji}
+                      className={cn(
+                        "w-4 h-4 rounded-full bg-secondary flex items-center justify-center ring-2 ring-card text-[10px] leading-none",
+                        idx === 0 ? "z-10" : "z-0",
+                      )}
+                    >
+                      {emoji}
+                    </div>
+                  ))}
               </div>
               <span className="text-[10px] text-muted-foreground font-medium pl-0.5 leading-none">
-                {comment.likes + Object.values(comment.reactions).reduce((acc, curr) => acc + curr.length, 0)}
+                {comment.likes +
+                  Object.values(comment.reactions).reduce(
+                    (acc, curr) => acc + curr.length,
+                    0,
+                  )}
               </span>
             </div>
           )}
         </div>
         <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 mt-1 ml-3">
           <span>{comment.date}</span>
-          <div className="relative" ref={openReactionPicker === comment.id ? reactionPickerRef : undefined}>
+          <div
+            className="relative"
+            ref={
+              openReactionPicker === comment.id ? reactionPickerRef : undefined
+            }
+          >
             <button
-              onClick={() => setOpenReactionPicker(openReactionPicker === comment.id ? null : comment.id)}
-              className={cn("hover:underline transition-colors", comment.liked_by.includes(currentUserId || '') ? "text-blue-600 dark:text-blue-500" : "")}
+              onClick={() =>
+                setOpenReactionPicker(
+                  openReactionPicker === comment.id ? null : comment.id,
+                )
+              }
+              className={cn(
+                "hover:underline transition-colors",
+                comment.liked_by.includes(currentUserId || "")
+                  ? "text-blue-600 dark:text-blue-500"
+                  : "",
+              )}
             >
               Curtir
             </button>
             {openReactionPicker === comment.id && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
                 <div className="bg-card border border-border shadow-[0_4px_12px_rgba(0,0,0,0.1)] rounded-full px-1.5 py-1 flex items-center gap-1">
-                  {["👍", "❤️", "😂", "👏", "😢", "🚀"].map(emoji => (
+                  {["👍", "❤️", "😂", "👏", "😢", "🚀"].map((emoji) => (
                     <button
                       key={emoji}
-                      onClick={(e) => { e.stopPropagation(); onReaction(comment.id, emoji, comment.reactions); setOpenReactionPicker(null); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onReaction(comment.id, emoji, comment.reactions);
+                        setOpenReactionPicker(null);
+                      }}
                       className={cn(
                         "w-8 h-8 flex items-center justify-center text-xl hover:scale-125 hover:-translate-y-1 transition-transform origin-bottom",
-                        comment.reactions[emoji]?.includes(currentUserId || '') ? "opacity-100" : "opacity-90"
+                        comment.reactions[emoji]?.includes(currentUserId || "")
+                          ? "opacity-100"
+                          : "opacity-90",
                       )}
                     >
                       {emoji}
@@ -210,14 +294,17 @@ function CommentBubble({
             )}
           </div>
           {!isReply && (
-            <button onClick={() => onReply(comment.id, comment.author)} className="hover:underline">
+            <button
+              onClick={() => onReply(comment.id, comment.author)}
+              className="hover:underline"
+            >
               Responder
             </button>
           )}
         </div>
         {comment.replies.length > 0 && (
           <div className="flex flex-col gap-1.5 mt-1.5">
-            {comment.replies.map(reply => (
+            {comment.replies.map((reply) => (
               <CommentBubble
                 key={reply.id}
                 comment={reply}
@@ -239,12 +326,26 @@ function CommentBubble({
   );
 }
 
-export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data: CommunicationPost; onEdit: (d: CommunicationPost) => void, onHide: (id: string | number) => void, userProfile?: UserProfile }) {
+export function CommunicationCard({
+  data,
+  onEdit,
+  onHide,
+  userProfile,
+}: {
+  data: CommunicationPost;
+  onEdit: (d: CommunicationPost) => void;
+  onHide: (id: string | number) => void;
+  userProfile?: UserProfile;
+}) {
   const currentUserId = userProfile?.id;
-  const canManage = userProfile?.permissions?.includes("Gerenciar Comunicados") || userProfile?.role === "admin";
+  const canManage =
+    userProfile?.permissions?.includes("Gerenciar Comunicados") ||
+    userProfile?.role === "admin";
   const isLiked = currentUserId ? data.likedBy.includes(currentUserId) : false;
   const [likes, setLikes] = useState(data.likes);
-  const [interaction, setInteraction] = useState<"like" | null>(isLiked ? "like" : null);
+  const [interaction, setInteraction] = useState<"like" | null>(
+    isLiked ? "like" : null,
+  );
   const [imageLoaded, setImageLoaded] = useState(false);
   const [likersAvatars, setLikersAvatars] = useState<string[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -257,29 +358,85 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [openReactionPicker, setOpenReactionPicker] = useState<number | null>(null);
+  const [openReactionPicker, setOpenReactionPicker] = useState<number | null>(
+    null,
+  );
   const reactionPickerRef = useRef<HTMLDivElement>(null);
-  const [replyingTo, setReplyingTo] = useState<{ id: number; author: string } | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{
+    id: number;
+    author: string;
+  } | null>(null);
   const replyInputRef = useRef<HTMLTextAreaElement>(null);
 
-  const EMOJIS = ["😀","😂","😍","🥰","😎","🤔","😅","🙏","👏","🎉","🔥","❤️","👍","👎","😢","😡","🤣","😊","🥳","💪","✨","🚀","💯","🎯","😴","🤦","🙌","💡","⭐","🏆","😘","🫡","🤩","🥹","😤","🫶","🤝","👀","💬","🎊"];
+  const EMOJIS = [
+    "😀",
+    "😂",
+    "😍",
+    "🥰",
+    "😎",
+    "🤔",
+    "😅",
+    "🙏",
+    "👏",
+    "🎉",
+    "🔥",
+    "❤️",
+    "👍",
+    "👎",
+    "😢",
+    "😡",
+    "🤣",
+    "😊",
+    "🥳",
+    "💪",
+    "✨",
+    "🚀",
+    "💯",
+    "🎯",
+    "😴",
+    "🤦",
+    "🙌",
+    "💡",
+    "⭐",
+    "🏆",
+    "😘",
+    "🫡",
+    "🤩",
+    "🥹",
+    "😤",
+    "🫶",
+    "🤝",
+    "👀",
+    "💬",
+    "🎊",
+  ];
 
   const insertEmoji = (emoji: string) => {
     const el = commentInputRef.current;
-    if (!el) { setNewComment(prev => prev + emoji); return; }
+    if (!el) {
+      setNewComment((prev) => prev + emoji);
+      return;
+    }
     const start = el.selectionStart ?? newComment.length;
     const end = el.selectionEnd ?? newComment.length;
     const updated = newComment.slice(0, start) + emoji + newComment.slice(end);
     setNewComment(updated);
-    setTimeout(() => { el.focus(); el.setSelectionRange(start + emoji.length, start + emoji.length); }, 0);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + emoji.length, start + emoji.length);
+    }, 0);
   };
 
-  const userAvatar = userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}`;
+  const userAvatar =
+    userProfile?.avatar ||
+    `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || "User"}`;
 
   const [lastDataId, setLastDataId] = useState(data.id);
   if (data.id !== lastDataId) {
     setLikes(data.likes);
-    setInteraction(currentUserId && data.likedBy.includes(currentUserId) ? "like" : null);
+    setInteraction(
+      currentUserId && data.likedBy.includes(currentUserId) ? "like" : null,
+    );
     setLastDataId(data.id);
   }
 
@@ -291,15 +448,19 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
       }
       const sortedIds = [...data.likedBy].reverse().slice(0, 5);
       const { data: users } = await supabase
-        .from('usuarios')
-        .select('id, avatar, name')
-        .in('id', sortedIds);
+        .from("usuarios")
+        .select("id, avatar, name")
+        .in("id", sortedIds);
       let finalAvatars: string[] = [];
       if (users) {
         finalAvatars = sortedIds
-          .map(id => users.find(u => String(u.id) === String(id)))
+          .map((id) => users.find((u) => String(u.id) === String(id)))
           .filter(Boolean)
-          .map(u => u!.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u!.name}`);
+          .map(
+            (u) =>
+              u!.avatar ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=${u!.name}`,
+          );
       }
       if (currentUserId && data.likedBy.includes(currentUserId)) {
         const alreadyIn = finalAvatars.includes(userAvatar);
@@ -326,7 +487,10 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
   useEffect(() => {
     if (!showEmojiPicker) return;
     const handler = (e: MouseEvent) => {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(e.target as Node)
+      ) {
         setShowEmojiPicker(false);
       }
     };
@@ -337,7 +501,10 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
   useEffect(() => {
     if (openReactionPicker === null) return;
     const handler = (e: MouseEvent) => {
-      if (reactionPickerRef.current && !reactionPickerRef.current.contains(e.target as Node)) {
+      if (
+        reactionPickerRef.current &&
+        !reactionPickerRef.current.contains(e.target as Node)
+      ) {
         setOpenReactionPicker(null);
       }
     };
@@ -349,7 +516,9 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
     setLoadingComments(true);
     const { data: rows } = await supabase
       .from("comunicado_comentarios")
-      .select("id, content, created_at, user_id, likes, liked_by, reactions, parent_id")
+      .select(
+        "id, content, created_at, user_id, likes, liked_by, reactions, parent_id",
+      )
       .eq("comunicado_id", data.dbId)
       .order("created_at", { ascending: true });
 
@@ -380,7 +549,7 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
 
       const userRows = (users || []) as unknown as DbUserRow[];
       const userMap = new Map<string, DbUserRow>(
-        userRows.map((u) => [String(u.id), u])
+        userRows.map((u) => [String(u.id), u]),
       );
       const mapped: ComunicadoComment[] = commentRows.map((c) => {
         const user = userMap.get(String(c.user_id));
@@ -388,7 +557,9 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
           id: c.id,
           content: c.content,
           author: user?.name || "Usuário",
-          authorAvatar: user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user_id}`,
+          authorAvatar:
+            user?.avatar ||
+            `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user_id}`,
           date: new Date(c.created_at).toLocaleDateString("pt-BR"),
           userId: c.user_id,
           likes: c.likes || 0,
@@ -401,7 +572,9 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
 
       // Agrupa respostas sob o comentário pai
       const topLevel: ComunicadoComment[] = [];
-      const byId = new Map<number, ComunicadoComment>(mapped.map(c => [c.id, c]));
+      const byId = new Map<number, ComunicadoComment>(
+        mapped.map((c) => [c.id, c]),
+      );
       for (const c of mapped) {
         if (c.parent_id !== null && byId.has(c.parent_id)) {
           byId.get(c.parent_id)!.replies.push(c);
@@ -421,7 +594,7 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
 
   const handleToggleComments = () => {
     if (!showComments) fetchComments();
-    setShowComments(prev => !prev);
+    setShowComments((prev) => !prev);
     setTimeout(() => commentInputRef.current?.focus(), 100);
   };
 
@@ -434,7 +607,9 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
       content: newComment.trim(),
     };
     if (replyingTo) payload.parent_id = replyingTo.id;
-    const { error } = await supabase.from("comunicado_comentarios").insert([payload]);
+    const { error } = await supabase
+      .from("comunicado_comentarios")
+      .insert([payload]);
     if (!error) {
       setNewComment("");
       setReplyingTo(null);
@@ -443,54 +618,77 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
     setSubmittingComment(false);
   };
 
-  const handleCommentLike = async (commentId: number, currentLikedBy: string[], currentLikes: number) => {
+  const handleCommentLike = async (
+    commentId: number,
+    currentLikedBy: string[],
+    currentLikes: number,
+  ) => {
     if (!currentUserId) return;
-    
+
     const isLiking = !currentLikedBy.includes(currentUserId);
-    const newLikedBy = isLiking 
-      ? [...currentLikedBy, currentUserId] 
-      : currentLikedBy.filter(id => id !== currentUserId);
-    const newLikes = isLiking ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+    const newLikedBy = isLiking
+      ? [...currentLikedBy, currentUserId]
+      : currentLikedBy.filter((id) => id !== currentUserId);
+    const newLikes = isLiking
+      ? currentLikes + 1
+      : Math.max(0, currentLikes - 1);
 
     // Remove the user from emoji reactions if they are liking
-    const comment = comments.find(c => c.id === commentId);
+    const comment = comments.find((c) => c.id === commentId);
     const newReactions = { ...(comment?.reactions || {}) };
     if (isLiking) {
-      Object.keys(newReactions).forEach(e => {
+      Object.keys(newReactions).forEach((e) => {
         if (newReactions[e].includes(currentUserId)) {
-          newReactions[e] = newReactions[e].filter(id => id !== currentUserId);
+          newReactions[e] = newReactions[e].filter(
+            (id) => id !== currentUserId,
+          );
           if (newReactions[e].length === 0) delete newReactions[e];
         }
       });
     }
 
-    setComments(prev => prev.map(c => 
-      c.id === commentId 
-        ? { ...c, likes: newLikes, liked_by: newLikedBy, reactions: newReactions } 
-        : c
-    ));
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === commentId
+          ? {
+              ...c,
+              likes: newLikes,
+              liked_by: newLikedBy,
+              reactions: newReactions,
+            }
+          : c,
+      ),
+    );
 
     try {
       await supabase
         .from("comunicado_comentarios")
-        .update({ likes: newLikes, liked_by: newLikedBy, reactions: newReactions })
+        .update({
+          likes: newLikes,
+          liked_by: newLikedBy,
+          reactions: newReactions,
+        })
         .eq("id", commentId);
     } catch (err) {
       console.error("Erro ao curtir comentário:", err);
     }
   };
 
-  const handleCommentReaction = async (commentId: number, emoji: string, currentReactions: Record<string, string[]>) => {
+  const handleCommentReaction = async (
+    commentId: number,
+    emoji: string,
+    currentReactions: Record<string, string[]>,
+  ) => {
     if (!currentUserId) return;
 
     const newReactions = { ...currentReactions };
     let hadThisReactionAlready = false;
-    
+
     // Remove o usuário de qualquer reação que ele já tenha dado
-    Object.keys(newReactions).forEach(e => {
+    Object.keys(newReactions).forEach((e) => {
       if (newReactions[e].includes(currentUserId)) {
         if (e === emoji) hadThisReactionAlready = true;
-        newReactions[e] = newReactions[e].filter(id => id !== currentUserId);
+        newReactions[e] = newReactions[e].filter((id) => id !== currentUserId);
         if (newReactions[e].length === 0) delete newReactions[e];
       }
     });
@@ -502,25 +700,36 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
     }
 
     // Removendo do Curtir (Likes normais) se ele estiver reagindo com emoji
-    const comment = comments.find(c => c.id === commentId);
+    const comment = comments.find((c) => c.id === commentId);
     let newLikedBy = [...(comment?.liked_by || [])];
     let newLikes = comment?.likes || 0;
-    
+
     if (!hadThisReactionAlready && newLikedBy.includes(currentUserId)) {
-       newLikedBy = newLikedBy.filter(id => id !== currentUserId);
-       newLikes = Math.max(0, newLikes - 1);
+      newLikedBy = newLikedBy.filter((id) => id !== currentUserId);
+      newLikes = Math.max(0, newLikes - 1);
     }
 
-    setComments(prev => prev.map(c => 
-      c.id === commentId 
-        ? { ...c, reactions: newReactions, likes: newLikes, liked_by: newLikedBy } 
-        : c
-    ));
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === commentId
+          ? {
+              ...c,
+              reactions: newReactions,
+              likes: newLikes,
+              liked_by: newLikedBy,
+            }
+          : c,
+      ),
+    );
 
     try {
       await supabase
         .from("comunicado_comentarios")
-        .update({ reactions: newReactions, likes: newLikes, liked_by: newLikedBy })
+        .update({
+          reactions: newReactions,
+          likes: newLikes,
+          liked_by: newLikedBy,
+        })
         .eq("id", commentId);
     } catch (err) {
       console.error("Erro ao reagir ao comentário:", err);
@@ -534,9 +743,11 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
     setLikes(newLikesCount);
     setInteraction(isLiking ? "like" : null);
     if (isLiking) {
-      setLikersAvatars(prev => [userAvatar, ...prev.filter(a => a !== userAvatar)].slice(0, 5));
+      setLikersAvatars((prev) =>
+        [userAvatar, ...prev.filter((a) => a !== userAvatar)].slice(0, 5),
+      );
     } else {
-      setLikersAvatars(prev => prev.filter(a => a !== userAvatar));
+      setLikersAvatars((prev) => prev.filter((a) => a !== userAvatar));
     }
     try {
       const { data: currentPost } = await supabase
@@ -560,7 +771,11 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
   };
 
   const handleHide = () => {
-    if (confirm("Deseja ocultar este comunicado? Você não o verá novamente nesta sessão.")) {
+    if (
+      confirm(
+        "Deseja ocultar este comunicado? Você não o verá novamente nesta sessão.",
+      )
+    ) {
       onHide(data.dbId);
     }
   };
@@ -580,7 +795,10 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
             alt={data.title}
             onLoad={() => setImageLoaded(true)}
             onError={() => setImageLoaded(true)}
-            className={cn("w-full h-full object-cover", "group-hover:scale-110 transition-transform duration-500")}
+            className={cn(
+              "w-full h-full object-cover",
+              "group-hover:scale-110 transition-transform duration-500",
+            )}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         </div>
@@ -588,30 +806,52 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
         <div className="flex-1 p-6 flex flex-col min-w-0">
           <div className="flex justify-between items-start gap-4 mb-2">
             <div className="flex items-center gap-3">
-              <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 uppercase tracking-widest">{data.category}</span>
-              <span className="text-xs text-slate-500 dark:text-slate-500 font-bold">{data.date}</span>
+              <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 uppercase tracking-widest">
+                {data.category}
+              </span>
+              <span className="text-xs text-slate-500 dark:text-slate-500 font-bold">
+                {data.date}
+              </span>
             </div>
             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-              <button onClick={handleHide} className="p-2 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-secondary rounded-xl transition-all" title="Ocultar Comunicado">
+              <button
+                onClick={handleHide}
+                className="p-2 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-secondary rounded-xl transition-all"
+                title="Ocultar Comunicado"
+              >
                 <EyeOff className="w-4 h-4" />
               </button>
               {canManage && (
-                <button onClick={() => onEdit(data)} className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all" title="Editar">
+                <button
+                  onClick={() => onEdit(data)}
+                  className="p-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-secondary rounded-xl transition-all"
+                  title="Editar"
+                >
                   <Edit2 className="w-4 h-4" />
                 </button>
               )}
             </div>
           </div>
 
-          <h3 className="text-lg font-black text-foreground tracking-tight mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase">{data.title}</h3>
+          <h3 className="text-lg font-black text-foreground tracking-tight mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase">
+            {data.title}
+          </h3>
 
           {data.title.includes("ALTERACOES DE PRECO") ? (
             /* Comunicado de alteração de preço: renderização estruturada por produto */
             <PriceChangeContent content={data.content} />
           ) : (
             /* Comunicados normais: expandir/recolher ao clicar */
-            <div onClick={() => setIsExpanded(!isExpanded)} className="cursor-pointer group/content">
-              <p className={cn("text-sm text-slate-600 dark:text-muted-foreground leading-relaxed font-medium mb-1 transition-all duration-300 whitespace-pre-wrap", !isExpanded && "line-clamp-3")}>
+            <div
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="cursor-pointer group/content"
+            >
+              <p
+                className={cn(
+                  "text-sm text-slate-600 dark:text-muted-foreground leading-relaxed font-medium mb-1 transition-all duration-300 whitespace-pre-wrap",
+                  !isExpanded && "line-clamp-3",
+                )}
+              >
                 {data.content}
               </p>
               {data.content.length > 150 && (
@@ -630,10 +870,15 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
                   "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-3 py-1.5 rounded-xl",
                   interaction === "like"
                     ? "bg-blue-600 dark:bg-blue-500/20 text-white dark:text-blue-400 shadow-lg shadow-blue-600/20 dark:shadow-none"
-                    : "text-slate-400 dark:text-muted-foreground hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary"
+                    : "text-slate-400 dark:text-muted-foreground hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary",
                 )}
               >
-                <ThumbsUp className={cn("w-4 h-4", interaction === "like" && "fill-white dark:fill-current")} />
+                <ThumbsUp
+                  className={cn(
+                    "w-4 h-4",
+                    interaction === "like" && "fill-white dark:fill-current",
+                  )}
+                />
                 {likes}
               </button>
               <button
@@ -642,25 +887,45 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
                   "flex items-center gap-2 text-xs font-black transition-all transform active:scale-95 px-3 py-1.5 rounded-xl",
                   showComments
                     ? "bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300"
-                    : "text-slate-400 dark:text-muted-foreground hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary"
+                    : "text-slate-400 dark:text-muted-foreground hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary",
                 )}
               >
-                <MessageCircle className={cn("w-4 h-4", showComments && "fill-slate-400 dark:fill-slate-400")} />
+                <MessageCircle
+                  className={cn(
+                    "w-4 h-4",
+                    showComments && "fill-slate-400 dark:fill-slate-400",
+                  )}
+                />
                 {commentCount}
               </button>
               <div className="flex items-center -space-x-2">
                 {likersAvatars.map((url, i) => (
-                  <div key={i} className="w-8 h-8 rounded-full border-2 border-card overflow-hidden bg-slate-100 dark:bg-slate-800 ring-1 ring-border shadow-sm transition-transform hover:scale-110 hover:z-10">
-                    <img src={url} className="w-full h-full object-cover" alt="liker" />
+                  <div
+                    key={i}
+                    className="w-8 h-8 rounded-full border-2 border-card overflow-hidden bg-slate-100 dark:bg-slate-800 ring-1 ring-border shadow-sm transition-transform hover:scale-110 hover:z-10"
+                  >
+                    <img
+                      src={url}
+                      className="w-full h-full object-cover"
+                      alt="liker"
+                    />
                   </div>
                 ))}
               </div>
             </div>
             <div className="flex items-center gap-3 bg-secondary/50 px-3 py-1.5 rounded-xl border border-border">
-              <img src={data.authorAvatar} className="w-7 h-7 rounded-full shadow-sm object-cover" alt={data.author} />
+              <img
+                src={data.authorAvatar}
+                className="w-7 h-7 rounded-full shadow-sm object-cover"
+                alt={data.author}
+              />
               <div className="flex flex-col leading-none text-left">
-                <span className="text-[10px] font-black text-foreground uppercase tracking-tighter truncate max-w-[80px]">{data.author}</span>
-                <span className="text-[9px] font-bold text-slate-500 dark:text-muted-foreground uppercase">Autor</span>
+                <span className="text-[10px] font-black text-foreground uppercase tracking-tighter truncate max-w-[80px]">
+                  {data.author}
+                </span>
+                <span className="text-[9px] font-bold text-slate-500 dark:text-muted-foreground uppercase">
+                  Autor
+                </span>
               </div>
             </div>
           </div>
@@ -671,7 +936,7 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
         <div className="border-t border-border bg-secondary/20 dark:bg-slate-800/20 px-6 py-4 flex flex-col gap-3">
           {loadingComments ? (
             <div className="flex flex-col gap-1.5">
-              {[1, 2].map(i => (
+              {[1, 2].map((i) => (
                 <div key={i} className="flex gap-2 items-start animate-pulse">
                   <div className="w-8 h-8 rounded-full bg-secondary dark:bg-slate-700 shrink-0" />
                   <div className="flex-1 space-y-2">
@@ -683,7 +948,7 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
             </div>
           ) : comments.length > 0 ? (
             <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
-              {comments.map(comment => (
+              {comments.map((comment) => (
                 <CommentBubble
                   key={comment.id}
                   comment={comment}
@@ -707,31 +972,53 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
             <div className="flex flex-col gap-1.5 pt-1">
               {replyingTo && (
                 <div className="flex items-center gap-2 ml-10 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <span className="text-[11px] text-blue-600 dark:text-blue-400 font-bold flex-1">Respondendo a {replyingTo.author}</span>
-                  <button onClick={() => setReplyingTo(null)} className="text-blue-400 hover:text-blue-600 text-xs font-black">✕</button>
+                  <span className="text-[11px] text-blue-600 dark:text-blue-400 font-bold flex-1">
+                    Respondendo a {replyingTo.author}
+                  </span>
+                  <button
+                    onClick={() => setReplyingTo(null)}
+                    className="text-blue-400 hover:text-blue-600 text-xs font-black"
+                  >
+                    ✕
+                  </button>
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <img src={userAvatar} className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm" alt={userProfile?.name} />
+                <img
+                  src={userAvatar}
+                  className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-sm"
+                  alt={userProfile?.name}
+                />
                 <div className="flex-1 flex gap-2">
                   <div className="flex-1 relative" ref={emojiPickerRef}>
                     <div className="flex items-center bg-card border border-border rounded-xl focus-within:ring-1 focus-within:ring-blue-500">
                       <textarea
                         ref={replyingTo ? replyInputRef : commentInputRef}
                         value={newComment}
-                        onChange={e => setNewComment(e.target.value)}
-                        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment(); }}}
-                        placeholder={replyingTo ? `Responder ${replyingTo.author}...` : "Escreva um comentário..."}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddComment();
+                          }
+                        }}
+                        placeholder={
+                          replyingTo
+                            ? `Responder ${replyingTo.author}...`
+                            : "Escreva um comentário..."
+                        }
                         rows={1}
                         disabled={submittingComment}
                         className="flex-1 pl-4 py-2.5 bg-transparent text-xs font-medium text-foreground outline-none resize-none placeholder:text-muted-foreground/40 leading-relaxed"
                       />
                       <button
                         type="button"
-                        onClick={() => setShowEmojiPicker(prev => !prev)}
+                        onClick={() => setShowEmojiPicker((prev) => !prev)}
                         className={cn(
                           "shrink-0 px-2.5 py-2.5 rounded-r-xl transition-colors",
-                          showEmojiPicker ? "text-yellow-500" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                          showEmojiPicker
+                            ? "text-yellow-500"
+                            : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300",
                         )}
                       >
                         <Smile className="w-5 h-5" />
@@ -739,7 +1026,7 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
                     </div>
                     {showEmojiPicker && (
                       <div className="absolute bottom-full right-0 mb-2 bg-card border border-border rounded-xl shadow-xl p-2 grid grid-cols-8 gap-0.5 z-50 w-64">
-                        {EMOJIS.map(emoji => (
+                        {EMOJIS.map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
@@ -769,14 +1056,23 @@ export function CommunicationCard({ data, onEdit, onHide, userProfile }: { data:
   );
 }
 
-export function CommunicationSection({ userProfile, loading: externalLoading }: { userProfile?: UserProfile, loading?: boolean }) {
+export function CommunicationSection({
+  userProfile,
+  loading: externalLoading,
+}: {
+  userProfile?: UserProfile;
+  loading?: boolean;
+}) {
   const { showNotification } = useNotification();
   const [activeCategory, setActiveCategory] = useState("Todos");
   const [comms, setComms] = useState<CommunicationPost[]>([]);
   const [internalLoading, setInternalLoading] = useState(true);
 
-  const canManage = userProfile?.permissions?.includes("Gerenciar Comunicados") || userProfile?.role === "admin";
-  const loading = externalLoading !== undefined ? externalLoading : internalLoading;
+  const canManage =
+    userProfile?.permissions?.includes("Gerenciar Comunicados") ||
+    userProfile?.role === "admin";
+  const loading =
+    externalLoading !== undefined ? externalLoading : internalLoading;
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | string | null>(null);
@@ -801,29 +1097,39 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
     // Buscamos o comunicado e os dados do autor (usuários) em uma única tacada
     const { data, error } = await supabase
       .from("comunicados")
-      .select(`
+      .select(
+        `
         *,
         usuarios (
           name,
           avatar
         )
-      `)
+      `,
+      )
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setComms((data as unknown as DbComunicado[]).map((c) => ({
-        id: String(c.id),
-        dbId: String(c.id),
-        title: c.titulo,
-        content: c.descricao || "",
-        category: c.filtro || "Empresa",
-        author: c.usuarios?.name || c.tag || "Carflax",
-        authorAvatar: c.usuarios?.avatar || (c.tag === "Carflax" ? "https://zwfvrmqffxcqurxpfewi.supabase.co/storage/v1/object/public/avatares/Carflax.jpg" : `https://api.dicebear.com/7.x/identicon/svg?seed=${c.tag || 'carflax'}`),
-        date: new Date(c.created_at).toLocaleDateString("pt-BR"),
-        image: (c.image_url || c.image || "").trim() || `https://api.dicebear.com/7.x/shapes/svg?seed=${c.id}`,
-        likes: c.likes || 0,
-        likedBy: c.liked_by || [],
-      })));
+      setComms(
+        (data as unknown as DbComunicado[]).map((c) => ({
+          id: String(c.id),
+          dbId: String(c.id),
+          title: c.titulo,
+          content: c.descricao || "",
+          category: c.filtro || "Empresa",
+          author: c.usuarios?.name || c.tag || "Carflax",
+          authorAvatar:
+            c.usuarios?.avatar ||
+            (c.tag === "Carflax"
+              ? "https://zwfvrmqffxcqurxpfewi.supabase.co/storage/v1/object/public/avatares/Carflax.jpg"
+              : `https://api.dicebear.com/7.x/identicon/svg?seed=${c.tag || "carflax"}`),
+          date: new Date(c.created_at).toLocaleDateString("pt-BR"),
+          image:
+            (c.image_url || c.image || "").trim() ||
+            `https://api.dicebear.com/7.x/shapes/svg?seed=${c.id}`,
+          likes: c.likes || 0,
+          likedBy: c.liked_by || [],
+        })),
+      );
     }
     setInternalLoading(false);
   }, []);
@@ -832,8 +1138,17 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
     fetchComunicados();
   }, [fetchComunicados]);
 
-  const [newPost, setNewPost] = useState<{title: string, content: string, category: string, image: string, _imageFile?: File}>(() => ({
-    title: "", content: "", category: "Empresa", image: ""
+  const [newPost, setNewPost] = useState<{
+    title: string;
+    content: string;
+    category: string;
+    image: string;
+    _imageFile?: File;
+  }>(() => ({
+    title: "",
+    content: "",
+    category: "Empresa",
+    image: "",
   }));
 
   const handleAddPost = async () => {
@@ -842,7 +1157,10 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
     try {
       let finalImageUrl = newPost.image || "";
       if (newPost._imageFile) {
-        const uploadedUrl = await uploadImage(newPost._imageFile, "Comunicados");
+        const uploadedUrl = await uploadImage(
+          newPost._imageFile,
+          "Comunicados",
+        );
         if (uploadedUrl) finalImageUrl = uploadedUrl;
       }
 
@@ -852,17 +1170,30 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
         filtro: newPost.category,
         image_url: finalImageUrl,
         tag: userProfile?.name || "Danilo",
-        user_id: userProfile?.id
+        user_id: userProfile?.id,
       };
 
       if (editingId) {
-        const { error } = await supabase.from("comunicados").update(payload).eq("id", editingId);
+        const { error } = await supabase
+          .from("comunicados")
+          .update(payload)
+          .eq("id", editingId);
         if (error) throw error;
-        showNotification("success", "Comunicado Atualizado", "As alterações foram salvas com sucesso!");
+        showNotification(
+          "success",
+          "Comunicado Atualizado",
+          "As alterações foram salvas com sucesso!",
+        );
       } else {
-        const { error } = await supabase.from("comunicados").insert([{ ...payload, likes: 0, liked_by: [] }]);
+        const { error } = await supabase
+          .from("comunicados")
+          .insert([{ ...payload, likes: 0, liked_by: [] }]);
         if (error) throw error;
-        showNotification("success", "Publicado!", "O novo comunicado já está disponível no feed.");
+        showNotification(
+          "success",
+          "Publicado!",
+          "O novo comunicado já está disponível no feed.",
+        );
       }
 
       await fetchComunicados(true);
@@ -871,7 +1202,11 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
       setNewPost({ title: "", content: "", category: "Empresa", image: "" });
     } catch (err) {
       console.error(err);
-      showNotification("error", "Erro ao Salvar", "Ocorreu um problema ao sincronizar com o banco.");
+      showNotification(
+        "error",
+        "Erro ao Salvar",
+        "Ocorreu um problema ao sincronizar com o banco.",
+      );
     } finally {
       setSaving(false);
     }
@@ -879,27 +1214,48 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
 
   const handleDelete = async () => {
     if (!editingId) return;
-    if (!confirm("Tem certeza que deseja excluir este comunicado permanentemente?")) return;
+    if (
+      !confirm(
+        "Tem certeza que deseja excluir este comunicado permanentemente?",
+      )
+    )
+      return;
 
     setSaving(true);
     try {
-      const { error } = await supabase.from("comunicados").delete().eq("id", editingId);
+      const { error } = await supabase
+        .from("comunicados")
+        .delete()
+        .eq("id", editingId);
       if (error) throw error;
-      
-      showNotification("success", "Comunicado Removido", "O post foi excluído permanentemente do feed.");
+
+      showNotification(
+        "success",
+        "Comunicado Removido",
+        "O post foi excluído permanentemente do feed.",
+      );
       await fetchComunicados(true);
       setIsModalOpen(false);
       setEditingId(null);
     } catch (err) {
       console.error(err);
-      showNotification("error", "Erro ao Excluir", "Não foi possível remover o comunicado.");
+      showNotification(
+        "error",
+        "Erro ao Excluir",
+        "Não foi possível remover o comunicado.",
+      );
     } finally {
       setSaving(false);
     }
   };
 
   const handleEdit = (data: CommunicationPost) => {
-    setNewPost({ title: data.title, content: data.content, category: data.category, image: data.image });
+    setNewPost({
+      title: data.title,
+      content: data.content,
+      category: data.category,
+      image: data.image,
+    });
     setEditingId(data.dbId);
     setIsModalOpen(true);
   };
@@ -907,68 +1263,160 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setNewPost(p => ({ ...p, image: URL.createObjectURL(file), _imageFile: file }));
+    setNewPost((p) => ({
+      ...p,
+      image: URL.createObjectURL(file),
+      _imageFile: file,
+    }));
   };
 
-  const filtered = (activeCategory === "Todos" ? comms : comms.filter(c => c.category === activeCategory))
-    .filter(c => !hiddenPosts.includes(String(c.dbId)));
+  const filtered = (
+    activeCategory === "Todos"
+      ? comms
+      : comms.filter((c) => c.category === activeCategory)
+  ).filter((c) => !hiddenPosts.includes(String(c.dbId)));
 
   return (
     <div className="flex flex-col relative">
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-sm bg-black/40">
-          <div className="fixed inset-0" onClick={() => !saving && setIsModalOpen(false)} />
+          <div
+            className="fixed inset-0"
+            onClick={() => !saving && setIsModalOpen(false)}
+          />
           <div className="relative bg-card w-full max-w-4xl rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
             <div className="w-full md:w-80 bg-secondary/30 dark:bg-slate-800/50 p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-border shrink-0">
-               <div className="w-40 h-40 md:w-56 md:h-56 rounded-2xl border-4 border-card shadow-xl overflow-hidden mb-6 group relative bg-card flex items-center justify-center">
-                  <img src={newPost.image || "https://api.dicebear.com/7.x/shapes/svg?seed=placeholder"} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="Preview" />
-                  <label className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer backdrop-blur-[2px]">
-                    <ImageIcon className="w-8 h-8 text-white mb-2" />
-                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Alterar Imagem</span>
-                    <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-                  </label>
-               </div>
-               <Button variant="outline" onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()} disabled={saving} className="font-bold text-xs h-10 px-6 rounded-xl">SELECIONAR FOTO</Button>
+              <div className="w-40 h-40 md:w-56 md:h-56 rounded-2xl border-4 border-card shadow-xl overflow-hidden mb-6 group relative bg-card flex items-center justify-center">
+                <img
+                  src={
+                    newPost.image ||
+                    "https://api.dicebear.com/7.x/shapes/svg?seed=placeholder"
+                  }
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  alt="Preview"
+                />
+                <label className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer backdrop-blur-[2px]">
+                  <ImageIcon className="w-8 h-8 text-white mb-2" />
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">
+                    Alterar Imagem
+                  </span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                  />
+                </label>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  document
+                    .querySelector<HTMLInputElement>('input[type="file"]')
+                    ?.click()
+                }
+                disabled={saving}
+                className="font-bold text-xs h-10 px-6 rounded-xl"
+              >
+                SELECIONAR FOTO
+              </Button>
             </div>
 
             <div className="flex-1 flex flex-col min-w-0">
               <div className="p-8 border-b border-border flex items-center justify-between">
-                <h2 className="text-xl font-black text-foreground tracking-tight uppercase">{editingId ? "EDITAR COMUNICADO" : "NOVO COMUNICADO"}</h2>
-                {!saving && <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-secondary/50 rounded-xl text-muted-foreground transition-colors">✕</button>}
+                <h2 className="text-xl font-black text-foreground tracking-tight uppercase">
+                  {editingId ? "EDITAR COMUNICADO" : "NOVO COMUNICADO"}
+                </h2>
+                {!saving && (
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="p-2 hover:bg-secondary/50 rounded-xl text-muted-foreground transition-colors"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
               <div className="p-8 overflow-y-auto space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Assunto do Post</label>
-                    <input type="text" value={newPost.title} onChange={(e) => setNewPost({ ...newPost, title: e.target.value })} className="w-full px-4 py-3 bg-secondary/20 border border-border rounded-xl text-sm font-bold text-foreground outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-muted-foreground/30" placeholder="Título impactante..." disabled={saving} />
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                      Assunto do Post
+                    </label>
+                    <input
+                      type="text"
+                      value={newPost.title}
+                      onChange={(e) =>
+                        setNewPost({ ...newPost, title: e.target.value })
+                      }
+                      className="w-full px-4 py-3 bg-secondary/20 border border-border rounded-xl text-sm font-bold text-foreground outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-muted-foreground/30"
+                      placeholder="Título impactante..."
+                      disabled={saving}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Categoria de Filtro</label>
-                    <TinyDropdown value={newPost.category} options={categories.filter(c => c !== "Todos")} onChange={(val) => setNewPost({ ...newPost, category: val })} icon={Tag} variant="blue" className="w-full" />
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                      Categoria de Filtro
+                    </label>
+                    <TinyDropdown
+                      value={newPost.category}
+                      options={categories.filter((c) => c !== "Todos")}
+                      onChange={(val) =>
+                        setNewPost({ ...newPost, category: val })
+                      }
+                      icon={Tag}
+                      variant="blue"
+                      className="w-full"
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Conteúdo do Comunicado</label>
-                  <textarea value={newPost.content} onChange={(e) => setNewPost({ ...newPost, content: e.target.value })} rows={6} className="w-full p-4 bg-secondary/20 border border-border rounded-xl text-sm font-medium text-foreground outline-none focus:ring-1 focus:ring-blue-500 resize-none placeholder:text-muted-foreground/30" placeholder="O que você quer contar para a equipe?" disabled={saving} />
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                    Conteúdo do Comunicado
+                  </label>
+                  <textarea
+                    value={newPost.content}
+                    onChange={(e) =>
+                      setNewPost({ ...newPost, content: e.target.value })
+                    }
+                    rows={6}
+                    className="w-full p-4 bg-secondary/20 border border-border rounded-xl text-sm font-medium text-foreground outline-none focus:ring-1 focus:ring-blue-500 resize-none placeholder:text-muted-foreground/30"
+                    placeholder="O que você quer contar para a equipe?"
+                    disabled={saving}
+                  />
                 </div>
               </div>
               <div className="p-8 bg-secondary/50 border-t border-border flex items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3">
                   {editingId && (
-                    <Button 
-                      variant="ghost" 
-                      onClick={handleDelete} 
-                      disabled={saving} 
+                    <Button
+                      variant="ghost"
+                      onClick={handleDelete}
+                      disabled={saving}
                       className="text-red-500 hover:text-red-600 hover:bg-red-50 font-black text-xs h-11 px-6 rounded-xl"
                     >
                       EXCLUIR
                     </Button>
                   )}
-                  <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={saving} className="font-bold text-xs h-11 px-6">CANCELAR</Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setIsModalOpen(false)}
+                    disabled={saving}
+                    className="font-bold text-xs h-11 px-6"
+                  >
+                    CANCELAR
+                  </Button>
                 </div>
-                
-                <Button onClick={handleAddPost} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs px-10 rounded-xl h-11 shadow-lg shadow-blue-600/20">
-                  {saving ? "PROCESSANDO..." : editingId ? "SALVAR ALTERAÇÕES" : "PUBLICAR AGORA"}
+
+                <Button
+                  onClick={handleAddPost}
+                  disabled={saving}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs px-10 rounded-xl h-11 shadow-lg shadow-blue-600/20"
+                >
+                  {saving
+                    ? "PROCESSANDO..."
+                    : editingId
+                      ? "SALVAR ALTERAÇÕES"
+                      : "PUBLICAR AGORA"}
                 </Button>
               </div>
             </div>
@@ -978,62 +1426,91 @@ export function CommunicationSection({ userProfile, loading: externalLoading }: 
 
       <div className="pb-3 border-b border-border mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-1">
-          {loading ? (
-            Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-7 w-16 bg-secondary dark:bg-slate-800/80 rounded-md animate-pulse" />
-            ))
-          ) : (
-            categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={cn(
-                  "px-4 py-1.5 text-xs font-bold rounded-md transition-all",
-                  activeCategory === cat
-                    ? "bg-slate-100 dark:bg-blue-500/20 text-slate-900 dark:text-blue-400 shadow-sm"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary/50"
-                )}
-              >
-                {cat}
-              </button>
-            ))
-          )}
+          {loading
+            ? Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-7 w-16 bg-secondary dark:bg-slate-800/80 rounded-md animate-pulse"
+                />
+              ))
+            : categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={cn(
+                    "px-4 py-1.5 text-xs font-bold rounded-md transition-all",
+                    activeCategory === cat
+                      ? "bg-slate-100 dark:bg-blue-500/20 text-slate-900 dark:text-blue-400 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-secondary/50",
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
         </div>
         {loading ? (
           <div className="h-9 w-40 bg-secondary dark:bg-slate-800/80 rounded-md animate-pulse shadow-sm" />
         ) : canManage ? (
-          <Button onClick={() => { setEditingId(null); setNewPost({ title: "", content: "", category: "Empresa", image: "" }); setIsModalOpen(true); }} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md h-9 px-4 text-[11px] font-bold shadow-sm group">
-            <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" /> NOVO COMUNICADO
+          <Button
+            onClick={() => {
+              setEditingId(null);
+              setNewPost({
+                title: "",
+                content: "",
+                category: "Empresa",
+                image: "",
+              });
+              setIsModalOpen(true);
+            }}
+            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md h-9 px-4 text-[11px] font-bold shadow-sm group"
+          >
+            <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" />{" "}
+            NOVO COMUNICADO
           </Button>
         ) : null}
       </div>
 
       <div className="flex flex-col gap-4">
-        {loading && Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col sm:flex-row h-auto sm:min-h-[220px] animate-pulse">
-            <div className="w-full sm:w-64 bg-secondary dark:bg-slate-800/50 shrink-0" />
-            <div className="flex-1 p-8 space-y-4">
-              <div className="flex gap-3">
-                <div className="h-6 w-20 bg-secondary dark:bg-slate-800 rounded-lg" />
-                <div className="h-6 w-24 bg-secondary dark:bg-slate-800 rounded-lg" />
-              </div>
-              <div className="h-8 w-3/4 bg-secondary dark:bg-slate-800/50 rounded-xl" />
-              <div className="space-y-2">
-                <div className="h-4 w-full bg-secondary dark:bg-slate-800 rounded-md" />
-                <div className="h-4 w-full bg-secondary dark:bg-slate-800 rounded-md" />
-                <div className="h-4 w-2/3 bg-secondary dark:bg-slate-800 rounded-md" />
-              </div>
-              <div className="pt-4 border-t border-border flex justify-between items-center">
-                <div className="h-8 w-24 bg-secondary dark:bg-slate-800 rounded-xl" />
-                <div className="h-10 w-32 bg-secondary dark:bg-slate-800 rounded-xl" />
+        {loading &&
+          Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col sm:flex-row h-auto sm:min-h-[220px] animate-pulse"
+            >
+              <div className="w-full sm:w-64 bg-secondary dark:bg-slate-800/50 shrink-0" />
+              <div className="flex-1 p-8 space-y-4">
+                <div className="flex gap-3">
+                  <div className="h-6 w-20 bg-secondary dark:bg-slate-800 rounded-lg" />
+                  <div className="h-6 w-24 bg-secondary dark:bg-slate-800 rounded-lg" />
+                </div>
+                <div className="h-8 w-3/4 bg-secondary dark:bg-slate-800/50 rounded-xl" />
+                <div className="space-y-2">
+                  <div className="h-4 w-full bg-secondary dark:bg-slate-800 rounded-md" />
+                  <div className="h-4 w-full bg-secondary dark:bg-slate-800 rounded-md" />
+                  <div className="h-4 w-2/3 bg-secondary dark:bg-slate-800 rounded-md" />
+                </div>
+                <div className="pt-4 border-t border-border flex justify-between items-center">
+                  <div className="h-8 w-24 bg-secondary dark:bg-slate-800 rounded-xl" />
+                  <div className="h-10 w-32 bg-secondary dark:bg-slate-800 rounded-xl" />
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-        {!loading && filtered.length === 0 && <p className="text-center text-slate-400 text-sm py-8 font-bold text-slate-300">NADA POR ENQUANTO.</p>}
-        {!loading && filtered.map((item) => (
-          <CommunicationCard key={item.id} data={item} onEdit={handleEdit} onHide={handleHidePost} userProfile={userProfile} />
-        ))}
+          ))}
+        {!loading && filtered.length === 0 && (
+          <p className="text-center text-slate-400 text-sm py-8 font-bold text-slate-300">
+            NADA POR ENQUANTO.
+          </p>
+        )}
+        {!loading &&
+          filtered.map((item) => (
+            <CommunicationCard
+              key={item.id}
+              data={item}
+              onEdit={handleEdit}
+              onHide={handleHidePost}
+              userProfile={userProfile}
+            />
+          ))}
       </div>
     </div>
   );

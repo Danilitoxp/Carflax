@@ -218,7 +218,11 @@ function DashboardContent({
   const [activeChats, setActiveChats] = useState<ActiveChat[]>(() => {
     try {
       const saved = localStorage.getItem("carflax-active-chats");
-      return saved ? JSON.parse(saved) : [];
+      const savedDismissed = localStorage.getItem("carflax-dismissed-chats");
+      const dismissedSet: Set<string> = savedDismissed ? new Set(JSON.parse(savedDismissed)) : new Set();
+      const all: ActiveChat[] = saved ? JSON.parse(saved) : [];
+      // Filtra documentos que foram dispensados para não reaparecer ao recarregar
+      return all.filter((c) => !dismissedSet.has(c.doc));
     } catch {
       return [];
     }
@@ -238,9 +242,7 @@ function DashboardContent({
     localStorage.setItem("carflax-dismissed-chats", JSON.stringify([...dismissedChatDocs]));
   }, [dismissedChatDocs]);
 
-  const [openChatDoc, setOpenChatDoc] = useState<string | null>(() => {
-    return activeChats.length > 0 ? activeChats[0].doc : null;
-  });
+  const [openChatDoc, setOpenChatDoc] = useState<string | null>(null);
 
   const openChatDocRef = useRef<string | null>(openChatDoc);
   useEffect(() => {
