@@ -138,7 +138,49 @@ export function ProdutosView() {
       return;
     }
 
-    const rowsHtml = filteredProducts.map(p => `
+    // Filter products dynamically in the print action to ensure we use the absolute latest state
+    const searchLower = searchTerm.trim().toLowerCase();
+    const words = searchLower.split(/\s+/).filter(Boolean);
+
+    const itemsToPrint = products.filter(p => {
+      const matchesSearch = words.length === 0 || 
+        words.every(word => p.desc.toLowerCase().includes(word)) || 
+        p.cod.toLowerCase().includes(searchLower);
+
+      const matchesBrand = filterBrand === "Todas as Marcas" || p.brand === filterBrand;
+      const matchesStock = filterStock === "TODOS" ||
+        (filterStock === "COM ESTOQUE" && p.stock > 0) ||
+        (filterStock === "SEM ESTOQUE" && p.stock <= 0);
+
+      return matchesSearch && matchesBrand && matchesStock;
+    });
+
+    // Sort itemsToPrint if needed
+    if (sortConfig !== null) {
+      itemsToPrint.sort((a, b) => {
+        const key = sortConfig.key;
+        const dir = sortConfig.direction;
+        
+        if (key === 'cod') {
+          return dir === 'asc' ? Number(a.cod) - Number(b.cod) : Number(b.cod) - Number(a.cod);
+        }
+        
+        const valA = a[key];
+        const valB = b[key];
+
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return dir === 'asc' ? valA - valB : valB - valA;
+        }
+
+        const strA = String(valA).toLowerCase();
+        const strB = String(valB).toLowerCase();
+        if (strA < strB) return dir === 'asc' ? -1 : 1;
+        if (strA > strB) return dir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    const rowsHtml = itemsToPrint.map(p => `
       <tr style="page-break-inside: avoid; break-inside: avoid;">
         <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-family: monospace; font-size: 11px; font-weight: bold; color: #1e293b;">${p.cod}</td>
         <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: 500; color: #0f172a; text-transform: uppercase;">${p.desc}</td>
@@ -268,7 +310,7 @@ export function ProdutosView() {
             <div class="meta-grid">
               <div class="meta-item"><strong>Filtros ativos:</strong> ${activeFilters}</div>
               <div class="meta-item"><strong>Gerado em:</strong> ${new Date().toLocaleString("pt-BR")}</div>
-              <div class="meta-item" style="text-align: right;"><strong>Total de Itens:</strong> ${filteredProducts.length}</div>
+              <div class="meta-item" style="text-align: right;"><strong>Total de Itens:</strong> ${itemsToPrint.length}</div>
             </div>
           </header>
           <table>

@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  Plus, Search, Trash2, Pencil, Calendar, Tag, Sparkles,
-  User, Check, Clock, Kanban,
-  CheckCircle2, BarChart2, X
+  Plus, Trash2, Pencil, Calendar, Tag,
+  User, Check, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -72,7 +71,7 @@ const TAG_OPTIONS = [
 
 export function EsteiraView({ userProfile }: EsteiraViewProps) {
   const [cards, setCards] = useState<KanbanCard[]>([]);
-  const [search, setSearch] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
@@ -225,26 +224,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     }
   };
 
-  // ── Filters & Stats ───────────────────────────────────────────────────────
-  const filteredCards = useMemo(() => {
-    if (!search.trim()) return cards;
-    const term = search.toLowerCase();
-    return cards.filter(c =>
-      c.title.toLowerCase().includes(term) ||
-      c.description?.toLowerCase().includes(term) ||
-      (c.tag_name && c.tag_name.toLowerCase().includes(term))
-    );
-  }, [cards, search]);
 
-  const stats = useMemo(() => {
-    const total = cards.length;
-    const ideas = cards.filter(c => c.column_id === "IDEIAS").length;
-    const todo = cards.filter(c => c.column_id === "A FAZER").length;
-    const doing = cards.filter(c => c.column_id === "FAZENDO").length;
-    const done = cards.filter(c => c.column_id === "CONCLUIDOS").length;
-    const completionRate = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { total, ideas, todo, doing, done, completionRate };
-  }, [cards]);
 
   const isOverdue = (dateStr?: string, columnId?: KanbanCard["column_id"]) => {
     if (!dateStr || columnId === "CONCLUIDOS") return false;
@@ -269,91 +249,12 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-background text-foreground p-6 overflow-hidden relative font-sans">
 
-      {/* HEADER */}
-      <div className="flex items-center justify-between mb-6 shrink-0">
-        <div>
-          <h2 className="text-3xl font-black uppercase tracking-tighter flex items-center gap-3">
-            <Kanban className="w-8 h-8 text-primary" />
-            Esteira de Atividades
-          </h2>
-          <p className="text-muted-foreground text-sm font-medium">Fluxo Kanban e Gestão de Campanhas de Marketing</p>
-        </div>
 
-        <button
-          onClick={() => openNewCard()}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 rounded-xl transition-all text-sm font-bold shadow-lg shadow-primary/20 active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          Adicionar Card
-        </button>
-      </div>
-
-      {/* STATS */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 shrink-0">
-        <div className="bg-card border border-border p-3.5 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden group">
-          <div className="absolute right-0 top-0 translate-x-2 -translate-y-2 opacity-5 group-hover:scale-110 transition-transform">
-            <BarChart2 className="w-20 h-20" />
-          </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none">Total</span>
-          <span className="text-2xl font-black mt-2 leading-none">{stats.total}</span>
-        </div>
-
-        <div className="bg-card border border-border p-3.5 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden group">
-          <div className="absolute right-0 top-0 translate-x-2 -translate-y-2 opacity-5 text-violet-500 group-hover:scale-110 transition-transform">
-            <Sparkles className="w-20 h-20" />
-          </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none">Ideias</span>
-          <span className="text-2xl font-black text-violet-500 mt-2 leading-none">{stats.ideas}</span>
-        </div>
-
-        <div className="bg-card border border-border p-3.5 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden group">
-          <div className="absolute right-0 top-0 translate-x-2 -translate-y-2 opacity-5 text-sky-500 group-hover:scale-110 transition-transform">
-            <Clock className="w-20 h-20" />
-          </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none">A Fazer / Fazendo</span>
-          <span className="text-2xl font-black text-sky-500 mt-2 leading-none">{stats.todo + stats.doing}</span>
-        </div>
-
-        <div className="bg-card border border-border p-3.5 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden group">
-          <div className="absolute right-0 top-0 translate-x-2 -translate-y-2 opacity-5 text-emerald-500 group-hover:scale-110 transition-transform">
-            <CheckCircle2 className="w-20 h-20" />
-          </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none">Concluídos</span>
-          <span className="text-2xl font-black text-emerald-500 mt-2 leading-none">{stats.done}</span>
-        </div>
-
-        <div className="bg-card border border-border p-3.5 rounded-2xl col-span-2 md:col-span-1 flex flex-col justify-between shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none">Aproveitamento</span>
-            <span className="text-[11px] font-bold text-emerald-500">{stats.completionRate}%</span>
-          </div>
-          <div className="mt-3">
-            <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                style={{ width: `${stats.completionRate}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* SEARCH */}
-      <div className="mb-6 relative shrink-0">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Pesquisar por título, descrição ou tag..."
-          className="w-full h-11 pl-11 pr-4 bg-card border border-border rounded-xl text-sm font-semibold outline-none focus:border-primary/50 placeholder:text-muted-foreground/30 transition-all"
-        />
-      </div>
 
       {/* KANBAN BOARD */}
       <div className="flex-1 overflow-x-auto min-h-0 flex gap-4 pr-1 pb-4 select-none custom-scrollbar">
         {COLUMNS.map(col => {
-          const colCards = filteredCards.filter(c => c.column_id === col.id);
+          const colCards = cards.filter(c => c.column_id === col.id);
           const isOver = draggedOverColumn === col.id;
 
           return (
@@ -542,20 +443,22 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                   </div>
 
                   {/* Column + Date */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quadro</label>
-                      <select
-                        className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all appearance-none"
-                        value={selectedCard.column_id || "IDEIAS"}
-                        onChange={(e) => setSelectedCard({ ...selectedCard, column_id: e.target.value as KanbanCard["column_id"] })}
-                      >
-                        <option value="IDEIAS">Ideias</option>
-                        <option value="A FAZER">A Fazer</option>
-                        <option value="FAZENDO">Fazendo</option>
-                        <option value="CONCLUIDOS">Concluídos</option>
-                      </select>
-                    </div>
+                  <div className={selectedCard.id ? "grid grid-cols-2 gap-4" : "grid grid-cols-1"}>
+                    {selectedCard.id && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quadro</label>
+                        <select
+                          className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all appearance-none"
+                          value={selectedCard.column_id || "IDEIAS"}
+                          onChange={(e) => setSelectedCard({ ...selectedCard, column_id: e.target.value as KanbanCard["column_id"] })}
+                        >
+                          <option value="IDEIAS">Ideias</option>
+                          <option value="A FAZER">A Fazer</option>
+                          <option value="FAZENDO">Fazendo</option>
+                          <option value="CONCLUIDOS">Concluídos</option>
+                        </select>
+                      </div>
+                    )}
 
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Prazo</label>
