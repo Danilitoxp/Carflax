@@ -10,7 +10,7 @@ interface KanbanCard {
   id: string;
   title: string;
   description: string;
-  column_id: "IDEIAS" | "A FAZER" | "FAZENDO" | "CONCLUIDOS";
+  column_id: "A FAZER" | "FAZENDO" | "CONCLUIDOS";
   order_index: number;
   tag_name?: string;
   tag_color?: string;
@@ -30,13 +30,6 @@ interface EsteiraViewProps {
 }
 
 const COLUMNS: { id: KanbanCard["column_id"]; title: string; bgClass: string; borderClass: string; textClass: string }[] = [
-  {
-    id: "IDEIAS",
-    title: "Ideias",
-    bgClass: "bg-violet-500/5 dark:bg-violet-500/10",
-    borderClass: "border-violet-500/20",
-    textClass: "text-violet-500"
-  },
   {
     id: "A FAZER",
     title: "A Fazer",
@@ -114,8 +107,8 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
         const payload = {
           title: cardData.title.trim(),
           description: cardData.description?.trim() || "",
-          column_id: cardData.column_id || "IDEIAS",
-          order_index: cards.filter(c => c.column_id === (cardData.column_id || "IDEIAS")).length,
+          column_id: cardData.column_id || "A FAZER",
+          order_index: cards.filter(c => c.column_id === (cardData.column_id || "A FAZER")).length,
           tag_name: cardData.tag_name || null,
           tag_color: cardData.tag_color || null,
           due_date: cardData.due_date || null,
@@ -240,7 +233,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     return `${day}/${month}/${year}`;
   };
 
-  const openNewCard = (columnId: KanbanCard["column_id"] = "IDEIAS") => {
+  const openNewCard = (columnId: KanbanCard["column_id"] = "A FAZER") => {
     setSelectedCard({ column_id: columnId });
     setIsCardModalOpen(true);
   };
@@ -449,10 +442,9 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quadro</label>
                         <select
                           className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all appearance-none"
-                          value={selectedCard.column_id || "IDEIAS"}
+                          value={selectedCard.column_id || "A FAZER"}
                           onChange={(e) => setSelectedCard({ ...selectedCard, column_id: e.target.value as KanbanCard["column_id"] })}
                         >
-                          <option value="IDEIAS">Ideias</option>
                           <option value="A FAZER">A Fazer</option>
                           <option value="FAZENDO">Fazendo</option>
                           <option value="CONCLUIDOS">Concluídos</option>
