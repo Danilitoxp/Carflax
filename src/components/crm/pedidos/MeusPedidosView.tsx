@@ -599,7 +599,15 @@ function SeparatedOrderCard({ order }: { order: ConferenciaOrder }) {
 
 function FaturamentoOrderCard({ order }: { order: FaturamentoOrder }) {
   const tipoInfo = getTipoInfo("", order.TIPO_MOVIMENTACAO, order.LOCAL_RETIRADA);
-  const statusInfo = getStatusInfo(order.STA_DESCRI);
+
+  // Se já tem separador e conferente, o status real é "Aguardando faturamento"
+  // independente do que o ERP registrou (pode estar desatualizado)
+  const statusEfetivo =
+    order.NOME_SEPARADOR && order.NOME_CONFERENTE
+      ? "Aguardando faturamento"
+      : order.STA_DESCRI;
+
+  const statusInfo = getStatusInfo(statusEfetivo);
 
   return (
     <div className="rounded-xl border border-sky-500/20 bg-card p-4 flex flex-col gap-3 transition-all hover:shadow-md hover:border-sky-500/40">
@@ -656,7 +664,7 @@ function FaturamentoOrderCard({ order }: { order: FaturamentoOrder }) {
       {/* Status */}
       <div className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border", statusInfo.color)}>
         <AlertCircle className="w-3.5 h-3.5 shrink-0 opacity-80" />
-        <span className="text-[11px] font-semibold truncate">{order.STA_DESCRI}</span>
+        <span className="text-[11px] font-semibold truncate">{statusEfetivo}</span>
       </div>
 
       {/* Observação */}
