@@ -4,7 +4,8 @@ import {
   ArrowUpDown,
   Tag,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Printer
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
@@ -130,6 +131,182 @@ export function ProdutosView() {
     }
   };
 
+  const handlePrint = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Por favor, permita pop-ups para imprimir o inventário.");
+      return;
+    }
+
+    const rowsHtml = filteredProducts.map(p => `
+      <tr style="page-break-inside: avoid; break-inside: avoid;">
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-family: monospace; font-size: 11px; font-weight: bold; color: #1e293b;">${p.cod}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: 500; color: #0f172a; text-transform: uppercase;">${p.desc}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: bold; text-align: right; color: #334155;">${p.stock.toFixed(3)}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; border-left: 1px solid #e2e8f0; width: 140px; background-color: #fafafa;"></td>
+      </tr>
+    `).join("");
+
+    const activeFilters = [
+      filterBrand !== "Todas as Marcas" ? `Marca: ${filterBrand}` : "",
+      filterStock !== "TODOS" ? `Estoque: ${filterStock}` : "",
+      searchTerm ? `Busca: "${searchTerm}"` : ""
+    ].filter(Boolean).join(" | ") || "Nenhum";
+
+    const pageHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Inventário - Carflax HUB</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              color: #1e293b;
+              margin: 30px;
+              line-height: 1.5;
+            }
+            header {
+              border-bottom: 2px solid #0f172a;
+              padding-bottom: 12px;
+              margin-bottom: 20px;
+            }
+            .header-top {
+              display: flex;
+              justify-content: space-between;
+              align-items: baseline;
+            }
+            h1 {
+              font-size: 20px;
+              font-weight: 800;
+              margin: 0;
+              color: #0f172a;
+              letter-spacing: -0.5px;
+            }
+            .brand-subtitle {
+              font-size: 10px;
+              font-weight: 700;
+              color: #2563eb;
+              text-transform: uppercase;
+              letter-spacing: 1.5px;
+              margin-bottom: 4px;
+            }
+            .meta-grid {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 16px;
+              margin-top: 12px;
+              font-size: 11px;
+              background-color: #f8fafc;
+              padding: 10px 14px;
+              border-radius: 6px;
+              border: 1px solid #e2e8f0;
+            }
+            .meta-item strong {
+              color: #475569;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+            }
+            th {
+              background-color: #f1f5f9;
+              color: #475569;
+              padding: 8px;
+              font-size: 10px;
+              font-weight: 800;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              border-bottom: 2px solid #cbd5e1;
+              border-top: 1px solid #e2e8f0;
+            }
+            .signature-section {
+              margin-top: 40px;
+              display: flex;
+              justify-content: space-between;
+              font-size: 11px;
+              color: #475569;
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+            .signature-box {
+              width: 45%;
+              border-top: 1px solid #cbd5e1;
+              text-align: center;
+              padding-top: 8px;
+              margin-top: 30px;
+            }
+            @media print {
+              body {
+                margin: 0;
+                color: #000;
+              }
+              .meta-grid {
+                background-color: transparent !important;
+                border-color: #cbd5e1;
+              }
+              th {
+                background-color: #f1f5f9 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              td {
+                border-bottom-color: #cbd5e1 !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <header>
+            <div class="brand-subtitle">Carflax HUB</div>
+            <div class="header-top">
+              <h1>Folha de Inventário de Produtos</h1>
+              <div style="font-size: 10px; color: #64748b; text-align: right;">
+                Página 1 de 1
+              </div>
+            </div>
+            <div class="meta-grid">
+              <div class="meta-item"><strong>Filtros ativos:</strong> ${activeFilters}</div>
+              <div class="meta-item"><strong>Gerado em:</strong> ${new Date().toLocaleString("pt-BR")}</div>
+              <div class="meta-item" style="text-align: right;"><strong>Total de Itens:</strong> ${filteredProducts.length}</div>
+            </div>
+          </header>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 15%; text-align: left;">Código</th>
+                <th style="width: 50%; text-align: left;">Descrição do Item</th>
+                <th style="width: 15%; text-align: right;">Saldo Atual</th>
+                <th style="width: 20%; text-align: center; border-left: 1px solid #cbd5e1;">Qtd. Contada</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <div class="signature-section">
+            <div class="signature-box">
+              Assinatura do Responsável pela Contagem
+            </div>
+            <div class="signature-box">
+              Visto / Conferência de Lançamento
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(pageHtml);
+    printWindow.document.close();
+  };
+
   return (
     <div className="flex-1 flex flex-col gap-4 pt-4 pb-6 px-6 overflow-hidden h-full max-h-screen bg-background">
       {/* TINY TOOLBAR */}
@@ -182,6 +359,14 @@ export function ProdutosView() {
               </button>
             ))}
           </div>
+
+          <button
+            onClick={handlePrint}
+            title="Imprimir Folha de Inventário"
+            className="flex items-center justify-center p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all shadow-sm group shrink-0"
+          >
+            <Printer className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
+          </button>
         </div>
       </div>
 
