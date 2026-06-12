@@ -550,13 +550,19 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
             }
             const responsiblesList: LossResponsible[] = JSON.parse(configData.value);
 
-            // Filtra responsáveis que devem ser alertados
+            // Filtra e deduplica por telefone para evitar envio em duplicidade
+            const seenPhones = new Set<string>();
             const matchingResponsibles = responsiblesList.filter(r => {
               if (!r.telefone) return false;
-              // Se o motivo do responsável for "Todos os Motivos", envia
-              if (r.motivo === "Todos os Motivos") return true;
-              // Se o motivo do responsável bater com o motivo da perda, envia
-              return r.motivo.toUpperCase().trim() === motivoUpper;
+              const formattedPhone = r.telefone.replace(/\D/g, "");
+              if (!formattedPhone) return false;
+
+              const isMatch = r.motivo === "Todos os Motivos" || r.motivo.toUpperCase().trim() === motivoUpper;
+              if (isMatch && !seenPhones.has(formattedPhone)) {
+                seenPhones.add(formattedPhone);
+                return true;
+              }
+              return false;
             });
 
             if (matchingResponsibles.length > 0) {
