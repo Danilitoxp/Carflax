@@ -512,6 +512,31 @@ export function ChatModal({
     }
   };
 
+  const formatDateSeparator = (ts?: string) => {
+    if (!ts) return "";
+    try {
+      const date = new Date(ts);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const msgDate = new Date(date);
+      msgDate.setHours(0, 0, 0, 0);
+      
+      if (msgDate.getTime() === today.getTime()) {
+        return "Hoje";
+      } else if (msgDate.getTime() === yesterday.getTime()) {
+        return "Ontem";
+      } else {
+        return date.toLocaleDateString("pt-BR");
+      }
+    } catch {
+      return "";
+    }
+  };
+
+
   const isMe = (msg: CrmConversa) => {
     if (!userProfile) return false;
     const myId = userProfile.id;
@@ -784,32 +809,51 @@ export function ChatModal({
                   <p className="text-[10px] text-muted-foreground font-black uppercase tracking-wider">Nenhuma conversa ainda</p>
                 </div>
               )}
-              {!(loading || headerLoading) && conversas.map((msg) => (
-                <div key={msg.id} className={cn("flex flex-col space-y-1", isMe(msg) ? "items-end" : "items-start")}>
-                  {!isMe(msg) && (
-                    <span className="text-[8px] font-black text-muted-foreground uppercase ml-1 tracking-widest">
-                      {(() => {
-                        if (msg.enviado_por_nome?.toUpperCase() === "SISTEMA") {
-                          const match = msg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
-                          return match ? match[1].replace(/\*/g, "").trim() : "Sistema";
-                        }
-                        return msg.enviado_por_nome;
-                      })()}
-                    </span>
-                  )}
-                  <div className={cn(
-                    "rounded-2xl max-w-full shadow-xl leading-relaxed transition-all", 
-                    isMaximized ? "p-4 text-[14px] font-bold" : "p-3.5 text-[11px] font-medium",
-                    isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40"
-                  )}>
-                    {renderFormattedText(msg.obs)}
+              {!(loading || headerLoading) && conversas.map((msg, index) => {
+                const prevMsg = index > 0 ? conversas[index - 1] : null;
+                const showDateSeparator = !prevMsg || (() => {
+                  if (!msg.timestamp || !prevMsg.timestamp) return false;
+                  const d1 = new Date(msg.timestamp).toDateString();
+                  const d2 = new Date(prevMsg.timestamp).toDateString();
+                  return d1 !== d2;
+                })();
+
+                return (
+                  <div key={msg.id} className="flex flex-col space-y-4">
+                    {showDateSeparator && (
+                      <div className="flex justify-center select-none my-2">
+                        <span className="text-[8px] font-black text-muted-foreground/80 uppercase bg-secondary/60 px-3 py-1 rounded-full border border-border/40 tracking-wider">
+                          {formatDateSeparator(msg.timestamp)}
+                        </span>
+                      </div>
+                    )}
+                    <div className={cn("flex flex-col space-y-1", isMe(msg) ? "items-end" : "items-start")}>
+                      {!isMe(msg) && (
+                        <span className="text-[8px] font-black text-muted-foreground uppercase ml-1 tracking-widest">
+                          {(() => {
+                            if (msg.enviado_por_nome?.toUpperCase() === "SISTEMA") {
+                              const match = msg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
+                              return match ? match[1].replace(/\*/g, "").trim() : "Sistema";
+                            }
+                            return msg.enviado_por_nome;
+                          })()}
+                        </span>
+                      )}
+                      <div className={cn(
+                        "rounded-2xl max-w-full shadow-xl leading-relaxed transition-all", 
+                        isMaximized ? "p-4 text-[14px] font-bold" : "p-3.5 text-[11px] font-medium",
+                        isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40"
+                      )}>
+                        {renderFormattedText(msg.obs)}
+                      </div>
+                      <div className={cn("flex items-center gap-2", isMe(msg) ? "mr-1" : "ml-1")}>
+                        <span className="text-[8px] font-black text-muted-foreground uppercase opacity-50">{formatTime(msg.timestamp)}</span>
+                        {isMe(msg) && <span className={cn("text-[8px] font-black uppercase", msg.lida ? "text-emerald-500" : "text-muted-foreground")}>{msg.lida ? "✓ Lida" : "✓✓"}</span>}
+                      </div>
+                    </div>
                   </div>
-                  <div className={cn("flex items-center gap-2", isMe(msg) ? "mr-1" : "ml-1")}>
-                    <span className="text-[8px] font-black text-muted-foreground uppercase opacity-50">{formatTime(msg.timestamp)}</span>
-                    {isMe(msg) && <span className={cn("text-[8px] font-black uppercase", msg.lida ? "text-emerald-500" : "text-muted-foreground")}>{msg.lida ? "✓ Lida" : "✓✓"}</span>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {partnerTyping && (
                 <div className="flex items-center gap-2 ml-1 mb-2 animate-pulse">
                   <span className="text-[10px] font-bold text-emerald-500 italic">digitando...</span>

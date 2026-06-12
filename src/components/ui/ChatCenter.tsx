@@ -48,6 +48,48 @@ export function ChatCenter({
 }: ChatCenterProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  const [positionRight, setPositionRight] = useState(24);
+  const dragRef = useRef({ hasMoved: false });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    
+    const startX = e.clientX;
+    const startRight = positionRight;
+    let hasMoved = false;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newRight = startRight - deltaX;
+      
+      const minRight = 24;
+      const maxRight = window.innerWidth - 350;
+      const clampedRight = Math.max(minRight, Math.min(newRight, maxRight));
+      
+      setPositionRight(clampedRight);
+      if (Math.abs(deltaX) > 5) {
+        hasMoved = true;
+      }
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      
+      if (hasMoved) {
+        dragRef.current.hasMoved = true;
+        setTimeout(() => {
+          dragRef.current.hasMoved = false;
+        }, 50);
+      } else {
+        dragRef.current.hasMoved = false;
+      }
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
 
   const totalUnread = useMemo(() => {
     return activeChats.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
@@ -131,10 +173,11 @@ export function ChatCenter({
     return text.replace(/[-=_]{3,}/g, "").trim();
   };
 
-  if (activeChats.length === 0) return null;
-
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex items-end gap-4 pointer-events-none">
+    <div 
+      className="fixed bottom-0 z-[9999] flex items-end gap-4 pointer-events-none"
+      style={{ right: `${positionRight}px` }}
+    >
       {/* 1. Chat Detail Area (Only shown if a chat is open and NOT minimized) */}
       {openChatDoc && activeChatData && (
         <div className="pointer-events-auto">
@@ -162,44 +205,36 @@ export function ChatCenter({
 
       {/* 2. Chat List / Launcher Area */}
       <div className={cn(
-        "bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-500 overflow-hidden",
-        isExpanded ? "w-[320px] h-[500px]" : "w-[64px] h-[64px]"
+        "bg-card/95 backdrop-blur-xl border border-border border-b-0 rounded-t-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-500 overflow-hidden w-[320px]",
+        isExpanded ? "h-[500px]" : "h-[48px]"
       )}>
         {/* Toggle / Header */}
         <div 
-          className={cn(
-            "flex items-center p-4 cursor-pointer transition-all duration-300 hover:bg-secondary/50 active:scale-95",
-            !isExpanded && "justify-center h-full w-full"
-          )}
-          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center p-3.5 cursor-grab active:cursor-grabbing hover:bg-secondary/50 border-b border-border/40 select-none transition-colors"
+          onMouseDown={handleMouseDown}
+          onClick={() => {
+            if (!dragRef.current.hasMoved) {
+              setIsExpanded(!isExpanded);
+            }
+          }}
         >
-          {isExpanded ? (
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <MessageSquare className="w-5 h-5 text-blue-600" />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
-                </div>
-                <span className="text-xs font-black text-foreground uppercase tracking-widest">Conversas</span>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <MessageSquare className="w-4.5 h-4.5 text-blue-500" />
                 {totalUnread > 0 && (
-                  <span className="bg-blue-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-lg shadow-blue-500/20">
-                    {totalUnread}
-                  </span>
+                  <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
                 )}
               </div>
-              <ChevronRight className={cn("w-4 h-4 text-muted-foreground transition-transform", isExpanded && "rotate-0")} />
-            </div>
-          ) : (
-            <div className="relative group">
-              <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl group-hover:bg-blue-500/40 transition-all animate-pulse" />
-              <MessageSquare className="w-7 h-7 text-blue-600 relative z-10 drop-shadow-sm" />
+              <span className="text-[11px] font-black text-foreground uppercase tracking-widest">Conversas</span>
               {totalUnread > 0 && (
-                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-card shadow-lg z-20">
+                <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-lg shadow-blue-500/20">
                   {totalUnread}
                 </span>
               )}
             </div>
-          )}
+            <ChevronRight className={cn("w-4 h-4 text-muted-foreground transition-transform duration-300", isExpanded ? "rotate-90" : "-rotate-90")} />
+          </div>
         </div>
 
         {isExpanded && (

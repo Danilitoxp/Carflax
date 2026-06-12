@@ -33,6 +33,7 @@ import {
   addConversa,
   type CrmStatus,
 } from "@/lib/crm-service";
+import { evolutionApi } from "@/lib/evolution-v2";
 
 export interface Orcamento {
   id: string;
@@ -399,7 +400,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     }
 
     apiCrmFaturamento(params).then(setFaturamento).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterSeller, startDate, endDate, userProfile]);
 
   // ── Status update ────────────────────────────────────────────────────────
@@ -526,6 +526,87 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           }
         } catch (err) {
           console.error("Erro ao enviar notificação automática:", err);
+        }
+      }
+
+      // 5. Notificação Automática por WhatsApp para Responsáveis de Acordo com o Motivo
+      if (newStatus.toUpperCase() === "PERDIDO" && extra?.motivo_perda) {
+        const motivoUpper = extra.motivo_perda.toUpperCase().trim();
+
+        try {
+          // Busca a lista de responsáveis configurada
+          const { data: configData } = await supabase
+            .from("crm_config")
+            .select("value")
+            .eq("key", "crm_loss_responsibles")
+            .maybeSingle();
+
+          if (configData?.value) {
+            interface LossResponsible {
+              id: string;
+              motivo: string;
+              nome: string;
+              telefone: string;
+            }
+            const responsiblesList: LossResponsible[] = JSON.parse(configData.value);
+
+            // Filtra responsáveis que devem ser alertados
+            const matchingResponsibles = responsiblesList.filter(r => {
+              if (!r.telefone) return false;
+              // Se o motivo do responsável for "Todos os Motivos", envia
+              if (r.motivo === "Todos os Motivos") return true;
+              // Se o motivo do responsável bater com o motivo da perda, envia
+              return r.motivo.toUpperCase().trim() === motivoUpper;
+            });
+
+            if (matchingResponsibles.length > 0) {
+              const toWhatsappJid = (phone: string) => {
+                const cleaned = phone.replace(/\D/g, "");
+                if (!cleaned) return "";
+                let formatted = cleaned;
+                if (formatted.length >= 10 && !formatted.startsWith("55")) {
+                  formatted = "55" + formatted;
+                }
+                return `${formatted}@s.whatsapp.net`;
+              };
+
+              const lostItemsList = (lostItemsIds.length > 0 && selectedItem.items)
+                ? selectedItem.items
+                    .filter(it => lostItemsIds.includes(String(it.COD_PRODUTO)))
+                    .map(it => `• ${it.PRODUTO} (${parseFloat(String(it.QUANTIDADE)).toFixed(0)} un)`)
+                    .join("\n")
+                : "";
+
+              const msgWpp = [
+                `⚠️ *PERDA DE ORÇAMENTO* ⚠️`,
+                `━━━━━━━━━━━━━━━━━━━━━━━━`,
+                `📑 *ORÇAMENTO:* #${selectedItem.id.replace("-OR", "")}`,
+                `🏢 *CLIENTE:*    ${selectedItem.client}`,
+                `👤 *VENDEDOR:*   ${selectedItem.seller}`,
+                `💰 *VALOR:*      ${selectedItem.total}`,
+                ``,
+                `❌ *MOTIVO:*     ${motivoUpper}`,
+                lostItemsList ? `\n📦 *ITENS AFETADOS:*\n${lostItemsList}` : "",
+                statusObs ? `\n💬 *OBSERVAÇÃO:* ${statusObs}` : "",
+                `━━━━━━━━━━━━━━━━━━━━━━━━`,
+                `🚨 _Por favor, verifiquem a situação com urgência._`
+              ].filter(Boolean).join("\n");
+
+              // Envia mensagens em paralelo para todos os destinatários filtrados
+              await Promise.all(
+                matchingResponsibles.map(async (resp) => {
+                  const jid = toWhatsappJid(resp.telefone);
+                  if (jid) {
+                    const msgPersonalizada = `Olá, *${resp.nome}*.\n\n${msgWpp}`;
+                    await evolutionApi.sendText(jid, msgPersonalizada)
+                      .catch(e => console.error(`Erro ao enviar wpp para ${resp.nome}:`, e));
+                  }
+                })
+              );
+            }
+          }
+        } catch (wppErr) {
+          console.error("Erro ao processar envio de WhatsApp para responsáveis:", wppErr);
         }
       }
 

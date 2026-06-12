@@ -908,6 +908,16 @@ function DashboardContent({
               ? (newMsg.obs?.includes("Divergência") ? `Divergência: ${resolvedSellerName || `#${newMsg.documento}`}` : `Aviso: #${newMsg.documento}`)
               : (resolvedSellerName || `#${newMsg.documento}`);
 
+            // Se a conversa estava fechada/dispensada no painel, remove do dismissed para que ela possa voltar a ficar ativa
+            if (dismissedChatDocsRef.current.has(newMsg.documento)) {
+              dismissedChatDocsRef.current.delete(newMsg.documento);
+              setDismissedChatDocs((prev) => {
+                const next = new Set(prev);
+                next.delete(newMsg.documento);
+                return next;
+              });
+            }
+
             setActiveChats((prev) => {
               const existing = prev.find((c) => c.doc === newMsg.documento);
               if (existing) {

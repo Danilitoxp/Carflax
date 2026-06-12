@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo, startTransition } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, startTransition, Fragment } from "react";
 import { 
   Search, 
   Paperclip, 
@@ -25,7 +25,8 @@ import {
   Camera,
   Video,
   Smile,
-  Printer
+  Printer,
+  FolderDown
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { marketingService } from "@/lib/marketing-service";
@@ -33,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { apiDashboardProdutos } from "@/lib/api";
 import { transcribeAudio, classifyTemperature } from "@/lib/gemini-service";
 import { Package } from "lucide-react";
+import { useNotification } from "@/hooks/useNotification";
 
 interface NormalizedProduct {
   cod: string;
@@ -146,6 +148,7 @@ const ARCHIVE_REASONS = [
   "Não vendemos o material",
   "Preço Alto",
   "Prazo Longo",
+  "Convertido",
   "Outros"
 ];
 
@@ -197,6 +200,36 @@ function formatAudioTime(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatFollowUpDate(dateStr?: string) {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+}
+
+
+function getFormattedMessageDate(timestampStr?: string) {
+  if (!timestampStr) return "";
+  const date = new Date(timestampStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const msgDate = new Date(date);
+  msgDate.setHours(0, 0, 0, 0);
+  
+  if (msgDate.getTime() === today.getTime()) {
+    return "Hoje";
+  } else if (msgDate.getTime() === yesterday.getTime()) {
+    return "Ontem";
+  } else {
+    return date.toLocaleDateString("pt-BR");
+  }
 }
 
 function CustomAudioPlayer({ 
@@ -269,9 +302,23 @@ function CustomAudioPlayer({
       
       {/* Avatar com Microfone */}
       <div className="relative shrink-0 ml-1">
-        <div className="w-[42px] h-[42px] rounded-full overflow-hidden bg-black/10 flex items-center justify-center">
+        <div className="w-[42px] h-[42px] rounded-full overflow-hidden bg-black/10 flex items-center justify-center relative">
           {avatar ? (
-            <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
+            <>
+              <img 
+                src={avatar} 
+                alt="Avatar" 
+                className="w-full h-full object-cover" 
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  const sibling = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                  if (sibling) sibling.style.display = 'flex';
+                }}
+              />
+              <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-black/10">
+                <User className="w-6 h-6 opacity-50 text-muted-foreground" />
+              </div>
+            </>
           ) : (
             <User className="w-6 h-6 opacity-50" />
           )}
@@ -340,14 +387,18 @@ function CustomAudioPlayer({
 }
 
 export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
+  const { showNotification } = useNotification();
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [followUpDateInput, setFollowUpDateInput] = useState("");
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [customArchiveReason, setCustomArchiveReason] = useState("");
+  const [isEnteringCustomReason, setIsEnteringCustomReason] = useState(false);
   const [showTempDropdown, setShowTempDropdown] = useState(false);
   
   const [saleValue, setSaleValue] = useState("");
@@ -372,6 +423,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedChatRef = useRef<Chat | null>(null);
+  const viewModeRef = useRef<"active" | "archived">("active");
   const lastPhoneJid = useRef<string | null>(null);
   const lidToJidMap = useRef<Map<string, string>>(new Map());
   const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -392,7 +444,15 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
   useEffect(() => {
     selectedChatRef.current = selectedChat;
-  }, [selectedChat]);
+    viewModeRef.current = viewMode;
+  }, [selectedChat, viewMode]);
+
+  useEffect(() => {
+    if (!showArchiveModal) {
+      setCustomArchiveReason("");
+      setIsEnteringCustomReason(false);
+    }
+  }, [showArchiveModal]);
 
   useEffect(() => {
     // Solicita permissão para notificações do Chrome
@@ -637,6 +697,23 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     );
   };
 
+  const handleArchiveInactive = async () => {
+    if (!confirm("Deseja realmente arquivar todas as conversas sem interação há mais de 2 dias?")) return;
+    
+    try {
+      setLoading(true);
+      await marketingService.archiveInactiveClientes(2, "Inatividade (> 2 dias)");
+      await loadChats();
+      setSelectedChat(null);
+      showNotification("success", "Conversas Arquivadas", "As conversas inativas há mais de 2 dias foram arquivadas.");
+    } catch (err) {
+      console.error("Erro ao arquivar inativos:", err);
+      showNotification("error", "Erro ao arquivar", "Ocorreu um erro ao arquivar as conversas inativas.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const currentTimers = tempClassifyTimers.current;
     // Conecta ao WebSocket para receber mensagens em tempo real
@@ -655,6 +732,30 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         if (processedMsgIds.current.size > 500) {
           const arr = [...processedMsgIds.current];
           processedMsgIds.current = new Set(arr.slice(250));
+        }
+      }
+
+      // Busca dados do cliente no banco
+      let dbCliente = null;
+      try {
+        dbCliente = await marketingService.getCliente(remoteJid);
+      } catch (err) {
+        console.error("Erro ao buscar cliente do banco:", err);
+      }
+
+      // Se o cliente está arquivado, desarquiva no banco e atualiza status
+      if (dbCliente?.arquivado) {
+        try {
+          await marketingService.toggleArchived(remoteJid, false);
+          dbCliente.arquivado = false;
+          
+          // Se o status era um motivo de arquivamento, volta para "Em Contato"
+          if (dbCliente.status && dbCliente.status !== "Novo Lead" && dbCliente.status !== "Em Contato" && dbCliente.status !== "Negociando" && dbCliente.status !== "Convertido") {
+            dbCliente.status = "Em Contato";
+            await marketingService.upsertCliente({ remote_jid: remoteJid, status: "Em Contato" });
+          }
+        } catch (err) {
+          console.error("Erro ao desarquivar cliente:", err);
         }
       }
 
@@ -787,17 +888,21 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       }
 
       startTransition(() => setChats(prevChats => {
-        // Desarquiva automaticamente se chegou nova mensagem
-        const existingChat = prevChats.find(c => c.id === remoteJid);
-        if (existingChat?.arquivado) marketingService.toggleArchived(remoteJid, false);
         const existingChatIndex = prevChats.findIndex(c => c.id === remoteJid);
+        
         if (existingChatIndex !== -1) {
           const updatedChats = [...prevChats];
           const chat = { ...updatedChats[existingChatIndex] };
 
-          // Se estava arquivado: remove da lista atual (ativa ou arquivada)
+          // Se estava arquivado: muda para não arquivado e limpa o status (motivo) se necessário
           if (chat.arquivado) {
-            return prevChats.filter(c => c.id !== remoteJid);
+            chat.arquivado = false;
+            const currentStatus = chat.leadInfo?.status;
+            const isArchiveReason = currentStatus && currentStatus !== "Novo Lead" && currentStatus !== "Em Contato" && currentStatus !== "Negociando" && currentStatus !== "Convertido";
+            chat.leadInfo = {
+              ...(chat.leadInfo || { status: "Em Contato", temperature: "Frio", source: "WhatsApp", campaign: "Geral" }),
+              status: isArchiveReason ? "Em Contato" : (currentStatus || "Novo Lead")
+            };
           }
 
           chat.lastMessage = text;
@@ -822,30 +927,39 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           }
 
           updatedChats.splice(existingChatIndex, 1);
-          if (!chat.avatar) fetchAvatar(remoteJid);
+          if (!chat.avatar) chat.avatar = dbCliente?.foto_url || "";
           // Reinsere respeitando fixados: fixados ficam no topo
           return sortChats([chat, ...updatedChats]);
         } else {
-          fetchAvatar(remoteJid);
+          if (!dbCliente?.foto_url) fetchAvatar(remoteJid);
 
-          const newChat: Chat = {
-            id: remoteJid,
-            name: message.key?.fromMe ? remoteJid.split('@')[0] : (validPushName || "Novo Lead"),
-            lastMessage: text,
-            lastMessageSender: message.key?.fromMe ? "me" : "contact",
-            lastMessageType: tipoMsg,
-            lastMessageStatus: message.key?.fromMe ? "sent" : undefined,
-            time: time,
-            unreadCount: 1,
-            avatar: avatarCache.get(remoteJid) || "",
-            leadInfo: {
-              status: "Novo Lead",
-              temperature: "Frio",
-              source: "WhatsApp",
-              campaign: "Geral"
-            }
-          };
-          return sortChats([newChat, ...prevChats]);
+          // Se estamos no modo ativo, adicionamos o chat desarquivado ou novo
+          if (viewModeRef.current === "active") {
+            const newChat: Chat = {
+              id: remoteJid,
+              name: dbCliente?.nome || dbCliente?.push_name || message.pushName || remoteJid.split('@')[0],
+              lastMessage: text,
+              lastMessageSender: message.key?.fromMe ? "me" : "contact",
+              lastMessageType: tipoMsg,
+              lastMessageStatus: message.key?.fromMe ? "sent" : undefined,
+              time: time,
+              unreadCount: selectedChatRef.current?.id === remoteJid ? 0 : 1,
+              avatar: dbCliente?.foto_url || avatarCache.get(remoteJid) || "",
+              arquivado: false,
+              leadInfo: {
+                status: dbCliente?.status || "Novo Lead",
+                temperature: (dbCliente?.temperatura as Temperature) || "Frio",
+                source: dbCliente?.origem || "WhatsApp",
+                campaign: dbCliente?.campanha || "Geral",
+                saleValue: (dbCliente?.valor_venda ?? 0) > 0
+                  ? dbCliente!.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : undefined
+              }
+            };
+            return sortChats([newChat, ...prevChats]);
+          }
+          // Se estamos no modo arquivados, e ele foi desarquivado, não fazemos nada na listagem de arquivados
+          return prevChats;
         }
       }));
 
@@ -857,6 +971,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               id: msgId,
               text: text,
               time: time,
+              rawTimestamp: timestamp,
               sender: message.key?.fromMe ? "me" : "contact",
               status: "sent",
               tipo: tipoMsg,
@@ -1151,6 +1266,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         id: msgId,
         text: textToSend,
         time: time,
+        rawTimestamp: timestamp,
         sender: "me",
         status: "sent",
         tipo: "text"
@@ -1222,6 +1338,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         tipo: "document",
         mediaUrl: base64Full,
         fileName: file.name,
+        rawTimestamp: timestamp,
       };
       setMessages(prev => [...prev, newMsg]);
 
@@ -1583,12 +1700,19 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     }
   }, [chats, displayedChats, selectedChat, handleSelectChat, viewMode]);
 
-  const scheduleFollowUp = (label: string) => {
-    if (!selectedChat || !selectedChat.leadInfo) return;
+  const scheduleFollowUp = (dateStr: string) => {
+    if (!selectedChat) return;
+    const updatedLeadInfo = {
+      ...(selectedChat.leadInfo || { status: "Novo Lead", temperature: "Frio" as Temperature, source: "WhatsApp", campaign: "Geral" }),
+      followUpDate: dateStr || undefined
+    };
     setSelectedChat({
       ...selectedChat,
-      leadInfo: { ...selectedChat.leadInfo, followUpDate: label }
+      leadInfo: updatedLeadInfo
     });
+    setChats(prev => prev.map(c =>
+      c.id === selectedChat.id ? { ...c, leadInfo: updatedLeadInfo } : c
+    ));
   };
 
   const handleTemperatureChange = useCallback((newTemp: Temperature) => {
@@ -1679,28 +1803,70 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       {/* Modals */}
       {showFollowUpModal && (
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="bg-card border border-border rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all duration-300">
             <div className="p-6 border-b border-border/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                 <Bell className="w-5 h-5 text-primary" />
-                 <h3 className="font-black text-sm uppercase tracking-tighter">Agendar Follow-up</h3>
+                 <Bell className="w-5 h-5 text-yellow-500" />
+                 <h3 className="font-black text-sm uppercase tracking-tighter text-card-foreground">Agendar Follow-up</h3>
               </div>
-              <button onClick={() => setShowFollowUpModal(false)} className="p-1 hover:bg-secondary rounded-lg transition-colors">
+              <button 
+                onClick={() => setShowFollowUpModal(false)} 
+                className="p-1 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="grid grid-cols-1 gap-2">
-                {["Hoje", "Amanhã", "Próxima Semana"].map((label) => (
-                  <button 
-                    key={label}
-                    onClick={() => { scheduleFollowUp(label); setShowFollowUpModal(false); }}
-                    className="flex items-center justify-between p-4 bg-secondary/30 hover:bg-primary/5 border border-border rounded-2xl font-bold text-xs"
-                  >
-                    {label}
-                  </button>
-                ))}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
+                  Escolha uma Data
+                </label>
+                <input
+                  type="date"
+                  value={followUpDateInput}
+                  onChange={(e) => setFollowUpDateInput(e.target.value)}
+                  className="w-full bg-secondary/50 border border-border/80 rounded-2xl px-4 py-3 text-sm font-bold text-foreground outline-none focus:border-yellow-500/50 focus:ring-2 focus:ring-yellow-500/20 transition-all"
+                />
               </div>
+
+              {selectedChat?.leadInfo?.followUpDate && (
+                <div className="p-3 bg-yellow-500/5 border border-yellow-500/10 rounded-2xl text-[11px] text-yellow-500/90 font-bold flex items-center justify-between">
+                  <span>Agendado: {formatFollowUpDate(selectedChat.leadInfo.followUpDate)}</span>
+                  <button 
+                    onClick={() => {
+                      scheduleFollowUp("");
+                      setFollowUpDateInput("");
+                      showNotification("success", "Follow-up Removido", "O agendamento foi cancelado.");
+                      setShowFollowUpModal(false);
+                    }}
+                    className="text-rose-500 hover:underline cursor-pointer font-black uppercase tracking-wider text-[9px]"
+                  >
+                    Desativar
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="p-6 border-t border-border/50 flex items-center justify-end gap-2 bg-secondary/10">
+              <button
+                onClick={() => setShowFollowUpModal(false)}
+                className="px-4 py-2 text-xs font-bold text-muted-foreground hover:bg-secondary rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (!followUpDateInput) {
+                    showNotification("error", "Erro", "Por favor, selecione uma data.");
+                    return;
+                  }
+                  scheduleFollowUp(followUpDateInput);
+                  showNotification("success", "Agendado", `Follow-up definido para ${formatFollowUpDate(followUpDateInput)}`);
+                  setShowFollowUpModal(false);
+                }}
+                className="px-5 py-2 text-xs font-black uppercase bg-yellow-500 hover:bg-yellow-600 text-black rounded-xl transition-all shadow-md hover:shadow-yellow-500/20 active:scale-95"
+              >
+                Confirmar
+              </button>
             </div>
           </div>
         </div>
@@ -1754,22 +1920,74 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
 
       {showArchiveModal && (
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border rounded-3xl shadow-2xl w-full max-w-sm">
+          <div className="bg-card border border-border rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all duration-300">
             <div className="p-6 border-b border-border/50 flex items-center justify-between">
-              <h3 className="font-black text-sm uppercase">Arquivar</h3>
-              <button onClick={() => setShowArchiveModal(false)}><X className="w-5 h-5"/></button>
+              <h3 className="font-black text-sm uppercase tracking-tighter">
+                {isEnteringCustomReason ? "Escreva o Motivo" : "Motivo do Arquivamento"}
+              </h3>
+              <button 
+                onClick={() => setShowArchiveModal(false)}
+                className="p-1 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5"/>
+              </button>
             </div>
-            <div className="p-6 space-y-2">
-              {ARCHIVE_REASONS.map(r => (
-                <button 
-                  key={r} 
-                  onClick={() => handleArchiveChat(r)} 
-                  className="w-full p-3 text-left hover:bg-secondary rounded-xl text-xs font-bold transition-colors border border-transparent hover:border-border"
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
+
+            {!isEnteringCustomReason ? (
+              <div className="p-6 space-y-2">
+                {ARCHIVE_REASONS.map(r => (
+                  <button 
+                    key={r} 
+                    onClick={() => {
+                      if (r === "Outros") {
+                        setIsEnteringCustomReason(true);
+                      } else {
+                        handleArchiveChat(r);
+                      }
+                    }} 
+                    className="w-full p-3.5 text-left hover:bg-secondary rounded-2xl text-xs font-bold transition-colors border border-transparent hover:border-border active:scale-[0.98]"
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-6 space-y-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
+                    Descreva o motivo personalizado
+                  </label>
+                  <textarea
+                    value={customArchiveReason}
+                    onChange={(e) => setCustomArchiveReason(e.target.value)}
+                    placeholder="Ex: Cliente fechou com o concorrente, não responde..."
+                    rows={3}
+                    className="w-full bg-secondary/50 border border-border/80 rounded-2xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-rose-500/50 focus:ring-2 focus:ring-rose-500/20 transition-all resize-none"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="p-6 border-t border-border/50 flex items-center justify-between gap-2 bg-secondary/10">
+                  <button
+                    onClick={() => setIsEnteringCustomReason(false)}
+                    className="px-4 py-2 text-xs font-bold text-muted-foreground hover:bg-secondary rounded-xl transition-all"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    disabled={!customArchiveReason.trim()}
+                    onClick={() => {
+                      if (customArchiveReason.trim()) {
+                        handleArchiveChat(customArchiveReason.trim());
+                      }
+                    }}
+                    className="px-5 py-2 text-xs font-black uppercase bg-rose-500 hover:bg-rose-600 text-white rounded-xl transition-all shadow-md hover:shadow-rose-500/20 active:scale-95 disabled:opacity-55 disabled:cursor-not-allowed disabled:active:scale-100"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1825,6 +2043,15 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
               )}
             </div>
             <div className="flex gap-1">
+              {viewMode === "active" && (
+                <button
+                  onClick={handleArchiveInactive}
+                  className="p-2 hover:bg-secondary rounded-xl text-muted-foreground hover:text-primary transition-colors"
+                  title="Arquivar conversas inativas (+2 dias)"
+                >
+                  <FolderDown className="w-4 h-4 text-amber-500" />
+                </button>
+              )}
               <button
                 onClick={() => setViewMode(viewMode === "archived" ? "active" : "archived")}
                 className="p-2 hover:bg-secondary rounded-xl transition-colors relative"
@@ -1872,16 +2099,26 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
               )}
 
-              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
+              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden shrink-0 border border-border/50 relative">
                 {chat.avatar ? (
-                  <img 
-                    src={chat.avatar} 
-                    className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedImage(chat.avatar!);
-                    }}
-                  />
+                  <>
+                    <img 
+                      src={chat.avatar} 
+                      className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        const sibling = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                        if (sibling) sibling.style.display = 'flex';
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedImage(chat.avatar!);
+                      }}
+                    />
+                    <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-secondary">
+                      <User className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  </>
                 ) : (
                   <User className="w-6 h-6" />
                 )}
@@ -1968,13 +2205,23 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           <>
             <div className="p-4 flex items-center justify-between border-b border-border bg-card/20 backdrop-blur-md z-40 relative">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border">
+                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border relative">
                    {selectedChat.avatar ? (
-                     <img 
-                      src={selectedChat.avatar} 
-                      className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
-                      onClick={() => setSelectedImage(selectedChat.avatar!)}
-                    />
+                     <>
+                       <img 
+                        src={selectedChat.avatar} 
+                        className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          const sibling = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                          if (sibling) sibling.style.display = 'flex';
+                        }}
+                        onClick={() => setSelectedImage(selectedChat.avatar!)}
+                      />
+                      <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-secondary">
+                        <User className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                     </>
                    ) : (
                      <User className="w-5 h-5" />
                    )}
@@ -2032,7 +2279,24 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                     <span className="text-[11px] font-black">R$ {selectedChat.leadInfo.saleValue}</span>
                   </button>
                 )}
-                <button onClick={()=>setShowFollowUpModal(true)} className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground"><Bell className="w-4 h-4"/></button>
+                <button 
+                  onClick={() => {
+                    setFollowUpDateInput(selectedChat.leadInfo?.followUpDate || "");
+                    setShowFollowUpModal(true);
+                  }} 
+                  className={cn(
+                    "p-2.5 hover:bg-secondary rounded-xl transition-all relative",
+                    selectedChat.leadInfo?.followUpDate 
+                      ? "text-yellow-500 bg-yellow-500/10 border border-yellow-500/20" 
+                      : "text-muted-foreground"
+                  )}
+                  title={selectedChat.leadInfo?.followUpDate ? `Follow-up agendado para: ${formatFollowUpDate(selectedChat.leadInfo.followUpDate)}` : "Agendar Follow-up"}
+                >
+                  <Bell className="w-4 h-4" />
+                  {selectedChat.leadInfo?.followUpDate && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-500 rounded-full animate-pulse" />
+                  )}
+                </button>
                 <button onClick={()=>setShowSaleModal(true)} className={cn("p-2.5 hover:bg-secondary rounded-xl transition-colors", selectedChat.leadInfo?.saleValue ? "text-emerald-500" : "text-muted-foreground")}><DollarSign className="w-4 h-4"/></button>
                 
                 {viewMode === "active" ? (
@@ -2102,19 +2366,33 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                       </button>
                     </div>
                   )}
-                  {messages.map((msg) => {
+                  {messages.map((msg, idx) => {
                     const isVisualMedia = msg.tipo === "image" || msg.tipo === "video" || msg.tipo === "sticker";
                     const isDocumentMsg = msg.tipo === "document";
                     const isSticker = msg.tipo === "sticker";
+
+                    const currentDateFormatted = getFormattedMessageDate(msg.rawTimestamp);
+                    const previousMsg = messages[idx - 1];
+                    const previousDateFormatted = previousMsg ? getFormattedMessageDate(previousMsg.rawTimestamp) : "";
+                    const showDateDivider = currentDateFormatted && currentDateFormatted !== previousDateFormatted;
+
                     return (
-                    <div key={msg.id} className={cn("flex flex-col", msg.sender === "me" ? "items-end" : "items-start")}>
-                      <div className={cn(
-                        "max-w-[75%] rounded-2xl shadow-sm relative flex flex-col group transition-all", 
-                        isSticker
-                          ? "bg-transparent shadow-none border-none"
-                          : msg.sender === "me" ? "bg-primary text-white rounded-tr-none" : "bg-card border border-border text-foreground rounded-tl-none",
-                        isDocumentMsg ? "p-0 overflow-hidden" : isVisualMedia ? "p-1" : "px-4 py-2"
-                      )}>
+                    <Fragment key={msg.id}>
+                      {showDateDivider && (
+                        <div className="flex justify-center my-4 animate-in fade-in duration-300 select-none">
+                          <span className="bg-secondary/80 text-[10px] font-black uppercase tracking-widest text-muted-foreground px-3 py-1 rounded-lg border border-border/50 shadow-sm backdrop-blur-sm">
+                            {currentDateFormatted}
+                          </span>
+                        </div>
+                      )}
+                      <div className={cn("flex flex-col", msg.sender === "me" ? "items-end" : "items-start")}>
+                        <div className={cn(
+                          "max-w-[75%] rounded-2xl shadow-sm relative flex flex-col group transition-all", 
+                          isSticker
+                            ? "bg-transparent shadow-none border-none"
+                            : msg.sender === "me" ? "bg-primary text-white rounded-tr-none" : "bg-card border border-border text-foreground rounded-tl-none",
+                          isDocumentMsg ? "p-0 overflow-hidden" : isVisualMedia ? "p-1" : "px-4 py-2"
+                        )}>
                         
                         {/* Mídia: Imagem ou Figurinha */}
                         {(msg.tipo === "image" || msg.tipo === "sticker") && msg.mediaUrl && (
@@ -2342,7 +2620,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                         </div>
                       )}
                     </div>
-                  )})}
+                  </Fragment>)})}
 
                   {/* Indicador de Digitando / Gravando */}
                   {selectedChat && presenceChats.has(selectedChat.id) && (

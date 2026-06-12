@@ -3,7 +3,6 @@ import {
   Search, 
   User, 
   Phone, 
-  Clock,
   CheckCircle2,
   Trash2,
   MessageSquare,
@@ -25,31 +24,56 @@ export function LeadsView() {
   const [leads, setLeads] = useState<MarketingCliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterPlatform, setFilterPlatform] = useState("Todas as Plataformas");
   const [filterTemperature, setFilterTemperature] = useState("Todas as Temperaturas");
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
 
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Load leads on filters or page change
   useEffect(() => {
     let isMounted = true;
-
     async function loadData() {
       setLoading(true);
-      const data = await marketingService.getClientes();
+      const offset = (currentPage - 1) * pageSize;
+      const { data, count } = await marketingService.getLeadsPaginated(
+        pageSize,
+        offset,
+        debouncedSearch,
+        filterTemperature
+      );
       if (isMounted) {
-        const onlyLeads = data.filter(c => c.status === "Novo Lead" || c.status === "Em Contato" || !c.status);
-        setLeads(onlyLeads);
+        setLeads(data);
+        setTotalCount(count);
         setLoading(false);
       }
     }
-
     loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [currentPage, pageSize, debouncedSearch, filterTemperature]);
 
   const refreshLeads = async () => {
     setLoading(true);
-    const data = await marketingService.getClientes();
-    const onlyLeads = data.filter(c => c.status === "Novo Lead" || c.status === "Em Contato" || !c.status);
-    setLeads(onlyLeads);
+    const offset = (currentPage - 1) * pageSize;
+    const { data, count } = await marketingService.getLeadsPaginated(
+      pageSize,
+      offset,
+      debouncedSearch,
+      filterTemperature
+    );
+    setLeads(data);
+    setTotalCount(count);
     setLoading(false);
   };
 
@@ -66,15 +90,10 @@ export function LeadsView() {
     window.dispatchEvent(new CustomEvent("carflax-change-tab", { detail: "Whatsapp" }));
   };
 
-  const filtered = leads.filter(c => {
-    const nome = (c.nome || c.push_name || c.remote_jid).toLowerCase();
-    const matchSearch = nome.includes(search.toLowerCase());
-    const matchTemp = filterTemperature === "Todas as Temperaturas" || c.temperatura === filterTemperature;
-    // Como a plataforma ainda não está no banco, tratamos todos como WhatsApp por enquanto
-    const matchPlatform = filterPlatform === "Todas as Plataformas" || filterPlatform === "WhatsApp";
-    
-    return matchSearch && matchTemp && matchPlatform;
-  });
+  // Como a plataforma ainda não está no banco, tratamos todos como WhatsApp por enquanto
+  const filtered = filterPlatform === "Todas as Plataformas" || filterPlatform === "WhatsApp"
+    ? leads
+    : [];
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden p-8">
@@ -131,7 +150,7 @@ export function LeadsView() {
             <div className="grid grid-cols-[2fr_1fr_2fr_1fr_1fr] gap-4 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               <span>Lead / Contato</span>
               <span>Telefone</span>
-              <span>Última Interação</span>
+              <span>Motivo</span>
               <span>Temperatura</span>
               <span className="text-right">Ações</span>
             </div>
@@ -141,10 +160,6 @@ export function LeadsView() {
               const phone = lead.remote_jid.split('@')[0];
               const temp = lead.temperatura || "Frio";
               const tempCfg = TEMP_CONFIG[temp as keyof typeof TEMP_CONFIG] || TEMP_CONFIG.Frio;
-              const updatedAt = lead.ultima_conversa_em
-                ? new Date(lead.ultima_conversa_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : "";
-              
               return (
                 <div key={lead.remote_jid} className="grid grid-cols-[2fr_1fr_2fr_1fr_1fr] gap-4 items-center bg-card border border-border/50 rounded-2xl p-3 hover:border-primary/30 hover:bg-primary/[0.02] transition-all group">
                   {/* Lead / Contato */}
@@ -172,17 +187,12 @@ export function LeadsView() {
                     {phone}
                   </div>
 
-                  {/* Última Interação */}
+                  {/* Motivo do Arquivamento */}
                   <div className="min-w-0">
-                    {lead.ultima_mensagem ? (
-                      <div className="flex flex-col">
-                        <p className="text-xs font-medium text-foreground/80 truncate italic">
-                          "{lead.ultima_mensagem}"
-                        </p>
-                        <p className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5" /> {updatedAt}
-                        </p>
-                      </div>
+                    {lead.arquivado ? (
+                      <span className="text-xs font-bold text-rose-500/90 bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-xl uppercase tracking-wider text-[10px]">
+                        {lead.status || "Arquivado"}
+                      </span>
                     ) : (
                       <span className="text-xs text-muted-foreground/50">—</span>
                     )}
@@ -220,6 +230,56 @@ export function LeadsView() {
           </div>
         )}
       </div>
+
+      {!loading && totalCount > 0 && (
+        <div className="px-6 py-4 border-t border-border/50 flex items-center justify-between bg-card/10 text-xs text-muted-foreground font-bold mt-2 rounded-b-2xl">
+          <div>
+            Exibindo {((currentPage - 1) * pageSize) + 1} a {Math.min(currentPage * pageSize, totalCount)} de {totalCount} leads
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {/* Page Size Selector */}
+            <div className="flex items-center gap-1.5">
+              <span>Mostrar</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-secondary/50 border border-border rounded-lg px-2 py-1 outline-none font-bold text-foreground text-xs"
+              >
+                {[25, 50, 100, 250].map(size => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="flex items-center gap-1">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                className="px-3 py-1.5 rounded-lg border border-border bg-secondary/30 hover:bg-secondary text-foreground disabled:opacity-40 disabled:hover:bg-secondary/30 transition-all font-black uppercase text-[10px] tracking-wider font-bold"
+              >
+                Anterior
+              </button>
+              
+              <span className="px-3 py-1.5 bg-primary/10 border border-primary/20 text-primary rounded-lg text-xs font-black">
+                {currentPage} / {Math.ceil(totalCount / pageSize)}
+              </span>
+
+              <button
+                disabled={currentPage >= Math.ceil(totalCount / pageSize)}
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(totalCount / pageSize)))}
+                className="px-3 py-1.5 rounded-lg border border-border bg-secondary/30 hover:bg-secondary text-foreground disabled:opacity-40 disabled:hover:bg-secondary/30 transition-all font-black uppercase text-[10px] tracking-wider font-bold"
+              >
+                Próximo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

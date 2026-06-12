@@ -82,8 +82,32 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
 
   const [isCardModalOpen, setIsCardModalOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<Partial<KanbanCard> | null>(null);
+  const [draggedOverCardId, setDraggedOverCardId] = useState<string | null>(null);
+  const [draggedOverCardPart, setDraggedOverCardPart] = useState<"top" | "bottom" | null>(null);
 
   const creatorName = userProfile?.name || "Marketing";
+
+  const getResponsibleUser = (createdByField?: string) => {
+    const responsibleName = getCardResponsible(createdByField);
+    if (!responsibleName) return null;
+    const rNameLower = responsibleName.trim().toLowerCase();
+    
+    // 1. Try exact match (case insensitive)
+    let found = usersList.find(u => u.name.trim().toLowerCase() === rNameLower);
+    if (found) return found;
+    
+    // 2. Try prefix match
+    found = usersList.find(u => {
+      const uNameLower = u.name.trim().toLowerCase();
+      return uNameLower.startsWith(rNameLower) || rNameLower.startsWith(uNameLower);
+    });
+    if (found) return found;
+    
+    // 3. Try first name match
+    const rFirstName = rNameLower.split(" ")[0];
+    found = usersList.find(u => u.name.trim().toLowerCase().split(" ")[0] === rFirstName);
+    return found || null;
+  };
 
   // ── Load cards and users ──────────────────────────────────────────────────
   useEffect(() => {
@@ -243,30 +267,136 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     e.preventDefault();
     setDraggedOverColumn(null);
     const cardId = e.dataTransfer.getData("text/plain");
+    if (!cardId) return;
 
     const targetCard = cards.find(c => c.id === cardId);
     if (!targetCard || targetCard.column_id === targetColumnId) return;
 
+    const sourceColumnId = targetCard.column_id;
     const newOrderIndex = cards.filter(x => x.column_id === targetColumnId).length;
 
-    // Optimistic update
-    setCards(prev => prev.map(c =>
-      c.id === cardId ? { ...c, column_id: targetColumnId, order_index: newOrderIndex } : c
-    ));
+    // Move card to target column at the end
+    const movedCard = { ...targetCard, column_id: targetColumnId, order_index: newOrderIndex };
+
+    // Re-index source column
+    const sourceColCards = cards
+      .filter(c => c.column_id === sourceColumnId && c.id !== cardId)
+      .sort((a, b) => a.order_index - b.order_index);
+
+    const reindexedSourceCards = sourceColCards.map((c, idx) => ({
+      ...c,
+      order_index: idx
+    }));
+
+    const updatedCardsMap = new Map<string, KanbanCard>();
+    reindexedSourceCards.forEach(c => updatedCardsMap.set(c.id, c));
+
+    const newCards = cards.map(c => {
+      if (c.id === cardId) return movedCard;
+      return updatedCardsMap.get(c.id) || c;
+    });
+
+    newCards.sort((a, b) => a.order_index - b.order_index);
+    setCards(newCards);
 
     try {
-      const { error } = await supabase
-        .from("marketing_esteira")
-        .update({ column_id: targetColumnId, order_index: newOrderIndex })
-        .eq("id", cardId);
+      const changedCards = newCards.filter(c => {
+        const orig = cards.find(oc => oc.id === c.id);
+        return !orig || orig.column_id !== c.column_id || orig.order_index !== c.order_index;
+      });
 
-      if (error) throw error;
+      for (const card of changedCards) {
+        await supabase
+          .from("marketing_esteira")
+          .update({ column_id: card.column_id, order_index: card.order_index })
+          .eq("id", card.id);
+      }
     } catch (err) {
       console.error("[EsteiraView] Erro ao mover card:", err);
-      // Rollback
-      setCards(prev => prev.map(c =>
-        c.id === cardId ? targetCard : c
-      ));
+      loadCards();
+    }
+  };
+
+  const handleCardDrop = async (e: React.DragEvent, targetCardId: string, position: "top" | "bottom") => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggedOverColumn(null);
+    setDraggedOverCardId(null);
+    setDraggedOverCardPart(null);
+
+    const cardId = e.dataTransfer.getData("text/plain");
+    if (!cardId || cardId === targetCardId) return;
+
+    const draggedCard = cards.find(c => c.id === cardId);
+    const targetCard = cards.find(c => c.id === targetCardId);
+    if (!draggedCard || !targetCard) return;
+
+    const targetColumnId = targetCard.column_id;
+    const sourceColumnId = draggedCard.column_id;
+
+    // Get all other cards in the target column
+    let targetColCards = cards
+      .filter(c => c.column_id === targetColumnId && c.id !== cardId)
+      .sort((a, b) => a.order_index - b.order_index);
+
+    const targetCardIndex = targetColCards.findIndex(c => c.id === targetCardId);
+    
+    // Determine the exact insertion index based on whether we dropped on the top or bottom half
+    const targetIndex = position === "bottom" ? targetCardIndex + 1 : targetCardIndex;
+    
+    // Insert the dragged card
+    const movedCard = { ...draggedCard, column_id: targetColumnId, order_index: targetIndex };
+    targetColCards.splice(targetIndex, 0, movedCard);
+
+    // Re-index target column
+    const reindexedTargetCards = targetColCards.map((c, idx) => ({
+      ...c,
+      order_index: idx
+    }));
+
+    // Re-index source column if it's different
+    let reindexedSourceCards: KanbanCard[] = [];
+    if (sourceColumnId !== targetColumnId) {
+      const sourceColCards = cards
+        .filter(c => c.column_id === sourceColumnId && c.id !== cardId)
+        .sort((a, b) => a.order_index - b.order_index);
+      
+      reindexedSourceCards = sourceColCards.map((c, idx) => ({
+        ...c,
+        order_index: idx
+      }));
+    }
+
+    // Combine updates
+    const updatedCardsMap = new Map<string, KanbanCard>();
+    reindexedTargetCards.forEach(c => updatedCardsMap.set(c.id, c));
+    reindexedSourceCards.forEach(c => updatedCardsMap.set(c.id, c));
+
+    const newCards = cards.map(c => {
+      if (c.id === cardId) {
+        return { ...draggedCard, column_id: targetColumnId, order_index: targetIndex };
+      }
+      return updatedCardsMap.get(c.id) || c;
+    });
+
+    newCards.sort((a, b) => a.order_index - b.order_index);
+    setCards(newCards);
+
+    try {
+      const changedCards = newCards.filter(c => {
+        const orig = cards.find(oc => oc.id === c.id);
+        return !orig || orig.column_id !== c.column_id || orig.order_index !== c.order_index;
+      });
+
+      for (const card of changedCards) {
+        await supabase
+          .from("marketing_esteira")
+          .update({ column_id: card.column_id, order_index: card.order_index })
+          .eq("id", card.id);
+      }
+    } catch (err) {
+      console.error("[EsteiraView] Erro ao reordenar card:", err);
+      loadCards();
     }
   };
 
@@ -329,10 +459,12 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
               <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 custom-scrollbar min-h-[150px]">
                 {loading ? (
                   Array.from({ length: 2 }).map((_, idx) => (
-                    <div key={idx} className="bg-card border border-border/50 p-4 rounded-xl animate-pulse space-y-3">
-                      <div className="h-4 bg-secondary rounded w-3/4" />
-                      <div className="h-3 bg-secondary rounded w-5/6" />
-                      <div className="flex justify-between items-center pt-2">
+                    <div key={idx} className="bg-card border border-border/50 p-4 rounded-xl animate-pulse relative h-[145px] shrink-0">
+                      <div className="space-y-3">
+                        <div className="h-4 bg-secondary rounded w-3/4" />
+                        <div className="h-3 bg-secondary rounded w-5/6" />
+                      </div>
+                      <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center pt-2 border-t border-border/30">
                         <div className="h-5 bg-secondary rounded w-20" />
                         <div className="h-5 bg-secondary rounded-full w-5" />
                       </div>
@@ -348,10 +480,33 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                         key={card.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, card.id)}
-                        className="bg-card hover:shadow-md border border-border hover:border-border/80 transition-all duration-200 hover:-translate-y-0.5 rounded-xl p-4 cursor-grab active:cursor-grabbing relative overflow-hidden group"
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const relativeY = e.clientY - rect.top;
+                          const isBottom = relativeY > rect.height / 2;
+                          setDraggedOverCardId(card.id);
+                          setDraggedOverCardPart(isBottom ? "bottom" : "top");
+                        }}
+                        onDragLeave={() => {
+                          setDraggedOverCardId(null);
+                          setDraggedOverCardPart(null);
+                        }}
+                        onDrop={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const relativeY = e.clientY - rect.top;
+                          const isBottom = relativeY > rect.height / 2;
+                          setDraggedOverCardId(null);
+                          setDraggedOverCardPart(null);
+                          handleCardDrop(e, card.id, isBottom ? "bottom" : "top");
+                        }}
+                        className={`bg-card hover:shadow-md border border-border hover:border-border/80 transition-all duration-150 hover:-translate-y-0.5 rounded-xl p-4 pb-14 cursor-grab active:cursor-grabbing relative overflow-hidden group h-[145px] shrink-0 ${
+                          draggedOverCardId === card.id && draggedOverCardPart === "top" ? "border-t-primary border-t-2 scale-[1.01] shadow-md" : 
+                          draggedOverCardId === card.id && draggedOverCardPart === "bottom" ? "border-b-primary border-b-2 scale-[1.01] shadow-md" : ""
+                        }`}
                       >
                         {/* Card top row */}
-                        <div className="flex items-start justify-between gap-2 mb-2.5">
+                        <div className="flex items-start justify-between gap-2 mb-1.5 shrink-0">
                           {card.tag_name ? (
                             <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider ${tagStyle}`}>
                               {card.tag_name}
@@ -382,7 +537,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                               <button
                                 onClick={() => { setSelectedCard(card); setIsViewOnly(true); setIsCardModalOpen(true); }}
                                 className="p-1 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors"
-                                title="Visualizar Detalhes"
+                                  title="Visualizar Detalhes"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
@@ -391,12 +546,14 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                         </div>
 
                         {/* Title */}
-                        <h4 className="text-xs font-bold text-foreground mb-1 leading-snug break-words">{card.title}</h4>
+                        <h4 className="text-xs font-bold text-foreground mb-1 leading-snug break-words line-clamp-2" title={card.title}>
+                          {card.title}
+                        </h4>
 
                         {/* Description */}
                         {card.description && (
                           <p 
-                            className="text-[11px] text-muted-foreground line-clamp-2 mb-3 leading-relaxed break-words whitespace-pre-line"
+                            className="text-[11px] text-muted-foreground line-clamp-1 leading-relaxed break-words whitespace-pre-line"
                             title={card.description}
                           >
                             {card.description}
@@ -404,7 +561,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                         )}
 
                         {/* Footer */}
-                        <div className="pt-2.5 border-t border-border/30 flex items-center justify-between gap-2 text-[10px] font-bold text-muted-foreground">
+                        <div className="absolute bottom-4 left-4 right-4 pt-2 border-t border-border/30 flex items-center justify-between gap-2 text-[10px] font-bold text-muted-foreground">
                           {card.due_date ? (
                             <div className={`flex items-center gap-1.5 ${expired ? "text-red-500 bg-red-500/5 px-2 py-0.5 rounded-lg border border-red-500/10 animate-pulse" : ""}`}>
                               <Calendar className="w-3.5 h-3.5" />
@@ -413,17 +570,19 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                           ) : <div className="w-1" />}
 
                            {(() => {
-                             const userObj = usersList.find(u => u.name === card.created_by_name);
-                             const userAvatar = userObj?.avatar;
+                             const responsibleUser = getResponsibleUser(card.created_by_name);
+                             const userAvatar = responsibleUser?.avatar;
+                             const displayName = responsibleUser?.name || getCardResponsible(card.created_by_name);
+                             
                              return (
                                <div 
                                  className="flex items-center gap-1.5 bg-secondary/50 pl-1 pr-2 py-0.5 rounded-md border border-border/40 shrink-0"
-                                 title={card.created_by_name || "Sem responsável"}
+                                 title={displayName || "Sem responsável"}
                                >
                                  {userAvatar ? (
                                    <img 
                                      src={userAvatar} 
-                                     alt={card.created_by_name} 
+                                     alt={displayName} 
                                      className="w-4 h-4 rounded-full object-cover shrink-0 border border-border/40" 
                                      onError={(e) => {
                                        // Fallback para caso o link da imagem quebre
@@ -434,7 +593,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                                    <User className="w-3 h-3 text-muted-foreground/70" />
                                  )}
                                  <span className="truncate max-w-[60px] text-[9px] uppercase tracking-wider">
-                                   {card.created_by_name?.split(" ")[0]}
+                                   {displayName.split(" ")[0]}
                                  </span>
                                </div>
                              );

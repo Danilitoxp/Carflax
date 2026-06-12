@@ -17,6 +17,8 @@ export interface MarketingCliente {
   mensagens_nao_lidas?: number;
   valor_venda?: number;
   data_venda?: string;
+  origem?: string;
+  campanha?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -70,6 +72,23 @@ export const marketingService = {
   async upsertCliente(cliente: MarketingCliente) {
     const results = await this.upsertClientes([cliente]);
     return results.length > 0 ? results[0] : null;
+  },
+
+  /**
+   * Busca um cliente pelo remote_jid
+   */
+  async getCliente(remoteJid: string): Promise<MarketingCliente | null> {
+    const { data, error } = await supabase
+      .from("marketing_clientes")
+      .select("*")
+      .eq("remote_jid", remoteJid)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[MarketingService] Erro ao buscar cliente:", error.message);
+      return null;
+    }
+    return data;
   },
 
   /**
@@ -289,6 +308,56 @@ export const marketingService = {
       console.error("[MarketingService] Erro ao arquivar/desarquivar:", error);
       throw error;
     }
+  },
+
+  async archiveInactiveClientes(days = 2, motivo = "Inatividade") {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    const { error } = await supabase
+      .from("marketing_clientes")
+      .update({
+        arquivado: true,
+        status: motivo,
+        updated_at: new Date().toISOString()
+      })
+      .or("arquivado.eq.false,arquivado.is.null")
+      .like('remote_jid', '%@s.whatsapp.net')
+      .lt("ultima_conversa_em", cutoffDate.toISOString());
+
+    if (error) {
+      console.error("[MarketingService] Erro ao arquivar inativos:", error.message);
+      throw error;
+    }
+    return true;
+  },
+
+  /**
+   * Busca leads de forma paginada com filtros aplicados diretamente no Supabase
+   */
+  async getLeadsPaginated(limit = 50, offset = 0, search = "", filterTemperature = "Todas as Temperaturas") {
+    let query = supabase
+      .from("marketing_clientes")
+      .select("*", { count: "exact" })
+      .or("status.is.null,and(status.neq.Negociando,status.neq.Convertido)");
+
+    if (search) {
+      query = query.or(`nome.ilike.%${search}%,push_name.ilike.%${search}%,remote_jid.ilike.%${search}%`);
+    }
+
+    if (filterTemperature !== "Todas as Temperaturas") {
+      query = query.eq("temperatura", filterTemperature);
+    }
+
+    const { data, error, count } = await query
+      .order("ultima_conversa_em", { ascending: false, nullsFirst: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao buscar leads paginados:", error.message);
+      return { data: [], count: 0 };
+    }
+    return { data: (data || []) as MarketingCliente[], count: count || 0 };
   },
 
   async registerSale(remoteJid: string, value: number) {

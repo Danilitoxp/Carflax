@@ -23,6 +23,7 @@ import {
   Plus,
   FileBadge,
   ChevronDown,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect } from "react";
@@ -287,6 +288,7 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
       cargo: userProfile.role || "",
       avatar: userProfile.avatar || "",
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userProfile?.id, userProfile?.avatar]);
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -313,9 +315,10 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
         // Disparar evento para atualizar o perfil globalmente sem refresh
         window.dispatchEvent(new CustomEvent("carflax-profile-updated"));
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Settings] Erro ao trocar foto:", err);
-      if (err.message?.includes("Refresh Token Not Found")) {
+      const error = err as Error;
+      if (error.message?.includes("Refresh Token Not Found")) {
         alert("Sua sessão expirou. Por favor, saia e entre novamente para continuar.");
       } else {
         alert("Erro ao enviar imagem. Verifique sua conexão ou tente novamente.");
@@ -775,10 +778,17 @@ function AppearanceTab() {
 /* ─────────────────────────────────────────────
    ORÇAMENTOS - CONFIGURAÇÕES
 ───────────────────────────────────────────── */
+interface LossResponsible {
+  id: string;
+  motivo: string;
+  nome: string;
+  telefone: string;
+}
+
 function OrcamentosTab() {
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
-  const [coachEnabled, setCoachEnabled] = useState<boolean>(true);
+  const [responsibles, setResponsibles] = useState<LossResponsible[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -804,14 +814,20 @@ function OrcamentosTab() {
 
       if (configData) setSelectedUserId(configData.value);
 
-      // 3. Fetch Coach IA config
-      const { data: aiData } = await supabase
+      // 4. Fetch Loss Responsibles config
+      const { data: responsiblesData } = await supabase
         .from("crm_config")
         .select("value")
-        .eq("key", "coach_ia_enabled")
+        .eq("key", "crm_loss_responsibles")
         .maybeSingle();
-      
-      if (aiData) setCoachEnabled(aiData.value === "true");
+
+      if (responsiblesData?.value) {
+        try {
+          setResponsibles(JSON.parse(responsiblesData.value));
+        } catch (e) {
+          console.error("Erro ao parsear crm_loss_responsibles:", e);
+        }
+      }
 
       setLoading(false);
     }
@@ -824,7 +840,7 @@ function OrcamentosTab() {
       .from("crm_config")
       .upsert([
         { key: "centralizer_user_id", value: selectedUserId || null },
-        { key: "coach_ia_enabled", value: String(coachEnabled) }
+        { key: "crm_loss_responsibles", value: JSON.stringify(responsibles) }
       ]);
 
     setSaving(false);
@@ -873,23 +889,122 @@ function OrcamentosTab() {
           </div>
         </div>
 
-        {/* Coach IA Global Control */}
-        <div className="mt-8 pt-8 border-t border-slate-50 dark:border-white/5">
-          <div className="flex items-center justify-between p-4 bg-blue-600/5 dark:bg-blue-500/5 border border-blue-600/10 dark:border-blue-500/10 rounded-2xl">
+        {/* Responsáveis por perda de orçamento */}
+        <div className="mt-8 pt-8 border-t border-slate-50 dark:border-white/5 space-y-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-blue-600 dark:bg-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20">
-                <Sparkles className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-rose-50 dark:bg-rose-500/10 rounded-xl flex items-center justify-center border border-rose-100 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
+                <Smartphone className="w-5 h-5" />
               </div>
               <div>
                 <h5 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-1">
-                  Inteligência Artificial (Coach IA)
+                  Responsáveis por Notificações de Perda
                 </h5>
-                <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                  Habilitar robô de coaching para todos os usuários
+                <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
+                  Defina quem receberá alertas no WhatsApp de acordo com o motivo de perda do orçamento.
                 </p>
               </div>
             </div>
-            <Toggle checked={coachEnabled} onChange={setCoachEnabled} />
+            
+            <button
+              type="button"
+              onClick={() => {
+                setResponsibles(prev => [
+                  ...prev,
+                  {
+                    id: String(Date.now()),
+                    motivo: "Todos os Motivos",
+                    nome: "",
+                    telefone: ""
+                  }
+                ]);
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Adicionar Responsável
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden bg-slate-50/10 dark:bg-slate-900/10 shadow-sm">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-200 dark:border-white/10 select-none">
+                <tr>
+                  <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] w-[35%]">Motivo de Perda</th>
+                  <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] w-[35%]">Nome do Responsável</th>
+                  <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] w-[20%]">WhatsApp (com DDD)</th>
+                  <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] text-center w-[10%]">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-white/10">
+                {responsibles.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400 dark:text-slate-600 font-bold uppercase tracking-wider text-[9px]">
+                      Nenhum responsável configurado. Os alertas de perda serão enviados apenas para o centralizador.
+                    </td>
+                  </tr>
+                ) : (
+                  responsibles.map((resp) => (
+                    <tr key={resp.id} className="hover:bg-slate-50/30 dark:hover:bg-white/[0.01] transition-colors">
+                      <td className="px-3 py-2.5">
+                        <select
+                          value={resp.motivo}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setResponsibles(prev => prev.map(r => r.id === resp.id ? { ...r, motivo: val } : r));
+                          }}
+                          className="w-full px-2.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-2 focus:ring-blue-600/5 transition-all"
+                        >
+                          <option value="Todos os Motivos">Todos os Motivos</option>
+                          <option value="Preço Alto">Preço Alto</option>
+                          <option value="Falta de Estoque">Falta de Estoque</option>
+                          <option value="Desistiu">Desistiu</option>
+                          <option value="Prazo de Entrega">Prazo de Entrega</option>
+                          <option value="Mão de Obra e Material">Mão de Obra e Material</option>
+                          <option value="Comparativo de Linhas">Comparativo de Linhas</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="text"
+                          value={resp.nome}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setResponsibles(prev => prev.map(r => r.id === resp.id ? { ...r, nome: val } : r));
+                          }}
+                          placeholder="Nome (ex: João do Estoque)"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-2 focus:ring-blue-600/5 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
+                        />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="text"
+                          value={resp.telefone}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setResponsibles(prev => prev.map(r => r.id === resp.id ? { ...r, telefone: val } : r));
+                          }}
+                          placeholder="Ex: 5511999999999"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-2 focus:ring-blue-600/5 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
+                        />
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResponsibles(prev => prev.filter(r => r.id !== resp.id));
+                          }}
+                          className="p-2 text-slate-400 hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                          title="Remover"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
