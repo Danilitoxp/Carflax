@@ -48,6 +48,29 @@ interface NormalizedProduct {
   quantidade?: number;
 }
 
+interface DBWhatsappMessage {
+  message_id: string;
+  remote_jid: string;
+  sender: string;
+  texto?: string;
+  tipo: string;
+  status: string;
+  timestamp: string;
+}
+
+interface DBWhatsappCliente {
+  remote_jid: string;
+  nome?: string;
+  push_name?: string;
+  foto_url?: string;
+  status?: string;
+  temperatura?: string;
+  mensagens_nao_lidas?: number;
+  arquivado?: boolean;
+  fixado?: boolean;
+  valor_venda?: number;
+}
+
 const BRAND_COLORS = [
   ['from-blue-500 to-blue-700', 'bg-blue-600'],
   ['from-emerald-500 to-emerald-700', 'bg-emerald-600'],
@@ -427,21 +450,19 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const viewModeRef = useRef<"active" | "archived">("active");
   const lastPhoneJid = useRef<string | null>(null);
   const lidToJidMap = useRef<Map<string, string>>(new Map());
-  const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const lastSeenMap = useRef<Map<string, Date>>(new Map());
   const processedMsgIds = useRef<Set<string>>(new Set());
-  const lidSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const manualOverrideRef = useRef<Map<string, number>>(new Map());
   const tempClassifyTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const [presenceChats, setPresenceChats] = useState<Map<string, string>>(new Map());
+  const [presenceChats] = useState<Map<string, string>>(new Map());
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isClassifyingTemp, setIsClassifyingTemp] = useState(false);
   const [myAvatar, setMyAvatar] = useState<string>("");
   const [viewMode, setViewMode] = useState<"active" | "archived">("active");
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, chat: Chat } | null>(null);
-  const [, forceUpdate] = useState(0); 
+
 
   useEffect(() => {
     selectedChatRef.current = selectedChat;
@@ -1082,51 +1103,6 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     socket.on('contacts.update', handleContactsUpdate);
     socket.on('CONTACTS_UPDATE', handleContactsUpdate);
 
-    const handlePresenceUpdate = (data: Record<string, unknown>) => {
-      const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
-      if (data.instance && data.instance !== instanceName) return;
-
-      const raw = (data.data ?? data) as Record<string, unknown>;
-      const rawJid = (raw.id ?? raw.remoteJid) as string | undefined;
-      if (!rawJid) return;
-
-      const jid = rawJid.endsWith('@lid')
-        ? (lidToJidMap.current.get(rawJid) ?? rawJid)
-        : rawJid;
-
-      const presences = raw.presences as Record<string, { lastKnownPresence?: string }> | undefined;
-      const presence = presences
-        ? Object.values(presences)[0]?.lastKnownPresence
-        : (raw.presence as string | undefined);
-      // Recebido: "typing" ou "composing" = digitando | "recording" = gravando áudio
-      const presenceType = (presence === 'composing' || presence === 'typing') ? 'composing'
-        : presence === 'recording' ? 'recording'
-        : null;
-
-      setPresenceChats(prev => {
-        const next = new Map(prev);
-        if (presenceType) {
-          next.set(jid, presenceType);
-          const existing = typingTimers.current.get(jid);
-          if (existing) clearTimeout(existing);
-          const timer = setTimeout(() => {
-            setPresenceChats(s => { const n = new Map(s); n.delete(jid); return n; });
-            typingTimers.current.delete(jid);
-          }, 5000);
-          typingTimers.current.set(jid, timer);
-        } else {
-          // Contato ficou offline/indisponível — registra o "visto por último"
-          if (presence === 'unavailable' || presence === 'paused') {
-            lastSeenMap.current.set(jid, new Date());
-            forceUpdate(n => n + 1); // re-render para atualizar o header
-          }
-          next.delete(jid);
-          const existing = typingTimers.current.get(jid);
-          if (existing) { clearTimeout(existing); typingTimers.current.delete(jid); }
-        }
-        return next;
-      });
-    };
 
     // ── CONFIGURAÇÃO DO SUPABASE REALTIME (SUBSTITUTO DO WEBSOCKET) ───────
     console.log('[Realtime] Inicializando canais de escuta Supabase Realtime...');
@@ -1138,7 +1114,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         schema: 'public',
         table: 'marketing_whatsapp'
       }, (payload) => {
-        const newMsg = payload.new as any;
+        const newMsg = payload.new as DBWhatsappMessage;
         console.log('[Realtime] Nova mensagem detectada no Supabase:', newMsg);
         
         const isMe = newMsg.sender === 'me';
@@ -1151,7 +1127,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           pushName: isMe ? "Me" : "",
           messageTimestamp: Math.floor(new Date(newMsg.timestamp).getTime() / 1000),
           status: newMsg.status === 'read' ? 3 : newMsg.status === 'delivered' ? 2 : 1,
-          message: {} as any
+          message: {} as Record<string, unknown>
         };
 
         if (newMsg.tipo === 'text') {
@@ -1168,7 +1144,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
           evoPayload.message = { stickerMessage: { mimetype: 'image/webp' } };
         }
 
-        processMessage(evoPayload as any);
+        processMessage(evoPayload as unknown as EvoMessageResponse);
       })
       // 2. Escuta atualizações de status das mensagens (equivalente a messages.update)
       .on('postgres_changes', {
@@ -1176,7 +1152,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         schema: 'public',
         table: 'marketing_whatsapp'
       }, (payload) => {
-        const updatedMsg = payload.new as any;
+        const updatedMsg = payload.new as DBWhatsappMessage;
         console.log('[Realtime] Atualização de mensagem detectada:', updatedMsg);
         
         const evoUpdatePayload = {
@@ -1193,7 +1169,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         schema: 'public',
         table: 'marketing_clientes'
       }, (payload) => {
-        const updatedContact = payload.new as any;
+        const updatedContact = payload.new as DBWhatsappCliente;
         console.log('[Realtime] Atualização de cliente detectada:', updatedContact);
         
         startTransition(() => {

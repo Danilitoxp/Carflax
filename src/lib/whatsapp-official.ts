@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { Socket } from "socket.io-client";
 
 /**
  * Cliente de serviço para o WhatsApp Oficial (Meta Cloud API)
@@ -10,38 +10,49 @@ export interface EvoSendResponse {
   status: string;
 }
 
+export interface InstanceInfoResponse {
+  instance: {
+    owner: string;
+    profilePictureUrl?: string;
+  };
+}
+
+export interface MediaBase64Response {
+  base64: string;
+  mimetype: string;
+}
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3002";
 
 export const whatsappOfficialApi = {
   /**
    * Conecta ao WebSocket (Mockado - o frontend usará Supabase Realtime diretamente)
    */
-  connectWebSocket() {
+  connectWebSocket(): Socket {
     console.log("[whatsappOfficialApi] Usando Supabase Realtime em vez do WebSocket da Evolution API.");
     return {
-      on: (event: string, callback: (...args: any[]) => void) => {
-        // No-op - eventos em tempo real agora vêm do Supabase
-        console.log(`[WebSocket Mock] Evento registrado na UI: ${event}`);
+      on() {
+        // No-op
       },
-      off: (event: string) => {
-        console.log(`[WebSocket Mock] Evento removido: ${event}`);
-      },
+      off() {},
       connected: true,
       active: true,
-    } as any;
+    } as unknown as Socket;
   },
 
   /**
    * Lista todos os chats (não necessário, a UI carrega do Supabase)
    */
-  async getChats(): Promise<any[]> {
+  async getChats(): Promise<unknown[]> {
     return [];
   },
 
   /**
    * Busca mensagens de uma conversa específica (não necessário, a UI carrega do Supabase)
    */
-  async getMessages(remoteJid: string, count: number = 15): Promise<any> {
+  async getMessages(remoteJid?: string, count?: number): Promise<unknown> {
+    void remoteJid;
+    void count;
     return { data: [] };
   },
 
@@ -72,50 +83,56 @@ export const whatsappOfficialApi = {
   /**
    * Simula o status "digitando..." ou "gravando áudio..." (Não suportado pela Meta Cloud API)
    */
-  async setPresence(remoteJid: string, presence: 'composing' | 'recording' | 'paused'): Promise<any> {
-    // Retorna mock de sucesso silencioso
+  async setPresence(remoteJid?: string, presence?: 'composing' | 'recording' | 'paused'): Promise<unknown> {
+    void remoteJid;
+    void presence;
     return { ok: true };
   },
 
   /**
    * Arquiva ou desarquiva uma conversa (Tratado localmente via Supabase no marketingService)
    */
-  async archiveChat(remoteJid: string, archive: boolean = true): Promise<any> {
+  async archiveChat(remoteJid?: string, archive?: boolean): Promise<unknown> {
+    void remoteJid;
+    void archive;
     return { ok: true };
   },
 
   /**
    * Busca informações de um contato (não necessário, a UI carrega do Supabase)
    */
-  async getContact(remoteJid: string): Promise<any> {
+  async getContact(remoteJid?: string): Promise<unknown> {
+    void remoteJid;
     return null;
   },
 
   /**
    * Inscreve para receber presença de um contato (Não suportado pela Meta Cloud API)
    */
-  async subscribePresence(remoteJid: string): Promise<void> {
-    // No-op
+  async subscribePresence(remoteJid?: string): Promise<void> {
+    void remoteJid;
   },
 
   /**
    * Busca a URL da foto de perfil de um contato (Não suportado publicamente de forma simples)
    */
-  async getProfilePic(remoteJid: string): Promise<string | null> {
+  async getProfilePic(remoteJid?: string): Promise<string | null> {
+    void remoteJid;
     return null;
   },
 
   /**
    * Baixa a mídia de uma mensagem em base64 (Tratado pelo webhook do backend)
    */
-  async getMediaBase64(messagePayload: any): Promise<any> {
+  async getMediaBase64(messagePayload?: unknown): Promise<MediaBase64Response | null> {
+    void messagePayload;
     return null;
   },
 
   /**
    * Envia uma imagem
    */
-  async sendImage(remoteJid: string, imageUrl: string, caption?: string): Promise<any> {
+  async sendImage(remoteJid: string, imageUrl: string, caption?: string): Promise<unknown> {
     const response = await fetch(`${BACKEND_URL}/api/whatsapp/send`, {
       method: "POST",
       headers: {
@@ -141,18 +158,14 @@ export const whatsappOfficialApi = {
    * Envia um documento (Aceita uma URL do Supabase Storage ou base64)
    */
   async sendDocument(remoteJid: string, fileUrlOrBase64: string, mimetype: string, filename: string, caption?: string): Promise<EvoSendResponse> {
-    // Se recebermos uma URL válida do Supabase Storage, enviamos ela diretamente para a Meta.
-    // Caso contrário (se for base64), precisaríamos subir no Supabase primeiro.
     let mediaUrl = fileUrlOrBase64;
 
     if (fileUrlOrBase64.startsWith("data:") || !fileUrlOrBase64.startsWith("http")) {
-      // É uma string base64: faz o upload para o Supabase Storage antes de chamar o envio
       const base64Data = fileUrlOrBase64.includes("base64,") ? fileUrlOrBase64.split("base64,")[1] : fileUrlOrBase64;
       const cleanMimetype = mimetype || "application/octet-stream";
       const ext = filename.split(".").pop() || "bin";
       const storageFilename = `doc_${Date.now()}.${ext}`;
 
-      // Import dinâmico do marketingService para evitar dependências circulares
       const { marketingService } = await import("./marketing-service");
       const publicUrl = await marketingService.uploadMedia(base64Data, cleanMimetype, storageFilename);
       if (!publicUrl) {
@@ -186,7 +199,7 @@ export const whatsappOfficialApi = {
   /**
    * Busca informações da própria instância (Mockado)
    */
-  async getInstanceInfo(): Promise<any> {
+  async getInstanceInfo(): Promise<InstanceInfoResponse | null> {
     return {
       instance: {
         owner: "Oficial",
