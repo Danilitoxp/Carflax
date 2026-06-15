@@ -37,6 +37,7 @@ import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { SorteioRealtimeModal } from "@/components/ui/SorteioRealtimeModal";
 import { RankingCopaView } from "@/components/crm/campanhas/RankingCopaView";
+import { PrivacyPolicyView } from "@/components/public/PrivacyPolicyView";
 
 export interface UserProfile {
   id?: string;
@@ -1596,6 +1597,11 @@ function App() {
       window.fetch = originalFetch;
     };
   }, [fetchProfile, forceLogout]); // Removido 'session' da dependência para evitar loop de requisições
+
+  const isPrivacyPolicy = window.location.pathname.includes("/politica-privacidade") || window.location.pathname.includes("/privacy-policy");
+  if (isPrivacyPolicy) {
+    return <PrivacyPolicyView />;
+  }
 
   if (loading) return <LoadingScreen />;
 

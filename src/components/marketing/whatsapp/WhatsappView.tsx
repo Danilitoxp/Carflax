@@ -28,8 +28,9 @@ import {
   Printer,
   FolderDown
 } from "lucide-react";
-import { evolutionApi } from "@/lib/evolution-v2";
+import { whatsappOfficialApi as evolutionApi } from "@/lib/whatsapp-official";
 import { marketingService } from "@/lib/marketing-service";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { apiDashboardProdutos } from "@/lib/api";
 import { transcribeAudio, classifyTemperature } from "@/lib/gemini-service";
@@ -1127,44 +1128,101 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
       });
     };
 
-    socket.on('presence.update', handlePresenceUpdate);
-    socket.on('PRESENCE_UPDATE', handlePresenceUpdate);
+    // ── CONFIGURAÇÃO DO SUPABASE REALTIME (SUBSTITUTO DO WEBSOCKET) ───────
+    console.log('[Realtime] Inicializando canais de escuta Supabase Realtime...');
+    const channel = supabase
+      .channel('whatsapp-marketing-realtime')
+      // 1. Escuta novas mensagens inseridas (equivalente a messages.upsert)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'marketing_whatsapp'
+      }, (payload) => {
+        const newMsg = payload.new as any;
+        console.log('[Realtime] Nova mensagem detectada no Supabase:', newMsg);
+        
+        const isMe = newMsg.sender === 'me';
+        const evoPayload = {
+          key: {
+            id: newMsg.message_id,
+            remoteJid: newMsg.remote_jid,
+            fromMe: isMe
+          },
+          pushName: isMe ? "Me" : "",
+          messageTimestamp: Math.floor(new Date(newMsg.timestamp).getTime() / 1000),
+          status: newMsg.status === 'read' ? 3 : newMsg.status === 'delivered' ? 2 : 1,
+          message: {} as any
+        };
 
-    // Correlaciona LID com JID de telefone usando a sequência de eventos
-    const handleChatsUpdate = (data: Record<string, unknown>) => {
-      const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
-      if (data.instance && data.instance !== instanceName) return;
-      const raw = data.data ?? data;
-      const items = Array.isArray(raw) ? raw : [raw];
-      (items as Array<{ remoteJid?: string }>).forEach(item => {
-        const lid = item.remoteJid;
-        if (lid?.endsWith('@lid') && lastPhoneJid.current) {
-          lidToJidMap.current.set(lid, lastPhoneJid.current);
-          // Debounce: evita serialização síncrona em cada evento WS
-          if (lidSaveTimer.current) clearTimeout(lidSaveTimer.current);
-          lidSaveTimer.current = setTimeout(() => {
-            localStorage.setItem('wpp_lid_map', JSON.stringify([...lidToJidMap.current.entries()]));
-          }, 2000);
+        if (newMsg.tipo === 'text') {
+          evoPayload.message = { conversation: newMsg.texto };
+        } else if (newMsg.tipo === 'image') {
+          evoPayload.message = { imageMessage: { caption: newMsg.texto, mimetype: 'image/jpeg' } };
+        } else if (newMsg.tipo === 'audio') {
+          evoPayload.message = { audioMessage: { mimetype: 'audio/ogg; codecs=opus' } };
+        } else if (newMsg.tipo === 'video') {
+          evoPayload.message = { videoMessage: { caption: newMsg.texto, mimetype: 'video/mp4' } };
+        } else if (newMsg.tipo === 'document') {
+          evoPayload.message = { documentMessage: { fileName: newMsg.texto, mimetype: 'application/pdf' } };
+        } else if (newMsg.tipo === 'sticker') {
+          evoPayload.message = { stickerMessage: { mimetype: 'image/webp' } };
         }
-      });
-    };
-    socket.on('chats.update', handleChatsUpdate);
-    socket.on('CHATS_UPDATE', handleChatsUpdate);
 
-    socket.on('disconnect', () => {
-    });
+        processMessage(evoPayload as any);
+      })
+      // 2. Escuta atualizações de status das mensagens (equivalente a messages.update)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'marketing_whatsapp'
+      }, (payload) => {
+        const updatedMsg = payload.new as any;
+        console.log('[Realtime] Atualização de mensagem detectada:', updatedMsg);
+        
+        const evoUpdatePayload = {
+          data: {
+            keyId: updatedMsg.message_id,
+            status: updatedMsg.status === 'read' ? 3 : updatedMsg.status === 'delivered' ? 2 : 1
+          }
+        };
+        handleMessageUpdate(evoUpdatePayload);
+      })
+      // 3. Escuta atualizações no cliente (equivalente a contacts.update)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'marketing_clientes'
+      }, (payload) => {
+        const updatedContact = payload.new as any;
+        console.log('[Realtime] Atualização de cliente detectada:', updatedContact);
+        
+        startTransition(() => {
+          setChats(prev => prev.map(chat => {
+            if (chat.id === updatedContact.remote_jid) {
+              return {
+                ...chat,
+                name: updatedContact.nome || updatedContact.push_name || chat.name,
+                avatar: updatedContact.foto_url || chat.avatar,
+                unreadCount: updatedContact.mensagens_nao_lidas ?? chat.unreadCount,
+                arquivado: updatedContact.arquivado ?? chat.arquivado,
+                fixado: updatedContact.fixado ?? chat.fixado,
+                leadInfo: {
+                  ...chat.leadInfo,
+                  status: updatedContact.status || chat.leadInfo?.status || "Novo Lead",
+                  temperature: (updatedContact.temperatura as Temperature) || chat.leadInfo?.temperature || "Frio",
+                  saleValue: updatedContact.valor_venda ? updatedContact.valor_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : chat.leadInfo?.saleValue
+                }
+              };
+            }
+            return chat;
+          }));
+        });
+      })
+      .subscribe();
 
     return () => {
-      socket.off('messages.upsert', handleIncomingMessage);
-      socket.off('MESSAGES_UPSERT', handleIncomingMessage);
-      socket.off('message', handleIncomingMessage);
-      socket.off('message-received', handleIncomingMessage);
-      socket.off('contacts.update', handleContactsUpdate);
-      socket.off('CONTACTS_UPDATE', handleContactsUpdate);
-      socket.off('presence.update', handlePresenceUpdate);
-      socket.off('PRESENCE_UPDATE', handlePresenceUpdate);
-      socket.off('chats.update', handleChatsUpdate);
-      socket.off('CHATS_UPDATE', handleChatsUpdate);
+      console.log('[Realtime] Removendo canais de escuta Supabase Realtime...');
+      channel.unsubscribe();
       currentTimers.forEach(t => clearTimeout(t));
       currentTimers.clear();
     };

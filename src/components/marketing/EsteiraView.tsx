@@ -335,7 +335,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     const sourceColumnId = draggedCard.column_id;
 
     // Get all other cards in the target column
-    let targetColCards = cards
+    const targetColCards = cards
       .filter(c => c.column_id === targetColumnId && c.id !== cardId)
       .sort((a, b) => a.order_index - b.order_index);
 
