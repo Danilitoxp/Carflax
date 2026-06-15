@@ -28,8 +28,9 @@ import {
   Printer,
   FolderDown
 } from "lucide-react";
-import { evolutionApi } from "@/lib/evolution-v2";
+import { whatsappOfficialApi as evolutionApi } from "@/lib/whatsapp-official";
 import { marketingService } from "@/lib/marketing-service";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { apiDashboardProdutos } from "@/lib/api";
 import { transcribeAudio, classifyTemperature } from "@/lib/gemini-service";
@@ -47,7 +48,28 @@ interface NormalizedProduct {
   quantidade?: number;
 }
 
+interface DBWhatsappMessage {
+  message_id: string;
+  remote_jid: string;
+  sender: string;
+  texto?: string;
+  tipo: string;
+  status: string;
+  timestamp: string;
+}
 
+interface DBWhatsappCliente {
+  remote_jid: string;
+  nome?: string;
+  push_name?: string;
+  foto_url?: string;
+  status?: string;
+  temperatura?: string;
+  mensagens_nao_lidas?: number;
+  arquivado?: boolean;
+  fixado?: boolean;
+  valor_venda?: number;
+}
 
 const BRAND_COLORS = [
   ['from-blue-500 to-blue-700', 'bg-blue-600'],
@@ -388,7 +410,7 @@ function CustomAudioPlayer({
   );
 }
 
-export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
+export function WhatsappOfficialView({ vendedorId }: { vendedorId?: string }) {
   const { showNotification } = useNotification();
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -433,10 +455,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const manualOverrideRef = useRef<Map<string, number>>(new Map());
   const tempClassifyTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const [presenceChats, setPresenceChats] = useState<Map<string, string>>(new Map());
-  const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const [, forceUpdate] = useState(0);
-  const lidSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [presenceChats] = useState<Map<string, string>>(new Map());
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isClassifyingTemp, setIsClassifyingTemp] = useState(false);
   const [myAvatar, setMyAvatar] = useState<string>("");
@@ -1085,96 +1104,101 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     socket.on('CONTACTS_UPDATE', handleContactsUpdate);
 
 
-    const handlePresenceUpdate = (data: Record<string, unknown>) => {
-      const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
-      if (data.instance && data.instance !== instanceName) return;
+    // ── CONFIGURAÇÃO DO SUPABASE REALTIME (SUBSTITUTO DO WEBSOCKET) ───────
+    console.log('[Realtime] Inicializando canais de escuta Supabase Realtime...');
+    const channel = supabase
+      .channel('whatsapp-marketing-realtime')
+      // 1. Escuta novas mensagens inseridas (equivalente a messages.upsert)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'marketing_whatsapp'
+      }, (payload) => {
+        const newMsg = payload.new as DBWhatsappMessage;
+        console.log('[Realtime] Nova mensagem detectada no Supabase:', newMsg);
+        
+        const isMe = newMsg.sender === 'me';
+        const evoPayload = {
+          key: {
+            id: newMsg.message_id,
+            remoteJid: newMsg.remote_jid,
+            fromMe: isMe
+          },
+          pushName: isMe ? "Me" : "",
+          messageTimestamp: Math.floor(new Date(newMsg.timestamp).getTime() / 1000),
+          status: newMsg.status === 'read' ? 3 : newMsg.status === 'delivered' ? 2 : 1,
+          message: {} as Record<string, unknown>
+        };
 
-      interface RawPresenceData {
-        key?: { remoteJid?: string };
-        id?: string;
-        presences?: Record<string, { lastKnownPresence?: string }>;
-        presence?: string;
-      }
-      const raw = (data.data ?? data) as RawPresenceData;
-      const rawJid = raw.key?.remoteJid || raw.id;
-      if (!rawJid) return;
+        if (newMsg.tipo === 'text') {
+          evoPayload.message = { conversation: newMsg.texto };
+        } else if (newMsg.tipo === 'image') {
+          evoPayload.message = { imageMessage: { caption: newMsg.texto, mimetype: 'image/jpeg' } };
+        } else if (newMsg.tipo === 'audio') {
+          evoPayload.message = { audioMessage: { mimetype: 'audio/ogg; codecs=opus' } };
+        } else if (newMsg.tipo === 'video') {
+          evoPayload.message = { videoMessage: { caption: newMsg.texto, mimetype: 'video/mp4' } };
+        } else if (newMsg.tipo === 'document') {
+          evoPayload.message = { documentMessage: { fileName: newMsg.texto, mimetype: 'application/pdf' } };
+        } else if (newMsg.tipo === 'sticker') {
+          evoPayload.message = { stickerMessage: { mimetype: 'image/webp' } };
+        }
 
-      const jid = rawJid.endsWith('@lid')
-        ? (lidToJidMap.current.get(rawJid) ?? rawJid)
-        : rawJid;
-
-      const presences = raw.presences as Record<string, { lastKnownPresence?: string }> | undefined;
-      const presence = presences
-        ? Object.values(presences)[0]?.lastKnownPresence
-        : (raw.presence as string | undefined);
-      // Recebido: "typing" ou "composing" = digitando | "recording" = gravando áudio
-      const presenceType = (presence === 'composing' || presence === 'typing') ? 'composing'
-        : presence === 'recording' ? 'recording'
-        : null;
-
-      setPresenceChats((prev: Map<string, string>) => {
-        const next = new Map(prev);
-        if (presenceType) {
-          next.set(jid, presenceType);
-          const existing = typingTimers.current.get(jid);
-          if (existing) clearTimeout(existing);
-          const timer = setTimeout(() => {
-            setPresenceChats((s: Map<string, string>) => { const n = new Map(s); n.delete(jid); return n; });
-            typingTimers.current.delete(jid);
-          }, 5000);
-          typingTimers.current.set(jid, timer);
-        } else {
-          // Contato ficou offline/indisponível — registra o "visto por último"
-          if (presence === 'unavailable' || presence === 'paused') {
-            lastSeenMap.current.set(jid, new Date());
-            forceUpdate((n: number) => n + 1); // re-render para atualizar o header
+        processMessage(evoPayload as unknown as EvoMessageResponse);
+      })
+      // 2. Escuta atualizações de status das mensagens (equivalente a messages.update)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'marketing_whatsapp'
+      }, (payload) => {
+        const updatedMsg = payload.new as DBWhatsappMessage;
+        console.log('[Realtime] Atualização de mensagem detectada:', updatedMsg);
+        
+        const evoUpdatePayload = {
+          data: {
+            keyId: updatedMsg.message_id,
+            status: updatedMsg.status === 'read' ? 3 : updatedMsg.status === 'delivered' ? 2 : 1
           }
-          next.delete(jid);
-          const existing = typingTimers.current.get(jid);
-          if (existing) { clearTimeout(existing); typingTimers.current.delete(jid); }
-        }
-        return next;
-      });
-    };
-
-    socket.on('presence.update', handlePresenceUpdate);
-    socket.on('PRESENCE_UPDATE', handlePresenceUpdate);
-
-    // Correlaciona LID com JID de telefone usando a sequência de eventos
-    const handleChatsUpdate = (data: Record<string, unknown>) => {
-      const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
-      if (data.instance && data.instance !== instanceName) return;
-      const raw = data.data ?? data;
-      const items = Array.isArray(raw) ? raw : [raw];
-      (items as Array<{ remoteJid?: string }>).forEach(item => {
-        const lid = item.remoteJid;
-        if (lid?.endsWith('@lid') && lastPhoneJid.current) {
-          lidToJidMap.current.set(lid, lastPhoneJid.current);
-          // Debounce: evita serialização síncrona em cada evento WS
-          if (lidSaveTimer.current) clearTimeout(lidSaveTimer.current);
-          lidSaveTimer.current = setTimeout(() => {
-            localStorage.setItem('wpp_lid_map', JSON.stringify([...lidToJidMap.current.entries()]));
-          }, 2000);
-        }
-      });
-    };
-    socket.on('chats.update', handleChatsUpdate);
-    socket.on('CHATS_UPDATE', handleChatsUpdate);
-
-    socket.on('disconnect', () => {
-    });
+        };
+        handleMessageUpdate(evoUpdatePayload);
+      })
+      // 3. Escuta atualizações no cliente (equivalente a contacts.update)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'marketing_clientes'
+      }, (payload) => {
+        const updatedContact = payload.new as DBWhatsappCliente;
+        console.log('[Realtime] Atualização de cliente detectada:', updatedContact);
+        
+        startTransition(() => {
+          setChats(prev => prev.map(chat => {
+            if (chat.id === updatedContact.remote_jid) {
+              return {
+                ...chat,
+                name: updatedContact.nome || updatedContact.push_name || chat.name,
+                avatar: updatedContact.foto_url || chat.avatar,
+                unreadCount: updatedContact.mensagens_nao_lidas ?? chat.unreadCount,
+                arquivado: updatedContact.arquivado ?? chat.arquivado,
+                fixado: updatedContact.fixado ?? chat.fixado,
+                leadInfo: {
+                  ...chat.leadInfo,
+                  status: updatedContact.status || chat.leadInfo?.status || "Novo Lead",
+                  temperature: (updatedContact.temperatura as Temperature) || chat.leadInfo?.temperature || "Frio",
+                  saleValue: updatedContact.valor_venda ? updatedContact.valor_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : chat.leadInfo?.saleValue
+                }
+              };
+            }
+            return chat;
+          }));
+        });
+      })
+      .subscribe();
 
     return () => {
-      socket.off('messages.upsert', handleIncomingMessage);
-      socket.off('MESSAGES_UPSERT', handleIncomingMessage);
-      socket.off('message', handleIncomingMessage);
-      socket.off('message-received', handleIncomingMessage);
-      socket.off('contacts.update', handleContactsUpdate);
-      socket.off('CONTACTS_UPDATE', handleContactsUpdate);
-      socket.off('presence.update', handlePresenceUpdate);
-      socket.off('PRESENCE_UPDATE', handlePresenceUpdate);
-      socket.off('chats.update', handleChatsUpdate);
-      socket.off('CHATS_UPDATE', handleChatsUpdate);
+      console.log('[Realtime] Removendo canais de escuta Supabase Realtime...');
+      channel.unsubscribe();
       currentTimers.forEach(t => clearTimeout(t));
       currentTimers.clear();
     };

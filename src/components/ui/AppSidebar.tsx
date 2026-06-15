@@ -64,7 +64,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Relatórios: FileBarChart,
   "Relatórios Mkt": FileBarChart,
   Marketing: Megaphone,
-  Whatsapp: Smartphone,
+  "Whatsapp Evolution": Smartphone,
+  "Whatsapp Oficial": Smartphone,
   Leads: Users,
   Cronograma: Calendar,
   Esteira: Kanban,
@@ -151,7 +152,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
 
     // Permissões específicas do departamento de MARKETING
     const isMarketingDept = userProfile?.department?.toUpperCase() === 'MARKETING';
-    const marketingItems = ["Marketing", "Whatsapp", "Leads", "Cronograma", "Esteira", "Relatórios Mkt"];
+    const marketingItems = ["Marketing", "Whatsapp Evolution", "Whatsapp Oficial", "Leads", "Cronograma", "Esteira", "Relatórios Mkt"];
     if (isMarketingDept && marketingItems.includes(label)) return true;
 
     // Permissões específicas do VENDEDOR

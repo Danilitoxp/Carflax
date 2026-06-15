@@ -1098,7 +1098,8 @@ function DashboardContent({
   ].includes(activeItem);
   const isMarketingView = [
     "Marketing",
-    "Whatsapp",
+    "Whatsapp Evolution",
+    "Whatsapp Oficial",
     "Cronograma",
     "Leads",
     "Esteira",

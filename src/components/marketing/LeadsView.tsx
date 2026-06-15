@@ -87,7 +87,7 @@ export function LeadsView() {
   const handleOpenChat = (jid: string) => {
     // Salva o JID para que o WhatsappView possa abrir automaticamente
     localStorage.setItem("carflax_pending_chat", jid);
-    window.dispatchEvent(new CustomEvent("carflax-change-tab", { detail: "Whatsapp" }));
+    window.dispatchEvent(new CustomEvent("carflax-change-tab", { detail: "Whatsapp Evolution" }));
   };
 
   // Como a plataforma ainda não está no banco, tratamos todos como WhatsApp por enquanto

@@ -1,5 +1,6 @@
 import { Megaphone, Calendar } from "lucide-react";
 import { WhatsappView } from "./whatsapp/WhatsappView";
+import { WhatsappOfficialView } from "./whatsapp/WhatsappOfficialView";
 import { ClientesView } from "./ClientesView";
 import { LeadsView } from "./LeadsView";
 import { ReportsView } from "./ReportsView";
@@ -20,8 +21,12 @@ interface MarketingViewProps {
 export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
   const firstName = userProfile?.name ? userProfile.name.split(' ')[0] : 'Usuário';
 
-  if (activeTab === "Whatsapp") {
+  if (activeTab === "Whatsapp Evolution") {
     return <WhatsappView vendedorId={userProfile?.id} />;
+  }
+
+  if (activeTab === "Whatsapp Oficial") {
+    return <WhatsappOfficialView vendedorId={userProfile?.id} />;
   }
 
   if (activeTab === "Clientes") {
