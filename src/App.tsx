@@ -38,6 +38,7 @@ import { evolutionApi } from "@/lib/evolution-v2";
 import { SorteioRealtimeModal } from "@/components/ui/SorteioRealtimeModal";
 import { RankingCopaView } from "@/components/crm/campanhas/RankingCopaView";
 import { PrivacyPolicyView } from "@/components/public/PrivacyPolicyView";
+import { TermsOfServiceView } from "@/components/public/TermsOfServiceView";
 
 export interface UserProfile {
   id?: string;
@@ -1601,6 +1602,11 @@ function App() {
   const isPrivacyPolicy = window.location.pathname.includes("/politica-privacidade") || window.location.pathname.includes("/privacy-policy");
   if (isPrivacyPolicy) {
     return <PrivacyPolicyView />;
+  }
+
+  const isTermsOfService = window.location.pathname.includes("/termos-de-servico") || window.location.pathname.includes("/terms-of-service");
+  if (isTermsOfService) {
+    return <TermsOfServiceView />;
   }
 
   if (loading) return <LoadingScreen />;
