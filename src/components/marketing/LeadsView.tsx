@@ -7,8 +7,11 @@ import {
   Trash2,
   MessageSquare,
   LayoutGrid,
-  Flame
+  Flame,
+  Pencil,
+  X
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { marketingService } from "@/lib/marketing-service";
 import type { MarketingCliente } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
@@ -31,6 +34,14 @@ export function LeadsView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Estados para Edição de Leads / UTMs
+  const [selectedLead, setSelectedLead] = useState<MarketingCliente | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editNome, setEditNome] = useState("");
+  const [editOrigem, setEditOrigem] = useState("");
+  const [editCampanha, setEditCampanha] = useState("");
+  const [savingLead, setSavingLead] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -85,20 +96,55 @@ export function LeadsView() {
   };
 
   const handleOpenChat = (jid: string) => {
-    // Salva o JID para que o WhatsappView possa abrir automaticamente
     localStorage.setItem("carflax_pending_chat", jid);
     window.dispatchEvent(new CustomEvent("carflax-change-tab", { detail: "Whatsapp Evolution" }));
   };
 
-  // Como a plataforma ainda não está no banco, tratamos todos como WhatsApp por enquanto
-  const filtered = filterPlatform === "Todas as Plataformas" || filterPlatform === "WhatsApp"
+  // Abrir modal de edição
+  const handleOpenEdit = (lead: MarketingCliente) => {
+    setSelectedLead(lead);
+    setEditNome(lead.nome || lead.push_name || "");
+    setEditOrigem(lead.origem || "WhatsApp");
+    setEditCampanha(lead.campanha || "");
+    setIsEditModalOpen(true);
+  };
+
+  // Salvar edições do lead
+  const handleSaveLeadDetails = async () => {
+    if (!selectedLead) return;
+    setSavingLead(true);
+    try {
+      const updatedData = {
+        ...selectedLead,
+        nome: editNome.trim() || null,
+        origem: editOrigem || null,
+        campanha: editCampanha.trim() || null,
+      };
+
+      await marketingService.upsertCliente(updatedData);
+      setIsEditModalOpen(false);
+      setSelectedLead(null);
+      refreshLeads();
+    } catch (err) {
+      console.error("[LeadsView] Erro ao salvar detalhes do lead:", err);
+      alert("Erro ao atualizar dados do lead.");
+    } finally {
+      setSavingLead(false);
+    }
+  };
+
+  // Filtrar leads baseado no dropdown de Plataformas (origem)
+  const filtered = filterPlatform === "Todas as Plataformas"
     ? leads
-    : [];
+    : leads.filter(lead => {
+        const leadOrigem = lead.origem || "WhatsApp";
+        return leadOrigem.toLowerCase() === filterPlatform.toLowerCase();
+      });
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden p-8">
       {/* Toolbar */}
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-4 mb-6 shrink-0">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
@@ -128,7 +174,6 @@ export function LeadsView() {
             variant="amber" 
             placeholder="Temperatura" 
           />
-
         </div>
       </div>
 
@@ -147,21 +192,22 @@ export function LeadsView() {
         ) : (
           <div className="space-y-2">
             {/* Cabeçalho da Lista */}
-            <div className="grid grid-cols-[2fr_1fr_2fr_1fr_1fr] gap-4 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <div className="grid grid-cols-[2fr_1.2fr_1fr_1.5fr_1.2fr_1.1fr] gap-4 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               <span>Lead / Contato</span>
               <span>Telefone</span>
-              <span>Motivo</span>
+              <span>Origem</span>
+              <span>Campanha</span>
               <span>Temperatura</span>
               <span className="text-right">Ações</span>
             </div>
 
             {filtered.map(lead => {
-              const nome = lead.nome || lead.push_name || lead.remote_jid.split('@')[0];
+              const displayNome = lead.nome || lead.push_name || lead.remote_jid.split('@')[0];
               const phone = lead.remote_jid.split('@')[0];
               const temp = lead.temperatura || "Frio";
               const tempCfg = TEMP_CONFIG[temp as keyof typeof TEMP_CONFIG] || TEMP_CONFIG.Frio;
               return (
-                <div key={lead.remote_jid} className="grid grid-cols-[2fr_1fr_2fr_1fr_1fr] gap-4 items-center bg-card border border-border/50 rounded-2xl p-3 hover:border-primary/30 hover:bg-primary/[0.02] transition-all group">
+                <div key={lead.remote_jid} className="grid grid-cols-[2fr_1.2fr_1fr_1.5fr_1.2fr_1.1fr] gap-4 items-center bg-card border border-border/50 rounded-2xl p-3 hover:border-primary/30 hover:bg-primary/[0.02] transition-all group">
                   {/* Lead / Contato */}
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-xl bg-secondary overflow-hidden border border-border/50 shrink-0">
@@ -174,10 +220,10 @@ export function LeadsView() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <h4 className="font-bold text-sm truncate">
-                        {nome.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                      <h4 className="font-bold text-sm truncate" title={displayNome}>
+                        {displayNome.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
                       </h4>
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Via WhatsApp</p>
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">WhatsApp</p>
                     </div>
                   </div>
 
@@ -187,15 +233,14 @@ export function LeadsView() {
                     {phone}
                   </div>
 
-                  {/* Motivo do Arquivamento */}
-                  <div className="min-w-0">
-                    {lead.arquivado ? (
-                      <span className="text-xs font-bold text-rose-500/90 bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-xl uppercase tracking-wider text-[10px]">
-                        {lead.status || "Arquivado"}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground/50">—</span>
-                    )}
+                  {/* Origem (Tráfego) */}
+                  <div className="text-xs font-bold text-muted-foreground uppercase">
+                    {lead.origem || <span className="opacity-40 italic font-semibold">WhatsApp</span>}
+                  </div>
+
+                  {/* Campanha */}
+                  <div className="text-xs font-semibold text-muted-foreground truncate" title={lead.campanha || ""}>
+                    {lead.campanha || <span className="opacity-30 italic font-semibold">Sem Campanha</span>}
                   </div>
 
                   {/* Temperatura */}
@@ -207,7 +252,15 @@ export function LeadsView() {
                   </div>
 
                   {/* Ações Rápidas */}
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button 
+                      onClick={() => handleOpenEdit(lead)}
+                      className="p-2 rounded-xl bg-secondary/50 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all border border-transparent hover:border-primary/20"
+                      title="Editar Origem/Campanha"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+
                     <button 
                       onClick={() => handleDeleteLead(lead.remote_jid)}
                       className="p-2 rounded-xl bg-secondary/50 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition-all border border-transparent hover:border-rose-500/20"
@@ -231,8 +284,9 @@ export function LeadsView() {
         )}
       </div>
 
+      {/* Paginação */}
       {!loading && totalCount > 0 && (
-        <div className="px-6 py-4 border-t border-border/50 flex items-center justify-between bg-card/10 text-xs text-muted-foreground font-bold mt-2 rounded-b-2xl">
+        <div className="px-6 py-4 border-t border-border/50 flex items-center justify-between bg-card/10 text-xs text-muted-foreground font-bold mt-2 rounded-b-2xl shrink-0">
           <div>
             Exibindo {((currentPage - 1) * pageSize) + 1} a {Math.min(currentPage * pageSize, totalCount)} de {totalCount} leads
           </div>
@@ -280,6 +334,113 @@ export function LeadsView() {
           </div>
         </div>
       )}
+
+      {/* Modal de Edição de Informações de Tráfego do Lead */}
+      <AnimatePresence>
+        {isEditModalOpen && selectedLead && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setIsEditModalOpen(false); setSelectedLead(null); }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <Pencil className="w-5 h-5 text-primary" />
+                    <h3 className="text-lg font-black uppercase tracking-tighter">
+                      Editar Detalhes do Lead
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => { setIsEditModalOpen(false); setSelectedLead(null); }}
+                    className="p-1.5 hover:bg-secondary rounded-full transition-colors"
+                  >
+                    <X className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Nome */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nome de Exibição</label>
+                    <input
+                      type="text"
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-semibold"
+                      value={editNome}
+                      onChange={(e) => setEditNome(e.target.value)}
+                      placeholder="Nome do cliente"
+                    />
+                  </div>
+
+                  {/* Origem da Plataforma */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Plataforma / Origem</label>
+                    <select
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all appearance-none font-semibold"
+                      value={editOrigem}
+                      onChange={(e) => setEditOrigem(e.target.value)}
+                    >
+                      <option value="WhatsApp">WhatsApp Direto</option>
+                      <option value="Google">Google Ads</option>
+                      <option value="Instagram">Instagram Ads / Direct</option>
+                      <option value="Facebook">Facebook Ads</option>
+                      <option value="Organic">Tráfego Orgânico</option>
+                      <option value="Outros">Outros Canais</option>
+                    </select>
+                  </div>
+
+                  {/* Nome da Campanha */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nome da Campanha (UTM Campaign)</label>
+                    <input
+                      type="text"
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-semibold"
+                      value={editCampanha}
+                      onChange={(e) => setEditCampanha(e.target.value)}
+                      placeholder="Ex: campanha_corolla_junho"
+                    />
+                  </div>
+                </div>
+
+                {/* Ações */}
+                <div className="mt-8 flex gap-3">
+                  <button
+                    onClick={() => { setIsEditModalOpen(false); setSelectedLead(null); }}
+                    className="flex-1 py-3 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs rounded-2xl border border-border transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSaveLeadDetails}
+                    disabled={savingLead}
+                    className="flex-1 py-3 bg-primary text-primary-foreground font-black text-xs rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+                  >
+                    {savingLead ? "Salvando..." : "Salvar Alterações"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <style>{`
+        select {
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+          background-position: right 1rem center;
+          background-repeat: no-repeat;
+          background-size: 1.25em;
+        }
+      `}</style>
     </div>
   );
 }

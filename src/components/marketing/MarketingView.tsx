@@ -6,6 +6,7 @@ import { LeadsView } from "./LeadsView";
 import { ReportsView } from "./ReportsView";
 import { CronogramaView } from "./CronogramaView";
 import { EsteiraView } from "./EsteiraView";
+import { PosVendaView } from "./PosVendaView";
 
 interface UserProfile {
   id?: string;
@@ -22,7 +23,7 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
   const firstName = userProfile?.name ? userProfile.name.split(' ')[0] : 'Usuário';
 
   if (activeTab === "Whatsapp Evolution") {
-    return <WhatsappView vendedorId={userProfile?.id} />;
+    return <WhatsappView vendedorId={userProfile?.id} userProfile={userProfile} />;
   }
 
   if (activeTab === "Whatsapp Oficial") {
@@ -43,6 +44,10 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
 
   if (activeTab === "Esteira") {
     return <EsteiraView userProfile={userProfile} />;
+  }
+
+  if (activeTab === "Pós-Venda") {
+    return <PosVendaView userProfile={userProfile} />;
   }
 
   if (activeTab.includes("Relatórios")) {

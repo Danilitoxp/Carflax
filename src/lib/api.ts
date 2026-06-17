@@ -358,6 +358,7 @@ export const apiDashboardProdutos = (codigo?: string) =>
 export const apiFornecedores = () => get("/api/fornecedores");
 export const apiProdutos = () => get("/api/produtos");
 export const apiClientes = () => get("/api/clientes");
+export const apiRegisterCliente = (body: any) => post("/api/clientes", body);
 export interface SqlResponse {
   success: boolean;
   data?: unknown[];

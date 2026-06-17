@@ -50,6 +50,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Leads" },
       { label: "Cronograma" },
       { label: "Esteira" },
+      { label: "Pós-Venda" },
       { label: "Relatórios", value: "Relatórios Mkt" },
     ],
   },

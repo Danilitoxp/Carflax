@@ -1103,6 +1103,7 @@ function DashboardContent({
     "Cronograma",
     "Leads",
     "Esteira",
+    "Pós-Venda",
     "Relatórios Mkt",
   ].includes(activeItem);
   const isComercial =

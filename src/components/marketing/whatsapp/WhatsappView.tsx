@@ -5,6 +5,7 @@ import {
   Send, 
   CheckCheck, 
   User,
+  UserPlus,
   Check,
   Megaphone,
   Flame,
@@ -31,7 +32,7 @@ import {
 import { evolutionApi } from "@/lib/evolution-v2";
 import { marketingService } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
-import { apiDashboardProdutos } from "@/lib/api";
+import { apiDashboardProdutos, apiRegisterCliente } from "@/lib/api";
 import { transcribeAudio, classifyTemperature } from "@/lib/gemini-service";
 import { Package } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
@@ -98,6 +99,15 @@ interface LeadMetadata {
   saleValue?: string;
   city?: string;
   followUpDate?: string;
+  numeroDocumento?: string;
+  tipoDocumento?: number;
+  cep?: string;
+  endereco?: string;
+  numero?: string;
+  bairro?: string;
+  codigoAtividade?: string;
+  codigoVendedor?: string;
+  emailNfe?: string;
 }
 
 interface Chat {
@@ -388,7 +398,16 @@ function CustomAudioPlayer({
   );
 }
 
-export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
+interface UserProfile {
+  id?: string;
+  name: string;
+  email: string;
+  role: string;
+  operator_code?: string;
+  operatorCode?: string;
+}
+
+export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?: UserProfile | null }) {
   const { showNotification } = useNotification();
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -402,6 +421,21 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
   const [customArchiveReason, setCustomArchiveReason] = useState("");
   const [isEnteringCustomReason, setIsEnteringCustomReason] = useState(false);
   const [showTempDropdown, setShowTempDropdown] = useState(false);
+  const [showClientDrawer, setShowClientDrawer] = useState(false);
+  const [drawerClientName, setDrawerClientName] = useState("");
+  
+  // ERP Autcom Required Fields
+  const [drawerClientNumeroDocumento, setDrawerClientNumeroDocumento] = useState("");
+  const [drawerClientTipoDocumento, setDrawerClientTipoDocumento] = useState<number>(2); // 1 = CNPJ, 2 = CPF
+  const [drawerClientCep, setDrawerClientCep] = useState("");
+  const [drawerClientEndereco, setDrawerClientEndereco] = useState("");
+  const [drawerClientNumero, setDrawerClientNumero] = useState("");
+  const [drawerClientBairro, setDrawerClientBairro] = useState("");
+  const [drawerClientCodigoAtividade, setDrawerClientCodigoAtividade] = useState("001");
+  const [drawerClientCodigoVendedor, setDrawerClientCodigoVendedor] = useState("991");
+  const [drawerClientEmailNfe, setDrawerClientEmailNfe] = useState("");
+
+  const [savingClient, setSavingClient] = useState(false);
   
   const [saleValue, setSaleValue] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -543,8 +577,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
         leadInfo: {
           status: item.status || "Novo Lead",
           temperature: (item.temperatura as Temperature) || "Frio",
-          source: "WhatsApp",
-          campaign: "Geral",
+          source: item.origem || "WhatsApp",
+          campaign: item.campanha || "Geral",
           saleValue: (item.valor_venda ?? 0) > 0
             ? item.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : undefined
@@ -609,8 +643,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     leadInfo: {
       status: item.status || "Novo Lead",
       temperature: (item.temperatura as Temperature) || "Frio",
-      source: "WhatsApp",
-      campaign: "Geral",
+      source: item.origem || "WhatsApp",
+      campaign: item.campanha || "Geral",
       saleValue: (item.valor_venda ?? 0) > 0
         ? item.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : undefined
@@ -1808,9 +1842,278 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
     }
   };
 
+  const handleCepChange = async (val: string) => {
+    setDrawerClientCep(val);
+    const clean = val.replace(/\D/g, "");
+    if (clean.length === 8) {
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.erro) {
+            setDrawerClientEndereco(data.logradouro || "");
+            setDrawerClientBairro(data.bairro || "");
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao buscar CEP:", err);
+      }
+    }
+  };
+
+  const handleSaveClientData = async () => {
+    if (!selectedChat || !drawerClientName.trim()) return;
+    
+    const cepClean = drawerClientCep.replace(/\D/g, "");
+    const docClean = drawerClientNumeroDocumento.replace(/\D/g, "");
+    
+    // Todos os campos (exceto email) são obrigatórios para o ERP
+    const hasErpFields = !!(
+      drawerClientName.trim() &&
+      docClean &&
+      cepClean &&
+      drawerClientEndereco.trim() &&
+      drawerClientNumero.trim() &&
+      drawerClientBairro.trim() &&
+      drawerClientCodigoAtividade.trim() &&
+      drawerClientCodigoVendedor.trim()
+    );
+
+    if (!hasErpFields) {
+      showNotification("error", "Erro", "Por favor, preencha todos os campos obrigatórios (*).");
+      return;
+    }
+
+    setSavingClient(true);
+    try {
+      const erpPayload = {
+        nome: drawerClientName.trim(),
+        numeroDocumento: docClean,
+        tipoDocumento: drawerClientTipoDocumento,
+        cep: cepClean,
+        endereco: drawerClientEndereco.trim(),
+        numero: drawerClientNumero.trim(),
+        bairro: drawerClientBairro.trim(),
+        codigoAtividade: drawerClientCodigoAtividade.trim(),
+        codigoVendedor: drawerClientCodigoVendedor.trim(),
+        emailNfe: drawerClientEmailNfe.trim() || "nfe@nfe.com.br",
+        telefoneCelular: selectedChat.id.split("@")[0]
+      };
+      
+      await apiRegisterCliente(erpPayload);
+      
+      showNotification("success", "Sucesso", "Cliente cadastrado com sucesso na Citel ERP!");
+      setShowClientDrawer(false);
+    } catch (err: unknown) {
+      console.error("[Autcom ERP Integration] Erro:", err);
+      const msg = err instanceof Error ? err.message : "Erro de resposta da API do ERP";
+      showNotification("error", "Erro ao cadastrar", msg);
+    } finally {
+      setSavingClient(false);
+    }
+  };
+
   return (
     <div className="flex h-full bg-background overflow-hidden border border-border/50 rounded-2xl shadow-2xl m-4 relative">
       {/* Modals */}
+      {showClientDrawer && (
+        <>
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[90] animate-in fade-in duration-200" 
+            onClick={() => setShowClientDrawer(false)}
+          />
+          <div className="absolute inset-y-0 right-0 w-[420px] bg-card border-l border-border/80 shadow-2xl z-[95] flex flex-col transform transition-transform duration-300 animate-in slide-in-from-right-5">
+            <div className="p-5 border-b border-border/50 flex items-center justify-between bg-secondary/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-xs uppercase tracking-tighter text-foreground">Ficha Cadastral ERP</h3>
+                  <p className="text-[9px] text-muted-foreground font-semibold">Preencha os dados de faturamento Autcom</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowClientDrawer(false)}
+                className="p-1 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
+              {/* Dados Requeridos pela API do ERP */}
+              <div className="space-y-3">
+                <h4 className="text-[9px] font-black text-primary uppercase tracking-widest border-b border-border/30 pb-1">Dados Cadastrais ERP (Autcom)</h4>
+                
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                    Razão Social / Nome Completo <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={drawerClientName}
+                    onChange={(e) => setDrawerClientName(e.target.value)}
+                    placeholder="Nome ou Razão Social"
+                    required
+                    className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1 col-span-1">
+                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                      Tipo Doc. <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={drawerClientTipoDocumento}
+                      onChange={(e) => setDrawerClientTipoDocumento(Number(e.target.value))}
+                      className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                    >
+                      <option value={2}>CPF</option>
+                      <option value={1}>CNPJ</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                      CPF / CNPJ <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={drawerClientNumeroDocumento}
+                      onChange={(e) => setDrawerClientNumeroDocumento(e.target.value)}
+                      placeholder={drawerClientTipoDocumento === 1 ? "00.000.000/0000-00" : "000.000.000-00"}
+                      required
+                      className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1 col-span-1">
+                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                      CEP <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={drawerClientCep}
+                      onChange={(e) => handleCepChange(e.target.value)}
+                      placeholder="00000-000"
+                      required
+                      className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                      Endereço / Logradouro <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={drawerClientEndereco}
+                      onChange={(e) => setDrawerClientEndereco(e.target.value)}
+                      placeholder="Av / Rua"
+                      required
+                      className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1 col-span-1">
+                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                      Número <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={drawerClientNumero}
+                      onChange={(e) => setDrawerClientNumero(e.target.value)}
+                      placeholder="Ex: 123"
+                      required
+                      className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                      Bairro <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={drawerClientBairro}
+                      onChange={(e) => setDrawerClientBairro(e.target.value)}
+                      placeholder="Nome do Bairro"
+                      required
+                      className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                    Cód. Atividade <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={drawerClientCodigoAtividade}
+                    onChange={(e) => setDrawerClientCodigoAtividade(e.target.value)}
+                    className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                  >
+                    <option value="001">001 - CPF</option>
+                    <option value="002">002 - INDUSTRIA</option>
+                    <option value="003">003 - REVENDA</option>
+                    <option value="004">004 - INSTALADOR</option>
+                    <option value="005">005 - A DEFINIR</option>
+                    <option value="006">006 - COMÉRCIO</option>
+                    <option value="007">007 - CONSTRUTORA</option>
+                    <option value="008">008 - IGREJA</option>
+                    <option value="009">009 - POSTO DE COMBUSTIVEL</option>
+                    <option value="010">010 - CONDOMINIO</option>
+                    <option value="011">011 - HOSPITAL</option>
+                    <option value="012">012 - SHOPPING</option>
+                    <option value="013">013 - LOGÍSTICA</option>
+                    <option value="014">014 - TRANSPORTADORA</option>
+                    <option value="015">015 - SERVIÇO PRESTADO</option>
+                    <option value="016">016 - E-COMMERCE</option>
+                    <option value="017">017 - ELETRICISTA</option>
+                    <option value="018">018 - ENCANADOR</option>
+                    <option value="019">019 - ENGENHEIRO</option>
+                    <option value="020">020 - ARQUITETO</option>
+                    <option value="999">999 - ALTERAR URGENTE</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                    E-mail NFe
+                  </label>
+                  <input
+                    type="email"
+                    value={drawerClientEmailNfe}
+                    onChange={(e) => setDrawerClientEmailNfe(e.target.value)}
+                    placeholder="email@dominio.com"
+                    className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-border/50 flex gap-2.5 bg-secondary/5">
+              <button
+                onClick={() => setShowClientDrawer(false)}
+                className="flex-1 py-2.5 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs rounded-xl border border-border transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveClientData}
+                disabled={savingClient || !drawerClientName.trim()}
+                className="flex-1 py-2.5 bg-primary text-primary-foreground font-black text-xs rounded-xl hover:opacity-90 transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingClient ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       {showFollowUpModal && (
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-card border border-border rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all duration-300">
@@ -2306,6 +2609,30 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                   {selectedChat.leadInfo?.followUpDate && (
                     <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-500 rounded-full animate-pulse" />
                   )}
+                </button>
+                <button
+                  onClick={() => {
+                    setDrawerClientName(selectedChat.name || "");
+                    
+                    // ERP Autcom (sem gravação no Supabase, envia direto ao ERP)
+                    setDrawerClientNumeroDocumento("");
+                    setDrawerClientTipoDocumento(2);
+                    setDrawerClientCep("");
+                    setDrawerClientEndereco("");
+                    setDrawerClientNumero("");
+                    setDrawerClientBairro("");
+                    setDrawerClientCodigoAtividade("001");
+                    
+                    setDrawerClientCodigoVendedor("991");
+                    
+                    setDrawerClientEmailNfe("");
+                    
+                    setShowClientDrawer(true);
+                  }}
+                  className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground hover:text-primary transition-all relative"
+                  title="Dados do Cliente"
+                >
+                  <UserPlus className="w-4 h-4" />
                 </button>
                 <button onClick={()=>setShowSaleModal(true)} className={cn("p-2.5 hover:bg-secondary rounded-xl transition-colors", selectedChat.leadInfo?.saleValue ? "text-emerald-500" : "text-muted-foreground")}><DollarSign className="w-4 h-4"/></button>
                 
@@ -2952,6 +3279,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string }) {
                   >
                     <Paperclip className="w-5 h-5"/>
                   </button>
+
                   <input 
                     type="text" 
                     value={inputText} 
