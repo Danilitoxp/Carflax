@@ -958,6 +958,7 @@ function OrcamentosTab() {
                           <option value="Todos os Motivos">Todos os Motivos</option>
                           <option value="Preço Alto">Preço Alto</option>
                           <option value="Falta de Estoque">Falta de Estoque</option>
+                          <option value="Furo de Estoque">Furo de Estoque</option>
                           <option value="Desistiu">Desistiu</option>
                           <option value="Prazo de Entrega">Prazo de Entrega</option>
                           <option value="Mão de Obra e Material">Mão de Obra e Material</option>

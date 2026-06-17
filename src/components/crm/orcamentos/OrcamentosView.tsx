@@ -662,6 +662,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     "Todos os Motivos",
     "Preço Alto",
     "Falta de Estoque",
+    "Furo de Estoque",
     "Desistiu",
     "Prazo de Entrega",
     "Mão de Obra e Material",
@@ -1377,7 +1378,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Selecione o Motivo *</label>
                       <TinyDropdown 
                         value={statusMotivoPerdido} 
-                        options={["Preço Alto", "Falta de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas"]} 
+                        options={["Preço Alto", "Falta de Estoque", "Furo de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas"]} 
                         onChange={(val) => setStatusMotivoPerdido(val)} 
                         icon={Tag} 
                         variant="slate" 
@@ -1385,7 +1386,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                         className="w-full" 
                       />
                     </div>
-                    {(statusMotivoPerdido === "Falta de Estoque") ? (
+                    {(statusMotivoPerdido === "Falta de Estoque" || statusMotivoPerdido === "Furo de Estoque") ? (
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Marque os Itens Perdidos *</label>
                         <div className="max-h-[220px] overflow-y-auto border border-border rounded-xl bg-secondary/40 divide-y divide-border/50 scrollbar-hide">
@@ -1423,7 +1424,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     )}
                     <button
                       onClick={() => handleUpdateStatus("PERDIDO", { motivo_perda: statusMotivoPerdido })}
-                      disabled={!statusMotivoPerdido || (statusMotivoPerdido === "Falta de Estoque" && lostItemsIds.length === 0)}
+                      disabled={!statusMotivoPerdido || ((statusMotivoPerdido === "Falta de Estoque" || statusMotivoPerdido === "Furo de Estoque") && lostItemsIds.length === 0)}
                       className="w-full h-14 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-500/20 active:scale-[0.98] transition-all"
                     >
                       Confirmar Perda
