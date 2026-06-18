@@ -11,6 +11,7 @@ import { PosVendaView } from "./PosVendaView";
 interface UserProfile {
   id?: string;
   name: string;
+  email?: string;
   role: string;
 }
 

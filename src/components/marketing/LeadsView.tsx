@@ -116,9 +116,9 @@ export function LeadsView() {
     try {
       const updatedData = {
         ...selectedLead,
-        nome: editNome.trim() || null,
-        origem: editOrigem || null,
-        campanha: editCampanha.trim() || null,
+        nome: editNome.trim() || undefined,
+        origem: editOrigem || undefined,
+        campanha: editCampanha.trim() || undefined,
       };
 
       await marketingService.upsertCliente(updatedData);
