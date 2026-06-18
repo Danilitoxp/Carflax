@@ -262,8 +262,8 @@ export interface CrmOrcamento {
 export const apiCrmOrcamentos = (params: { vendedor?: string, inicio?: string, fim?: string }) =>
   get<CrmOrcamento[]>("/api/crm/orcamentos", params as Record<string, string>);
 
-export const apiCrmOrcamentoItens = (documento: string) =>
-  get<CrmItem[]>(`/api/crm/orcamentos/${encodeURIComponent(documento)}/itens`);
+export const apiCrmOrcamentoItens = (documento: string, empresa?: string) =>
+  get<CrmItem[]>(`/api/crm/orcamentos/${encodeURIComponent(documento)}/itens`, empresa ? { empresa } : {});
 
 export interface FaturamentoResumo {
   QTD_VENDAS: number;

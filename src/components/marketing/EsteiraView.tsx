@@ -71,6 +71,73 @@ const getCardResponsible = (createdByField?: string) => {
   return parts[1] || parts[0] || "Marketing";
 };
 
+interface Subtask {
+  index: number;
+  text: string;
+  completed: boolean;
+}
+
+const getChecklistStats = (description?: string) => {
+  if (!description) return { total: 0, completed: 0 };
+  const lines = description.split("\n");
+  let total = 0;
+  let completed = 0;
+  lines.forEach(line => {
+    const match = line.match(/^\s*[-*•]?\s*\[([ xX])\]\s*(.*)$/);
+    if (match) {
+      total++;
+      if (match[1].toLowerCase() === "x") {
+        completed++;
+      }
+    }
+  });
+  return { total, completed };
+};
+
+const parseSubtasks = (description?: string): Subtask[] => {
+  if (!description) return [];
+  const lines = description.split("\n");
+  const subtasks: Subtask[] = [];
+  lines.forEach((line, index) => {
+    const match = line.match(/^\s*[-*•]?\s*\[([ xX])\]\s*(.*)$/);
+    if (match) {
+      subtasks.push({
+        index,
+        text: match[2].trim(),
+        completed: match[1].toLowerCase() === "x"
+      });
+    }
+  });
+  return subtasks;
+};
+
+const toggleSubtaskInDescription = (description: string, lineIndex: number): string => {
+  const lines = description.split("\n");
+  const line = lines[lineIndex];
+  if (line !== undefined) {
+    const match = line.match(/^(\s*[-*•]?\s*\[)([ xX])(\]\s*.*)$/);
+    if (match) {
+      const newChar = match[2].toLowerCase() === "x" ? " " : "x";
+      lines[lineIndex] = `${match[1]}${newChar}${match[3]}`;
+    }
+  }
+  return lines.join("\n");
+};
+
+const addSubtaskToDescription = (description: string, text: string): string => {
+  const newline = `- [ ] ${text.trim()}`;
+  if (!description || description.trim() === "") {
+    return newline;
+  }
+  return `${description.trimEnd()}\n${newline}`;
+};
+
+const deleteSubtaskFromDescription = (description: string, lineIndex: number): string => {
+  const lines = description.split("\n");
+  lines.splice(lineIndex, 1);
+  return lines.join("\n");
+};
+
 export function EsteiraView({ userProfile }: EsteiraViewProps) {
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [usersList, setUsersList] = useState<{ id: string; name: string; avatar?: string }[]>([]);
@@ -84,6 +151,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   const [selectedCard, setSelectedCard] = useState<Partial<KanbanCard> | null>(null);
   const [draggedOverCardId, setDraggedOverCardId] = useState<string | null>(null);
   const [draggedOverCardPart, setDraggedOverCardPart] = useState<"top" | "bottom" | null>(null);
+  const [newSubtaskText, setNewSubtaskText] = useState("");
 
   const creatorName = userProfile?.name || "Marketing";
 
@@ -114,6 +182,12 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     loadCards();
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    if (!isCardModalOpen) {
+      setNewSubtaskText("");
+    }
+  }, [isCardModalOpen]);
 
   const fetchUsers = async () => {
     try {
@@ -216,6 +290,31 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
       setSaving(false);
       setIsCardModalOpen(false);
       setSelectedCard(null);
+    }
+  };
+
+  const handleToggleSubtaskInViewMode = async (cardId: string, lineIndex: number) => {
+    const card = cards.find(c => c.id === cardId);
+    if (!card) return;
+
+    const newDescription = toggleSubtaskInDescription(card.description || "", lineIndex);
+    
+    // Update local state first (optimistic update)
+    setCards(prev => prev.map(c => c.id === cardId ? { ...c, description: newDescription } : c));
+    if (selectedCard && selectedCard.id === cardId) {
+      setSelectedCard(prev => ({ ...prev, description: newDescription }));
+    }
+
+    try {
+      const { error } = await supabase
+        .from("marketing_esteira")
+        .update({ description: newDescription })
+        .eq("id", cardId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("[EsteiraView] Erro ao salvar alteração da sub-tarefa:", err);
+      loadCards();
     }
   };
 
@@ -474,6 +573,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                   colCards.map(card => {
                     const expired = isOverdue(card.due_date, card.column_id);
                     const tagStyle = TAG_OPTIONS.find(t => t.name === card.tag_name)?.color || "bg-secondary text-muted-foreground border-border/50";
+                    const stats = getChecklistStats(card.description);
 
                     return (
                       <div
@@ -559,15 +659,26 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                             {card.description}
                           </p>
                         )}
-
                         {/* Footer */}
                         <div className="absolute bottom-4 left-4 right-4 pt-2 border-t border-border/30 flex items-center justify-between gap-2 text-[10px] font-bold text-muted-foreground">
-                          {card.due_date ? (
-                            <div className={`flex items-center gap-1.5 ${expired ? "text-red-500 bg-red-500/5 px-2 py-0.5 rounded-lg border border-red-500/10 animate-pulse" : ""}`}>
-                              <Calendar className="w-3.5 h-3.5" />
-                              <span>{formatDate(card.due_date)}</span>
-                            </div>
-                          ) : <div className="w-1" />}
+                           <div className="flex items-center gap-2">
+                            {card.due_date && (
+                              <div className={`flex items-center gap-1.5 ${expired ? "text-red-500 bg-red-500/5 px-2 py-0.5 rounded-lg border border-red-500/10 animate-pulse" : ""}`}>
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span>{formatDate(card.due_date)}</span>
+                              </div>
+                            )}
+                            {stats.total > 0 && (
+                              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] ${
+                                stats.completed === stats.total 
+                                  ? "text-emerald-500 bg-emerald-500/5 border-emerald-500/10" 
+                                  : "text-sky-500 bg-sky-500/5 border-sky-500/10"
+                              }`}>
+                                <Check className="w-3 h-3 text-current" />
+                                <span>{stats.completed}/{stats.total}</span>
+                              </div>
+                            )}
+                          </div>
 
                            {(() => {
                              const responsibleUser = getResponsibleUser(card.created_by_name);
@@ -676,15 +787,136 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                   {/* Description */}
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Descrição / Tarefas</label>
-                    <textarea
-                      rows={3}
-                      disabled={isViewOnly}
-                      placeholder="Detalhes, links de referências ou roteiros..."
-                      className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none disabled:opacity-75 disabled:cursor-not-allowed"
-                      value={selectedCard.description || ""}
-                      onChange={(e) => setSelectedCard({ ...selectedCard, description: e.target.value })}
-                    />
+                    {isViewOnly ? (
+                      <div className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm min-h-[80px] max-h-[250px] overflow-y-auto space-y-2 custom-scrollbar">
+                        {(() => {
+                          const description = selectedCard.description || "";
+                          if (!description.trim()) {
+                            return <span className="text-muted-foreground italic text-xs">Nenhuma descrição ou tarefa informada.</span>;
+                          }
+                          const lines = description.split("\n");
+                          return lines.map((line, index) => {
+                            const match = line.match(/^(\s*[-*•]?\s*\[)([ xX])(\]\s*)(.*)$/);
+                            if (match) {
+                              const isCompleted = match[2].toLowerCase() === "x";
+                              const text = match[4];
+                              return (
+                                <div key={index} className="flex items-start gap-2.5 py-0.5 group">
+                                  <input
+                                    type="checkbox"
+                                    checked={isCompleted}
+                                    onChange={() => handleToggleSubtaskInViewMode(selectedCard.id!, index)}
+                                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 mt-0.5 cursor-pointer accent-primary"
+                                  />
+                                  <span className={`text-sm select-none break-all ${isCompleted ? "line-through text-muted-foreground opacity-60" : "text-foreground font-semibold"}`}>
+                                    {text}
+                                  </span>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <p key={index} className="text-foreground text-sm break-all leading-relaxed whitespace-pre-line font-medium min-h-[1rem]">
+                                  {line}
+                                </p>
+                              );
+                            }
+                          });
+                        })()}
+                      </div>
+                    ) : (
+                      <textarea
+                        rows={3}
+                        placeholder="Detalhes, links de referências ou roteiros..."
+                        className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                        value={selectedCard.description || ""}
+                        onChange={(e) => setSelectedCard({ ...selectedCard, description: e.target.value })}
+                      />
+                    )}
                   </div>
+
+                  {/* Visual Subtasks Builder (Only in Create/Edit Mode) */}
+                  {!isViewOnly && (
+                    <div className="space-y-2 pt-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Sub-tarefas</label>
+                      
+                      {/* Subtasks List */}
+                      {(() => {
+                        const subtasks = parseSubtasks(selectedCard.description || "");
+                        return (
+                          <>
+                            {subtasks.length > 0 && (
+                              <div className="space-y-2 bg-secondary/50 border border-border/50 rounded-xl p-3 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                {subtasks.map((task) => (
+                                  <div key={task.index} className="flex items-center justify-between gap-2 py-0.5 group/item">
+                                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                                      <input
+                                        type="checkbox"
+                                        checked={task.completed}
+                                        onChange={() => {
+                                          const updated = toggleSubtaskInDescription(selectedCard.description || "", task.index);
+                                          setSelectedCard({ ...selectedCard, description: updated });
+                                        }}
+                                        className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 mt-0.5 cursor-pointer accent-primary"
+                                      />
+                                      <span className={`text-xs select-none break-all ${task.completed ? "line-through text-muted-foreground opacity-60" : "text-foreground font-semibold"}`}>
+                                        {task.text}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = deleteSubtaskFromDescription(selectedCard.description || "", task.index);
+                                        setSelectedCard({ ...selectedCard, description: updated });
+                                      }}
+                                      className="p-1 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover/item:opacity-100 focus:opacity-100"
+                                      title="Excluir sub-tarefa"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Add Subtask Input Form */}
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Adicionar sub-tarefa..."
+                                className="flex-1 bg-secondary border border-border rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-semibold"
+                                value={newSubtaskText}
+                                onChange={(e) => setNewSubtaskText(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    if (newSubtaskText.trim()) {
+                                      const updated = addSubtaskToDescription(selectedCard.description || "", newSubtaskText);
+                                      setSelectedCard({ ...selectedCard, description: updated });
+                                      setNewSubtaskText("");
+                                    }
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (newSubtaskText.trim()) {
+                                    const updated = addSubtaskToDescription(selectedCard.description || "", newSubtaskText);
+                                    setSelectedCard({ ...selectedCard, description: updated });
+                                    setNewSubtaskText("");
+                                  }
+                                }}
+                                disabled={!newSubtaskText.trim()}
+                                className="px-3 bg-primary text-primary-foreground font-bold rounded-xl hover:opacity-90 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {/* Responsável */}
                   <div className="space-y-1">

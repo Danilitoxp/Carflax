@@ -1103,7 +1103,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                         setIsItemsModalOpen(true);
                         setItens(o.items);
                         try {
-                          const fatdorItens = await apiCrmOrcamentoItens(o.id);
+                          const fatdorItens = await apiCrmOrcamentoItens(o.id, o.empresa);
                           setItens(fatdorItens.map(mapCrmItem));
                         } catch {
                           // mantém o.items como fallback
