@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { apiDashboardProdutos } from "@/lib/api";
 
 interface StorageItem {
   codigo: string;
@@ -97,6 +98,7 @@ export function ColetorView() {
   const [pendingPickings, setPendingPickings] = useState<PendingPicking[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [missingItems, setMissingItems] = useState<MissingItem[]>([]);
+  const [stockMap, setStockMap] = useState<Record<string, number | string>>({});
   const [searchTerm, setSearchTerm] = useState("");
 
 
@@ -142,7 +144,24 @@ export function ColetorView() {
         .select('*')
         .order('timestamp', { ascending: false });
 
-      setMissingItems((faltasData as MissingItem[]) || []);
+      const faltasList = (faltasData as MissingItem[]) || [];
+      setMissingItems(faltasList);
+
+      if (faltasList.length > 0) {
+        const codigos = [...new Set(faltasList.map(f => f.codigo_produto))];
+        const stockResults: Record<string, number | string> = {};
+        await Promise.all(
+          codigos.map(async (codigo) => {
+            try {
+              const res = await apiDashboardProdutos(codigo);
+              if (res && res.length > 0) {
+                stockResults[codigo] = res[0].TOTAL_DISPONIVEL;
+              }
+            } catch {}
+          })
+        );
+        setStockMap(stockResults);
+      }
 
       // Inventário (Opcional - Atualmente Externo na Citel)
       setInventoryItems([]);
@@ -712,7 +731,7 @@ export function ColetorView() {
                     <th className="p-4 pl-6 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Data/Hora</th>
                     <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Pedido</th>
                     <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Produto</th>
-                    <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Esperado / Achado</th>
+                    <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Disponível / Achado</th>
                     <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Separador</th>
                     <th className="p-4 pr-6 text-right text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Status</th>
                   </tr>
@@ -744,7 +763,7 @@ export function ColetorView() {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
-                             <span className="text-sm font-black text-foreground">{item.quantidade_pedida}</span>
+                             <span className="text-sm font-black text-foreground">{stockMap[item.codigo_produto] ?? "—"}</span>
                              <span className="text-[10px] text-muted-foreground">/</span>
                              <span className="text-sm font-black text-rose-500">{item.quantidade_separada}</span>
                           </div>
