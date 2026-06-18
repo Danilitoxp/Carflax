@@ -1,12 +1,7 @@
 const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
-const API_BASE = isLocal 
-  ? "https://marketing-carflax.velbav.easypanel.host"
-  : "/api-marketing";
-
-const API_CAMPAIGN = isLocal
-  ? "https://marketing-gestao-de-tempo.velbav.easypanel.host"
-  : "/api-campaign";
+const API_BASE = "/api-marketing";
+const API_CAMPAIGN = "/api-campaign";
 
 
 

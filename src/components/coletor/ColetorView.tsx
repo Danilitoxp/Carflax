@@ -155,7 +155,8 @@ export function ColetorView() {
             try {
               const res = await apiDashboardProdutos(codigo);
               if (res && res.length > 0) {
-                stockResults[codigo] = res[0].TOTAL_DISPONIVEL;
+                const row = res[0] as any;
+                stockResults[codigo] = row['TOTAL_DISPONÍVEL'] ?? row.TOTAL_DISPONIVEL ?? '—';
               }
             } catch {}
           })

@@ -2,9 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_IA || "");
 
-const PRODUTOS_API_URL = import.meta.env.DEV
-  ? "https://marketing-carflax.velbav.easypanel.host/api/dashboard/produtos"
-  : "/api-marketing/api/dashboard/produtos";
+const PRODUTOS_API_URL = "/api-marketing/api/dashboard/produtos";
 
 // ─── Cache de catálogo (persiste entre aberturas do modal) ───────────────────
 let catalogoCache: ProdutoAPI[] | null = null;
@@ -336,9 +334,9 @@ function filtrarCatalogo(texto: string, produtos: ProdutoAPI[]): ProdutoAPI[] {
     words.forEach(w => keywords.add(w));
 
     // Dimensões e números
-    const dims = n.match(/\d+[x/]\d+|\d+\s*mm/g) || [];
+    const dims: string[] = n.match(/\d+[x/]\d+|\d+\s*mm/g) || [];
     dims.forEach(d => keywords.add(d.replace(/\s*mm/, "").replace("x", "")));
-    const nums = n.match(/\b\d{2,3}\b/g) || [];
+    const nums: string[] = n.match(/\b\d{2,3}\b/g) || [];
     nums.forEach(d => keywords.add(d));
 
     // Sinônimos — usando termos pré-normalizados
