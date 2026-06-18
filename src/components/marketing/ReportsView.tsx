@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   TrendingUp,
   Users,
@@ -38,6 +38,18 @@ export function ReportsView() {
   });
   const [showFunnel, setShowFunnel] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  const peakHour = useMemo(() => {
+    let maxVal = -1;
+    let maxH = -1;
+    hourlyData.forEach((val, h) => {
+      if (val > maxVal) {
+        maxVal = val;
+        maxH = h;
+      }
+    });
+    return { hour: maxH, count: maxVal };
+  }, [hourlyData]);
 
 
   useEffect(() => {
@@ -124,10 +136,20 @@ export function ReportsView() {
 
   return (
     <div className="flex-1 p-8 bg-background overflow-y-auto">
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8 pb-16">
         
-        <div className="flex flex-col lg:flex-row gap-4 items-center justify-end shrink-0 mb-4 px-1">
-          <div className="flex items-center gap-2 shrink-0 w-full lg:w-auto justify-end">
+        {/* Page Header */}
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between shrink-0 mb-6 border-b border-border pb-6 px-1">
+          <div>
+            <h1 className="text-2xl font-black uppercase tracking-tight text-foreground flex items-center gap-2.5">
+              <span className="w-1.5 h-6 bg-primary rounded-full" />
+              Desempenho de Marketing
+            </h1>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">
+              Métricas de atração, conversão e SLA de resposta de leads
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-start md:justify-end">
             {/* Date */}
             <div className="relative">
               <button
@@ -227,6 +249,7 @@ export function ReportsView() {
             color="bg-indigo-500"
             subValue="Meta: 500"
             isPositive={stats.leadsMonth > 400}
+            progress={Math.min((stats.leadsMonth / 500) * 100, 100)}
           />
 
           {/* Faturamento no Período */}
@@ -245,19 +268,32 @@ export function ReportsView() {
             value={formatCurrency(stats.billingMonth)} 
             icon={<TrendingUp className="w-6 h-6" />}
             color="bg-rose-500"
-            subValue="Atingimento: 88%"
+            subValue="Meta de faturamento"
             isPositive={true}
+            progress={88}
           />
         </div>
 
         {/* Secondary Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-card border border-border rounded-3xl p-8 shadow-sm">
+          <div className="lg:col-span-2 bg-card border border-border rounded-3xl p-8 shadow-sm relative overflow-hidden group/chart flex flex-col justify-between">
              <h3 className="text-lg font-bold uppercase tracking-tight mb-6 flex items-center justify-between">
-                Fluxo de Leads por Horário
-                <span className="text-[10px] text-primary bg-primary/10 px-2 py-1 rounded-full">Picos de Hoje</span>
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-6 bg-primary rounded-full" />
+                  Fluxo de Leads por Horário
+                </div>
+                <span className="text-[9px] font-black text-primary bg-primary/10 px-3 py-1 rounded-full uppercase tracking-widest">Picos de Hoje</span>
              </h3>
-             <div className="h-64 flex items-end gap-1.5 sm:gap-3">
+             
+             <div className="h-64 flex items-end gap-1.5 sm:gap-3 relative z-10">
+                {/* Subtle horizontal grid lines */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-5">
+                   <div className="w-full border-t border-foreground h-0" />
+                   <div className="w-full border-t border-foreground h-0" />
+                   <div className="w-full border-t border-foreground h-0" />
+                   <div className="w-full border-t border-foreground h-0" />
+                </div>
+
                 {(() => {
                   const day = (startDate || new Date()).getDay();
                   const isSaturday = day === 6;
@@ -274,19 +310,19 @@ export function ReportsView() {
                   return filteredData.map(({ val, h }) => {
                     const height = (val / maxLeads) * 100;
                     return (
-                      <div key={h} className="flex-1 h-full flex flex-col justify-end items-center gap-3 group">
+                      <div key={h} className="flex-1 h-full flex flex-col justify-end items-center gap-3 group/bar z-10">
                         <div className="flex-1 w-full flex flex-col justify-end relative">
                           <div 
                             className={cn(
                               "w-full rounded-full transition-all duration-500 relative min-h-[4px]",
                               val > 0 
-                                ? "bg-gradient-to-t from-primary/80 to-primary shadow-[0_0_15px_rgba(59,130,246,0.3)]" 
-                                : "bg-secondary/20"
+                                ? "bg-gradient-to-t from-blue-600 to-indigo-500 shadow-[0_0_15px_rgba(59,130,246,0.25)] hover:from-blue-500 hover:to-indigo-400 cursor-pointer" 
+                                : "bg-secondary/35 hover:bg-secondary/50"
                             )} 
                             style={{ height: `${val > 0 ? Math.max(height, 8) : 4}%` }}
                           >
                              {val > 0 && (
-                               <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 border border-white/10 px-2 py-1 rounded-lg text-[9px] font-black text-white opacity-0 group-hover:opacity-100 transition-all transform group-hover:-translate-y-1 z-20 shadow-2xl whitespace-nowrap">
+                               <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-950 border border-white/10 px-2.5 py-1 rounded-xl text-[9px] font-black text-white opacity-0 group-hover/bar:opacity-100 transition-all transform group-hover/bar:-translate-y-1.5 z-20 shadow-2xl whitespace-nowrap">
                                  {val} {val === 1 ? 'lead' : 'leads'} • {h}h
                                </div>
                              )}
@@ -303,41 +339,73 @@ export function ReportsView() {
                   });
                 })()}
              </div>
+
+             {/* Dynamic insight footer */}
+             <div className="mt-6 pt-4 border-t border-border/40 flex items-center justify-between text-[9px] font-black text-muted-foreground uppercase tracking-widest">
+               <span>Análise de Fluxo:</span>
+               <span className="text-foreground">
+                 {peakHour.hour !== -1 && peakHour.count > 0
+                   ? `Pico de atendimentos às ${peakHour.hour}h com ${peakHour.count} ${peakHour.count === 1 ? 'lead' : 'leads'}`
+                   : "Nenhum lead registrado nas últimas horas."}
+               </span>
+             </div>
           </div>
 
           <div className="space-y-6">
-             <div className="bg-card border border-border rounded-3xl p-6">
+             <div className="bg-card border border-border rounded-3xl p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
                 <p className="text-xs font-bold text-muted-foreground uppercase mb-1">Ticket Médio</p>
-                <p className="text-2xl font-bold">{formatCurrency(stats.avgTicket)}</p>
+                <p className="text-2xl font-bold tracking-tight">{formatCurrency(stats.avgTicket)}</p>
                 <div className="flex items-center gap-1 text-emerald-500 text-[10px] font-bold mt-2">
                    <ArrowUpRight className="w-3 h-3" /> +5.2% vs mês anterior
                 </div>
              </div>
 
-             <div className="bg-card border border-border rounded-3xl p-6">
+             <div className="bg-card border border-border rounded-3xl p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
                 <p className="text-xs font-bold text-muted-foreground uppercase mb-1">Taxa de Conversão</p>
-                <p className="text-2xl font-bold">{stats.conversionRate.toFixed(1)}%</p>
+                <p className="text-2xl font-bold tracking-tight">{stats.conversionRate.toFixed(1)}%</p>
                 <div className="flex items-center gap-1 text-rose-500 text-[10px] font-bold mt-2">
                    <ArrowDownRight className="w-3 h-3" /> -1.2% vs média histórica
                 </div>
              </div>
 
-             <div className="bg-card border border-border rounded-3xl p-6">
-                <div className="flex items-center gap-2 mb-1">
-                  <Timer className="w-3.5 h-3.5 text-amber-500" />
-                  <p className="text-xs font-bold text-muted-foreground uppercase">1ª Resposta Média</p>
+             <div className="bg-card border border-border rounded-3xl p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <Timer className="w-3.5 h-3.5 text-amber-500" />
+                    <p className="text-xs font-bold text-muted-foreground uppercase">1ª Resposta Média</p>
+                  </div>
+                  {/* Glowing Status Dot */}
+                  <span className={cn(
+                    "w-2.5 h-2.5 rounded-full shrink-0",
+                    stats.avgFirstResponseMinutes === null 
+                      ? "bg-slate-500" 
+                      : stats.avgFirstResponseMinutes < 3
+                      ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)] animate-pulse"
+                      : stats.avgFirstResponseMinutes < 5
+                      ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.7)] animate-pulse"
+                      : "bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.7)] animate-pulse"
+                  )} />
                 </div>
-                <p className={cn("text-2xl font-bold", stats.avgFirstResponseMinutes === null && "text-muted-foreground")}>
+                <p className={cn("text-2xl font-bold tracking-tight", stats.avgFirstResponseMinutes === null && "text-muted-foreground")}>
                   {formatResponseTime(stats.avgFirstResponseMinutes)}
                 </p>
-                <p className="text-[10px] font-bold text-muted-foreground mt-2 uppercase">
+                <p className={cn(
+                  "text-[9px] font-black mt-3 uppercase px-2.5 py-1 rounded-lg w-fit",
+                  stats.avgFirstResponseMinutes === null
+                    ? "bg-secondary text-muted-foreground"
+                    : stats.avgFirstResponseMinutes < 3
+                    ? "bg-emerald-500/10 text-emerald-500"
+                    : stats.avgFirstResponseMinutes < 5
+                    ? "bg-amber-500/10 text-amber-500"
+                    : "bg-rose-500/10 text-rose-500"
+                )}>
                   {stats.avgFirstResponseMinutes === null
                     ? "Sem dados no período"
                     : stats.avgFirstResponseMinutes < 3
                     ? "Excelente tempo de resposta"
                     : stats.avgFirstResponseMinutes < 5
-                    ? "Atenção: tempo alto"
-                    : "Crítico: acima de 5 min"}
+                    ? "Atenção: tempo de resposta alto"
+                    : "Crítico: acima do SLA de 5 min"}
                 </p>
              </div>
           </div>
@@ -448,13 +516,29 @@ interface StatCardProps {
   color: string;
   subValue: string;
   isPositive: boolean;
+  progress?: number;
 }
 
-function StatCard({ title, value, icon, color, subValue, isPositive }: StatCardProps) {
+function StatCard({ title, value, icon, color, subValue, isPositive, progress }: StatCardProps) {
+  const shadowGlow = color.includes("blue") 
+    ? "hover:shadow-blue-500/5 hover:border-blue-500/30" 
+    : color.includes("indigo")
+    ? "hover:shadow-indigo-500/5 hover:border-indigo-500/30"
+    : color.includes("emerald")
+    ? "hover:shadow-emerald-500/5 hover:border-emerald-500/30"
+    : "hover:shadow-rose-500/5 hover:border-rose-500/30";
+
   return (
-    <div className="bg-card border border-border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className={cn(
+      "bg-card border border-border rounded-3xl p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl",
+      shadowGlow
+    )}>
       <div className="flex items-center justify-between mb-4">
-        <div className={cn("p-3 rounded-2xl text-white", color)}>
+        <div className={cn("p-3 rounded-2xl text-white shadow-lg", color, 
+          color.includes("blue") ? "shadow-blue-500/20" : 
+          color.includes("indigo") ? "shadow-indigo-500/20" : 
+          color.includes("emerald") ? "shadow-emerald-500/20" : "shadow-rose-500/20"
+        )}>
           {icon}
         </div>
         <div className={cn(
@@ -467,7 +551,25 @@ function StatCard({ title, value, icon, color, subValue, isPositive }: StatCardP
       </div>
       <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">{title}</p>
       <h3 className="text-2xl font-bold tracking-tight">{value}</h3>
-      <p className="text-[10px] font-bold text-muted-foreground mt-2 uppercase">{subValue}</p>
+      
+      {progress !== undefined && (
+        <div className="mt-3 space-y-1">
+          <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
+            <div 
+              className={cn("h-full rounded-full transition-all duration-500", 
+                color.includes("indigo") ? "bg-indigo-500" : 
+                color.includes("rose") ? "bg-rose-500" : "bg-primary"
+              )} 
+              style={{ width: `${progress}%` }} 
+            />
+          </div>
+        </div>
+      )}
+
+      <p className="text-[10px] font-bold text-muted-foreground mt-2 uppercase flex items-center justify-between">
+        <span>{subValue}</span>
+        {progress !== undefined && <span className="text-foreground/80 font-black">{progress.toFixed(0)}%</span>}
+      </p>
     </div>
   );
 }

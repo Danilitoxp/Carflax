@@ -175,7 +175,7 @@ export function ChatCenter({
 
   return (
     <div 
-      className="fixed bottom-0 z-[9999] flex items-end gap-4 pointer-events-none"
+      className="fixed bottom-6 z-[9999] flex items-end gap-4 pointer-events-none"
       style={{ right: `${positionRight}px` }}
     >
       {/* 1. Chat Detail Area (Only shown if a chat is open and NOT minimized) */}
@@ -204,41 +204,59 @@ export function ChatCenter({
       )}
 
       {/* 2. Chat List / Launcher Area */}
-      <div className={cn(
-        "bg-card/95 backdrop-blur-xl border border-border border-b-0 rounded-t-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-500 overflow-hidden w-[320px]",
-        isExpanded ? "h-[500px]" : "h-[48px]"
-      )}>
-        {/* Toggle / Header */}
-        <div 
-          className="flex items-center p-3.5 cursor-grab active:cursor-grabbing hover:bg-secondary/50 border-b border-border/40 select-none transition-colors"
-          onMouseDown={handleMouseDown}
-          onClick={() => {
-            if (!dragRef.current.hasMoved) {
-              setIsExpanded(!isExpanded);
-            }
-          }}
-        >
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <MessageSquare className="w-4.5 h-4.5 text-blue-500" />
-                {totalUnread > 0 && (
-                  <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-                )}
-              </div>
-              <span className="text-[11px] font-black text-foreground uppercase tracking-widest">Conversas</span>
-              {totalUnread > 0 && (
-                <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-lg shadow-blue-500/20">
-                  {totalUnread}
-                </span>
-              )}
-            </div>
-            <ChevronRight className={cn("w-4 h-4 text-muted-foreground transition-transform duration-300", isExpanded ? "rotate-90" : "-rotate-90")} />
+      <div 
+        className={cn(
+          "bg-card/95 backdrop-blur-xl border border-border shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 overflow-hidden",
+          isExpanded 
+            ? "w-[350px] h-[520px] rounded-2xl" 
+            : "w-14 h-14 rounded-full bg-primary border-primary/20 items-center justify-center cursor-pointer shadow-lg hover:shadow-primary/30 hover:scale-105 active:scale-95 text-primary-foreground"
+        )}
+        onClick={() => {
+          if (!isExpanded) {
+            setIsExpanded(true);
+          }
+        }}
+      >
+        {!isExpanded ? (
+          <div className="relative flex items-center justify-center w-full h-full">
+            <MessageSquare className="w-5.5 h-5.5 text-white" />
+            {totalUnread > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[9px] font-black flex items-center justify-center rounded-full shadow-lg border-2 border-card animate-pulse">
+                {totalUnread}
+              </span>
+            )}
           </div>
-        </div>
-
-        {isExpanded && (
+        ) : (
           <>
+            {/* Toggle / Header */}
+            <div 
+              className="flex items-center p-3.5 cursor-grab active:cursor-grabbing hover:bg-secondary/50 border-b border-border/40 select-none transition-colors shrink-0"
+              onMouseDown={handleMouseDown}
+              onClick={(e) => {
+                if (!dragRef.current.hasMoved) {
+                  e.stopPropagation();
+                  setIsExpanded(false);
+                }
+              }}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <MessageSquare className="w-4.5 h-4.5 text-blue-500" />
+                    {totalUnread > 0 && (
+                      <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                    )}
+                  </div>
+                  <span className="text-[11px] font-black text-foreground uppercase tracking-widest">Conversas</span>
+                  {totalUnread > 0 && (
+                    <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-lg shadow-blue-500/20">
+                      {totalUnread}
+                    </span>
+                  )}
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform duration-300 rotate-90" />
+              </div>
+            </div>
             {/* Search */}
             <div className="px-4 pb-4">
               <div className="relative">
