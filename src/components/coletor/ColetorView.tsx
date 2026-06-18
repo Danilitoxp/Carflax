@@ -344,7 +344,7 @@ export function ColetorView() {
           )}
         >
           <AlertCircle className="w-3.5 h-3.5" />
-          Faltas
+          Furos
           {missingItems.filter(f => !f.resolvido).length > 0 && (
             <span className="absolute -top-1 -right-1 flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
@@ -714,7 +714,7 @@ export function ColetorView() {
           <div className="flex flex-col h-full">
             <div className="p-6 border-b border-border flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-black text-foreground uppercase tracking-tight">Relatório de Faltas</h2>
+                <h2 className="text-lg font-black text-foreground uppercase tracking-tight">Relatório de Furos</h2>
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Itens não encontrados durante a separação</p>
               </div>
               <div className="flex items-center gap-3">
@@ -731,7 +731,7 @@ export function ColetorView() {
                     <th className="p-4 pl-6 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Data/Hora</th>
                     <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Pedido</th>
                     <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Produto</th>
-                    <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Disponível / Achado</th>
+                    <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Consta / Encontrado</th>
                     <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Separador</th>
                     <th className="p-4 pr-6 text-right text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Status</th>
                   </tr>
