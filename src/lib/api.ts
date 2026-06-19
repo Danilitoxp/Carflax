@@ -259,7 +259,7 @@ export interface CrmOrcamento {
   CLIENTE_NOME?: string;
 }
 
-export const apiCrmOrcamentos = (params: { vendedor?: string, inicio?: string, fim?: string }) =>
+export const apiCrmOrcamentos = (params: { vendedor?: string, inicio?: string, fim?: string, documento?: string }) =>
   get<CrmOrcamento[]>("/api/crm/orcamentos", params as Record<string, string>);
 
 export const apiCrmOrcamentoItens = (documento: string, empresa?: string) =>
@@ -353,7 +353,7 @@ export const apiDashboardProdutos = (codigo?: string) =>
 export const apiFornecedores = () => get("/api/fornecedores");
 export const apiProdutos = () => get("/api/produtos");
 export const apiClientes = () => get("/api/clientes");
-export const apiRegisterCliente = (body: any) => post("/api/clientes", body);
+export const apiRegisterCliente = (body: unknown) => post("/api/clientes", body);
 export interface SqlResponse {
   success: boolean;
   data?: unknown[];

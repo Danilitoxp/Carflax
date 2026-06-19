@@ -871,15 +871,19 @@ function DashboardContent({
     // Listener de Mensagens
     const channelName = `global_crm_${myId}`;
     const channel = supabase.channel(channelName);
+    let lastSeenTimestamp = new Date().toISOString();
+    const seenMsgIds = new Set<string>();
 
-    channel
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "crm_conversas" },
-        (payload) => {
-          console.log("[CRM] Nova mensagem recebida em realtime:", payload.new);
-          const newMsg = payload.new as CrmConversa;
-          if (newMsg.enviado_por === myId) return;
+    const processRealtimeMessage = (newMsg: CrmConversa) => {
+      if (newMsg.enviado_por === myId) return;
+      if (newMsg.id && seenMsgIds.has(newMsg.id)) return;
+      if (newMsg.id) {
+        seenMsgIds.add(newMsg.id);
+        if (seenMsgIds.size > 500) {
+          const arr = Array.from(seenMsgIds);
+          arr.splice(0, 250).forEach(id => seenMsgIds.delete(id));
+        }
+      }
 
           // USA O REF que é atualizado pelo initSession
           const isForMe =
@@ -998,9 +1002,85 @@ function DashboardContent({
               /* silêncio */
             }
           }
+    };
+
+    channel
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "crm_conversas" },
+        (payload) => {
+          const newMsg = payload.new as CrmConversa;
+          if (newMsg.enviado_por === myId) return;
+          if (newMsg.timestamp) lastSeenTimestamp = newMsg.timestamp;
+          processRealtimeMessage(newMsg);
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[CRM] Realtime status:", status);
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("[CRM] Realtime desconectado, tentando reconectar...");
+          setTimeout(() => {
+            supabase.removeChannel(channel);
+            const retryChannel = supabase.channel(channelName);
+            retryChannel
+              .on("postgres_changes", { event: "INSERT", schema: "public", table: "crm_conversas" },
+                (payload) => {
+                  const newMsg = payload.new as CrmConversa;
+                  if (newMsg.enviado_por === myId) return;
+                  if (newMsg.timestamp) lastSeenTimestamp = newMsg.timestamp;
+                  processRealtimeMessage(newMsg);
+                })
+              .subscribe();
+          }, 2000);
+        }
+      });
+
+    // Fallback: poll para mensagens perdidas a cada 15s
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data } = await supabase
+          .from("crm_conversas")
+          .select("*")
+          .gt("timestamp", lastSeenTimestamp)
+          .or(`destino.eq.${myId},destino.eq.todos`)
+          .neq("enviado_por", myId)
+          .order("timestamp", { ascending: true })
+          .limit(50);
+        if (data && data.length > 0) {
+          for (const msg of data) {
+            if (msg.timestamp) lastSeenTimestamp = msg.timestamp;
+            processRealtimeMessage(msg as CrmConversa);
+          }
+        }
+      } catch {
+        /* silêncio */
+      }
+    }, 15000);
+
+    // Fallback: ao voltar à aba, busca mensagens perdidas
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "visible") {
+        try {
+          const { data } = await supabase
+            .from("crm_conversas")
+            .select("*")
+            .gt("timestamp", lastSeenTimestamp)
+            .or(`destino.eq.${myId},destino.eq.todos`)
+            .neq("enviado_por", myId)
+            .order("timestamp", { ascending: true })
+            .limit(50);
+          if (data && data.length > 0) {
+            for (const msg of data) {
+              if (msg.timestamp) lastSeenTimestamp = msg.timestamp;
+              processRealtimeMessage(msg as CrmConversa);
+            }
+          }
+        } catch {
+          /* silêncio */
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const handleOpenChat = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -1046,6 +1126,8 @@ function DashboardContent({
 
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("open-crm-chat", handleOpenChat);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

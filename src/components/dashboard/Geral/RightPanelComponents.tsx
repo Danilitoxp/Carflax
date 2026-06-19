@@ -47,20 +47,22 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     if (externalData) {
       setData(externalData);
       setInternalLoading(false);
-      return;
     }
+
+    const role = userProfile?.role?.toUpperCase() || "";
+    const isManager = role.includes("GERENTE") || role === "ADMIN";
+
+    if (externalData && !isManager) return;
 
     async function fetchData() {
       try {
-        setInternalLoading(true);
+        if (!externalData) setInternalLoading(true);
         const now = new Date();
         const yyyy = now.getFullYear();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const dd = String(now.getDate()).padStart(2, '0');
         const dataStr = `${yyyy}-${mm}-${dd}`;
 
-        const role = userProfile?.role?.toUpperCase() || "";
-        const isManager = role.includes("GERENTE") || role === "ADMIN";
         const codVendedor = userProfile?.operator_code || userProfile?.operatorCode || "049";
 
         const response = await apiDashboardGeral(isManager ? undefined : codVendedor, dataStr);
@@ -69,16 +71,15 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
           if (isManager) {
             setAllVendedores(response);
 
-            // Procura a linha "MEDIA" que a API agora retorna como agregado
-            const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
-
-            if (mediaRow) {
-              setData(mediaRow);
-              setSelectedCod("MEDIA");
-            } else {
-              // Fallback caso não venha MEDIA (improvável agora)
-              setData(response[0]);
-              setSelectedCod(response[0].COD_VENDEDOR);
+            if (!externalData) {
+              const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
+              if (mediaRow) {
+                setData(mediaRow);
+                setSelectedCod("MEDIA");
+              } else {
+                setData(response[0]);
+                setSelectedCod(response[0].COD_VENDEDOR);
+              }
             }
           } else {
             const myData = response.find(r => r.COD_VENDEDOR === codVendedor) || response[0];

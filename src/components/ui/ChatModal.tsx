@@ -62,6 +62,7 @@ export function ChatModal({
 }: ChatModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [messageText, setMessageText] = useState("");
+  const [clientName, setClientName] = useState<string | null>(null);
   const [conversas, setConversas] = useState<CrmConversa[]>([]);
   const [loading, setLoading] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
@@ -218,31 +219,65 @@ export function ChatModal({
       }
     }).catch(() => setLoading(false));
 
-    // Realtime para este documento (Filtragem manual estabilizada)
+    // Realtime para este documento
     const cleanDoc = documento.replace("#", "").trim();
+
+    const handleNewMsg = (newMsg: CrmConversa) => {
+      const msgDoc = (newMsg.documento || "").replace("#", "").trim();
+      if (msgDoc !== cleanDoc) return;
+      if (newMsg.enviado_por === userProfile?.id) return;
+
+      setPartnerTyping(false);
+      setConversas((prev) => {
+        const exists = prev.some(m => m.id === newMsg.id || (m.obs === newMsg.obs && m.enviado_por === newMsg.enviado_por));
+        if (exists) return prev;
+
+        const senderName = newMsg.enviado_por_nome || "Mensagem no Chat";
+        notifyMessage(`Carflax: ${senderName}`, newMsg.obs);
+
+        return [...prev, newMsg];
+      });
+    };
+
     const channel = supabase
       .channel(`chat_room_${cleanDoc}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' },
-        (payload) => {
-          const newMsg = payload.new as CrmConversa;
+        (payload) => handleNewMsg(payload.new as CrmConversa))
+      .subscribe((status) => {
+        console.log(`[Chat] Realtime ${cleanDoc} status:`, status);
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn(`[Chat] Realtime ${cleanDoc} desconectado, reconectando...`);
+          setTimeout(() => {
+            supabase.removeChannel(channel);
+            supabase.channel(`chat_room_${cleanDoc}`)
+              .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crm_conversas' },
+                (payload) => handleNewMsg(payload.new as CrmConversa))
+              .subscribe();
+          }, 2000);
+        }
+      });
 
-          const msgDoc = (newMsg.documento || "").replace("#", "").trim();
-          if (msgDoc !== cleanDoc) return;
-
-          if (newMsg.enviado_por === userProfile?.id) return;
-
-          setPartnerTyping(false);
-           setConversas((prev) => {
-            const exists = prev.some(m => m.id === newMsg.id || (m.obs === newMsg.obs && m.enviado_por === newMsg.enviado_por));
-            if (exists) return prev;
-
-            const senderName = newMsg.enviado_por_nome || "Mensagem no Chat";
-            notifyMessage(`Carflax: ${senderName}`, newMsg.obs);
-
-            return [...prev, newMsg];
-          });
-        })
-      .subscribe();
+    // Poll de fallback: busca mensagens novas a cada 10s
+    let lastPollTs = new Date().toISOString();
+    const chatPoll = setInterval(async () => {
+      try {
+        const { data } = await supabase
+          .from("crm_conversas")
+          .select("*")
+          .eq("documento", cleanDoc)
+          .gt("timestamp", lastPollTs)
+          .order("timestamp", { ascending: true })
+          .limit(20);
+        if (data && data.length > 0) {
+          for (const msg of data) {
+            if (msg.timestamp) lastPollTs = msg.timestamp;
+            handleNewMsg(msg as CrmConversa);
+          }
+        }
+      } catch {
+        /* silêncio */
+      }
+    }, 10000);
 
     // Canal de broadcast para indicador "digitando"
     const cleanDocTyping = documento.replace("#", "").trim();
@@ -259,6 +294,7 @@ export function ChatModal({
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(typingChannel);
+      clearInterval(chatPoll);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -341,6 +377,52 @@ export function ChatModal({
     }
   }, [conversas, userProfile?.id, userProfile?.name, amICentralizer, sellerName, isOpen, budgetOwner, ownerProfile]);
 
+  // Efeito para carregar o nome do cliente do orçamento
+  useEffect(() => {
+    if (!isOpen || !documento) return;
+
+    // Tenta primeiro obter a partir do `title` se ele não for um nome de sistema ou do centralizador/vendedor
+    const isTitleNotSellerOrCentralizer = 
+      title && 
+      title !== sellerName && 
+      !title.includes("Aviso:") && 
+      !title.includes("Divergência:") && 
+      title !== "Centralizador Carflax" &&
+      title !== "Centralizador" &&
+      title !== userProfile?.name &&
+      !title.startsWith("#") &&
+      !/^\d+$/.test(title.replace("#", "").split("-")[0].trim());
+
+    if (isTitleNotSellerOrCentralizer) {
+      const cleanTitle = title.includes("-") && (title.includes("OR") || title.includes("PD"))
+        ? title.split("-")[1].trim()
+        : title;
+      setClientName(cleanTitle);
+    } else {
+      setClientName(null);
+    }
+
+    async function fetchClientName() {
+      try {
+        const cleanDocId = documento.replace("#", "").split("-")[0].trim();
+        const raw = await apiCrmOrcamentos({ documento: cleanDocId });
+        const budget = raw.find(b => 
+          b.ORCAMENTO === cleanDocId || 
+          b.ORCAMENTO?.includes(cleanDocId)
+        );
+        if (budget && budget.CLIENTE) {
+          const cleanName = budget.CLIENTE.includes("-")
+            ? budget.CLIENTE.slice(budget.CLIENTE.indexOf("-") + 1).trim()
+            : budget.CLIENTE.trim();
+          setClientName(cleanName);
+        }
+      } catch (err) {
+        console.error("[ChatModal] Erro ao buscar dados do orçamento/cliente:", err);
+      }
+    }
+
+    fetchClientName();
+  }, [isOpen, documento, title, sellerName, userProfile?.name]);
 
   // Scroll automático
   useEffect(() => {
@@ -691,7 +773,7 @@ export function ChatModal({
         <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/30 rounded-t-2xl shrink-0 transition-all">
           <div className="flex items-center gap-3">
             <div className={cn(
-              "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black overflow-hidden border border-blue-500/30",
+              "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black overflow-hidden border border-blue-500/30",
               (headerLoading) ? "bg-secondary/40 animate-pulse" : "bg-blue-500/20 text-blue-500"
             )}>
               {displayUser?.avatar && !headerLoading ? (
@@ -704,13 +786,21 @@ export function ChatModal({
               {headerLoading ? (
                 <div className="h-2 w-24 bg-secondary/40 rounded-full animate-pulse" />
               ) : (
-                <span className="text-[10px] font-black text-foreground tracking-tight leading-none uppercase">
+                <span className="text-[13px] font-black text-foreground tracking-tight leading-none uppercase">
                   {displayUser.name}
                 </span>
               )}
               {documento && !headerLoading ? (
-                <span className="text-[9px] font-black text-blue-500 uppercase tracking-tighter opacity-80">
-                  #{documento.replace("#", "")}
+                <span className="text-[11px] font-black text-blue-500 uppercase tracking-tighter opacity-80 flex items-center gap-1 flex-wrap">
+                  <span>#{documento.replace("#", "")}</span>
+                  {clientName && (
+                    <>
+                      <span className="text-muted-foreground/60 font-medium">•</span>
+                      <span className="text-foreground/90 truncate max-w-[170px] uppercase font-black" title={clientName}>
+                        {clientName}
+                      </span>
+                    </>
+                  )}
                 </span>
               ) : (
                 <div className="h-1.5 w-16 bg-secondary/20 rounded-full animate-pulse" />
@@ -829,7 +919,7 @@ export function ChatModal({
                     )}
                     <div className={cn("flex flex-col space-y-1", isMe(msg) ? "items-end" : "items-start")}>
                       {!isMe(msg) && (
-                        <span className="text-[8px] font-black text-muted-foreground uppercase ml-1 tracking-widest">
+                        <span className="text-[10px] font-black text-muted-foreground uppercase ml-1 tracking-widest">
                           {(() => {
                             if (msg.enviado_por_nome?.toUpperCase() === "SISTEMA") {
                               const match = msg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
@@ -841,14 +931,14 @@ export function ChatModal({
                       )}
                       <div className={cn(
                         "rounded-2xl max-w-full shadow-xl leading-relaxed transition-all", 
-                        isMaximized ? "p-4 text-[14px] font-bold" : "p-3.5 text-[11px] font-medium",
+                        isMaximized ? "p-4 text-[15px] font-bold" : "p-3.5 text-[13px] font-semibold",
                         isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40"
                       )}>
                         {renderFormattedText(msg.obs)}
                       </div>
                       <div className={cn("flex items-center gap-2", isMe(msg) ? "mr-1" : "ml-1")}>
-                        <span className="text-[8px] font-black text-muted-foreground uppercase opacity-50">{formatTime(msg.timestamp)}</span>
-                        {isMe(msg) && <span className={cn("text-[8px] font-black uppercase", msg.lida ? "text-emerald-500" : "text-muted-foreground")}>{msg.lida ? "✓ Lida" : "✓✓"}</span>}
+                        <span className="text-[9px] font-black text-muted-foreground uppercase opacity-50">{formatTime(msg.timestamp)}</span>
+                        {isMe(msg) && <span className={cn("text-[9px] font-black uppercase", msg.lida ? "text-emerald-500" : "text-muted-foreground")}>{msg.lida ? "✓ Lida" : "✓✓"}</span>}
                       </div>
                     </div>
                   </div>
@@ -856,7 +946,7 @@ export function ChatModal({
               })}
               {partnerTyping && (
                 <div className="flex items-center gap-2 ml-1 mb-2 animate-pulse">
-                  <span className="text-[10px] font-bold text-emerald-500 italic">digitando...</span>
+                  <span className="text-xs font-bold text-emerald-500 italic">digitando...</span>
                 </div>
               )}
               <div ref={bottomRef} />
@@ -888,7 +978,7 @@ export function ChatModal({
                   rows={1}
                   className={cn(
                     "w-full bg-secondary/50 border border-border rounded-xl pl-4 pr-10 outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/30 font-bold resize-none py-3 scrollbar-hide",
-                    isMaximized ? "text-[13px] min-h-[52px]" : "text-[11px] min-h-[44px]"
+                    isMaximized ? "text-[14px] min-h-[52px]" : "text-[13px] min-h-[44px]"
                   )} 
                 />
                 <button 
