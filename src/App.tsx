@@ -764,7 +764,7 @@ function DashboardContent({
               title: resolved.displayTitle,
               lastMessage: c.lastMessage || lastMsg.obs,
               lastMessageTime: c.lastMessageTime || lastMsg.timestamp,
-              unreadCount: c.unreadCount || unread,
+              unreadCount: unread,
             };
           });
 

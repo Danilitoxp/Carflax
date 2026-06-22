@@ -56,9 +56,7 @@ export function ChatCenter({
   const [posBottom, setPosBottom] = useState(24);
   const dragRef = useRef({ hasMoved: false });
 
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [searchTerm]);
+
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -202,9 +200,9 @@ export function ChatCenter({
 
       <div
         className={cn(
-          "bg-card/95 backdrop-blur-xl border border-border shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 overflow-hidden",
+          "bg-card/95 backdrop-blur-xl border border-border shadow-2xl flex flex-col pointer-events-auto transition-all duration-300",
           isExpanded
-            ? "w-[350px] h-[520px] rounded-2xl"
+            ? "w-[350px] h-[520px] rounded-2xl overflow-hidden"
             : "w-14 h-14 rounded-full bg-primary border-primary/20 items-center justify-center shadow-lg hover:shadow-primary/30 hover:scale-105 active:scale-95 text-primary-foreground"
         )}
         style={{ cursor: isExpanded ? undefined : "grab" }}
@@ -219,7 +217,7 @@ export function ChatCenter({
           <div className="relative flex items-center justify-center w-full h-full pointer-events-none">
             <MessageSquare className="w-5.5 h-5.5 text-white" />
             {totalUnread > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[9px] font-black flex items-center justify-center rounded-full shadow-lg border-2 border-card animate-pulse">
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[9px] font-black flex items-center justify-center rounded-full shadow-lg border-2 border-card">
                 {totalUnread}
               </span>
             )}
@@ -241,7 +239,7 @@ export function ChatCenter({
                   <div className="relative">
                     <MessageSquare className="w-4.5 h-4.5 text-blue-500" />
                     {totalUnread > 0 && (
-                      <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                      <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full" />
                     )}
                   </div>
                   <span className="text-[11px] font-black text-foreground uppercase tracking-widest">Conversas</span>
@@ -262,7 +260,10 @@ export function ChatCenter({
                   type="text"
                   placeholder="Buscar conversa..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setVisibleCount(PAGE_SIZE);
+                  }}
                   className="w-full bg-secondary/50 border border-border rounded-xl pl-9 pr-4 py-2 text-[11px] font-bold outline-none focus:border-blue-500/50 transition-all"
                 />
               </div>
