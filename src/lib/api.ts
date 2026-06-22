@@ -252,6 +252,7 @@ export interface CrmOrcamento {
   MARKUP_DOC?: number | null;
   DATA_BAIXA: string;
   MOTIVO_CANCELAMENTO: string;
+  TELEFONE_CLIENTE?: string;
   PRODUTOS: CrmItem[];
   // Raw fields
   FDO_NUMDOC?: string;

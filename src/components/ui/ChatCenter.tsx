@@ -35,6 +35,8 @@ interface ChatCenterProps {
   onForcedChatResolved?: () => void;
 }
 
+const PAGE_SIZE = 20;
+
 export function ChatCenter({
   activeChats,
   onCloseChat,
@@ -48,48 +50,45 @@ export function ChatCenter({
 }: ChatCenterProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  
-  const [positionRight, setPositionRight] = useState(24);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const [posBottom, setPosBottom] = useState(24);
   const dragRef = useRef({ hasMoved: false });
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    
-    const startX = e.clientX;
-    const startRight = positionRight;
-    let hasMoved = false;
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [searchTerm]);
 
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const newRight = startRight - deltaX;
-      
-      const minRight = 24;
-      const maxRight = window.innerWidth - 350;
-      const clampedRight = Math.max(minRight, Math.min(newRight, maxRight));
-      
-      setPositionRight(clampedRight);
-      if (Math.abs(deltaX) > 5) {
-        hasMoved = true;
-      }
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+
+    const startY = e.clientY;
+    const startBottom = posBottom;
+    let moved = false;
+
+    const onMove = (ev: MouseEvent) => {
+      const dy = ev.clientY - startY;
+      if (Math.abs(dy) > 4) moved = true;
+      const maxBottom = window.innerHeight - (isExpanded ? 530 : 64);
+      setPosBottom(Math.max(8, Math.min(startBottom - dy, maxBottom)));
     };
 
-    const onMouseUp = () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      
-      if (hasMoved) {
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      if (moved) {
         dragRef.current.hasMoved = true;
-        setTimeout(() => {
-          dragRef.current.hasMoved = false;
-        }, 50);
+        setTimeout(() => { dragRef.current.hasMoved = false; }, 50);
       } else {
         dragRef.current.hasMoved = false;
       }
     };
 
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [posBottom, isExpanded]);
 
   const totalUnread = useMemo(() => {
     return activeChats.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
@@ -97,27 +96,35 @@ export function ChatCenter({
 
   const filteredChats = useMemo(() => {
     let chats = [...activeChats];
-    
-    // Filtro de busca
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      chats = chats.filter(c => 
-        c.title.toLowerCase().includes(term) || 
+      chats = chats.filter(c =>
+        c.title.toLowerCase().includes(term) ||
         c.doc.toLowerCase().includes(term) ||
         c.sellerName?.toLowerCase().includes(term)
       );
     }
 
-    // Ordenação: 1. Não lidas primeiro, 2. Mais recentes primeiro
     return chats.sort((a, b) => {
       if ((a.unreadCount || 0) > (b.unreadCount || 0)) return -1;
       if ((a.unreadCount || 0) < (b.unreadCount || 0)) return 1;
-      
       const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
       const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
       return timeB - timeA;
     });
   }, [activeChats, searchTerm]);
+
+  const visibleChats = useMemo(() => filteredChats.slice(0, visibleCount), [filteredChats, visibleCount]);
+  const hasMore = visibleCount < filteredChats.length;
+
+  const handleScroll = useCallback(() => {
+    const el = listRef.current;
+    if (!el || !hasMore) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
+      setVisibleCount(prev => prev + PAGE_SIZE);
+    }
+  }, [hasMore]);
 
   const activeChatData = useMemo(() => {
     return activeChats.find(c => c.doc === openChatDoc);
@@ -136,23 +143,19 @@ export function ChatCenter({
 
   const formatLastMessage = (text: string | undefined) => {
     if (!text) return "Nenhuma mensagem...";
-    
-    // Se for mensagem de status do sistema (estratégia por linha)
+
     if (text.toUpperCase().includes("STATUS:")) {
       const lines = text.split('\n');
       const statusLine = lines.find(l => l.toUpperCase().includes("STATUS:"));
       if (statusLine) {
-        // Pega tudo que vem depois de "STATUS:"
         const afterStatus = statusLine.split(/STATUS:/i)[1];
         if (afterStatus) {
-          // Remove emojis e símbolos, mantém letras e espaços
           const cleaned = afterStatus.replace(/[^\w\sÀ-Ú]/g, "").trim().toUpperCase();
           if (cleaned) return cleaned;
         }
       }
     }
 
-    // Se for divergência/aviso
     if (text.toUpperCase().includes("DIVERGÊNCIA:")) {
       const lines = text.split('\n');
       const divLine = lines.find(l => l.toUpperCase().includes("DIVERGÊNCIA:"));
@@ -164,21 +167,16 @@ export function ChatCenter({
       }
     }
 
-    // Limpeza para mensagens de sistema que não casaram acima
-    if (text.includes("ATUALIZAÇÃO DE STATUS")) {
-      return "ATUALIZAÇÃO";
-    }
+    if (text.includes("ATUALIZAÇÃO DE STATUS")) return "ATUALIZAÇÃO";
 
-    // Limpeza geral para outras mensagens (remove hífens repetidos e quebras)
     return text.replace(/[-=_]{3,}/g, "").trim();
   };
 
   return (
-    <div 
-      className="fixed bottom-6 z-[9999] flex items-end gap-4 pointer-events-none"
-      style={{ right: `${positionRight}px` }}
+    <div
+      className="fixed z-[9999] flex items-end gap-4 pointer-events-none"
+      style={{ right: 24, bottom: `${posBottom}px` }}
     >
-      {/* 1. Chat Detail Area (Only shown if a chat is open and NOT minimized) */}
       {openChatDoc && activeChatData && (
         <div className="pointer-events-auto">
           <ChatModal
@@ -203,22 +201,23 @@ export function ChatCenter({
         </div>
       )}
 
-      {/* 2. Chat List / Launcher Area */}
-      <div 
+      <div
         className={cn(
           "bg-card/95 backdrop-blur-xl border border-border shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 overflow-hidden",
-          isExpanded 
-            ? "w-[350px] h-[520px] rounded-2xl" 
-            : "w-14 h-14 rounded-full bg-primary border-primary/20 items-center justify-center cursor-pointer shadow-lg hover:shadow-primary/30 hover:scale-105 active:scale-95 text-primary-foreground"
+          isExpanded
+            ? "w-[350px] h-[520px] rounded-2xl"
+            : "w-14 h-14 rounded-full bg-primary border-primary/20 items-center justify-center shadow-lg hover:shadow-primary/30 hover:scale-105 active:scale-95 text-primary-foreground"
         )}
+        style={{ cursor: isExpanded ? undefined : "grab" }}
+        onMouseDown={!isExpanded ? handleDragStart : undefined}
         onClick={() => {
-          if (!isExpanded) {
+          if (!isExpanded && !dragRef.current.hasMoved) {
             setIsExpanded(true);
           }
         }}
       >
         {!isExpanded ? (
-          <div className="relative flex items-center justify-center w-full h-full">
+          <div className="relative flex items-center justify-center w-full h-full pointer-events-none">
             <MessageSquare className="w-5.5 h-5.5 text-white" />
             {totalUnread > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[9px] font-black flex items-center justify-center rounded-full shadow-lg border-2 border-card animate-pulse">
@@ -228,10 +227,9 @@ export function ChatCenter({
           </div>
         ) : (
           <>
-            {/* Toggle / Header */}
-            <div 
+            <div
               className="flex items-center p-3.5 cursor-grab active:cursor-grabbing hover:bg-secondary/50 border-b border-border/40 select-none transition-colors shrink-0"
-              onMouseDown={handleMouseDown}
+              onMouseDown={handleDragStart}
               onClick={(e) => {
                 if (!dragRef.current.hasMoved) {
                   e.stopPropagation();
@@ -257,11 +255,11 @@ export function ChatCenter({
                 <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform duration-300 rotate-90" />
               </div>
             </div>
-            {/* Search */}
+
             <div className="px-4 pb-4">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input 
+                <input
                   type="text"
                   placeholder="Buscar conversa..."
                   value={searchTerm}
@@ -271,9 +269,12 @@ export function ChatCenter({
               </div>
             </div>
 
-            {/* List */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide">
-              {filteredChats.map((chat) => {
+            <div
+              ref={listRef}
+              className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide"
+              onScroll={handleScroll}
+            >
+              {visibleChats.map((chat) => {
                 const userCache = (window as unknown as { _carflaxUserCache: Record<string, UserProfileLite> })._carflaxUserCache || {};
                 const centralizerId = (window as unknown as Record<string, unknown>)._carflaxCentralizerId as string | undefined;
                 const myId = userProfile?.id;
@@ -282,7 +283,6 @@ export function ChatCenter({
                 let partnerName = "";
                 let partnerAvatar = "";
 
-                // Prioridade 1: sellerCode (ID) diferente de mim → busca no cache
                 if (chat.sellerCode && chat.sellerCode !== myId && chat.sellerCode !== centralizerId) {
                   const cachedById = userCache[chat.sellerCode];
                   if (cachedById) {
@@ -291,7 +291,6 @@ export function ChatCenter({
                   }
                 }
 
-                // Prioridade 2: sellerName diferente do meu nome
                 if (!partnerName && chat.sellerName) {
                   const sellerUpper = chat.sellerName.toUpperCase().trim();
                   const isMyName = myNameUpper && (sellerUpper === myNameUpper || sellerUpper.includes(myNameUpper) || myNameUpper.includes(sellerUpper));
@@ -302,7 +301,6 @@ export function ChatCenter({
                   }
                 }
 
-                // Prioridade 3: Se sou vendedor, mostro o centralizador
                 if (!partnerName && !amICentralizer) {
                   const centralizerUser = centralizerId
                     ? userCache[centralizerId]
@@ -313,7 +311,6 @@ export function ChatCenter({
                   }
                 }
 
-                // Prioridade 4: fallback
                 if (!partnerName) {
                   partnerName = chat.title || `#${chat.doc.replace("#", "")}`;
                 }
@@ -321,58 +318,58 @@ export function ChatCenter({
                 const avatarUrl = partnerAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${partnerName || chat.doc}`;
 
                 return (
-                  <div 
+                  <div
                     key={chat.doc}
                     className={cn(
                       "group flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer relative",
-                      openChatDoc === chat.doc 
-                        ? "bg-blue-500/10 border border-blue-500/20" 
+                      openChatDoc === chat.doc
+                        ? "bg-blue-500/10 border border-blue-500/20"
                         : "hover:bg-secondary/80 border border-transparent"
                     )}
                     onClick={() => setOpenChatDoc(chat.doc)}
                   >
                     <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center border border-border shrink-0 overflow-hidden">
-                      <img 
+                      <img
                         src={avatarUrl}
                         className="w-full h-full object-cover"
                         alt={partnerName}
                       />
                     </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <p className="text-[11px] font-black text-foreground truncate uppercase tracking-tight">
-                          {partnerName}
-                        </p>
-                        <span className="text-[9px] font-black text-blue-500 uppercase tracking-tighter opacity-80 shrink-0">
-                          #{chat.doc.replace("#", "")}
-                        </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="text-[11px] font-black text-foreground truncate uppercase tracking-tight">
+                            {partnerName}
+                          </p>
+                          <span className="text-[9px] font-black text-blue-500 uppercase tracking-tighter opacity-80 shrink-0">
+                            #{chat.doc.replace("#", "")}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        {chat.lastMessage?.toUpperCase().includes("STATUS:") && (
-                          <div className={cn(
-                            "w-2 h-2 rounded-full shrink-0",
-                            (() => {
-                              const s = formatLastMessage(chat.lastMessage);
-                              if (s.includes("ENVIADO")) return "bg-blue-500";
-                              if (s.includes("FATURADO") || s.includes("APROVADO") || s.includes("PEDIDO")) return "bg-emerald-500";
-                              if (s.includes("PERDIDO") || s.includes("DECLINADO") || s.includes("CANCELADO")) return "bg-rose-500";
-                              if (s.includes("PENDENTE") || s.includes("AGUARDANDO")) return "bg-amber-500";
-                              return "bg-blue-500";
-                            })()
-                          )} />
-                        )}
-                        <p className={cn(
-                          "text-[10px] font-bold truncate leading-tight",
-                          chat.lastMessage?.toUpperCase().includes("STATUS:") ? "text-blue-500/80" : "text-muted-foreground/60"
-                        )}>
-                          {formatLastMessage(chat.lastMessage)}
-                        </p>
-                      </div>
-                      {chat.lastMessageTime && (() => {
+
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          {chat.lastMessage?.toUpperCase().includes("STATUS:") && (
+                            <div className={cn(
+                              "w-2 h-2 rounded-full shrink-0",
+                              (() => {
+                                const s = formatLastMessage(chat.lastMessage);
+                                if (s.includes("ENVIADO")) return "bg-blue-500";
+                                if (s.includes("FATURADO") || s.includes("APROVADO") || s.includes("PEDIDO")) return "bg-emerald-500";
+                                if (s.includes("PERDIDO") || s.includes("DECLINADO") || s.includes("CANCELADO")) return "bg-rose-500";
+                                if (s.includes("PENDENTE") || s.includes("AGUARDANDO")) return "bg-amber-500";
+                                return "bg-blue-500";
+                              })()
+                            )} />
+                          )}
+                          <p className={cn(
+                            "text-[10px] font-bold truncate leading-tight",
+                            chat.lastMessage?.toUpperCase().includes("STATUS:") ? "text-blue-500/80" : "text-muted-foreground/60"
+                          )}>
+                            {formatLastMessage(chat.lastMessage)}
+                          </p>
+                        </div>
+                        {chat.lastMessageTime && (() => {
                           const d = new Date(chat.lastMessageTime);
                           const now = new Date();
                           const isToday = d.toDateString() === now.toDateString();
@@ -388,29 +385,37 @@ export function ChatCenter({
                             </span>
                           );
                         })()}
+                      </div>
                     </div>
-                  </div>
-                  
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCloseChat(chat.doc);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-all"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
 
-                  {chat.unreadCount ? (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[18px] h-[18px] px-1 bg-blue-600 text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-lg shadow-blue-500/20 z-10">
-                      {chat.unreadCount}
-                    </div>
-                  ) : openChatDoc === chat.doc && (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCloseChat(chat.doc);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-all"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+
+                    {chat.unreadCount ? (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[18px] h-[18px] px-1 bg-blue-600 text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-lg shadow-blue-500/20 z-10">
+                        {chat.unreadCount}
+                      </div>
+                    ) : openChatDoc === chat.doc && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    )}
+                  </div>
+                );
+              })}
+
+              {hasMore && (
+                <div className="flex justify-center py-3">
+                  <span className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+                    Carregando mais...
+                  </span>
                 </div>
-              );
-            })}
+              )}
 
               {filteredChats.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-10 opacity-40">
@@ -422,9 +427,8 @@ export function ChatCenter({
               )}
             </div>
 
-            {/* Footer Actions */}
             <div className="p-3 border-t border-border bg-secondary/10 flex justify-center">
-              <button 
+              <button
                 onClick={() => {
                   activeChats.forEach(c => onCloseChat(c.doc));
                   setIsExpanded(false);

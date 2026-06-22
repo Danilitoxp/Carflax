@@ -51,6 +51,7 @@ export interface Orcamento {
   empresa?: string;
   items: CrmItem[];
   sellerCode?: string;
+  phone?: string;
 }
 
 
@@ -70,6 +71,15 @@ function parseName(raw: string): string {
     : raw.trim();
   
   return clean;
+}
+
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  if (digits.length === 13 && digits.startsWith("55")) return `(${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
+  if (digits.length === 12 && digits.startsWith("55")) return `(${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`;
+  return raw;
 }
 
 function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
@@ -108,7 +118,8 @@ function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
       lossReason: r.MOTIVO_CANCELAMENTO !== "SEM MOTIVO" ? r.MOTIVO_CANCELAMENTO : undefined,
       empresa: r.EMPRESA,
       items: products,
-      sellerCode: r.COD_VENDEDOR
+      sellerCode: r.COD_VENDEDOR,
+      phone: r.TELEFONE_CLIENTE ? formatPhone(r.TELEFONE_CLIENTE.trim()) : ''
     };
   });
 }
@@ -121,12 +132,13 @@ function isGerente(role?: string) {
 
 interface RowProps {
   item: Orcamento;
+  isAdmin?: boolean;
   onOpenItems: (o: Orcamento) => void;
   onOpenStatus: (o: Orcamento) => void;
   onOpenChat: (o: Orcamento) => void;
 }
 
-const OrcamentoRow = memo(({ item, onOpenItems, onOpenStatus, onOpenChat }: RowProps) => {
+const OrcamentoRow = memo(({ item, isAdmin, onOpenItems, onOpenStatus, onOpenChat }: RowProps) => {
   return (
     <tr className="hover:bg-secondary/50 transition-colors group">
       <td className="px-6 py-4">
@@ -142,7 +154,14 @@ const OrcamentoRow = memo(({ item, onOpenItems, onOpenStatus, onOpenChat }: RowP
         </div>
       </td>
       <td className="px-6 py-4 max-w-[140px]"><span className="block truncate text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight" title={item.seller}>{item.seller}</span></td>
-      <td className="px-6 py-4 max-w-[200px]"><span className="block truncate text-[11px] font-black text-foreground uppercase tracking-tighter transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400" title={item.client}>{item.client}</span></td>
+      <td className="px-6 py-4 max-w-[200px]">
+        <div className="flex flex-col gap-0.5">
+          <span className="block truncate text-[11px] font-black text-foreground uppercase tracking-tighter transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400" title={item.client}>{item.client}</span>
+          {item.phone && (
+            <span className="text-[9px] font-medium text-muted-foreground tracking-tight">{item.phone}</span>
+          )}
+        </div>
+      </td>
       <td className="px-6 py-4">
         <div className="flex items-baseline gap-2">
           <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">{item.date}</span>
@@ -161,11 +180,12 @@ const OrcamentoRow = memo(({ item, onOpenItems, onOpenStatus, onOpenChat }: RowP
           <div
             onClick={(e) => {
               e.stopPropagation();
-              if (item.status !== "VENDA" && item.status !== "PERDIDO") onOpenStatus(item);
+              const blocked = item.status === "VENDA" || (item.status === "PERDIDO" && !isAdmin);
+              if (!blocked) onOpenStatus(item);
             }}
             className={cn(
               "inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black tracking-tighter transition-all border",
-              item.status !== "VENDA" && item.status !== "PERDIDO" ? "cursor-pointer hover:brightness-110 active:scale-95 shadow-sm" : "cursor-default opacity-80",
+              item.status === "VENDA" || (item.status === "PERDIDO" && !isAdmin) ? "cursor-default opacity-80" : "cursor-pointer hover:brightness-110 active:scale-95 shadow-sm",
               item.status === "VENDA" ? "bg-emerald-600/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-600/20" :
               item.status === "EMITIDO" ? "bg-slate-500/10 dark:bg-slate-400/10 text-slate-600 dark:text-slate-400 border-slate-500/20" :
               item.status === "ENVIADO" ? "bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-600/20" :
@@ -1095,9 +1115,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                   </tr>
                 ) : (
                   visibleProducts.map((item) => (
-                    <OrcamentoRow 
-                      key={item.id} 
-                      item={item} 
+                    <OrcamentoRow
+                      key={item.id}
+                      item={item}
+                      isAdmin={isGerente(userProfile?.role)}
                       onOpenItems={async (o) => {
                         setSelectedItem(o);
                         setIsItemsModalOpen(true);

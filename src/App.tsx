@@ -957,8 +957,7 @@ function DashboardContent({
               ];
             });
 
-            // CORREÇÃO REALTIME: Abre o modal se for sistema ou se não houver nada aberto
-            if (isForMe && (isSystem || !openChatDocRef.current)) {
+            if (isForMe && !openChatDocRef.current) {
               handleSelectChat(newMsg.documento);
             }
 
