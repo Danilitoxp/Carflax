@@ -246,6 +246,7 @@ function DashboardContent({
 
   const [openChatDoc, setOpenChatDoc] = useState<string | null>(null);
 
+  const isCentRef = useRef(false);
   const openChatDocRef = useRef<string | null>(openChatDoc);
   useEffect(() => {
     openChatDocRef.current = openChatDoc;
@@ -259,6 +260,27 @@ function DashboardContent({
       );
     }
   }, []);
+
+  // Marca mensagens como lidas no banco quando o usuário abre um chat
+  useEffect(() => {
+    if (!openChatDoc || !userProfile?.id) return;
+    const markRead = async () => {
+      try {
+        let query = supabase
+          .from("crm_conversas")
+          .update({ lida: true })
+          .eq("documento", openChatDoc)
+          .eq("lida", false)
+          .neq("enviado_por", userProfile.id);
+        if (!isCentRef.current) {
+          query = query.eq("destino", userProfile.id);
+        }
+        await query;
+      } catch { /* silently fail */ }
+    };
+    markRead();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openChatDoc, userProfile?.id]);
 
   useEffect(() => {
     localStorage.setItem("carflax-active-chats", JSON.stringify(activeChats));
@@ -614,8 +636,6 @@ function DashboardContent({
   }, []);
 
   // 2. Realtime e Verificação Inicial
-  const isCentRef = useRef(false);
-
   useEffect(() => {
     if (!userProfile || !userProfile.id) return;
 
