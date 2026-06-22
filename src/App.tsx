@@ -555,11 +555,11 @@ function DashboardContent({
       try {
         const { data } = await supabase
           .from("usuarios")
-          .select("id, name, avatar, role");
+          .select("id, name, avatar, role, operator_code");
         if (data) {
           const cache: Record<
             string,
-            { id: string; name: string; avatar: string | null; role?: string }
+            { id: string; name: string; avatar: string | null; role?: string; operator_code?: string }
           > = {};
           data.forEach((u) => (cache[u.id] = u));
           (
@@ -1090,8 +1090,16 @@ function DashboardContent({
         const resolvedSellerName = detail.sellerName;
         const displayTitle = isSystem ? `Aviso: #${detail.doc}` : detail.title;
 
-        // Se for sistema, tentamos descobrir o vendedor real se houver contexto (itens ou mensagens anteriores)
-        // No caso do open-crm-chat manual do OrcamentosView, o sellerName já vem preenchido.
+        // Converte operator_code (ERP) → id (Supabase) para o sellerCode
+        let resolvedSellerCode = detail.sellerCode;
+        if (resolvedSellerCode) {
+          const userCache = (window as unknown as { _carflaxUserCache?: Record<string, { id: string; operator_code?: string }> })._carflaxUserCache || {};
+          const codeClean = String(resolvedSellerCode).replace(/^0+/, "");
+          const matchedUser = Object.values(userCache).find(u =>
+            u.operator_code && u.operator_code.replace(/^0+/, "") === codeClean
+          );
+          if (matchedUser) resolvedSellerCode = matchedUser.id;
+        }
 
         setDismissedChatDocs((prev) => {
           if (!prev.has(detail.doc)) return prev;
@@ -1113,7 +1121,7 @@ function DashboardContent({
               doc: detail.doc,
               title: displayTitle,
               sellerName: resolvedSellerName,
-              sellerCode: detail.sellerCode,
+              sellerCode: resolvedSellerCode,
               items: detail.items,
               unreadCount: 0,
             },

@@ -107,11 +107,10 @@ export function ChatCenter({
     }
 
     return chats.sort((a, b) => {
-      if ((a.unreadCount || 0) > (b.unreadCount || 0)) return -1;
-      if ((a.unreadCount || 0) < (b.unreadCount || 0)) return 1;
       const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
       const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
-      return timeB - timeA;
+      if (timeA !== timeB) return timeB - timeA;
+      return (b.unreadCount || 0) - (a.unreadCount || 0);
     });
   }, [activeChats, searchTerm]);
 
@@ -275,36 +274,49 @@ export function ChatCenter({
               onScroll={handleScroll}
             >
               {visibleChats.map((chat) => {
-                const userCache = (window as unknown as { _carflaxUserCache: Record<string, UserProfileLite> })._carflaxUserCache || {};
+                const userCache = (window as unknown as { _carflaxUserCache: Record<string, UserProfileLite & { operator_code?: string }> })._carflaxUserCache || {};
                 const centralizerId = (window as unknown as Record<string, unknown>)._carflaxCentralizerId as string | undefined;
                 const myId = userProfile?.id;
-                const myNameUpper = userProfile?.name?.toUpperCase().trim();
 
                 let partnerName = "";
                 let partnerAvatar = "";
+                const cacheValues = Object.values(userCache);
 
                 if (chat.sellerCode && chat.sellerCode !== myId && chat.sellerCode !== centralizerId) {
-                  const cachedById = userCache[chat.sellerCode];
-                  if (cachedById) {
-                    partnerName = cachedById.name;
-                    partnerAvatar = cachedById.avatar || "";
+                  // Tenta pelo ID do Supabase
+                  let cached = userCache[chat.sellerCode];
+                  // Fallback: se o sellerCode é código ERP, busca pelo operator_code
+                  if (!cached) {
+                    const codeClean = chat.sellerCode.replace(/^0+/, "");
+                    cached = cacheValues.find(u => u.operator_code && u.operator_code.replace(/^0+/, "") === codeClean) as typeof cached;
+                  }
+                  if (cached) {
+                    partnerName = cached.name;
+                    partnerAvatar = cached.avatar || "";
                   }
                 }
 
+                // Fallback pelo nome
                 if (!partnerName && chat.sellerName) {
                   const sellerUpper = chat.sellerName.toUpperCase().trim();
+                  const myNameUpper = userProfile?.name?.toUpperCase().trim();
                   const isMyName = myNameUpper && (sellerUpper === myNameUpper || sellerUpper.includes(myNameUpper) || myNameUpper.includes(sellerUpper));
                   if (!isMyName) {
-                    const cachedByName = Object.values(userCache).find(u => u.name?.toUpperCase().trim() === sellerUpper);
-                    partnerName = cachedByName?.name || chat.sellerName;
-                    partnerAvatar = cachedByName?.avatar || "";
+                    partnerName = chat.sellerName;
+                    const match = cacheValues.find(u => {
+                      const n = u.name?.toUpperCase().trim();
+                      return n && (n === sellerUpper || sellerUpper.includes(n) || n.includes(sellerUpper));
+                    });
+                    if (match) {
+                      if (!partnerName) partnerName = match.name;
+                      partnerAvatar = match.avatar || "";
+                    }
                   }
                 }
 
-                if (!partnerName && !amICentralizer) {
-                  const centralizerUser = centralizerId
-                    ? userCache[centralizerId]
-                    : Object.values(userCache).find(u => u.role?.toUpperCase() === "ADMIN" || u.role?.toUpperCase().includes("GERENTE"));
+                // Se sou vendedor, mostro o centralizador
+                if (!partnerName && !amICentralizer && centralizerId) {
+                  const centralizerUser = userCache[centralizerId];
                   if (centralizerUser) {
                     partnerName = centralizerUser.name;
                     partnerAvatar = centralizerUser.avatar || "";
