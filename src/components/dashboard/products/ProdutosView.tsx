@@ -426,16 +426,14 @@ export function ProdutosView() {
                   { id: "desc", label: "DESCRIÇÃO", align: "left" },
                   { id: "brand", label: "MARCA", align: "center" },
                   { id: "stock", label: "ESTOQUE", align: "right" },
-                  { id: "sales", label: "VENDAS (MÊS)", align: "right" },
                   { id: "debit", label: "DÉBITO", align: "right" },
-                  { id: "credit", label: "CRÉDITO 3X", align: "right" },
                 ].map((col) => (
                   <th
                     key={col.id}
                     onClick={() => requestSort(col.id as keyof Product)}
                     className={cn(
-                      "py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors",
-                      col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                       "py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors",
+                       col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
                     )}
                   >
                     <div className={cn("flex items-center gap-1.5", col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start")}>
@@ -460,9 +458,7 @@ export function ProdutosView() {
                     <td className="py-4 px-6"><div className="h-2 w-full max-w-[250px] bg-secondary rounded" /></td>
                     <td className="py-4 px-6"><div className="h-5 w-16 bg-secondary/50 rounded-lg mx-auto" /></td>
                     <td className="py-4 px-6 text-right"><div className="h-2 w-12 bg-secondary rounded ml-auto" /></td>
-                    <td className="py-4 px-6 text-right"><div className="h-2 w-10 bg-secondary rounded ml-auto" /></td>
                     <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-secondary/50 rounded ml-auto" /></td>
-                    <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-secondary rounded ml-auto" /></td>
                   </tr>
                 ))
               ) : (
@@ -487,18 +483,8 @@ export function ProdutosView() {
                         </span>
                       </td>
                       <td className="py-3 px-6 text-right">
-                        <span className="text-[11px] font-black tracking-tighter text-blue-600 dark:text-blue-400">
-                          {(p.sales || 0).toFixed(3)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-6 text-right">
                         <span className="text-[11px] font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">
                           R$ {p.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </td>
-                      <td className="py-3 px-6 text-right">
-                        <span className="text-[11px] font-black text-foreground tracking-tighter">
-                          R$ {p.credit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
                     </tr>
@@ -506,7 +492,7 @@ export function ProdutosView() {
                   
                   {visibleCount < filteredProducts.length && (
                     <tr>
-                      <td colSpan={7} className="py-6">
+                      <td colSpan={5} className="py-6">
                         <div className="flex justify-center w-full">
                           <TinyLoader size="sm" />
                         </div>
