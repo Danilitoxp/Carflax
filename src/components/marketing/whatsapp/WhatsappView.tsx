@@ -3489,7 +3489,18 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                   <input 
                     type="text" 
                     value={inputText} 
-                    onChange={(e)=>setInputText(e.target.value)} 
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      const trimmed = val.trim().toLowerCase();
+                      if (trimmed === "/info") {
+                        val = "Só preciso de algumas informações \n\n* para quando precisa do matéria?\n* endereço da obra?\n* dados para cadastro";
+                      } else if (trimmed === "/bom") {
+                        const hr = new Date().getHours();
+                        const greeting = hr < 12 ? "Bom dia" : "Boa tarde";
+                        val = `${greeting}, como posso te ajudar?`;
+                      }
+                      setInputText(val);
+                    }} 
                     onKeyDown={(e)=>e.key === "Enter" && (pendingFile ? confirmSendFile() : handleSendMessage())} 
                     onPaste={handlePaste}
                     placeholder={pendingFile ? "Adicione uma legenda..." : "Responda agora..."} 
