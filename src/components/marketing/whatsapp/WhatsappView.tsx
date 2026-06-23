@@ -110,6 +110,102 @@ interface LeadMetadata {
   emailNfe?: string;
 }
 
+const GoogleIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.87-2.6-3.03-4.53-5.84-4.53z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+  </svg>
+);
+
+const InstagramIcon = () => (
+  <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+  </svg>
+);
+
+const FacebookIcon = () => (
+  <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+  </svg>
+);
+
+const TikTokIcon = () => (
+  <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.02 1.59 4.23.99 1.25 2.37 2.15 3.91 2.51v3.83c-1.63-.03-3.23-.52-4.61-1.41-.43-.27-.82-.6-1.18-.96v7.7c.04 1.77-.47 3.52-1.47 4.96-1.6 2.31-4.29 3.73-7.12 3.74-2.22 0-4.38-.85-6.02-2.39-1.97-1.85-2.95-4.57-2.66-7.25C.7 11.23 2.91 8.5 5.86 7.73c1.23-.33 2.52-.3 3.73.08V11.7c-.89-.37-1.88-.41-2.8-.13-1.15.35-2.09 1.22-2.5 2.34-.63 1.72-.05 3.76 1.39 4.88.94.73 2.13.97 3.29.7 1.22-.29 2.22-1.22 2.55-2.42.04-1.97.02-17.02.02-17.02l.01-.03z"/>
+  </svg>
+);
+
+const detectOrigin = (text: string): string | null => {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  if (lower.includes("google")) return "Google";
+  if (lower.includes("instagram") || lower.includes("insta")) return "Instagram";
+  if (lower.includes("facebook") || lower.includes("face")) return "Facebook";
+  if (lower.includes("tiktok") || lower.includes("tik tok")) return "TikTok";
+  if (lower.includes("site") || lower.includes("website") || lower.includes("pelo site")) return "Site";
+  if (lower.includes("indicação") || lower.includes("indicacao") || lower.includes("indicado")) return "Indicação";
+  return null;
+};
+
+const getOriginBadge = (origin?: string) => {
+  if (!origin) return null;
+  const o = origin.toLowerCase();
+  
+  if (o.includes("google")) {
+    return (
+      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white border border-border/80 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.1)] z-10 animate-in fade-in zoom-in duration-200">
+        <GoogleIcon />
+      </div>
+    );
+  }
+  if (o.includes("instagram")) {
+    return (
+      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.1)] z-10 animate-in fade-in zoom-in duration-200">
+        <InstagramIcon />
+      </div>
+    );
+  }
+  if (o.includes("facebook")) {
+    return (
+      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#1877F2] flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.1)] z-10 animate-in fade-in zoom-in duration-200">
+        <FacebookIcon />
+      </div>
+    );
+  }
+  if (o.includes("tiktok")) {
+    return (
+      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-black flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.1)] z-10 animate-in fade-in zoom-in duration-200">
+        <TikTokIcon />
+      </div>
+    );
+  }
+  if (o.includes("site")) {
+    return (
+      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.1)] z-10 animate-in fade-in zoom-in duration-200">
+        <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+      </div>
+    );
+  }
+  if (o.includes("indicação") || o.includes("indicacao")) {
+    return (
+      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.1)] z-10 animate-in fade-in zoom-in duration-200">
+        <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+      </div>
+    );
+  }
+  return null;
+};
+
 interface Chat {
   id: string;
   name: string;
@@ -564,26 +660,35 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
       chatOffsetRef.current = dbClientes.length;
       setHasMoreChats(dbClientes.length === CHATS_PAGE);
       
-      const mappedChats: Chat[] = dbClientes.map((item) => ({
-        id: item.remote_jid,
-        name: item.nome || item.push_name || item.remote_jid.split('@')[0],
-        lastMessage: item.ultima_mensagem || "",
-        lastMessageType: inferMsgType(item.ultima_mensagem || ""),
-        time: item.ultima_conversa_em ? new Date(item.ultima_conversa_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
-        unreadCount: item.mensagens_nao_lidas || 0,
-        avatar: item.foto_url || "",
-        arquivado: item.arquivado,
-        fixado: item.fixado || false,
-        leadInfo: {
-          status: item.status || "Novo Lead",
-          temperature: (item.temperatura as Temperature) || "Frio",
-          source: item.origem || "WhatsApp",
-          campaign: item.campanha || "Geral",
-          saleValue: (item.valor_venda ?? 0) > 0
-            ? item.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : undefined
+      const mappedChats: Chat[] = dbClientes.map((item) => {
+        const detected = detectOrigin(item.ultima_mensagem || "") || detectOrigin(item.nome || "") || detectOrigin(item.push_name || "");
+        const finalSource = item.origem || detected || "WhatsApp";
+
+        if (detected && (!item.origem || item.origem.toLowerCase() === "whatsapp")) {
+          marketingService.upsertCliente({ remote_jid: item.remote_jid, origem: detected }).catch(() => null);
         }
-      }));
+
+        return {
+          id: item.remote_jid,
+          name: item.nome || item.push_name || item.remote_jid.split('@')[0],
+          lastMessage: item.ultima_mensagem || "",
+          lastMessageType: inferMsgType(item.ultima_mensagem || ""),
+          time: item.ultima_conversa_em ? new Date(item.ultima_conversa_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
+          unreadCount: item.mensagens_nao_lidas || 0,
+          avatar: item.foto_url || "",
+          arquivado: item.arquivado,
+          fixado: item.fixado || false,
+          leadInfo: {
+            status: item.status || "Novo Lead",
+            temperature: (item.temperatura as Temperature) || "Frio",
+            source: finalSource,
+            campaign: item.campanha || "Geral",
+            saleValue: (item.valor_venda ?? 0) > 0
+              ? item.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              : undefined
+          }
+        };
+      });
       
       setChats(sortChats(mappedChats));
       setLoading(false);
@@ -630,26 +735,35 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
     }
   }, []);
 
-  const mapClienteToChat = useCallback((item: import("@/lib/marketing-service").MarketingCliente): Chat => ({
-    id: item.remote_jid,
-    name: item.nome || item.push_name || item.remote_jid.split('@')[0],
-    lastMessage: item.ultima_mensagem || "",
-    lastMessageType: inferMsgType(item.ultima_mensagem || ""),
-    time: item.ultima_conversa_em ? new Date(item.ultima_conversa_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
-    unreadCount: item.mensagens_nao_lidas || 0,
-    avatar: item.foto_url || "",
-    arquivado: item.arquivado,
-    fixado: item.fixado || false,
-    leadInfo: {
-      status: item.status || "Novo Lead",
-      temperature: (item.temperatura as Temperature) || "Frio",
-      source: item.origem || "WhatsApp",
-      campaign: item.campanha || "Geral",
-      saleValue: (item.valor_venda ?? 0) > 0
-        ? item.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : undefined
+  const mapClienteToChat = useCallback((item: import("@/lib/marketing-service").MarketingCliente): Chat => {
+    const detected = detectOrigin(item.ultima_mensagem || "") || detectOrigin(item.nome || "") || detectOrigin(item.push_name || "");
+    const finalSource = item.origem || detected || "WhatsApp";
+
+    if (detected && (!item.origem || item.origem.toLowerCase() === "whatsapp")) {
+      marketingService.upsertCliente({ remote_jid: item.remote_jid, origem: detected }).catch(() => null);
     }
-  }), []);
+
+    return {
+      id: item.remote_jid,
+      name: item.nome || item.push_name || item.remote_jid.split('@')[0],
+      lastMessage: item.ultima_mensagem || "",
+      lastMessageType: inferMsgType(item.ultima_mensagem || ""),
+      time: item.ultima_conversa_em ? new Date(item.ultima_conversa_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
+      unreadCount: item.mensagens_nao_lidas || 0,
+      avatar: item.foto_url || "",
+      arquivado: item.arquivado,
+      fixado: item.fixado || false,
+      leadInfo: {
+        status: item.status || "Novo Lead",
+        temperature: (item.temperatura as Temperature) || "Frio",
+        source: finalSource,
+        campaign: item.campanha || "Geral",
+        saleValue: (item.valor_venda ?? 0) > 0
+          ? item.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : undefined
+      }
+    };
+  }, []);
 
   const loadMoreChats = useCallback(async () => {
     if (loadingMoreChats || !hasMoreChats) return;
@@ -867,6 +981,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         tipo: tipoMsg,
         status: (message.status === "READ" || String(message.status) === "3") ? "read" : (message.status === "DELIVERY_ACK" || String(message.status) === "2") ? "delivered" : "sent",
         ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {}),
+      }).then(() => {
+        if (text) {
+          detectAndSaveOrigin(remoteJid, text);
+        }
       }).catch(() => null);
 
       // Download assíncrono de mídia — não bloqueia a renderização da mensagem
@@ -1582,6 +1700,45 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
     }
   };
 
+  const detectAndSaveOrigin = (remoteJid: string, text: string) => {
+    const detected = detectOrigin(text);
+    if (!detected) return;
+
+    setChats(prev => {
+      const chat = prev.find(c => c.id === remoteJid);
+      const currentOrigin = chat?.leadInfo?.source;
+      const isGeneric = !currentOrigin || currentOrigin.toLowerCase() === "whatsapp";
+
+      if (isGeneric) {
+        marketingService.upsertCliente({ remote_jid: remoteJid, origem: detected }).catch(() => null);
+
+        setSelectedChat(s => {
+          if (s && s.id === remoteJid) {
+            return {
+              ...s,
+              leadInfo: {
+                ...s.leadInfo,
+                source: detected
+              }
+            };
+          }
+          return s;
+        });
+
+        return prev.map(c => 
+          c.id === remoteJid ? { 
+            ...c, 
+            leadInfo: { 
+              ...c.leadInfo, 
+              source: detected 
+            } 
+          } : c
+        );
+      }
+      return prev;
+    });
+  };
+
   const handleInsertQuote = () => {
     if (cartProducts.length === 0) return;
 
@@ -1680,6 +1837,13 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
 
       setMessages(msgs);
       setHasMoreMessages(dbMessages.length === 50);
+
+      // Scan message history to detect traffic source
+      dbMessages.forEach(m => {
+        if (m.texto) {
+          detectAndSaveOrigin(chat.id, m.texto);
+        }
+      });
 
       if (msgs.length > 0) {
         const lastMsg = msgs[msgs.length - 1];
@@ -2433,29 +2597,32 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
               )}
 
-              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden shrink-0 border border-border/50 relative">
-                {chat.avatar ? (
-                  <>
-                    <img 
-                      src={chat.avatar} 
-                      className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                        const sibling = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                        if (sibling) sibling.style.display = 'flex';
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedImage(chat.avatar!);
-                      }}
-                    />
-                    <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-secondary">
-                      <User className="w-6 h-6 text-muted-foreground" />
-                    </div>
-                  </>
-                ) : (
-                  <User className="w-6 h-6" />
-                )}
+              <div className="relative shrink-0">
+                <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border/50 relative">
+                  {chat.avatar ? (
+                    <>
+                      <img 
+                        src={chat.avatar} 
+                        className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          const sibling = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                          if (sibling) sibling.style.display = 'flex';
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedImage(chat.avatar!);
+                        }}
+                      />
+                      <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-secondary">
+                        <User className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                    </>
+                  ) : (
+                    <User className="w-6 h-6" />
+                  )}
+                </div>
+                {getOriginBadge(chat.leadInfo?.source)}
               </div>
               
               <div className="flex-1 min-w-0 flex justify-between gap-2">
@@ -2539,26 +2706,29 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
           <>
             <div className="p-4 flex items-center justify-between border-b border-border bg-card/20 backdrop-blur-md z-40 relative">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border relative">
-                   {selectedChat.avatar ? (
-                     <>
-                       <img 
-                        src={selectedChat.avatar} 
-                        className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                          const sibling = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                          if (sibling) sibling.style.display = 'flex';
-                        }}
-                        onClick={() => setSelectedImage(selectedChat.avatar!)}
-                      />
-                      <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-secondary">
-                        <User className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                     </>
-                   ) : (
-                     <User className="w-5 h-5" />
-                   )}
+                <div className="relative shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border relative">
+                     {selectedChat.avatar ? (
+                       <>
+                         <img 
+                          src={selectedChat.avatar} 
+                          className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            const sibling = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                            if (sibling) sibling.style.display = 'flex';
+                          }}
+                          onClick={() => setSelectedImage(selectedChat.avatar!)}
+                        />
+                        <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-secondary">
+                          <User className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                       </>
+                     ) : (
+                       <User className="w-5 h-5" />
+                     )}
+                  </div>
+                  {getOriginBadge(selectedChat.leadInfo?.source)}
                 </div>
                 <div>
                   <h4 className="font-bold text-base tracking-tight font-inter">
