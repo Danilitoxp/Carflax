@@ -1551,6 +1551,27 @@ export function WhatsappOfficialView({ vendedorId }: { vendedorId?: string }) {
     }));
   };
 
+  const handleSetQuantity = (cod: string, value: string) => {
+    const num = parseInt(value, 10);
+    setCartProducts(prev => prev.map(p => {
+      if (p.cod === cod) {
+        return { ...p, quantidade: isNaN(num) ? undefined : Math.max(1, num) };
+      }
+      return p;
+    }));
+  };
+
+  const handleBlurQuantity = (cod: string, value: number | undefined) => {
+    if (value === undefined || value < 1) {
+      setCartProducts(prev => prev.map(p => {
+        if (p.cod === cod) {
+          return { ...p, quantidade: 1 };
+        }
+        return p;
+      }));
+    }
+  };
+
   const handleInsertQuote = () => {
     if (cartProducts.length === 0) return;
 
@@ -2776,7 +2797,14 @@ export function WhatsappOfficialView({ vendedorId }: { vendedorId?: string }) {
                                       >
                                         -
                                       </button>
-                                      <span className="w-8 text-center text-xs font-black">{p.quantidade || 1}</span>
+                                      <input
+                                        type="number"
+                                        value={p.quantidade === undefined ? "" : p.quantidade}
+                                        onChange={(e) => handleSetQuantity(p.cod, e.target.value)}
+                                        onBlur={() => handleBlurQuantity(p.cod, p.quantidade)}
+                                        className="w-10 text-center text-xs font-black bg-transparent border-none focus:outline-none focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-foreground"
+                                        min="1"
+                                      />
                                       <button 
                                         onClick={() => handleUpdateQuantity(p.cod, 1)}
                                         className="w-6 h-6 flex items-center justify-center hover:bg-secondary rounded-md text-muted-foreground transition-colors"
@@ -2871,7 +2899,15 @@ export function WhatsappOfficialView({ vendedorId }: { vendedorId?: string }) {
                                         >
                                           -
                                         </button>
-                                        <span className="w-8 text-center text-xs font-black">{cartMap.get(p.cod)?.quantidade || 1}</span>
+                                        <input
+                                          type="number"
+                                          value={cartMap.get(p.cod)?.quantidade === undefined ? "" : cartMap.get(p.cod)?.quantidade}
+                                          onChange={(e) => handleSetQuantity(p.cod, e.target.value)}
+                                          onBlur={() => handleBlurQuantity(p.cod, cartMap.get(p.cod)?.quantidade)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="w-10 text-center text-xs font-black bg-transparent border-none focus:outline-none focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-foreground"
+                                          min="1"
+                                        />
                                         <button 
                                           onClick={(e) => { e.stopPropagation(); handleUpdateQuantity(p.cod, 1); }}
                                           className="w-6 h-6 flex items-center justify-center hover:bg-background rounded-md text-muted-foreground transition-colors"
