@@ -155,6 +155,7 @@ export function MeusPedidosView({ userProfile }: Props) {
   const [search, setSearch] = useState("");
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [usersCache, setUsersCache] = useState<Map<string, { name: string; avatar: string }>>(new Map());
+  const [namesToCodesCache, setNamesToCodesCache] = useState<Map<string, string>>(new Map());
 
   const fetchData = useCallback(async () => {
     try {
@@ -172,16 +173,23 @@ export function MeusPedidosView({ userProfile }: Props) {
       // Build users cache
       if (usersRes.data) {
         const cache = new Map<string, { name: string; avatar: string }>();
+        const nameToCode = new Map<string, string>();
         usersRes.data.forEach((u: { operator_code?: string | number; name?: string; avatar?: string }) => {
           const code = String(u.operator_code || "").trim();
           if (code) {
             const normalized = code.replace(/^0+/, "") || code;
             cache.set(normalized, { name: u.name || "", avatar: u.avatar || "" });
             cache.set(code, { name: u.name || "", avatar: u.avatar || "" });
+            if (u.name) {
+              nameToCode.set(u.name.toUpperCase().trim(), code);
+            }
           }
         });
         setUsersCache(cache);
+        setNamesToCodesCache(nameToCode);
       }
+
+
 
       const meuCodigo = String(userProfile?.operator_code || userProfile?.operatorCode || "").trim();
       const meuCodigoNorm = meuCodigo.replace(/^0+/, "") || meuCodigo;
@@ -286,6 +294,9 @@ export function MeusPedidosView({ userProfile }: Props) {
     const channel = supabase
       .channel("meus-pedidos-locks")
       .on("postgres_changes", { event: "*", schema: "public", table: "coletor_separacao" }, () => {
+        fetchData();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "crm_conversas" }, () => {
         fetchData();
       })
       .subscribe();
@@ -450,7 +461,7 @@ export function MeusPedidosView({ userProfile }: Props) {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 mb-6">
                       {filteredSeparated.map((order, idx) => (
-                        <SeparatedOrderCard key={`conf-${order.PEDIDO}-${idx}`} order={order} />
+                        <SeparatedOrderCard key={`conf-${order.PEDIDO}-${idx}`} order={order} namesToCodesCache={namesToCodesCache} />
                       ))}
                     </div>
                   </>
@@ -516,8 +527,15 @@ export function MeusPedidosView({ userProfile }: Props) {
 
 /* ─── Card: pedido já separado ───────────────────────────────── */
 
-function SeparatedOrderCard({ order }: { order: ConferenciaOrder }) {
+function SeparatedOrderCard({
+  order,
+  namesToCodesCache,
+}: {
+  order: ConferenciaOrder;
+  namesToCodesCache: Map<string, string>;
+}) {
   const tipoInfo = getTipoInfo(order.TIPO, order.TIPO_MOVIMENTACAO, order.LOCAL_RETIRADA);
+  const numDoc = String(order.PEDIDO).trim();
 
   return (
     <div className="rounded-xl border border-emerald-500/20 bg-card p-4 flex flex-col gap-3 transition-all hover:shadow-md hover:border-emerald-500/40 shadow-emerald-500/5">
@@ -534,10 +552,31 @@ function SeparatedOrderCard({ order }: { order: ConferenciaOrder }) {
           </div>
           <p className="text-sm font-semibold text-foreground mt-1 truncate">{order.CLIENTE}</p>
         </div>
-        {/* Status badge */}
-        <div className="flex items-center gap-1 shrink-0 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="text-[10px] font-bold text-emerald-400 whitespace-nowrap">Separado</span>
+        {/* Status and Chat */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent("open-crm-chat", {
+                  detail: {
+                    doc: numDoc,
+                    title: order.CLIENTE,
+                    sellerName: order.SEPARADOR || "Separador",
+                    sellerCode: namesToCodesCache.get((order.SEPARADOR || "").toUpperCase().trim()) || "",
+                  },
+                })
+              );
+            }}
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/15 hover:bg-primary/25 text-primary text-[10px] font-semibold transition-colors shrink-0"
+            title="Conversar"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Mensagem</span>
+          </button>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[10px] font-bold text-emerald-400 whitespace-nowrap">Separado</span>
+          </div>
         </div>
       </div>
 
@@ -599,6 +638,7 @@ function SeparatedOrderCard({ order }: { order: ConferenciaOrder }) {
 
 function FaturamentoOrderCard({ order }: { order: FaturamentoOrder }) {
   const tipoInfo = getTipoInfo("", order.TIPO_MOVIMENTACAO, order.LOCAL_RETIRADA);
+  const numDoc = String(order.FGO_NUMDOC).trim();
 
   // Se já tem separador e conferente, o status real é "Aguardando faturamento"
   // independente do que o ERP registrou (pode estar desatualizado)
@@ -624,9 +664,31 @@ function FaturamentoOrderCard({ order }: { order: FaturamentoOrder }) {
           </div>
           <p className="text-sm font-semibold text-foreground mt-1 truncate">{order.NOME_CLIENTE}</p>
         </div>
-        <div className="flex items-center gap-1 shrink-0 px-2 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20">
-          <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
-          <span className="text-[10px] font-bold text-sky-400 whitespace-nowrap">Conferido</span>
+        {/* Status and Chat */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent("open-crm-chat", {
+                  detail: {
+                    doc: numDoc,
+                    title: order.NOME_CLIENTE,
+                    sellerName: order.NOME_SEPARADOR || "Separador",
+                    sellerCode: order.CODIGO_SEPARADOR || "",
+                  },
+                })
+              );
+            }}
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/15 hover:bg-primary/25 text-primary text-[10px] font-semibold transition-colors shrink-0"
+            title="Conversar"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Mensagem</span>
+          </button>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20">
+            <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
+            <span className="text-[10px] font-bold text-sky-400 whitespace-nowrap">Conferido</span>
+          </div>
         </div>
       </div>
 
@@ -750,6 +812,27 @@ function OrderCard({ order, usersCache }: { order: Order; usersCache: Map<string
           </div>
           <p className="text-sm font-semibold text-foreground mt-1 truncate">{order.NOME_CLIENTE}</p>
         </div>
+        {/* Chat button */}
+        <button
+          onClick={() => {
+            const numDoc = String(order.FGO_NUMDOC).trim();
+            window.dispatchEvent(
+              new CustomEvent("open-crm-chat", {
+                detail: {
+                  doc: numDoc,
+                  title: order.NOME_CLIENTE,
+                  sellerName: order.separatorName || order.NOME_SEPARADOR || "Separador",
+                  sellerCode: order.separatorCode || order.CODIGO_SEPARADOR || "",
+                },
+              })
+            );
+          }}
+          className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/15 hover:bg-primary/25 text-primary text-[10px] font-semibold transition-colors shrink-0"
+          title="Conversar"
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span>Mensagem</span>
+        </button>
       </div>
 
       {/* Status */}

@@ -80,6 +80,7 @@ export function ChatModal({
   const [showItems, setShowItems] = useState(false);
   const [items, setItems] = useState<CrmItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const isChatWithSeparator = !amICentralizer && !!sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName !== userProfile?.name;
 
   // 1. Efeito Principal de Inicialização e Realtime
   useEffect(() => {
@@ -125,6 +126,49 @@ export function ChatModal({
     // Buscar quem é a outra parte da conversa (Prioriza cache, fallback no banco)
     async function fetchOwner() {
       const centralizerId = (window as unknown as Record<string, unknown>)?._carflaxCentralizerId as string | undefined;
+
+      // Se for chat com separador, busca o separador em vez do centralizador
+      if (isChatWithSeparator) {
+        try {
+          const vCode = sellerCode;
+          const vName = sellerName;
+
+          // Tenta resolver pelo cache global primeiro
+          if (vCode) {
+            const cachedUser = Object.values(userCache).find((u) => u.operator_code === vCode);
+            if (cachedUser && cachedUser.id !== userProfile?.id) {
+              setBudgetOwner(cachedUser.id);
+              setOwnerProfile({ name: cachedUser.name, avatar: cachedUser.avatar || "" });
+              setHeaderLoading(false);
+              return;
+            }
+          }
+
+          if (vName && vName.toUpperCase() !== "SISTEMA" && vName !== userProfile?.name) {
+            setOwnerProfile(prev => ({ name: vName, avatar: prev?.avatar || "" }));
+          }
+
+          // Fallback: busca no banco só se cache não resolveu
+          if (vCode) {
+            const { data: dbUser } = await supabase.from("usuarios").select("id, name, avatar").eq("operator_code", vCode).maybeSingle();
+            if (dbUser && dbUser.id !== userProfile?.id) {
+              setBudgetOwner(dbUser.id);
+              setOwnerProfile({ name: dbUser.name, avatar: dbUser.avatar || "" });
+            }
+          } else if (vName) {
+            const { data: dbUser } = await supabase.from("usuarios").select("id, name, avatar").ilike("name", `%${vName}%`).maybeSingle();
+            if (dbUser && dbUser.id !== userProfile?.id) {
+              setBudgetOwner(dbUser.id);
+              setOwnerProfile({ name: dbUser.name, avatar: dbUser.avatar || "" });
+            }
+          }
+        } catch (e) {
+          console.error("[Chat] Erro ao buscar separador:", e);
+        } finally {
+          setHeaderLoading(false);
+        }
+        return;
+      }
 
       // Se sou Vendedor, busca o perfil do Centralizador
       if (!amICentralizer) {
@@ -343,13 +387,13 @@ export function ChatModal({
         const user = userCache[otherMessage.enviado_por];
         if (user) {
           setOwnerProfile({ name: user.name, avatar: user.avatar || "" });
-          if (amICentralizer) setBudgetOwner(user.id);
+          if (amICentralizer || isChatWithSeparator) setBudgetOwner(user.id);
           else setCentralizer({ id: user.id, name: user.name, avatar: user.avatar || "" });
         } else {
           supabase.from("usuarios").select("id, name, avatar").eq("id", otherMessage.enviado_por).maybeSingle().then(({ data: u }) => {
             if (u && u.id !== userProfile?.id) {
               setOwnerProfile({ name: u.name, avatar: u.avatar || "" });
-              if (amICentralizer) setBudgetOwner(u.id);
+              if (amICentralizer || isChatWithSeparator) setBudgetOwner(u.id);
             }
           });
         }
@@ -375,7 +419,7 @@ export function ChatModal({
         }
       }
     }
-  }, [conversas, userProfile?.id, userProfile?.name, amICentralizer, sellerName, isOpen, budgetOwner, ownerProfile]);
+  }, [conversas, userProfile?.id, userProfile?.name, amICentralizer, sellerName, isOpen, budgetOwner, ownerProfile, isChatWithSeparator]);
 
   // Efeito para carregar o nome do cliente do orçamento
   useEffect(() => {
@@ -544,13 +588,21 @@ export function ChatModal({
     if (!text || sending) return;
     setSending(true);
 
-    let destinoId = amICentralizer ? (budgetOwner || "todos") : (centralizer?.id || "todos");
+    let destinoId = (amICentralizer || isChatWithSeparator) ? (budgetOwner || "todos") : (centralizer?.id || "todos");
 
-    if (amICentralizer && (destinoId === "todos" || !destinoId) && sellerCode) {
-      const { data: user } = await supabase.from("usuarios").select("id").eq("operator_code", sellerCode).maybeSingle();
-      if (user) {
-        destinoId = user.id;
-        setBudgetOwner(user.id);
+    if ((amICentralizer || isChatWithSeparator) && (destinoId === "todos" || !destinoId)) {
+      if (sellerCode) {
+        const { data: user } = await supabase.from("usuarios").select("id").eq("operator_code", sellerCode).maybeSingle();
+        if (user) {
+          destinoId = user.id;
+          setBudgetOwner(user.id);
+        }
+      } else if (sellerName) {
+        const { data: user } = await supabase.from("usuarios").select("id").ilike("name", `%${sellerName}%`).maybeSingle();
+        if (user) {
+          destinoId = user.id;
+          setBudgetOwner(user.id);
+        }
       }
     }
 
