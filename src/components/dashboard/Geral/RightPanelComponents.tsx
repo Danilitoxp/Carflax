@@ -46,7 +46,117 @@ const MOTIVATIONAL_QUOTES = [
   { text: "Foque no processo e os resultados virão naturalmente.", author: "Nick Saban", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Nick%20Saban" },
   { text: "A excelência não é um ato, mas um hábito. Venda com paixão!", author: "Aristóteles", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Aristoteles" },
   { text: "O único limite para as nossas conquistas de amanhã são as nossas dúvidas de hoje.", author: "Franklin D. Roosevelt", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Franklin%20D%20Roosevelt" },
-  { text: "Grandes resultados requerem grandes ambições. Supere-se hoje!", author: "Heráclito", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Heraclito" }
+  { text: "Grandes resultados requerem grandes ambições. Supere-se hoje!", author: "Heráclito", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Heraclito" },
+  { text: "Se você não está cuidando do seu cliente, seu concorrente vai cuidar.", author: "Bob Hooey", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Bob%20Hooey" },
+  { text: "O melhor momento para plantar uma árvore foi há 20 anos. O segundo melhor é agora.", author: "Provérbio Chinês", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Proverbio%20Chines" },
+  { text: "Não conte os dias, faça os dias contarem.", author: "Muhammad Ali", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Muhammad%20Ali" },
+  { text: "A persistência é o caminho do êxito.", author: "Charles Chaplin", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Charles%20Chaplin" },
+  { text: "O segredo de progredir é começar.", author: "Mark Twain", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Mark%20Twain" },
+  { text: "A única maneira de fazer um excelente trabalho é amar o que você faz.", author: "Steve Jobs", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Steve%20Jobs" },
+  { text: "O que não nos mata nos torna mais fortes.", author: "Friedrich Nietzsche", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Friedrich%20Nietzsche" },
+  { text: "Falhe sete vezes, levante-se oito.", author: "Provérbio Japonês", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Proverbio%20Japones" },
+  { text: "Faça do seu cliente o herói da sua história.", author: "Ann Handley", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Ann%20Handley" },
+  { text: "A melhor publicidade é fazer um bom trabalho.", author: "Philip Kotler", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Philip%20Kotler" },
+  { text: "O cliente compra a sua confiança antes de comprar o seu produto.", author: "Brian Tracy", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Brian%20Tracy" },
+  { text: "Se você puder sonhar, você poderá fazer.", author: "Walt Disney", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Walt%20Disney" },
+  { text: "Para ter sucesso, seu desejo de sucesso deve ser maior do que seu medo de fracassar.", author: "Bill Cosby", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Bill%20Cosby" },
+  { text: "Sucesso é caminhar de fracasso em fracasso sem perder o entusiasmo.", author: "Winston Churchill", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Winston%20Churchill" },
+  { text: "Se você quer ir rápido, vá sozinho. Se você quer ir longe, vá acompanhado.", author: "Provérbio Africano", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Proverbio%20Africano" },
+  { text: "Motivação é o que te faz começar. Hábito é o que te faz continuar.", author: "Jim Rohn", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Jim%20Rohn" },
+  { text: "Não venda produtos. Venda sentimentos, status e soluções.", author: "Jordan Belfort", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Jordan%20Belfort" },
+  { text: "Você erra 100% dos chutes que não dá.", author: "Wayne Gretzky", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Wayne%20Gretzky" },
+  { text: "A oportunidade dança com aqueles que já estão na pista.", author: "H. Jackson Brown Jr.", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Jackson%20Brown" },
+  { text: "Agir, eis a inteligência verdadeira. Serei o que quiser. Mas tenho que querer o que for.", author: "Fernando Pessoa", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Fernando%20Pessoa" },
+  { text: "Nós somos o que fazemos repetidamente.", author: "Will Durant", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Will%20Durant" },
+  { text: "A vida é 10% o que acontece comigo e 90% como eu reajo a isso.", author: "Charles Swindoll", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Charles%20Swindoll" },
+  { text: "Acredite que você pode e você já está no meio do caminho.", author: "Theodore Roosevelt", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Theodore%20Roosevelt" },
+  { text: "Definição de propósito é o ponto de partida de toda conquista.", author: "W. Clement Stone", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Clement%20Stone" },
+  { text: "Concentre todos os seus pensamentos no trabalho que está realizando.", author: "Alexander Graham Bell", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Graham%20Bell" },
+  { text: "Um cliente satisfeito é a melhor estratégia de negócios.", author: "Michael LeBoeuf", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Michael%20LeBoeuf" },
+  { text: "As pessoas não compram o que você faz; elas compram o porquê de você fazer.", author: "Simon Sinek", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Simon%20Sinek" },
+  { text: "Não encontre defeitos, encontre soluções.", author: "Henry Ford", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Henry%20Ford" },
+  { text: "Quem quer fazer algo encontra um meio, quem não quer encontra uma desculpa.", author: "Provérbio Árabe", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Proverbio%20Arabe" },
+  { text: "Obstáculos são aquelas coisas assustadoras que você vê quando desvia os olhos do seu objetivo.", author: "Henry Ford", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Henry%20Ford" },
+  { text: "No meio da dificuldade encontra-se a oportunidade.", author: "Albert Einstein", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Albert%20Einstein" },
+  { text: "A imaginação é mais importante que o conhecimento.", author: "Albert Einstein", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Albert%20Einstein" },
+  { text: "A sorte favorece a mente preparada.", author: "Louis Pasteur", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Louis%20Pasteur" },
+  { text: "Você não é pago por hora. Você é pago pelo valor que traz para a hora.", author: "Jim Rohn", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Jim%20Rohn" },
+  { text: "O sucesso não é a chave para a felicidade. A felicidade é a chave para o sucesso.", author: "Albert Schweitzer", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Albert%20Schweitzer" },
+  { text: "Lembre-se de que ninguém pode fazer você se sentir inferior sem o seu consentimento.", author: "Eleanor Roosevelt", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Eleanor%20Roosevelt" },
+  { text: "O que você faz hoje pode melhorar todos os seus amanhãs.", author: "Ralph Marston", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Ralph%20Marston" },
+  { text: "Vender é arte, ciência e conexão humana.", author: "Dale Carnegie", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Dale%20Carnegie" },
+  { text: "O insucesso é apenas uma oportunidade para recomeçar com mais inteligência.", author: "Henry Ford", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Henry%20Ford" },
+  { text: "Todo progresso acontece fora da zona de conforto.", author: "Michael John Bobak", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Michael%20Bobak" },
+  { text: "Quanto mais eu treino, mais sorte eu tenho.", author: "Gary Player", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Gary%20Player" },
+  { text: "Se você faz o que sempre fez, obterá o que sempre obteve.", author: "Tony Robbins", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Tony%20Robbins" },
+  { text: "O sucesso é a habilidade de ir de fracasso em fracasso sem perder o entusiasmo.", author: "Winston Churchill", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Winston%20Churchill" },
+  { text: "Não se preocupe em ser bem-sucedido, mas sim em ser valioso.", author: "Albert Einstein", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Albert%20Einstein" },
+  { text: "Se você não valoriza seu tempo, os outros também não o farão.", author: "Kim Garst", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Kim%20Garst" },
+  { text: "Comece onde você está. Use o que você tem. Faça o que puder.", author: "Arthur Ashe", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Arthur%20Ashe" },
+  { text: "Foque no cliente e todo o resto virá.", author: "Larry Page", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Larry%20Page" },
+  { text: "A atitude determina a sua altitude.", author: "Zig Ziglar", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Zig%20Ziglar" },
+  { text: "Não tente ser uma pessoa de sucesso. Em vez disso, seja uma pessoa de valor.", author: "Albert Einstein", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Albert%20Einstein" },
+  { text: "O sucesso é aprender a ir de fracasso em fracasso sem perder a vontade.", author: "Winston Churchill", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Winston%20Churchill" },
+  { text: "Descubra o que você gosta de fazer e arranje alguém que pague por isso.", author: "Katherine Whitehorn", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Katherine%20Whitehorn" },
+  { text: "Daqui a um ano você vai desejar ter começado hoje.", author: "Karen Lamb", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Karen%20Lamb" },
+  { text: "Você nunca é velho demais para estabelecer outro objetivo ou sonhar um novo sonho.", author: "C.S. Lewis", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=CS%20Lewis" },
+  { text: "Mire na lua. Mesmo se você errar, você pousará entre as estrelas.", author: "Les Brown", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Les%20Brown" },
+  { text: "Nunca ceda, nunca ceda, nunca, nunca, nunca.", author: "Winston Churchill", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Winston%20Churchill" },
+  { text: "Inteligência sem ambição é um pássaro sem asas.", author: "Salvador Dalí", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Salvador%20Dali" },
+  { text: "O homem que move montanhas começa carregando pequenas pedras.", author: "Confúcio", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Confucio" },
+  { text: "Exija muito de si mesmo e espere pouco dos outros. Assim evitará aborrecimentos.", author: "Confúcio", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Confucio" },
+  { text: "O guerreiro de sucesso é o homem médio, com foco semelhante a um laser.", author: "Bruce Lee", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Bruce%20Lee" },
+  { text: "Não reze por uma vida fácil, reze por forças para suportar uma difícil.", author: "Bruce Lee", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Bruce%20Lee" },
+  { text: "A simplicidade é o último grau de sofisticação.", author: "Leonardo da Vinci", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Leonardo%20da%20Vinci" },
+  { text: "Saber não é suficiente; devemos aplicar. Querer não é suficiente; devemos fazer.", author: "Johann Wolfgang von Goethe", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Goethe" },
+  { text: "Vá na direção de seus sonhos. Viva a vida que você imaginou.", author: "Henry David Thoreau", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Henry%20Thoreau" },
+  { text: "Faça o que você puder, com o que você tem, onde você estiver.", author: "Theodore Roosevelt", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Theodore%20Roosevelt" },
+  { text: "A energia e a persistência conquistam todas as coisas.", author: "Benjamin Franklin", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Benjamin%20Franklin" },
+  { text: "Se você fechar a porta para todos os erros, a verdade ficará de fora.", author: "Rabindranath Tagore", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Rabindranath%20Tagore" },
+  { text: "O insucesso é uma ótima oportunidade para recomeçar com mais inteligência.", author: "Henry Ford", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Henry%20Ford" },
+  { text: "Venda o problema que você resolve, não o produto que você faz.", author: "Desconhecido", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Desconhecido" },
+  { text: "Nada é impossível para aquele que persiste.", author: "Alexandre, o Grande", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Alexandre%20o%20Grande" },
+  { text: "Faça da sua vida um reflexo dos seus maiores sonhos.", author: "Desconhecido", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Desconhecido" },
+  { text: "Se você não lutar pelo que quer, não lamente pelo que perdeu.", author: "Desconhecido", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Desconhecido" },
+  { text: "A disciplina é a ponte entre metas e realizações.", author: "Jim Rohn", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Jim%20Rohn" },
+  { text: "A melhor maneira de prever o futuro é criá-lo.", author: "Peter Drucker", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Peter%20Drucker" },
+  { text: "O que pode ser medido, pode ser melhorado.", author: "Peter Drucker", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Peter%20Drucker" },
+  { text: "Não há atalhos para os lugares onde vale a pena ir.", author: "Beverly Sills", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Beverly%20Sills" },
+  { text: "A coragem não é a ausência do medo, mas o triunfo sobre ele.", author: "Nelson Mandela", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Nelson%20Mandela" },
+  { text: "Sempre parece impossível até que seja feito.", author: "Nelson Mandela", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Nelson%20Mandela" },
+  { text: "Seus clientes mais insatisfeitos são sua maior fonte de aprendizado.", author: "Bill Gates", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Bill%20Gates" },
+  { text: "O sucesso é um mestre terrível. Ele convence as pessoas inteligentes de que elas não podem perder.", author: "Bill Gates", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Bill%20Gates" },
+  { text: "Se você nasceu pobre, não é sua culpa. Mas se você morrer pobre, a culpa é sua.", author: "Bill Gates", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Bill%20Gates" },
+  { text: "Faça o seu melhor hoje e o amanhã se cuidará sozinho.", author: "Desconhecido", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Desconhecido" },
+  { text: "O entusiasmo é a maior força da alma. Conserva-o.", author: "Gerard de Nerval", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Gerard%20de%20Nerval" },
+  { text: "Se você não tem metas, você trabalha para quem tem.", author: "Desconhecido", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Desconhecido" },
+  { text: "O segredo do sucesso na vida é o homem estar pronto para sua oportunidade quando ela surgir.", author: "Benjamin Disraeli", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Benjamin%20Disraeli" },
+  { text: "Aqueles que não podem mudar suas mentes não podem mudar nada.", author: "George Bernard Shaw", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Bernard%20Shaw" },
+  { text: "O único lugar onde o sucesso vem antes do trabalho é no dicionário.", author: "Vidal Sassoon", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Vidal%20Sassoon" },
+  { text: "O fracasso é a oportunidade de começar de novo, inteligentemente.", author: "Henry Ford", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Henry%20Ford" },
+  { text: "Na vida, não existem prêmios ou punições, existem apenas consequências.", author: "Robert Ingersoll", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Robert%20Ingersoll" },
+  { text: "A mente que se abre a uma nova ideia jamais voltarará ao seu tamanho original.", author: "Albert Einstein", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Albert%20Einstein" },
+  { text: "Viva como se fosse morrer amanhã. Aprenda como se fosse viver para sempre.", author: "Mah Mahatma Gandhi", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Mahatma%20Gandhi" },
+  { text: "Onde há vontade, há um caminho.", author: "Provérbio Inglês", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Proverbio%20Ingles" },
+  { text: "Não se preocupe com os fracassos, preocupe-se com as chances que você perde quando nem sequer tenta.", author: "Jack Canfield", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Jack%20Canfield" },
+  { text: "Nós somos o que fazemos repetidas vezes; a excelência, portanto, não é um feito, mas um hábito.", author: "Aristóteles", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Aristoteles" },
+  { text: "A diferença entre o ordinário e o extraordinário é aquele pequeno extra.", author: "Jimmy Johnson", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Jimmy%20Johnson" },
+  { text: "Não espere por circunstâncias ideais. Elas nunca chegarão. Comece agora.", author: "Napoleon Hill", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Napoleon%20Hill" },
+  { text: "O que quer que a mente humana possa conceber e acreditar, ela pode alcançar.", author: "Napoleon Hill", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Napoleon%20Hill" },
+  { text: "O homem que faz mais do que é pago para fazer, em breve será pago por mais do que faz.", author: "Napoleon Hill", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Napoleon%20Hill" },
+  { text: "Desafie seus limites, não limite seus desafios.", author: "Desconhecido", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Desconhecido" },
+  { text: "Na vida de vendas, você é o comandante do seu próprio destino.", author: "Og Mandino", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Og%20Mandino" },
+  { text: "O medo do fracasso é o maior assassino de sonhos do mundo.", author: "Desconhecido", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Desconhecido" },
+  { text: "Nada grandioso jamais foi alcançado sem entusiasmo.", author: "Ralph Waldo Emerson", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Waldo%20Emerson" },
+  { text: "Vencer a si mesmo é a maior das vitórias.", author: "Platão", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Platao" },
+  { text: "No final, não são os anos em sua vida que contam. É a vida em seus anos.", author: "Abraham Lincoln", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Abraham%20Lincoln" },
+  { text: "Na adversidade, alguns quebram; outros batem recordes.", author: "William A. Ward", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=William%20Ward" },
+  { text: "A vitória pertence ao mais perseverante.", author: "Napoleão Bonaparte", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Napoleao" },
+  { text: "A melhor maneira de começar é parar de falar e começar a fazer.", author: "Walt Disney", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Walt%20Disney" },
+  { text: "O sucesso nas vendas resulta do foco nas necessidades do cliente, não no bolso dele.", author: "Zig Ziglar", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Zig%20Ziglar" },
+  { text: "O fracasso é apenas uma pausa para organizar as ideias.", author: "Dale Carnegie", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Dale%20Carnegie" },
+  { text: "A força não vem da capacidade física, mas de uma vontade indomável.", author: "Mahatma Gandhi", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Mahatma%20Gandhi" },
+  { text: "A vitória mais bela é a que se consegue sobre si mesmo.", author: "Ayrton Senna", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Ayrton%20Senna" }
 ];
 
 export function SalesMetricsCard({ isCompact, userProfile, data: externalData, loading: externalLoading, perdidoMap = new Map() }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo, loading?: boolean, perdidoMap?: Map<string, number> }) {
@@ -93,6 +203,11 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
       console.warn("localStorage error:", e);
     }
   };
+
+  const getRandomQuote = useCallback((current: { text: string; author: string; avatar?: string } | null) => {
+    const filtered = MOTIVATIONAL_QUOTES.filter(q => q.text !== current?.text);
+    return filtered[Math.floor(Math.random() * filtered.length)];
+  }, []);
 
   const openStats = useCallback(async () => {
     setIsStatsOpen(true);
@@ -172,8 +287,8 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   }, [userProfile, externalData]);
 
   useEffect(() => {
-    setActiveQuote(MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
-  }, [selectedCod]);
+    setActiveQuote(prev => getRandomQuote(prev));
+  }, [selectedCod, getRandomQuote]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -322,7 +437,24 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             </span>
           )}
         </div>
-        <div className="relative z-10 flex-shrink-0 flex items-center justify-end">
+        <div className="relative z-10 flex-shrink-0 flex items-center gap-1 justify-end">
+          <button
+            onClick={() => {
+              const next = !showSocial;
+              setShowSocial(next);
+              if (next) {
+                setActiveQuote(prev => getRandomQuote(prev));
+              }
+            }}
+            className={cn(
+              "p-1.5 rounded-lg transition-all",
+              showSocial ? "text-amber-400 hover:bg-secondary" : "text-slate-400 hover:text-amber-500 hover:bg-secondary"
+            )}
+            title={showSocial ? "Ver Métricas" : "Ver Stories Motivacional"}
+          >
+            <Star className="w-4 h-4 fill-current" />
+          </button>
+
           {canChangeSeller && (
             <button 
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -391,7 +523,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
       <div className="relative flex-1 flex flex-col justify-start">
         {/* STORIES VIEW */}
         <div className={cn(
-          "transition-all duration-500 ease-in-out flex flex-col items-center py-4 px-4 text-center gap-3 origin-center",
+          "transition-all duration-500 ease-in-out flex flex-col items-center pt-1 pb-4 px-4 text-center gap-3 origin-center",
           showSocial 
             ? "opacity-100 scale-100 pointer-events-auto" 
             : "opacity-0 scale-95 pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden"
@@ -400,7 +532,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             {getGreeting()}, {userProfile?.name ? userProfile.name.trim().split(' ')[0] : (data?.NOME_VENDEDOR && selectedCod !== "MEDIA" && selectedCod !== "TOTAL" ? data.NOME_VENDEDOR.trim().split(' ')[0] : 'Time')}!
           </h2>
 
-          <div className="relative">
+          <div className="relative mt-3">
             <div className="w-20 h-20 rounded-full border-2 border-blue-500 p-0.5 bg-background shadow-md overflow-hidden">
               <img
                 src={userProfile?.avatar || data?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || data?.NOME_VENDEDOR || "vendedor"}`}
