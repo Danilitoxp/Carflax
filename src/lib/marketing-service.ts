@@ -207,7 +207,7 @@ export const marketingService = {
   async getMessagesByJid(remoteJid: string, limit = 50, sinceDate?: string, beforeDate?: string) {
     let query = supabase
       .from("marketing_whatsapp")
-      .select("message_id, remote_jid, sender, texto, tipo, status, timestamp, media_url, reacao, vendedor_id")
+      .select("message_id, remote_jid, sender, texto, tipo, status, timestamp, media_url, reacao, vendedor_id, editado")
       .eq("remote_jid", remoteJid);
 
     if (sinceDate) query = query.gte("timestamp", sinceDate);

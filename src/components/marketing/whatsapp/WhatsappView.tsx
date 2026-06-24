@@ -30,6 +30,7 @@ import {
   FolderDown
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
+import { supabase } from "@/lib/supabase";
 import { marketingService } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
 import { apiDashboardProdutos, apiRegisterCliente } from "@/lib/api";
@@ -88,6 +89,7 @@ interface Message {
   isTranscribing?: boolean;
   quotedText?: string;
   quotedSender?: "me" | "contact";
+  editado?: boolean;
 }
 
 type Temperature = "Quente" | "Morno" | "Frio";
@@ -905,7 +907,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         }
       }
 
-      // Tratamento de mensagens editadas (antes da deduplicação — edições reutilizam o key.id original)
+      // Tratamento de mensagens editadas — protocolMessage/editedMessage (texto legível)
       const editedMsg = (messageContent as Record<string, unknown>)?.editedMessage as Record<string, unknown> | undefined;
       const protocolMsg = (messageContent as Record<string, unknown>)?.protocolMessage as Record<string, unknown> | undefined;
       if (editedMsg || (protocolMsg && (protocolMsg.type === 14 || protocolMsg.type === "MESSAGE_EDIT"))) {
@@ -930,6 +932,19 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         }
         return;
       }
+
+      // secretEncryptedMessage = edição criptografada — marca como editada na UI
+      const secretMsg = (messageContent as Record<string, unknown>)?.secretEncryptedMessage as Record<string, unknown> | undefined;
+      if (secretMsg?.targetMessageKey) {
+        const targetId = (secretMsg.targetMessageKey as Record<string, unknown>).id as string | undefined;
+        if (targetId) {
+          setMessages(prev => prev.map(m => m.id === targetId ? { ...m, editado: true } : m));
+        }
+        return;
+      }
+
+      // messageType secretEncryptedMessage sem targetMessageKey — ignorar
+      if ((message as Record<string, unknown>).messageType === 'secretEncryptedMessage') return;
 
       // Deduplicação: ignora se esta mensagem já foi processada na sessão
       const msgKeyId = message.key?.id;
@@ -1257,6 +1272,41 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
     socket.on('messages.update', handleMessageUpdate);
     socket.on('MESSAGES_UPDATE', handleMessageUpdate);
 
+    const handleMessageEdit = (data: Record<string, unknown>) => {
+      const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
+      if (data.instance && data.instance !== instanceName) return;
+      console.log('[WS] messages.edit recebido:', JSON.stringify(data, null, 2).substring(0, 800));
+
+      const payload = (data.data || data) as Record<string, unknown>;
+      const editKey = payload.key as Record<string, unknown> | undefined;
+      const originalMsgId = editKey?.id as string | undefined;
+      if (!originalMsgId) return;
+
+      const editedContent = payload.editedMessage as Record<string, unknown> | undefined;
+      if (editedContent) {
+        const newText = (editedContent.conversation as string)
+          || (editedContent.extendedTextMessage as Record<string, unknown>)?.text as string
+          || "";
+        if (newText) {
+          const remoteJid = editKey?.remoteJid as string || "";
+          setMessages(prev => prev.map(m => m.id === originalMsgId ? { ...m, text: newText } : m));
+          if (remoteJid) {
+            marketingService.saveMessage({
+              message_id: originalMsgId,
+              remote_jid: remoteJid,
+              texto: newText,
+              sender: editKey?.fromMe ? "me" : "contact",
+              timestamp: new Date().toISOString(),
+            }).catch(() => null);
+          }
+        }
+      }
+    };
+
+    socket.on('messages.edit', handleMessageEdit);
+    socket.on('MESSAGES_EDIT', handleMessageEdit);
+    socket.on('MESSAGES_EDITED', handleMessageEdit);
+
     // Usa profilePicUrl direto do evento contacts.update (sem chamada extra à API)
     const handleContactsUpdate = (data: Record<string, unknown>) => {
       const instanceName = import.meta.env.VITE_EVO_INSTANCE as string;
@@ -1380,10 +1430,38 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
       socket.off('PRESENCE_UPDATE', handlePresenceUpdate);
       socket.off('chats.update', handleChatsUpdate);
       socket.off('CHATS_UPDATE', handleChatsUpdate);
+      socket.off('messages.edit', handleMessageEdit);
+      socket.off('MESSAGES_EDIT', handleMessageEdit);
+      socket.off('MESSAGES_EDITED', handleMessageEdit);
       currentTimers.forEach(t => clearTimeout(t));
       currentTimers.clear();
     };
   }, [fetchAvatar, vendedorId]);
+
+  // Realtime: escuta edições de mensagens salvas pelo webhook no Supabase
+  useEffect(() => {
+    const channel = supabase
+      .channel('whatsapp-msg-edits')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'marketing_whatsapp' },
+        (payload) => {
+          const updated = payload.new as { message_id?: string; texto?: string; editado?: boolean };
+          if (updated.message_id) {
+            setMessages(prev => prev.map(m => {
+              if (m.id !== updated.message_id) return m;
+              return {
+                ...m,
+                ...(updated.texto ? { text: updated.texto } : {}),
+                ...(updated.editado !== undefined ? { editado: updated.editado } : {}),
+              };
+            }));
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   useEffect(() => {
     loadChats();
@@ -1886,6 +1964,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         tipo: m.tipo,
         mediaUrl: m.media_url,
         reacao: m.reacao,
+        editado: m.editado || false,
       }));
 
       setMessages(msgs);
@@ -3113,7 +3192,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                                 <span className={cn(
                                   "text-[10px] font-bold",
                                   msg.sender === "me" ? "text-white/90" : "text-muted-foreground"
-                                )}>{msg.time}</span>
+                                )}>{msg.editado && <span className="italic mr-1">editada</span>}{msg.time}</span>
                                 {msg.sender === "me" && (
                                   msg.status === "read"
                                     ? <CheckCheck className="w-3.5 h-3.5" style={{ color: '#34b7f1' }} />
@@ -3201,7 +3280,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                               return cn("opacity-60", isVisualMedia ? "px-2 pb-0.5 mt-0.5" : "mt-1");
                             })()
                           )}>
-                            <span className="text-[9px] font-bold mt-[1px]">{msg.time}</span>
+                            <span className="text-[9px] font-bold mt-[1px]">{msg.editado && <span className="italic mr-1">editada</span>}{msg.time}</span>
                             {msg.sender === "me" && (
                               <span>
                                 {msg.status === "read"
