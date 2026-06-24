@@ -512,12 +512,16 @@ const notifSections = [
   },
 ];
 
-function NotificationsTab() {
+function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null }) {
   const [state, setState] = useState<StateMap>(buildDefault);
   const [responsibles, setResponsibles] = useState<LossResponsible[]>([]);
   const [loadingResp, setLoadingResp] = useState(true);
   const [savingResp, setSavingResp] = useState(false);
   const [savedResp, setSavedResp] = useState(false);
+
+  const isManager = userProfile?.is_admin ||
+    userProfile?.role?.toUpperCase().includes('ADMIN') ||
+    userProfile?.role?.toUpperCase().includes('GERENTE');
 
   function toggle(section: string, item: string) {
     setState((prev) => ({ ...prev, [section]: { ...prev[section], [item]: !prev[section][item] } }));
@@ -588,7 +592,8 @@ function NotificationsTab() {
         ))}
       </div>
 
-      {/* Responsáveis por Notificações de Perda */}
+      {/* Responsáveis por Notificações de Perda — apenas gerentes/admin */}
+      {isManager && (
       <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
@@ -727,6 +732,7 @@ function NotificationsTab() {
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -1097,7 +1103,7 @@ export function SettingsSection({ externalTab, userProfile }: SettingsSectionPro
         <div className="max-w-[1200px] mx-auto">
           {activeTab === "profile" && <ProfileTab userProfile={userProfile} />}
           {activeTab === "orcamentos" && <OrcamentosTab />}
-          {activeTab === "notifications" && <NotificationsTab />}
+          {activeTab === "notifications" && <NotificationsTab userProfile={userProfile} />}
           {activeTab === "security" && <SecurityTab />}
           {activeTab === "appearance" && <AppearanceTab />}
           {activeTab === "banners" && <BannersTab userProfile={userProfile} />}

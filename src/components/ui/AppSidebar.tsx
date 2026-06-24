@@ -155,6 +155,11 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const marketingItems = ["Marketing", "Whatsapp Evolution", "Whatsapp Oficial", "Leads", "Cronograma", "Esteira", "Relatórios Mkt"];
     if (isMarketingDept && marketingItems.includes(label)) return true;
 
+    // Permissões específicas do departamento de VENDAS
+    const isVendasDept = userProfile?.department?.toUpperCase() === 'VENDAS';
+    const comercialItems = ["Comercial", "Orçamentos", "Meus Pedidos", "Prospecções", "Campanhas", "Alugueis", "Relatórios"];
+    if (isVendasDept && comercialItems.includes(label)) return true;
+
     // Permissões manuais (Database) — vale para todos os roles
     const hasManualPermission = userProfile?.permissions?.includes(label);
 
