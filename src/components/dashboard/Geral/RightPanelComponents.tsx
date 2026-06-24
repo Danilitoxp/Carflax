@@ -36,6 +36,18 @@ interface UserProfileLite {
   avatar?: string;
   role?: string;
 }
+const MOTIVATIONAL_QUOTES = [
+  { text: "O sucesso é a soma de pequenos esforços repetidos dia após dia.", author: "Robert Collier", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Robert%20Collier" },
+  { text: "Seja a sua própria motivação. Venda soluções, entregue valor!", author: "Zig Ziglar", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Zig%20Ziglar" },
+  { text: "Metas existem para ser batidas e limites existem para ser superados!", author: "Dale Carnegie", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Dale%20Carnegie" },
+  { text: "Vender não é sobre o que você oferece, é sobre o impacto que você gera.", author: "Simon Sinek", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Simon%20Sinek" },
+  { text: "Cada não te aproxima mais do próximo SIM. Continue firme!", author: "Og Mandino", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Og%20Mandino" },
+  { text: "A determinação de hoje é o sucesso de amanhã. Vamos pra cima!", author: "Desconhecido", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Desconhecido" },
+  { text: "Foque no processo e os resultados virão naturalmente.", author: "Nick Saban", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Nick%20Saban" },
+  { text: "A excelência não é um ato, mas um hábito. Venda com paixão!", author: "Aristóteles", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Aristoteles" },
+  { text: "O único limite para as nossas conquistas de amanhã são as nossas dúvidas de hoje.", author: "Franklin D. Roosevelt", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Franklin%20D%20Roosevelt" },
+  { text: "Grandes resultados requerem grandes ambições. Supere-se hoje!", author: "Heráclito", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Heraclito" }
+];
 
 export function SalesMetricsCard({ isCompact, userProfile, data: externalData, loading: externalLoading, perdidoMap = new Map() }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo, loading?: boolean, perdidoMap?: Map<string, number> }) {
   const [internalLoading, setInternalLoading] = useState(!externalData);
@@ -47,7 +59,40 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   const [vendasDiarias, setVendasDiarias] = useState<VendaDiaria[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsTab, setStatsTab] = useState<'vendido' | 'faturado'>('vendido');
-  const [periodTab, setPeriodTab] = useState<'mes' | '7dias'>('mes');
+  const [periodTab, setPeriodTab] = useState<'mes' | '7dias'>('7dias');
+  const [showSocial, setShowSocial] = useState(() => {
+    try {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+      return localStorage.getItem(`carflax-stories-dismissed-${todayStr}`) !== "true";
+    } catch {
+      return true;
+    }
+  });
+  const [activeQuote, setActiveQuote] = useState<{ text: string; author: string; avatar?: string }>(() => 
+    MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]
+  );
+  const [currentTime, setCurrentTime] = useState(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  });
+
+  const dismissSocialToday = () => {
+    setShowSocial(false);
+    try {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+      localStorage.setItem(`carflax-stories-dismissed-${todayStr}`, "true");
+    } catch (e) {
+      console.warn("localStorage error:", e);
+    }
+  };
 
   const openStats = useCallback(async () => {
     setIsStatsOpen(true);
@@ -125,6 +170,27 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
 
     fetchData();
   }, [userProfile, externalData]);
+
+  useEffect(() => {
+    setActiveQuote(MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
+  }, [selectedCod]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    }, 1000 * 30);
+    return () => clearInterval(timer);
+  }, []);
+
+
+
+  const getGreeting = () => {
+    const hr = new Date().getHours();
+    if (hr < 12) return "Bom dia";
+    if (hr < 18) return "Boa tarde";
+    return "Boa noite";
+  };
 
   const formatBRL = (val: number | string) => {
     const num = typeof val === 'string' ? parseFloat(val) : val;
@@ -236,25 +302,27 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
       "bg-card border border-border rounded-xl shadow-sm flex flex-col",
       isCompact ? "p-4" : "p-5"
     )}>
-      {/* 1. HEADER (Limpado) */}
-      <div className="flex items-center justify-between relative mb-2">
-        <div className="flex-1 flex items-center">
-          <button
-            onClick={openStats}
-            className="p-1.5 rounded-lg transition-all hover:bg-secondary"
-            title="Estatísticas diárias"
-          >
-            <Activity className="w-4 h-4 text-blue-500" />
-          </button>
+      {/* 1. HEADER (Com controles de Stories) */}
+      <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-border/10">
+        <div className="flex items-center gap-1 z-10 flex-shrink-0">
+          {!showSocial && (
+            <button
+              onClick={openStats}
+              className="p-1.5 rounded-lg transition-all hover:bg-secondary"
+              title="Estatísticas diárias"
+            >
+              <Activity className="w-4 h-4 text-blue-500" />
+            </button>
+          )}
         </div>
-        <div className="absolute inset-x-0 flex items-center justify-center pointer-events-none">
-          {canChangeSeller && selectedCod !== "TOTAL" && (
-            <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-tighter truncate max-w-[200px]">
-              {data?.NOME_VENDEDOR}
+        <div className="flex-1 text-center min-w-0 px-1">
+          {!showSocial && selectedCod !== "TOTAL" && data?.NOME_VENDEDOR && (
+            <span className="text-[10px] font-black uppercase tracking-tighter truncate block text-blue-600 dark:text-blue-400">
+              {data.NOME_VENDEDOR}
             </span>
           )}
         </div>
-        <div className="relative z-10 flex-shrink-0">
+        <div className="relative z-10 flex-shrink-0 flex items-center justify-end">
           {canChangeSeller && (
             <button 
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -320,94 +388,152 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
         </div>
       </div>
 
-      {/* 2. GRÁFICO DE ROSCA (TOP) */}
-      <div className="mb-6 flex flex-col items-center">
-        <div className="relative w-32 h-32">
-          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-            <circle
-              cx="50"
-              cy="50"
-              r="40"
-              stroke="currentColor"
-              strokeWidth="8"
-              fill="transparent"
-              className="text-secondary dark:text-slate-800"
-            />
-            <circle
-              cx="50"
-              cy="50"
-              r="40"
-              stroke="currentColor"
-              strokeWidth="8"
-              strokeDasharray={2 * Math.PI * 40}
-              strokeDashoffset={2 * Math.PI * 40 * (1 - Math.min(percentageVsEquilibrio, 100) / 100)}
-              strokeLinecap="round"
-              fill="transparent"
-              className={cn(
-                "transition-all duration-1000 ease-out",
-                percentageVsEquilibrio >= 100 ? "text-blue-600 dark:text-blue-500" : "text-rose-500"
-              )}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center leading-none text-center">
-            <span className={cn(
-              "text-2xl font-black tracking-tighter",
-              percentageVsEquilibrio >= 100 ? "text-foreground" : "text-rose-600"
-            )}>
-              {percentageVsEquilibrio.toFixed(0)}%
-            </span>
-            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
-              {percentageVsEquilibrio.toFixed(0) === '100' 
-                ? "Equilíbrio" 
-                : (equilibrio - Number(total) > 0 
-                    ? `- ${formatBRL(equilibrio - Number(total))}` 
-                    : `+ ${formatBRL(Math.abs(equilibrio - Number(total)))}`
-                  )
-              }
-            </span>
-          </div>
-        </div>
-      </div>
+      <div className="relative flex-1 flex flex-col justify-start">
+        {/* STORIES VIEW */}
+        <div className={cn(
+          "transition-all duration-500 ease-in-out flex flex-col items-center py-4 px-4 text-center gap-3 origin-center",
+          showSocial 
+            ? "opacity-100 scale-100 pointer-events-auto" 
+            : "opacity-0 scale-95 pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden"
+        )}>
+          <h2 className="text-base font-black tracking-tight text-foreground">
+            {getGreeting()}, {userProfile?.name ? userProfile.name.trim().split(' ')[0] : (data?.NOME_VENDEDOR && selectedCod !== "MEDIA" && selectedCod !== "TOTAL" ? data.NOME_VENDEDOR.trim().split(' ')[0] : 'Time')}!
+          </h2>
 
-      {/* 4. VALOR VENDIDO (MAIS DISCRETO) */}
-      <div className="mb-4 flex flex-col items-center text-center">
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 font-sans">
-          Total Vendido Hoje
-        </p>
-        <h3 className="text-2xl font-black text-foreground tracking-tighter mb-1.5">
-          {formatBRL(data?.TOTAL_VENDIDO_HOJE || 0)}
-        </h3>
-      </div>
-
-      {/* Progress Bar (Meta) */}
-      <div className="mb-8 px-2">
-        <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
-          <span className="text-blue-600 dark:text-blue-500">Meta</span>
-          <span className="text-foreground">{((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100).toFixed(1)}%</span>
-        </div>
-        <div className="h-2 w-full bg-secondary dark:bg-slate-800 rounded-full overflow-hidden border border-border">
-          <div
-            className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(37,99,235,0.4)]"
-            style={{ width: `${Math.min(((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100), 100)}%` }}
-          />
-        </div>
-      </div>
-
-      {/* 4. GRID DE INDICADORES (Sober/Professional) */}
-      <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-        {metrics.map((m, i) => (
-          <div key={i} className="flex items-start gap-3 group">
-            <div className="mt-0.5 p-1.5 bg-secondary/50 dark:bg-slate-800/50 border border-border rounded-lg shrink-0 transition-colors group-hover:bg-card group-hover:border-slate-400/20">
-              <m.icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider truncate mb-0.5">{m.label}</span>
-              <span className={cn("text-xs font-black tracking-tight", m.valueColor.includes('slate-900') ? 'text-foreground' : m.valueColor)}>
-                {m.value}
-              </span>
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full border-2 border-blue-500 p-0.5 bg-background shadow-md overflow-hidden">
+              <img
+                src={userProfile?.avatar || data?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || data?.NOME_VENDEDOR || "vendedor"}`}
+                alt={userProfile?.name || data?.NOME_VENDEDOR || "Avatar"}
+                className="w-full h-full rounded-full object-cover animate-in zoom-in-95 duration-500"
+              />
             </div>
           </div>
-        ))}
+
+          <div className="max-w-[270px] flex flex-col items-center">
+            <div className="relative px-4 mt-1 text-center">
+              <span className="absolute -top-3.5 left-1 text-2xl font-serif text-blue-500/30">“</span>
+              <p className="text-[10px] font-black italic text-foreground leading-relaxed">
+                {activeQuote?.text}
+              </p>
+              <span className="absolute -bottom-5 right-1 text-2xl font-serif text-blue-500/30">”</span>
+            </div>
+            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60 mt-0.5 block">
+              — {activeQuote?.author}
+            </span>
+          </div>
+
+          <div className="pt-2 pb-1 flex flex-col items-center gap-2.5">
+            <span className="text-4xl font-sans font-semibold tracking-tighter text-foreground">
+              {currentTime}
+            </span>
+            <button
+              onClick={dismissSocialToday}
+              className="mt-1 px-4 py-1.5 rounded-full border border-border/40 hover:border-border/80 active:scale-95 text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground bg-secondary/15 transition-all duration-200 flex items-center gap-1.5"
+            >
+              <span>Bora pra cima</span>
+              <Zap className="w-2.5 h-2.5 fill-current text-blue-500" />
+            </button>
+          </div>
+        </div>
+
+        {/* METRICS VIEW */}
+        <div className={cn(
+          "transition-all duration-500 ease-in-out flex flex-col origin-center",
+          !showSocial 
+            ? "opacity-100 scale-100 pointer-events-auto" 
+            : "opacity-0 scale-95 pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden"
+        )}>
+          {/* 2. GRÁFICO DE ROSCA (TOP) */}
+          <div className="mb-3 flex flex-col items-center">
+            <div className="relative w-32 h-32">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="transparent"
+                  className="text-secondary dark:text-slate-800"
+                />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  strokeDasharray={2 * Math.PI * 40}
+                  strokeDashoffset={2 * Math.PI * 40 * (1 - Math.min(percentageVsEquilibrio, 100) / 100)}
+                  strokeLinecap="round"
+                  fill="transparent"
+                  className={cn(
+                    "transition-all duration-1000 ease-out",
+                    percentageVsEquilibrio >= 100 ? "text-blue-600 dark:text-blue-500" : "text-rose-500"
+                  )}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center leading-none text-center">
+                <span className={cn(
+                  "text-2xl font-black tracking-tighter",
+                  percentageVsEquilibrio >= 100 ? "text-foreground" : "text-rose-600"
+                )}>
+                  {percentageVsEquilibrio.toFixed(0)}%
+                </span>
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
+                  {percentageVsEquilibrio.toFixed(0) === '100' 
+                    ? "Equilíbrio" 
+                    : (equilibrio - Number(total) > 0 
+                        ? `- ${formatBRL(equilibrio - Number(total))}` 
+                        : `+ ${formatBRL(Math.abs(equilibrio - Number(total)))}`
+                      )
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. VALOR VENDIDO (MAIS DISCRETO) */}
+          <div className="mb-2 flex flex-col items-center text-center">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 font-sans">
+              Total Vendido Hoje
+            </p>
+            <h3 className="text-2xl font-black text-foreground tracking-tighter mb-0.5">
+              {formatBRL(data?.TOTAL_VENDIDO_HOJE || 0)}
+            </h3>
+          </div>
+
+          {/* Progress Bar (Meta) */}
+          <div className="mb-4 px-2">
+            <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
+              <span className="text-blue-600 dark:text-blue-500">Meta</span>
+              <span className="text-foreground">{((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100).toFixed(1)}%</span>
+            </div>
+            <div className="h-2 w-full bg-secondary dark:bg-slate-800 rounded-full overflow-hidden border border-border">
+              <div
+                className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(37,99,235,0.4)]"
+                style={{ width: `${Math.min(((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100), 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* 4. GRID DE INDICADORES (Sober/Professional) */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
+            {metrics.map((m, i) => (
+              <div key={i} className="flex items-start gap-3 group">
+                <div className="mt-0.5 p-1.5 bg-secondary/50 dark:bg-slate-800/50 border border-border rounded-lg shrink-0 transition-colors group-hover:bg-card group-hover:border-slate-400/20">
+                  <m.icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider truncate mb-0.5">{m.label}</span>
+                  <span className={cn("text-xs font-black tracking-tight", m.valueColor.includes('slate-900') ? 'text-foreground' : m.valueColor)}>
+                    {m.value}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* MODAL DE ESTATÍSTICAS DIÁRIAS */}
@@ -877,7 +1003,7 @@ export function UpcomingEventsCard({ loading: externalLoading, operatorCode }: {
       }
     }
     fetchEvents();
-  }, []);
+  }, [operatorCode]);
 
   const getTypeStyle = (type: string) => {
     switch (type) {

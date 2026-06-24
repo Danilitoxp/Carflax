@@ -61,6 +61,7 @@ export interface VendedorResumo {
   PRAZO_MEDIO_DIAS_HOJE?: number | string;
   TOTAL_VENDIDO_HOJE: number | string;
   dias_trabalhados?: number;
+  avatar?: string;
 }
 
 export interface VendedoresResponse {
