@@ -888,53 +888,9 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
       const remoteJid = message.key?.remoteJid;
       if (!remoteJid || !remoteJid.endsWith('@s.whatsapp.net')) return;
 
-      // Deduplicação: ignora se esta mensagem já foi processada na sessão
-      const msgKeyId = message.key?.id;
-      if (msgKeyId) {
-        if (processedMsgIds.current.has(msgKeyId)) return;
-        processedMsgIds.current.add(msgKeyId);
-        // Evita crescimento ilimitado: descarta as primeiras 250 entradas ao atingir 500
-        if (processedMsgIds.current.size > 500) {
-          const arr = [...processedMsgIds.current];
-          processedMsgIds.current = new Set(arr.slice(250));
-        }
-      }
-
-      // Busca dados do cliente no banco
-      let dbCliente = null;
-      try {
-        dbCliente = await marketingService.getCliente(remoteJid);
-      } catch (err) {
-        console.error("Erro ao buscar cliente do banco:", err);
-      }
-
-      // Se o cliente está arquivado, desarquiva no banco e atualiza status
-      if (dbCliente?.arquivado) {
-        try {
-          await marketingService.toggleArchived(remoteJid, false);
-          dbCliente.arquivado = false;
-          
-          // Se o status era um motivo de arquivamento, volta para "Em Contato"
-          if (dbCliente.status && dbCliente.status !== "Novo Lead" && dbCliente.status !== "Em Contato" && dbCliente.status !== "Negociando" && dbCliente.status !== "Convertido") {
-            dbCliente.status = "Em Contato";
-            await marketingService.upsertCliente({ remote_jid: remoteJid, status: "Em Contato" });
-          }
-        } catch (err) {
-          console.error("Erro ao desarquivar cliente:", err);
-        }
-      }
-
-      // Guarda o JID para correlacionar com o LID do chats.update que vem logo após
-      lastPhoneJid.current = remoteJid;
-
-      // Ignora mensagens com mais de 7 dias
-      const MIN_SYNC_TIMESTAMP = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
-      const msgTimestamp = message.messageTimestamp || 0;
-      if (msgTimestamp > 0 && msgTimestamp < MIN_SYNC_TIMESTAMP) return;
-
       const messageContent = message.message;
-      
-      // Tratamento de reações
+
+      // Tratamento de reações (antes da deduplicação — reações reutilizam o key.id)
       if (messageContent?.reactionMessage) {
         const reactedMsgId = messageContent.reactionMessage.key?.id;
         const reactionText = messageContent.reactionMessage.text || "";
@@ -949,7 +905,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         }
       }
 
-      // Tratamento de mensagens editadas
+      // Tratamento de mensagens editadas (antes da deduplicação — edições reutilizam o key.id original)
       const editedMsg = (messageContent as Record<string, unknown>)?.editedMessage as Record<string, unknown> | undefined;
       const protocolMsg = (messageContent as Record<string, unknown>)?.protocolMessage as Record<string, unknown> | undefined;
       if (editedMsg || (protocolMsg && (protocolMsg.type === 14 || protocolMsg.type === "MESSAGE_EDIT"))) {
@@ -974,6 +930,48 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         }
         return;
       }
+
+      // Deduplicação: ignora se esta mensagem já foi processada na sessão
+      const msgKeyId = message.key?.id;
+      if (msgKeyId) {
+        if (processedMsgIds.current.has(msgKeyId)) return;
+        processedMsgIds.current.add(msgKeyId);
+        if (processedMsgIds.current.size > 500) {
+          const arr = [...processedMsgIds.current];
+          processedMsgIds.current = new Set(arr.slice(250));
+        }
+      }
+
+      // Busca dados do cliente no banco
+      let dbCliente = null;
+      try {
+        dbCliente = await marketingService.getCliente(remoteJid);
+      } catch (err) {
+        console.error("Erro ao buscar cliente do banco:", err);
+      }
+
+      // Se o cliente está arquivado, desarquiva no banco e atualiza status
+      if (dbCliente?.arquivado) {
+        try {
+          await marketingService.toggleArchived(remoteJid, false);
+          dbCliente.arquivado = false;
+
+          if (dbCliente.status && dbCliente.status !== "Novo Lead" && dbCliente.status !== "Em Contato" && dbCliente.status !== "Negociando" && dbCliente.status !== "Convertido") {
+            dbCliente.status = "Em Contato";
+            await marketingService.upsertCliente({ remote_jid: remoteJid, status: "Em Contato" });
+          }
+        } catch (err) {
+          console.error("Erro ao desarquivar cliente:", err);
+        }
+      }
+
+      // Guarda o JID para correlacionar com o LID do chats.update que vem logo após
+      lastPhoneJid.current = remoteJid;
+
+      // Ignora mensagens com mais de 7 dias
+      const MIN_SYNC_TIMESTAMP = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
+      const msgTimestamp = message.messageTimestamp || 0;
+      if (msgTimestamp > 0 && msgTimestamp < MIN_SYNC_TIMESTAMP) return;
 
       const isAudio = !!messageContent?.audioMessage;
       const isSticker = !!messageContent?.stickerMessage;
