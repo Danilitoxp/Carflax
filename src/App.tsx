@@ -342,64 +342,6 @@ function DashboardContent({
   const [isCentralizer, setIsCentralizer] = useState(false);
   const initialCheckPerformed = useRef(false);
 
-  // ── Notificações de Follow-ups do Dia ───────────────────────────
-  useEffect(() => {
-    if (!userProfile?.id) return;
-    
-    async function checkTodayFollowUps() {
-      const now = new Date();
-      const todayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-
-      // Dismissed com expiração por dia: { date: "YYYY-M-D", ids: [...] }
-      const raw = localStorage.getItem("carflax-dismissed-notifs-v2");
-      const stored = raw ? JSON.parse(raw) : null;
-      const dismissed: string[] = (stored?.date === todayKey) ? stored.ids : [];
-      if (stored?.date !== todayKey) {
-        localStorage.setItem("carflax-dismissed-notifs-v2", JSON.stringify({ date: todayKey, ids: [] }));
-      }
-
-      const myCode = String(userProfile?.operator_code || userProfile?.operatorCode || "").replace(/^0+/, '');
-      if (!myCode) return; // sem código de operador, sem notificações
-
-      const { data: events } = await supabase
-        .from("eventos_calendario")
-        .select("*")
-        .eq("year", now.getFullYear())
-        .eq("month", now.getMonth() + 1)
-        .eq("day", now.getDate())
-        .eq("type", "follow-up")
-        .eq("vendedor_codigo", userProfile?.operator_code || userProfile?.operatorCode || "");
-
-      if (!events || events.length === 0) return;
-
-      let delay = 0;
-      events.forEach(ev => {
-        const tag = String(ev.id);
-        if (dismissed.includes(tag)) return;
-
-        const clientPart = ev.title.split('- Vendedor:')[0] || "";
-        const clientName = clientPart.replace(/^FOLLOW-UP:\s*/i, '').trim();
-
-        setTimeout(() => {
-          showNotification(
-            "info",
-            "⚠️ RETORNO PENDENTE",
-            `Cliente: ${clientName}\n\n${ev.description || "Verifique os detalhes no orçamento."}`,
-            false,
-            tag,
-            3000
-          );
-        }, delay);
-        
-        delay += 3500;
-      });
-    }
-
-    // Aguardar o carregamento inicial e disparar
-    const timeout = setTimeout(checkTodayFollowUps, 2000);
-    return () => clearTimeout(timeout);
-  }, [userProfile, showNotification]);
-
   // ── Notificações de Entregas (Realtime) ─────────────────────────────
   useEffect(() => {
     if (!userProfile?.id) return;

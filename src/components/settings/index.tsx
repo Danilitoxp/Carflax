@@ -24,6 +24,8 @@ import {
   FileBadge,
   ChevronDown,
   Trash2,
+  Send,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect } from "react";
@@ -523,6 +525,45 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
     userProfile?.role?.toUpperCase().includes('ADMIN') ||
     userProfile?.role?.toUpperCase().includes('GERENTE');
 
+  const [testingId, setTestingId] = useState<string | null>(null);
+
+  async function handleTestMessage(resp: LossResponsible) {
+    if (!resp.telefone || !resp.nome) return;
+    setTestingId(resp.id);
+    try {
+      let phone = resp.telefone.replace(/\D/g, "");
+      if (phone.length >= 10 && !phone.startsWith("55")) phone = "55" + phone;
+
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3002";
+      const msg = [
+        `Olá, *${resp.nome}*.`,
+        ``,
+        `✅ *MENSAGEM DE TESTE* ✅`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `📋 *Motivo:* ${resp.motivo}`,
+        `📱 *Número:* ${phone}`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `_Esta é uma mensagem de teste do Carflax HUB._`,
+        `_Se você recebeu, as notificações estão funcionando!_`
+      ].join('\n');
+
+      const res = await fetch(`${BACKEND_URL}/api/whatsapp/send-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: phone, text: msg }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("[Test] Resposta do servidor:", res.status, errorData);
+      }
+    } catch (err) {
+      console.error("[Test] Erro ao enviar mensagem teste:", err);
+    } finally {
+      setTimeout(() => setTestingId(null), 2000);
+    }
+  }
+
   function toggle(section: string, item: string) {
     setState((prev) => ({ ...prev, [section]: { ...prev[section], [item]: !prev[section][item] } }));
   }
@@ -701,16 +742,32 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
                       />
                     </td>
                     <td className="px-3 py-2.5 text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setResponsibles(prev => prev.filter(r => r.id !== resp.id));
-                        }}
-                        className="p-2 text-slate-400 hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
-                        title="Remover"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleTestMessage(resp)}
+                          disabled={testingId === resp.id || !resp.telefone || !resp.nome}
+                          className={cn(
+                            "p-2 rounded-lg transition-colors",
+                            testingId === resp.id
+                              ? "text-emerald-500 dark:text-emerald-400"
+                              : "text-slate-400 hover:text-blue-500 dark:text-slate-600 dark:hover:text-blue-400 hover:bg-blue-500/10"
+                          )}
+                          title="Enviar mensagem teste"
+                        >
+                          {testingId === resp.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResponsibles(prev => prev.filter(r => r.id !== resp.id));
+                          }}
+                          className="p-2 text-slate-400 hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                          title="Remover"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

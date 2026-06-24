@@ -84,6 +84,18 @@ export const apiDashboardGeral = (vendedor?: string, data?: string) =>
     ...(data ? { data } : {})
   });
 
+export interface VendaDiaria {
+  DIA: string;
+  TOTAL_VENDIDO: number;
+  FATURADO: number;
+}
+
+export const apiVendasDiarias = (vendedor?: string, data?: string) =>
+  get<VendaDiaria[]>("/api/dashboard/geral/diario", {
+    ...(vendedor ? { vendedor } : {}),
+    ...(data ? { data } : {})
+  });
+
 // ── Metas de Campanha (Elegíveis para Sorteio) ────────────────────────────────
 
 export interface MetaVendedor {

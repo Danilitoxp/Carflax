@@ -17,12 +17,15 @@ import {
   AlertCircle,
   Plane,
   Sun,
-  Star
+  Star,
+  Activity,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { useState, useEffect } from "react";
-import { apiDashboardGeral, type VendedorResumo, apiEntregasConcluidas, apiCampanhaMetas } from "@/lib/api";
+import { useState, useEffect, useCallback } from "react";
+import { apiDashboardGeral, type VendedorResumo, apiEntregasConcluidas, apiCampanhaMetas, apiVendasDiarias, type VendaDiaria } from "@/lib/api";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { calculateMonthlyWinner } from "@/lib/highlights_automation";
 import { supabase } from "@/lib/supabase";
 
@@ -40,8 +43,33 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   const [allVendedores, setAllVendedores] = useState<VendedorResumo[]>([]);
   const [selectedCod, setSelectedCod] = useState<string>("TOTAL");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [vendasDiarias, setVendasDiarias] = useState<VendaDiaria[]>([]);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsTab, setStatsTab] = useState<'vendido' | 'faturado'>('vendido');
+  const [periodTab, setPeriodTab] = useState<'mes' | '7dias'>('mes');
+
+  const openStats = useCallback(async () => {
+    setIsStatsOpen(true);
+    setStatsLoading(true);
+    try {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const dataStr = `${yyyy}-${mm}-${dd}`;
+      const cod = selectedCod === "MEDIA" || selectedCod === "TOTAL" ? undefined : selectedCod;
+      const result = await apiVendasDiarias(cod, dataStr);
+      setVendasDiarias(result);
+    } catch (err) {
+      console.error("Erro ao carregar vendas diárias:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [selectedCod]);
 
   const loading = externalLoading !== undefined ? externalLoading : internalLoading;
+  const filteredData = periodTab === '7dias' ? vendasDiarias.slice(-7) : vendasDiarias;
 
   useEffect(() => {
     if (externalData) {
@@ -210,7 +238,15 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     )}>
       {/* 1. HEADER (Limpado) */}
       <div className="flex items-center justify-between relative mb-2">
-        <div className="flex-1" />
+        <div className="flex-1 flex items-center">
+          <button
+            onClick={openStats}
+            className="p-1.5 rounded-lg transition-all hover:bg-secondary"
+            title="Estatísticas diárias"
+          >
+            <Activity className="w-4 h-4 text-blue-500" />
+          </button>
+        </div>
         <div className="absolute inset-x-0 flex items-center justify-center pointer-events-none">
           {canChangeSeller && selectedCod !== "TOTAL" && (
             <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-tighter truncate max-w-[200px]">
@@ -373,6 +409,140 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
           </div>
         ))}
       </div>
+
+      {/* MODAL DE ESTATÍSTICAS DIÁRIAS */}
+      {isStatsOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsStatsOpen(false)} />
+          <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-[95vw] max-w-[700px] max-h-[85vh] overflow-y-auto z-10 animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-card/95 backdrop-blur-md border-b border-border px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-xl border border-blue-100 dark:border-blue-900/50">
+                  <Activity className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-foreground uppercase tracking-tight">Estatísticas Diárias</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    {new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
+                    {selectedCod !== "MEDIA" && selectedCod !== "TOTAL" && data?.NOME_VENDEDOR ? ` — ${data.NOME_VENDEDOR}` : ''}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setIsStatsOpen(false)} className="p-2 rounded-xl hover:bg-secondary transition-colors">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-8">
+              {statsLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 animate-pulse">
+                  <div className="w-12 h-12 rounded-2xl bg-secondary/50 dark:bg-slate-800/50" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Carregando dados...</span>
+                </div>
+              ) : vendasDiarias.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 opacity-40">
+                  <Activity className="w-8 h-8 text-muted-foreground" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Sem dados para o período</span>
+                </div>
+              ) : (
+                <>
+                  {/* Controles de Filtros Estilo Nubank */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                    {/* Filtro de Métrica */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setStatsTab('vendido')}
+                        className={cn(
+                          "px-4 py-1.5 text-xs font-black rounded-full border transition-all duration-200 flex items-center gap-1.5",
+                          statsTab === 'vendido'
+                            ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20"
+                            : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground bg-secondary/30"
+                        )}
+                      >
+                        {statsTab === 'vendido' && <span className="text-[10px]">✓</span>}
+                        Vendido
+                      </button>
+                      <button
+                        onClick={() => setStatsTab('faturado')}
+                        className={cn(
+                          "px-4 py-1.5 text-xs font-black rounded-full border transition-all duration-200 flex items-center gap-1.5",
+                          statsTab === 'faturado'
+                            ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20"
+                            : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground bg-secondary/30"
+                        )}
+                      >
+                        {statsTab === 'faturado' && <span className="text-[10px]">✓</span>}
+                        Faturado
+                      </button>
+                    </div>
+
+                    {/* Filtro de Período */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPeriodTab('mes')}
+                        className={cn(
+                          "px-4 py-1.5 text-xs font-black rounded-full border transition-all duration-200 flex items-center gap-1.5",
+                          periodTab === 'mes'
+                            ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20"
+                            : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground bg-secondary/30"
+                        )}
+                      >
+                        {periodTab === 'mes' && <span className="text-[10px]">✓</span>}
+                        Mês Atual
+                      </button>
+                      <button
+                        onClick={() => setPeriodTab('7dias')}
+                        className={cn(
+                          "px-4 py-1.5 text-xs font-black rounded-full border transition-all duration-200 flex items-center gap-1.5",
+                          periodTab === '7dias'
+                            ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20"
+                            : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground bg-secondary/30"
+                        )}
+                      >
+                        {periodTab === '7dias' && <span className="text-[10px]">✓</span>}
+                        Últimos 7 dias
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Gráfico Unificado Estilo Nubank */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                        {statsTab === 'vendido' ? 'Total Vendido por Dia' : 'Faturado por Dia'}
+                      </span>
+                    </div>
+                    <div className="h-56 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                      <div className="h-full min-w-[500px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={filteredData.map(d => ({ ...d, dia: new Date(d.DIA + 'T00:00:00').getDate().toString().padStart(2, '0') }))} barCategoryGap={periodTab === '7dias' ? "6%" : "12%"}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
+                            <XAxis dataKey="dia" tick={{ fontSize: 10, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} width={40} />
+                            <Tooltip
+                              contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px', fontSize: '11px', fontWeight: 700, color: 'hsl(var(--foreground))' }}
+                              labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                              itemStyle={{ color: '#3b82f6' }}
+                              formatter={(value: number) => [new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value), statsTab === 'vendido' ? 'Total Vendido' : 'Faturado']}
+                              labelFormatter={(label: string) => `Dia ${label}`}
+                              cursor={{ fill: 'rgba(59, 130, 246, 0.08)', radius: 6 }}
+                            />
+                            <Bar dataKey={statsTab === 'vendido' ? 'TOTAL_VENDIDO' : 'FATURADO'} fill="#3b82f6" radius={periodTab === '7dias' ? [20, 20, 0, 0] : [8, 8, 0, 0]} maxBarSize={periodTab === '7dias' ? 90 : 32} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
