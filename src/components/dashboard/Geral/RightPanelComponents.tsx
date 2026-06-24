@@ -526,8 +526,8 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                               contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px', fontSize: '11px', fontWeight: 700, color: 'hsl(var(--foreground))' }}
                               labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
                               itemStyle={{ color: '#3b82f6' }}
-                              formatter={(value: number) => [new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value), statsTab === 'vendido' ? 'Total Vendido' : 'Faturado']}
-                              labelFormatter={(label: string) => `Dia ${label}`}
+                              formatter={(value: unknown) => [new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(value)), statsTab === 'vendido' ? 'Total Vendido' : 'Faturado']}
+                              labelFormatter={(label) => `Dia ${label}`}
                               cursor={{ fill: 'rgba(59, 130, 246, 0.08)', radius: 6 }}
                             />
                             <Bar dataKey={statsTab === 'vendido' ? 'TOTAL_VENDIDO' : 'FATURADO'} fill="#3b82f6" radius={periodTab === '7dias' ? [20, 20, 0, 0] : [8, 8, 0, 0]} maxBarSize={periodTab === '7dias' ? 90 : 32} />

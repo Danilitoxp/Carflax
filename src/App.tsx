@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { type Session } from "@supabase/supabase-js";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
-import { useNotification } from "@/hooks/useNotification";
 import { ThemeProvider } from "@/context/theme-provider";
 import { AppSidebar } from "@/components/ui/AppSidebar";
 import { ChatCenter } from "@/components/ui/ChatCenter";
@@ -66,7 +65,6 @@ function DashboardContent({
   perdidoMap,
   onLogout,
 }: DashboardContentProps) {
-  const { showNotification } = useNotification();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
