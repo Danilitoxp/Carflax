@@ -494,7 +494,7 @@ function CustomAudioPlayer({
              <span className="text-[9px] font-bold">{msgTime}</span>
              {isMe && (
                msgStatus === "read"
-                ? <CheckCheck className="w-3.5 h-3.5" style={{ color: '#020817' }} />
+                ? <CheckCheck className="w-3.5 h-3.5" style={{ color: '#34b7f1' }} />
                 : msgStatus === "delivered"
                   ? <CheckCheck className="w-3.5 h-3.5 text-white" />
                   : <Check className="w-3.5 h-3.5 text-white" />
@@ -2378,7 +2378,7 @@ export function WhatsappOfficialView({ vendedorId }: { vendedorId?: string }) {
                           {chat.lastMessageSender === "me" && (() => {
                             const s = chat.lastMessageStatus;
                             return s === "read"
-                              ? <CheckCheck className="w-3 h-3 shrink-0" style={{ color: '#020817' }} />
+                              ? <CheckCheck className="w-3 h-3 shrink-0" style={{ color: '#34b7f1' }} />
                               : s === "delivered"
                                 ? <CheckCheck className="w-3 h-3 shrink-0 text-muted-foreground" />
                                 : <Check className="w-3 h-3 shrink-0 text-muted-foreground" />;
@@ -2760,7 +2760,7 @@ export function WhatsappOfficialView({ vendedorId }: { vendedorId?: string }) {
                                 )}>{msg.time}</span>
                                 {msg.sender === "me" && (
                                   msg.status === "read"
-                                    ? <CheckCheck className="w-3.5 h-3.5" style={{ color: '#020817' }} />
+                                    ? <CheckCheck className="w-3.5 h-3.5" style={{ color: '#34b7f1' }} />
                                     : msg.status === "delivered"
                                       ? <CheckCheck className="w-3.5 h-3.5 text-white" />
                                       : <Check className="w-3.5 h-3.5 text-white" />
@@ -2826,7 +2826,7 @@ export function WhatsappOfficialView({ vendedorId }: { vendedorId?: string }) {
                             {msg.sender === "me" && (
                               <span>
                                 {msg.status === "read"
-                                  ? <CheckCheck className="w-3.5 h-3.5" style={{ color: '#020817' }} />
+                                  ? <CheckCheck className="w-3.5 h-3.5" style={{ color: '#34b7f1' }} />
                                   : msg.status === "delivered"
                                     ? <CheckCheck className="w-3.5 h-3.5 text-white" />
                                     : <Check className="w-3.5 h-3.5 text-white" />}

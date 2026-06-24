@@ -635,6 +635,15 @@ function DashboardContent({
     setForcedChatDoc(null);
   }, []);
 
+  // Clear orphaned forcedChatDoc if chats loaded but the forced one isn't among them
+  useEffect(() => {
+    if (!forcedChatDoc) return;
+    if (activeChats.length === 0) return; // chats not loaded yet
+    if (!activeChats.some(c => c.doc === forcedChatDoc)) {
+      setForcedChatDoc(null);
+    }
+  }, [forcedChatDoc, activeChats]);
+
   // 2. Realtime e Verificação Inicial
   useEffect(() => {
     if (!userProfile || !userProfile.id) return;
@@ -1387,8 +1396,8 @@ function DashboardContent({
         />
       )}
 
-      {/* Blur overlay when centralizador forces chat */}
-      {forcedChatDoc && (
+      {/* Blur overlay when centralizador forces chat — only if the forced chat is actually open */}
+      {forcedChatDoc && openChatDoc === forcedChatDoc && activeChats.some(c => c.doc === forcedChatDoc) && (
         <div className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm pointer-events-auto" />
       )}
 
