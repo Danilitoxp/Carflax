@@ -316,7 +316,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
           )}
         </div>
         <div className="flex-1 text-center min-w-0 px-1">
-          {!showSocial && selectedCod !== "TOTAL" && data?.NOME_VENDEDOR && (
+          {!showSocial && canChangeSeller && selectedCod !== "TOTAL" && data?.NOME_VENDEDOR && (
             <span className="text-[10px] font-black uppercase tracking-tighter truncate block text-blue-600 dark:text-blue-400">
               {data.NOME_VENDEDOR}
             </span>
