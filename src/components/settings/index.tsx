@@ -514,39 +514,219 @@ const notifSections = [
 
 function NotificationsTab() {
   const [state, setState] = useState<StateMap>(buildDefault);
+  const [responsibles, setResponsibles] = useState<LossResponsible[]>([]);
+  const [loadingResp, setLoadingResp] = useState(true);
+  const [savingResp, setSavingResp] = useState(false);
+  const [savedResp, setSavedResp] = useState(false);
 
   function toggle(section: string, item: string) {
     setState((prev) => ({ ...prev, [section]: { ...prev[section], [item]: !prev[section][item] } }));
   }
 
+  useEffect(() => {
+    async function fetchResponsibles() {
+      setLoadingResp(true);
+      const { data } = await supabase
+        .from("crm_config")
+        .select("value")
+        .eq("key", "crm_loss_responsibles")
+        .maybeSingle();
+
+      if (data?.value) {
+        try {
+          setResponsibles(JSON.parse(data.value));
+        } catch (e) {
+          console.error("Erro ao parsear crm_loss_responsibles:", e);
+        }
+      }
+      setLoadingResp(false);
+    }
+    fetchResponsibles();
+  }, []);
+
+  async function handleSaveResponsibles() {
+    setSavingResp(true);
+    const { error } = await supabase
+      .from("crm_config")
+      .upsert([{ key: "crm_loss_responsibles", value: JSON.stringify(responsibles) }]);
+
+    setSavingResp(false);
+    if (!error) {
+      setSavedResp(true);
+      setTimeout(() => setSavedResp(false), 3000);
+    }
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
-      {notifSections.map(({ key, icon: Icon, title, desc, items, color }) => (
-        <div key={key} className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden flex flex-col shadow-sm">
-          <div className="p-5 border-b border-slate-50 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.02] flex items-center gap-4">
-            <div className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center",
-              color === 'rose' ? "bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400" :
-                color === 'blue' ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400" :
-                  "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
-            )}>
-              <Icon className="w-5 h-5" />
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {notifSections.map(({ key, icon: Icon, title, desc, items, color }) => (
+          <div key={key} className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden flex flex-col shadow-sm">
+            <div className="p-5 border-b border-slate-50 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.02] flex items-center gap-4">
+              <div className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center",
+                color === 'rose' ? "bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400" :
+                  color === 'blue' ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400" :
+                    "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              )}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-black text-slate-800 dark:text-white uppercase tracking-tight leading-none mb-1">{title}</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{desc}</p>
+              </div>
+            </div>
+            <div className="flex-1 p-5 space-y-4">
+              {items.map((item) => (
+                <div key={item.key} className="flex items-center justify-between group">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{item.label}</span>
+                  <Toggle checked={state[key][item.key]} onChange={() => toggle(key, item.key)} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Responsáveis por Notificações de Perda */}
+      <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-rose-50 dark:bg-rose-500/10 rounded-xl flex items-center justify-center border border-rose-100 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
+              <Smartphone className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-black text-slate-800 dark:text-white uppercase tracking-tight leading-none mb-1">{title}</p>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{desc}</p>
+              <h5 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-1">
+                Responsáveis por Notificações de Perda
+              </h5>
+              <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
+                Defina quem receberá alertas no WhatsApp de acordo com o motivo de perda do orçamento.
+              </p>
             </div>
           </div>
-          <div className="flex-1 p-5 space-y-4">
-            {items.map((item) => (
-              <div key={item.key} className="flex items-center justify-between group">
-                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{item.label}</span>
-                <Toggle checked={state[key][item.key]} onChange={() => toggle(key, item.key)} />
-              </div>
-            ))}
-          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setResponsibles(prev => [
+                ...prev,
+                {
+                  id: String(Date.now()),
+                  motivo: "Todos os Motivos",
+                  nome: "",
+                  telefone: ""
+                }
+              ]);
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Adicionar Responsável
+          </button>
         </div>
-      ))}
+
+        <div className="rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden bg-slate-50/10 dark:bg-slate-900/10 shadow-sm">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-200 dark:border-white/10 select-none">
+              <tr>
+                <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] w-[35%]">Motivo de Perda</th>
+                <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] w-[35%]">Nome do Responsável</th>
+                <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] w-[20%]">WhatsApp (com DDD)</th>
+                <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] text-center w-[10%]">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-white/10">
+              {loadingResp ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-slate-400 dark:text-slate-600 font-bold uppercase tracking-wider text-[9px] animate-pulse">
+                    Carregando responsáveis...
+                  </td>
+                </tr>
+              ) : responsibles.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-slate-400 dark:text-slate-600 font-bold uppercase tracking-wider text-[9px]">
+                    Nenhum responsável configurado. Os alertas de perda serão enviados apenas para o centralizador.
+                  </td>
+                </tr>
+              ) : (
+                responsibles.map((resp) => (
+                  <tr key={resp.id} className="hover:bg-slate-50/30 dark:hover:bg-white/[0.01] transition-colors">
+                    <td className="px-3 py-2.5">
+                      <select
+                        value={resp.motivo}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setResponsibles(prev => prev.map(r => r.id === resp.id ? { ...r, motivo: val } : r));
+                        }}
+                        className="w-full px-2.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-2 focus:ring-blue-600/5 transition-all"
+                      >
+                        <option value="Todos os Motivos">Todos os Motivos</option>
+                        <option value="Preço Alto">Preço Alto</option>
+                        <option value="Falta de Estoque">Falta de Estoque</option>
+                        <option value="Furo de Estoque">Furo de Estoque</option>
+                        <option value="Desistiu">Desistiu</option>
+                        <option value="Prazo de Entrega">Prazo de Entrega</option>
+                        <option value="Mão de Obra e Material">Mão de Obra e Material</option>
+                        <option value="Comparativo de Linhas">Comparativo de Linhas</option>
+                        <option value="Alteração de Preço">Alteração de Preço</option>
+                      </select>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <input
+                        type="text"
+                        value={resp.nome}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setResponsibles(prev => prev.map(r => r.id === resp.id ? { ...r, nome: val } : r));
+                        }}
+                        placeholder="Nome (ex: João do Estoque)"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-2 focus:ring-blue-600/5 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
+                      />
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <input
+                        type="text"
+                        value={resp.telefone}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setResponsibles(prev => prev.map(r => r.id === resp.id ? { ...r, telefone: val } : r));
+                        }}
+                        placeholder="Ex: 5511999999999"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-2 focus:ring-blue-600/5 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
+                      />
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResponsibles(prev => prev.filter(r => r.id !== resp.id));
+                        }}
+                        className="p-2 text-slate-400 hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                        title="Remover"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-slate-50 dark:border-white/5 flex items-center justify-end">
+          <Button
+            onClick={handleSaveResponsibles}
+            disabled={savingResp}
+            className={cn(
+              "h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-95",
+              savedResp ? "bg-emerald-600 text-white shadow-emerald-500/20" : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
+            )}
+          >
+            {savingResp ? "Salvando..." : savedResp ? "Responsáveis Salvos!" : "Salvar Responsáveis"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -788,7 +968,6 @@ interface LossResponsible {
 function OrcamentosTab() {
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
-  const [responsibles, setResponsibles] = useState<LossResponsible[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -796,7 +975,6 @@ function OrcamentosTab() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      // 1. Fetch users
       const { data: usersData } = await supabase
         .from("usuarios")
         .select("id, name")
@@ -805,7 +983,6 @@ function OrcamentosTab() {
 
       if (usersData) setUsers(usersData);
 
-      // 2. Fetch current config
       const { data: configData } = await supabase
         .from("crm_config")
         .select("value")
@@ -813,21 +990,6 @@ function OrcamentosTab() {
         .maybeSingle();
 
       if (configData) setSelectedUserId(configData.value);
-
-      // 4. Fetch Loss Responsibles config
-      const { data: responsiblesData } = await supabase
-        .from("crm_config")
-        .select("value")
-        .eq("key", "crm_loss_responsibles")
-        .maybeSingle();
-
-      if (responsiblesData?.value) {
-        try {
-          setResponsibles(JSON.parse(responsiblesData.value));
-        } catch (e) {
-          console.error("Erro ao parsear crm_loss_responsibles:", e);
-        }
-      }
 
       setLoading(false);
     }
@@ -840,7 +1002,6 @@ function OrcamentosTab() {
       .from("crm_config")
       .upsert([
         { key: "centralizer_user_id", value: selectedUserId || null },
-        { key: "crm_loss_responsibles", value: JSON.stringify(responsibles) }
       ]);
 
     setSaving(false);
@@ -889,127 +1050,6 @@ function OrcamentosTab() {
           </div>
         </div>
 
-        {/* Responsáveis por perda de orçamento */}
-        <div className="mt-8 pt-8 border-t border-slate-50 dark:border-white/5 space-y-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-rose-50 dark:bg-rose-500/10 rounded-xl flex items-center justify-center border border-rose-100 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
-                <Smartphone className="w-5 h-5" />
-              </div>
-              <div>
-                <h5 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-1">
-                  Responsáveis por Notificações de Perda
-                </h5>
-                <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
-                  Defina quem receberá alertas no WhatsApp de acordo com o motivo de perda do orçamento.
-                </p>
-              </div>
-            </div>
-            
-            <button
-              type="button"
-              onClick={() => {
-                setResponsibles(prev => [
-                  ...prev,
-                  {
-                    id: String(Date.now()),
-                    motivo: "Todos os Motivos",
-                    nome: "",
-                    telefone: ""
-                  }
-                ]);
-              }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Adicionar Responsável
-            </button>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden bg-slate-50/10 dark:bg-slate-900/10 shadow-sm">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-200 dark:border-white/10 select-none">
-                <tr>
-                  <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] w-[35%]">Motivo de Perda</th>
-                  <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] w-[35%]">Nome do Responsável</th>
-                  <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] w-[20%]">WhatsApp (com DDD)</th>
-                  <th className="px-4 py-3.5 font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[9px] text-center w-[10%]">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-white/10">
-                {responsibles.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400 dark:text-slate-600 font-bold uppercase tracking-wider text-[9px]">
-                      Nenhum responsável configurado. Os alertas de perda serão enviados apenas para o centralizador.
-                    </td>
-                  </tr>
-                ) : (
-                  responsibles.map((resp) => (
-                    <tr key={resp.id} className="hover:bg-slate-50/30 dark:hover:bg-white/[0.01] transition-colors">
-                      <td className="px-3 py-2.5">
-                        <select
-                          value={resp.motivo}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setResponsibles(prev => prev.map(r => r.id === resp.id ? { ...r, motivo: val } : r));
-                          }}
-                          className="w-full px-2.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-2 focus:ring-blue-600/5 transition-all"
-                        >
-                          <option value="Todos os Motivos">Todos os Motivos</option>
-                          <option value="Preço Alto">Preço Alto</option>
-                          <option value="Falta de Estoque">Falta de Estoque</option>
-                          <option value="Furo de Estoque">Furo de Estoque</option>
-                          <option value="Desistiu">Desistiu</option>
-                          <option value="Prazo de Entrega">Prazo de Entrega</option>
-                          <option value="Mão de Obra e Material">Mão de Obra e Material</option>
-                          <option value="Comparativo de Linhas">Comparativo de Linhas</option>
-                          <option value="Alteração de Preço">Alteração de Preço</option>
-                        </select>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <input
-                          type="text"
-                          value={resp.nome}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setResponsibles(prev => prev.map(r => r.id === resp.id ? { ...r, nome: val } : r));
-                          }}
-                          placeholder="Nome (ex: João do Estoque)"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-2 focus:ring-blue-600/5 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
-                        />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <input
-                          type="text"
-                          value={resp.telefone}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setResponsibles(prev => prev.map(r => r.id === resp.id ? { ...r, telefone: val } : r));
-                          }}
-                          placeholder="Ex: 5511999999999"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-2 focus:ring-blue-600/5 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
-                        />
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setResponsibles(prev => prev.filter(r => r.id !== resp.id));
-                          }}
-                          className="p-2 text-slate-400 hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
-                          title="Remover"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
         <div className="mt-10 pt-6 border-t border-slate-50 dark:border-white/5 flex items-center justify-between">
           <p className="text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest">Configuração Global</p>
           <Button
@@ -1033,28 +1073,22 @@ function OrcamentosTab() {
 ───────────────────────────────────────────── */
 
 export function SettingsSection({ externalTab, userProfile }: SettingsSectionProps) {
-  const [activeTab, setActiveTab] = useState("profile");
+  const tabMap: Record<string, string> = {
+    "Meu Perfil": "profile",
+    "Config. Orçamentos": "orcamentos",
+    "Notificações": "notifications",
+    "Segurança": "security",
+    "Aparência": "appearance",
+    "Banners": "banners",
+    "Configurações": "profile",
+  };
 
-  // Sincronização de Navegação Externa (Padrão recomendado pelo React)
-  const [prevExternalTab, setPrevExternalTab] = useState<string | undefined>(externalTab);
-  if (externalTab !== prevExternalTab) {
-    setPrevExternalTab(externalTab);
-    if (externalTab) {
-      const tabMap: Record<string, string> = {
-        "Meu Perfil": "profile",
-        "Config. Orçamentos": "orcamentos",
-        "Notificações": "notifications",
-        "Segurança": "security",
-        "Aparência": "appearance",
-        "Banners": "banners",
-        "Configurações": "profile",
-      };
-      const target = tabMap[externalTab];
-      if (target && target !== activeTab) {
-        setActiveTab(target);
-      }
-    }
-  }
+  const resolvedTab = (externalTab && tabMap[externalTab]) || "profile";
+  const [activeTab, setActiveTab] = useState(resolvedTab);
+
+  useEffect(() => {
+    setActiveTab(resolvedTab);
+  }, [resolvedTab]);
 
   return (
     <div className="h-full flex flex-col bg-[#F8FAFC] dark:bg-slate-950">

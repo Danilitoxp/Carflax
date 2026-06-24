@@ -141,9 +141,9 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const role = userProfile?.role?.toUpperCase() || "";
     if (role.includes('ADMIN') || role.includes('GERENTE')) return true;
 
-    // Itens padrão (que todos vêem)
+    // Itens padrão (que todos vêem) — configurações pessoais + módulos essenciais
     const alwaysAllowed = [
-      "Meu Perfil", "Aparência", "Notificações", "Segurança", "Relatórios", "Coletor",
+      "Meu Perfil", "Aparência", "Notificações", "Segurança",
       "Dashboard", "Geral", "Produtos",
       "Calendário", "Eventos", "Férias",
       "Sugestões"
@@ -155,25 +155,13 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const marketingItems = ["Marketing", "Whatsapp Evolution", "Whatsapp Oficial", "Leads", "Cronograma", "Esteira", "Relatórios Mkt"];
     if (isMarketingDept && marketingItems.includes(label)) return true;
 
-    // Permissões específicas do VENDEDOR
-    const vendedorStandard = [
-      "Geral", "Produtos", "Dashboard", 
-      "Calendário", "Eventos", "Férias", 
-      "Comercial", "Orçamentos", "Meus Pedidos", "Clientes", "Prospecções", "Ligações", "Campanhas", "Alugueis", "Relatórios", "Coletor",
-      "Logística", "Romaneios", "Entregas", 
-      "Produtos", "Estoque", "Preços", "Eventos", "Férias"
-    ];
-    if (role.includes('VENDEDOR') && vendedorStandard.includes(label)) return true;
-
-    // Permissões manuais (Database)
+    // Permissões manuais (Database) — vale para todos os roles
     const hasManualPermission = userProfile?.permissions?.includes(label);
-    
-    // Se for VENDEDOR, ele só vê o que está na lista standard OU o que tem permissão manual
-    if (role.includes('VENDEDOR')) {
-      return vendedorStandard.includes(label) || hasManualPermission;
-    }
 
-    return hasManualPermission;
+    // Seções-pai (dropdowns) aparecem se o usuário tem permissão em pelo menos um sub-item
+    // Isso é tratado pelo filter no render, não precisa de lógica extra aqui
+
+    return hasManualPermission || false;
   };
 
   return (
