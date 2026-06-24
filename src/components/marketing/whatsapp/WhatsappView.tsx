@@ -77,7 +77,7 @@ interface Message {
   id: string;
   text: string;
   time: string;
-  rawTimestamp?: string; // ISO — usado para paginação (load more)
+  rawTimestamp?: string;
   sender: "me" | "contact";
   status: "sent" | "delivered" | "read";
   tipo?: string;
@@ -86,6 +86,8 @@ interface Message {
   fileName?: string;
   transcription?: string;
   isTranscribing?: boolean;
+  quotedText?: string;
+  quotedSender?: "me" | "contact";
 }
 
 type Temperature = "Quente" | "Morno" | "Frio";
@@ -232,23 +234,35 @@ interface EvoChatResponse {
   unreadCount?: number;
 }
 
+interface EvoContextInfo {
+  quotedMessage?: {
+    conversation?: string;
+    extendedTextMessage?: { text?: string };
+    imageMessage?: { caption?: string };
+    videoMessage?: { caption?: string };
+  };
+  participant?: string;
+  stanzaId?: string;
+}
+
 interface EvoMessageResponse {
   key?: { id?: string; fromMe?: boolean; remoteJid?: string };
   id?: string;
   pushName?: string;
-  message?: { 
+  message?: {
     base64?: string;
-    conversation?: string; 
-    extendedTextMessage?: { text?: string };
-    imageMessage?: { caption?: string; mimetype?: string };
-    videoMessage?: { caption?: string; mimetype?: string };
-    audioMessage?: { ptt?: boolean; mimetype?: string };
-    documentMessage?: { fileName?: string; caption?: string; mimetype?: string };
+    conversation?: string;
+    extendedTextMessage?: { text?: string; contextInfo?: EvoContextInfo };
+    imageMessage?: { caption?: string; mimetype?: string; contextInfo?: EvoContextInfo };
+    videoMessage?: { caption?: string; mimetype?: string; contextInfo?: EvoContextInfo };
+    audioMessage?: { ptt?: boolean; mimetype?: string; contextInfo?: EvoContextInfo };
+    documentMessage?: { fileName?: string; caption?: string; mimetype?: string; contextInfo?: EvoContextInfo };
     stickerMessage?: { mimetype?: string };
     reactionMessage?: { key?: { id?: string }; text?: string };
   };
   messageTimestamp?: number;
   status?: string;
+  contextInfo?: EvoContextInfo;
 }
 
 const ARCHIVE_REASONS = [
@@ -935,6 +949,32 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         }
       }
 
+      // Tratamento de mensagens editadas
+      const editedMsg = (messageContent as Record<string, unknown>)?.editedMessage as Record<string, unknown> | undefined;
+      const protocolMsg = (messageContent as Record<string, unknown>)?.protocolMessage as Record<string, unknown> | undefined;
+      if (editedMsg || (protocolMsg && (protocolMsg.type === 14 || protocolMsg.type === "MESSAGE_EDIT"))) {
+        const editedContent = editedMsg?.message as Record<string, unknown> | undefined
+          || protocolMsg?.editedMessage as Record<string, unknown> | undefined;
+        const editedMsgId = (editedMsg?.key as Record<string, unknown>)?.id as string | undefined
+          || (protocolMsg?.key as Record<string, unknown>)?.id as string | undefined;
+        if (editedContent && editedMsgId) {
+          const newText = (editedContent.conversation as string)
+            || (editedContent.extendedTextMessage as Record<string, unknown>)?.text as string
+            || "";
+          if (newText) {
+            setMessages(prev => prev.map(m => m.id === editedMsgId ? { ...m, text: newText } : m));
+            marketingService.saveMessage({
+              message_id: editedMsgId,
+              remote_jid: remoteJid,
+              texto: newText,
+              sender: message.key?.fromMe ? "me" : "contact",
+              timestamp: new Date().toISOString(),
+            }).catch(() => null);
+          }
+        }
+        return;
+      }
+
       const isAudio = !!messageContent?.audioMessage;
       const isSticker = !!messageContent?.stickerMessage;
       const isDocument = !!messageContent?.documentMessage;
@@ -945,6 +985,20 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         messageContent?.videoMessage?.caption ||
         (isDocument ? (messageContent.documentMessage?.fileName || "Documento") : null) ||
         (isAudio ? "🎵 Áudio" : isSticker ? "🖼️ Figurinha" : "📎 Mídia");
+
+      // Extrair citação (reply/quote)
+      const ctxInfo = messageContent?.extendedTextMessage?.contextInfo
+        || messageContent?.imageMessage?.contextInfo
+        || messageContent?.videoMessage?.contextInfo
+        || messageContent?.audioMessage?.contextInfo
+        || messageContent?.documentMessage?.contextInfo
+        || message.contextInfo;
+      const quotedMsg = ctxInfo?.quotedMessage;
+      const quotedText = quotedMsg
+        ? (quotedMsg.conversation || quotedMsg.extendedTextMessage?.text || quotedMsg.imageMessage?.caption || quotedMsg.videoMessage?.caption || "")
+        : undefined;
+      const quotedIsFromMe = ctxInfo?.participant ? false : true;
+      const quotedSender: "me" | "contact" | undefined = quotedText ? (ctxInfo?.stanzaId ? (quotedIsFromMe ? "me" : "contact") : undefined) : undefined;
 
       const timestamp = message.messageTimestamp
         ? new Date(message.messageTimestamp * 1000).toISOString()
@@ -1130,7 +1184,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
               sender: message.key?.fromMe ? "me" : "contact",
               status: "sent",
               tipo: tipoMsg,
-              mediaUrl: mediaUrl
+              mediaUrl: mediaUrl,
+              ...(quotedText ? { quotedText, quotedSender } : {})
             };
             return [...prevMsgs, newMsg];
           });
@@ -3098,6 +3153,29 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                                   Salvar como...
                                </a>
                             </div>
+                          </div>
+                        )}
+
+                        {/* Mensagem citada (reply/quote) */}
+                        {msg.quotedText && (
+                          <div className={cn(
+                            "rounded-lg px-3 py-2 mb-1 border-l-3",
+                            msg.sender === "me"
+                              ? "bg-white/10 border-l-white/40"
+                              : "bg-secondary/60 border-l-blue-500"
+                          )} style={{ borderLeftWidth: 3 }}>
+                            <p className={cn(
+                              "text-[10px] font-black uppercase tracking-wider mb-0.5",
+                              msg.sender === "me" ? "text-white/60" : "text-blue-500"
+                            )}>
+                              {msg.quotedSender === "me" ? "Você" : "Cliente"}
+                            </p>
+                            <p className={cn(
+                              "text-xs font-medium line-clamp-3 whitespace-pre-wrap",
+                              msg.sender === "me" ? "text-white/70" : "text-muted-foreground"
+                            )}>
+                              {msg.quotedText}
+                            </p>
                           </div>
                         )}
 
