@@ -687,6 +687,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     "Prazo de Entrega",
     "Mão de Obra e Material",
     "Comparativo de Linhas",
+    "Alteração de Preço",
   ];
 
   const filteredAndSortedItems = useMemo(() => {
@@ -1399,7 +1400,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Selecione o Motivo *</label>
                       <TinyDropdown 
                         value={statusMotivoPerdido} 
-                        options={["Preço Alto", "Falta de Estoque", "Furo de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas"]} 
+                        options={["Preço Alto", "Falta de Estoque", "Furo de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas", "Alteração de Preço"]} 
                         onChange={(val) => setStatusMotivoPerdido(val)} 
                         icon={Tag} 
                         variant="slate" 
