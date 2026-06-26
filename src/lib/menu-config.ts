@@ -47,6 +47,7 @@ export const NAV_SECTIONS: NavSection[] = [
     subItems: [
       { label: "Whatsapp Evolution" },
       { label: "Whatsapp Oficial" },
+      { label: "Whatsapp Go" },
       { label: "Leads" },
       { label: "Cronograma" },
       { label: "Esteira" },

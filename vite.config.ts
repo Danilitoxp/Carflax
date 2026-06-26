@@ -30,6 +30,13 @@ export default defineConfig({
         target: 'https://pontowebintegracaoexterna.secullum.com.br',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/secullum-api/, '')
+      },
+      '/supabase': {
+        target: 'https://zwfvrmqffxcqurxpfewi.supabase.co',
+        changeOrigin: true,
+        secure: true,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/supabase/, '')
       }
     }
   }

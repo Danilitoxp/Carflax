@@ -1,6 +1,7 @@
 import { Megaphone, Calendar } from "lucide-react";
 import { WhatsappView } from "./whatsapp/WhatsappView";
 import { WhatsappOfficialView } from "./whatsapp/WhatsappOfficialView";
+import { WhatsappGoView } from "./whatsapp-go/WhatsappGoView";
 import { ClientesView } from "./ClientesView";
 import { LeadsView } from "./LeadsView";
 import { ReportsView } from "./ReportsView";
@@ -29,6 +30,10 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
 
   if (activeTab === "Whatsapp Oficial") {
     return <WhatsappOfficialView vendedorId={userProfile?.id} />;
+  }
+
+  if (activeTab === "Whatsapp Go") {
+    return <WhatsappGoView vendedorId={userProfile?.id} userProfile={userProfile} />;
   }
 
   if (activeTab === "Clientes") {

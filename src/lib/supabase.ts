@@ -1,13 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+// Em dev, roteia pelo proxy do Vite (evita bloqueio de CORS para PATCH/DELETE).
+// Em produção usa a URL direta do Supabase.
+const SUPABASE_URL = import.meta.env.DEV
+  ? `${location.origin}/supabase`
+  : import.meta.env.VITE_SUPABASE_URL;
+
+if (!SUPABASE_ANON_KEY) {
   console.error("Missing Supabase environment variables!");
 }
 
-export const supabase = createClient(SUPABASE_URL || "", SUPABASE_ANON_KEY || "");
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "");
 
 // Limpa automaticamente sessões com refresh token inválido/expirado.
 // Sem isso, o Supabase fica tentando renovar o token em loop, gerando erros repetidos.

@@ -1158,6 +1158,7 @@ function DashboardContent({
     "Marketing",
     "Whatsapp Evolution",
     "Whatsapp Oficial",
+    "Whatsapp Go",
     "Cronograma",
     "Leads",
     "Esteira",

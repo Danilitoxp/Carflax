@@ -110,12 +110,16 @@ export const marketingService = {
   /**
    * Busca apenas clientes que possuem mensagens no banco (CRM Ativo)
    */
-  async getActiveClientes(includeArchived: boolean | 'all' = false, limit = 50, offset = 0) {
+  async getActiveClientes(includeArchived: boolean | 'all' = false, limit = 50, offset = 0, vendedorId?: string) {
     let query = supabase
       .from("marketing_clientes")
       .select("*")
       .not('ultima_conversa_em', 'is', null)
       .like('remote_jid', '%@s.whatsapp.net');
+
+    if (vendedorId) {
+      query = query.eq('vendedor_id', vendedorId);
+    }
 
     if (includeArchived !== 'all') {
       if (!includeArchived) {
@@ -204,11 +208,15 @@ export const marketingService = {
    * Busca histórico de mensagens de um JID específico.
    * Suporta paginação: `beforeDate` carrega mensagens ANTERIORES a esse timestamp (scroll infinito para cima).
    */
-  async getMessagesByJid(remoteJid: string, limit = 50, sinceDate?: string, beforeDate?: string) {
+  async getMessagesByJid(remoteJid: string, limit = 50, sinceDate?: string, beforeDate?: string, vendedorId?: string) {
     let query = supabase
       .from("marketing_whatsapp")
       .select("message_id, remote_jid, sender, texto, tipo, status, timestamp, media_url, reacao, vendedor_id, editado")
       .eq("remote_jid", remoteJid);
+
+    if (vendedorId) {
+      query = query.eq("vendedor_id", vendedorId);
+    }
 
     if (sinceDate) query = query.gte("timestamp", sinceDate);
     if (beforeDate) query = query.lt("timestamp", beforeDate);
