@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Search, MoreVertical, MessageSquare, Users, RefreshCw,
+  Search, MoreVertical, MessageSquare, RefreshCw,
   Send, Paperclip, Mic, Smile, CheckCheck, Check,
   ArrowLeft, Phone, Circle, Lock, PenSquare,
 } from "lucide-react";
@@ -373,31 +373,14 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
     if (expiryRef.current) clearInterval(expiryRef.current);
   }, []);
 
-  useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-    checkConnection();
-    return () => {
-      clearTimers();
-      // Reset on actual unmount so re-mounting works correctly
-      initializedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // nome da instância persistido para passar ao connect/pair
   const instanceNameRef = useRef<string>("carflax");
 
   const resolveInstanceName = (inst: GoInstance) =>
     inst.instanceName || inst.name || inst.id || "carflax";
 
-  const isConnected = (inst: any) =>
+  const isConnected = (inst: GoInstance & { connected?: boolean }) =>
     Boolean(inst.connected ?? ["open", "connected"].includes(inst.status));
 
-  // Helper para extrair QR de qualquer formato de resposta
   const extractQr = (obj: Record<string, unknown>): string => {
     for (const key of ["Qrcode", "qrcode", "base64", "qr", "qr_code", "qrCode", "code", "pairingCode"]) {
       if (typeof obj[key] === "string" && (obj[key] as string).length > 10) return obj[key] as string;
@@ -426,19 +409,16 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
     setPairCode("");
 
     try {
-      // 1. Dispara o connect (sem name/token — ConnectStruct da API não tem esses campos)
       console.log("[EvoGO] Chamando /instance/connect...");
       await evolutionGoApi.connectInstance({
         webhookUrl: `${import.meta.env.VITE_BACKEND_URL || "https://marketing-carflax.velbav.easypanel.host"}/webhook${vendedorId ? `?vendedor_id=${vendedorId}` : ""}`,
         subscribe: ["ALL", "MESSAGE", "CONNECTION", "QRCODE", "PRESENCE", "CHAT_PRESENCE", "READ_RECEIPT", "CALL"]
       });
     } catch (e) {
-      // connect pode falhar se já estiver em processo de conexão — tudo bem, continua
       console.warn("[EvoGO] connectInstance warning (esperado se já conectando):", e);
     }
 
     try {
-      // 2. Busca o QR code no endpoint dedicado GET /instance/qr
       console.log("[EvoGO] Buscando QR em /instance/qr...");
       const qrRes = await evolutionGoApi.getQr();
       console.log("[EvoGO] /instance/qr response:", JSON.stringify(qrRes));
@@ -448,7 +428,6 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       if (errMsg.toLowerCase().includes("already logged in") || errMsg.includes("session already")) {
-        // Sessão já autenticada! Vai direto para estado conectado
         console.log("[EvoGO] Sessão já autenticada (/instance/qr retornou 400). Buscando instância...");
         clearTimers();
         setQrLoading(false);
@@ -456,7 +435,9 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
           const all = await evolutionGoApi.getAllInstances();
           const active = all.find(i => ["open", "connected"].includes((i.status || "").toLowerCase()));
           if (active) setInstance(active);
-        } catch {}
+        } catch (err) {
+          console.warn("[EvoGO] Failed to get active instance on already logged in:", err);
+        }
         setConnState("connected");
         return;
       }
@@ -470,17 +451,14 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
       setQrExpiry(prev => { if (prev <= 1) { clearInterval(expiryRef.current!); return 0; } return prev - 1; });
     }, 1000);
 
-    // Polling de conexão: verifica a cada 3s se o WhatsApp foi conectado
     pollRef.current = setInterval(async () => {
       try {
         const status = await evolutionGoApi.getStatus();
         const data = (status.data ?? status) as Record<string, unknown>;
-        // A API retorna { data: { Connected: true, LoggedIn: true, Name: "..." } }
         const isConn = Boolean(data.LoggedIn ?? data.loggedIn);
         if (isConn) {
           clearTimers();
           const nameStr = String(data.Name ?? data.name ?? "");
-          // Monta um GoInstance mínimo com os dados disponíveis
           const inst = { status: "open", phone: nameStr } as import("../../../lib/evolution-go").GoInstance;
           try {
             const all = await evolutionGoApi.getAllInstances();
@@ -491,128 +469,27 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
           setConnState("connected");
         }
       } catch {
-        // Fallback: getAllInstances
         try {
           const all = await evolutionGoApi.getAllInstances();
           const active = all.find(isConnected);
           if (active) { clearTimers(); setInstance(active); setConnState("connected"); }
-        } catch {}
+        } catch (err) {
+          void err;
+        }
       }
     }, 3000);
-  }, [clearTimers]);
-
-  // Auto-refresh do QR: quando o timer chega a 0 e ainda estamos aguardando conexão
-  // DEVE ficar DEPOIS da declaração de generateQr para evitar TDZ error
-  useEffect(() => {
-    if (qrExpiry === 0 && connState === "qr") {
-      const t = setTimeout(() => generateQr(), 1500);
-      return () => clearTimeout(t);
-    }
-  }, [qrExpiry, connState, generateQr]);
-
-  // Carrega a lista de contatos como chats quando conectado
-  // Helper: converte JID do whatsmeow (pode ser string ou objeto {User, Server}) para string
-  const resolveJid = (raw: unknown): string => {
-    if (!raw) return "";
-    if (typeof raw === "string") return raw;
-    if (typeof raw === "object") {
-      const obj = raw as Record<string, unknown>;
-      // whatsmeow.JID: { User: "5511...", Server: "s.whatsapp.net" }
-      if (obj.User && obj.Server) return `${obj.User}@${obj.Server}`;
-      if (obj.user && obj.server) return `${obj.user}@${obj.server}`;
-    }
-    return String(raw);
-  };
-
-  useEffect(() => {
-    if (connState !== "connected") return;
-    let cancelled = false;
-
-    const loadChats = async () => {
-      try {
-        // 1. Busca apenas os clientes ativos no Supabase filtrados por vendedorId
-        const dbClientes = await marketingService.getActiveClientes('all', 100, 0, vendedorId);
-        if (cancelled) return;
-
-        // Mapeia para o formato de chat local do Go
-        const mapped: GoChat[] = dbClientes.map(c => ({
-          jid: c.remote_jid,
-          name: c.nome || c.push_name || c.remote_jid.split("@")[0],
-          pushName: c.push_name || "",
-          lastMessage: c.ultima_mensagem || "",
-          lastMessageTime: c.ultima_conversa_em ? Math.floor(new Date(c.ultima_conversa_em).getTime() / 1000) : 0,
-          unreadCount: c.mensagens_nao_lidas || 0,
-          profilePicUrl: c.foto_url || "",
-          isGroup: c.remote_jid.includes("@g.us"),
-        }));
-
-        // 2. Adiciona também chats abertos localmente nesta sessão (garante que não somem)
-        const combined = [...mapped];
-        localChatsRef.current.forEach(jid => {
-          if (combined.some(c => c.jid.toLowerCase() === jid.toLowerCase())) return;
-          combined.push({
-            jid,
-            name: jid.split("@")[0],
-            pushName: "",
-            lastMessage: "",
-            lastMessageTime: 0,
-            unreadCount: 0,
-            profilePicUrl: "",
-            isGroup: jid.includes("@g.us"),
-          });
-        });
-
-        // 3. Ordena os chats pelo horário da última mensagem (decrescente)
-        combined.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
-
-        setChats(combined);
-      } catch (e) {
-        console.error("[EvoGO] Erro ao carregar contatos do Supabase:", e);
-      }
-    };
-
-    loadChats();
-    const interval = setInterval(loadChats, 5000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [connState]);
-
-  // Polling de mensagens novas para o chat selecionado (a cada 5s)
-  const selectedChatRef = useRef<GoChat | null>(null);
-  useEffect(() => { selectedChatRef.current = selectedChat; }, [selectedChat]);
-
-  useEffect(() => {
-    if (!selectedChat) return;
-    const interval = setInterval(async () => {
-      try {
-        const msgs = await evolutionGoApi.getMessages(selectedChatRef.current!.jid, 50, vendedorId);
-        const sorted = msgs.sort((a, b) => a.timestamp - b.timestamp);
-        setMessages(prev => {
-          // Adiciona apenas mensagens novas (por ID)
-          const ids = new Set(prev.map(m => m.id));
-          const newOnes = sorted.filter(m => !ids.has(m.id));
-          return newOnes.length > 0 ? [...prev, ...newOnes] : prev;
-        });
-      } catch {}
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [selectedChat?.jid]);
+  }, [clearTimers, vendedorId]);
 
   const checkConnection = useCallback(async () => {
     setConnState("checking");
     let name = "carflax";
 
-    // 0. Verifica rapidamente o status atual — se já conectado, evita todo o fluxo de QR
     try {
       const status = await evolutionGoApi.getStatus();
       const data = (status.data ?? status) as Record<string, unknown>;
       const isConn = Boolean(data.LoggedIn ?? data.loggedIn);
       if (isConn) {
         console.log("[EvoGO] checkConnection: já conectado via /instance/status");
-        // Garante que o webhook está configurado no backend
         try {
           await evolutionGoApi.connectInstance({
             webhookUrl: `${import.meta.env.VITE_BACKEND_URL || "https://marketing-carflax.velbav.easypanel.host"}/webhook`,
@@ -632,11 +509,10 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
         setConnState("connected");
         return;
       }
-    } catch {
-      // getStatus falhou — prossegue com o fluxo normal
+    } catch (err) {
+      void err;
     }
 
-    // 1. Verifica instâncias existentes
     try {
       const raw = await evolutionGoApi.getAllInstances();
       const instances = Array.isArray(raw) ? raw : [];
@@ -648,32 +524,122 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
         return;
       }
       if (instances.length > 0) {
-        // Instância já existe mas não está conectada — reutiliza o nome
         name = resolveInstanceName(instances[0]);
         instanceNameRef.current = name;
         generateQr();
         return;
       }
-    } catch {
-      // getAllInstances falhou — continua com nome padrão
+    } catch (err) {
+      void err;
     }
 
-    // 2. Nenhuma instância encontrada — tenta criar uma nova
     try {
       const created = await evolutionGoApi.createInstance(name);
       name = resolveInstanceName(created);
     } catch (err) {
-      // "instance already exists" é esperado e não é um erro real
       const msg = err instanceof Error ? err.message : String(err);
       if (!msg.toLowerCase().includes("already exists")) {
         console.warn("[EvoGO] createInstance falhou inesperadamente:", msg);
       }
-      // Em qualquer caso, prossegue com o nome padrão
     }
 
     instanceNameRef.current = name;
     generateQr();
   }, [generateQr]);
+
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    checkConnection();
+    return () => {
+      clearTimers();
+      initializedRef.current = false;
+    };
+  }, [checkConnection, clearTimers]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (qrExpiry === 0 && connState === "qr") {
+      const t = setTimeout(() => generateQr(), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [qrExpiry, connState, generateQr]);
+
+  useEffect(() => {
+    if (connState !== "connected") return;
+    let cancelled = false;
+
+    const loadChats = async () => {
+      try {
+        const dbClientes = await marketingService.getActiveClientes('all', 100, 0, vendedorId);
+        if (cancelled) return;
+
+        const mapped: GoChat[] = dbClientes.map(c => ({
+          jid: c.remote_jid,
+          name: c.nome || c.push_name || c.remote_jid.split("@")[0],
+          pushName: c.push_name || "",
+          lastMessage: c.ultima_mensagem || "",
+          lastMessageTime: c.ultima_conversa_em ? Math.floor(new Date(c.ultima_conversa_em).getTime() / 1000) : 0,
+          unreadCount: c.mensagens_nao_lidas || 0,
+          profilePicUrl: c.foto_url || "",
+          isGroup: c.remote_jid.includes("@g.us"),
+        }));
+
+        const combined = [...mapped];
+        localChatsRef.current.forEach(jid => {
+          if (combined.some(c => c.jid.toLowerCase() === jid.toLowerCase())) return;
+          combined.push({
+            jid,
+            name: jid.split("@")[0],
+            pushName: "",
+            lastMessage: "",
+            lastMessageTime: 0,
+            unreadCount: 0,
+            profilePicUrl: "",
+            isGroup: jid.includes("@g.us"),
+          });
+        });
+
+        combined.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+
+        setChats(combined);
+      } catch (e) {
+        console.error("[EvoGO] Erro ao carregar contatos do Supabase:", e);
+      }
+    };
+
+    loadChats();
+    const interval = setInterval(loadChats, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [connState, vendedorId]);
+
+  const selectedChatRef = useRef<GoChat | null>(null);
+  useEffect(() => { selectedChatRef.current = selectedChat; }, [selectedChat]);
+
+  useEffect(() => {
+    if (!selectedChat) return;
+    const interval = setInterval(async () => {
+      try {
+        const msgs = await evolutionGoApi.getMessages(selectedChatRef.current!.jid, 50, vendedorId);
+        const sorted = msgs.sort((a, b) => a.timestamp - b.timestamp);
+        setMessages(prev => {
+          const ids = new Set(prev.map(m => m.id));
+          const newOnes = sorted.filter(m => !ids.has(m.id));
+          return newOnes.length > 0 ? [...prev, ...newOnes] : prev;
+        });
+      } catch (err) {
+        console.error("[EvoGO] Messages polling error:", err);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [selectedChat, vendedorId]);
 
   const handleRequestPairCode = async () => {
     if (!phone.trim()) return;
@@ -685,9 +651,13 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
           const all = await evolutionGoApi.getAllInstances();
           const active = all.find(i => i.status === "open" || i.status === "connected");
           if (active) { clearTimers(); setInstance(active); setConnState("connected"); }
-        } catch {}
+        } catch (err) {
+          void err;
+        }
       }, 3000);
-    } catch {}
+    } catch (err) {
+      console.error("[EvoGO] pair code flow error:", err);
+    }
   };
 
   const sendMessage = async () => {
@@ -700,7 +670,11 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
       text, type: "text", timestamp: Math.floor(Date.now() / 1000), status: "sent",
     };
     setMessages(prev => [...prev, optimistic]);
-    try { await evolutionGoApi.sendText(selectedChat.jid, text); } catch {}
+    try {
+      await evolutionGoApi.sendText(selectedChat.jid, text);
+    } catch (err) {
+      console.error("[EvoGO] Failed to send text:", err);
+    }
     setSending(false);
   };
 

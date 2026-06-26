@@ -48,7 +48,7 @@ function compressImage(file: File): Promise<File> {
   });
 }
 
-export async function uploadImage(file: File, bucket: string): Promise<string | null> {
+export async function uploadImage(file: File, bucket: string, skipCompression: boolean = false): Promise<string | null> {
   const { data: { session }, error: authError } = await supabase.auth.getSession();
   
   if (authError || !session) {
@@ -60,7 +60,7 @@ export async function uploadImage(file: File, bucket: string): Promise<string | 
     return null;
   }
 
-  const compressed = await compressImage(file);
+  const compressed = skipCompression ? file : await compressImage(file);
   const ext = compressed.name.split(".").pop() ?? "jpg";
   const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
@@ -76,6 +76,11 @@ export async function uploadImage(file: File, bucket: string): Promise<string | 
   }
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  console.log(`[Storage] Imagem disponível em: ${data.publicUrl}`);
-  return data.publicUrl;
+  let publicUrl = data.publicUrl;
+  if (import.meta.env.DEV && publicUrl.includes("/supabase/storage/")) {
+    const realSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://zwfvrmqffxcqurxpfewi.supabase.co";
+    publicUrl = publicUrl.replace(`${window.location.origin}/supabase`, realSupabaseUrl);
+  }
+  console.log(`[Storage] Imagem disponível em: ${publicUrl}`);
+  return publicUrl;
 }

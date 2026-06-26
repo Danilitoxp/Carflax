@@ -22,7 +22,8 @@ export interface MediaBase64Response {
   mimetype: string;
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3002";
+const VITE_BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "/api-marketing";
+const BACKEND_URL = VITE_BACKEND_URL.startsWith("http") ? VITE_BACKEND_URL : window.location.origin + VITE_BACKEND_URL;
 
 export const whatsappOfficialApi = {
   /**

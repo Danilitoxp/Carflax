@@ -21,6 +21,8 @@ interface UserProfileLite {
   name: string;
   role: string;
   avatar?: string;
+  phone?: string;
+  whatsapp?: string;
 }
 
 interface ChatCenterProps {

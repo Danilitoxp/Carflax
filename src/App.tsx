@@ -50,6 +50,8 @@ export interface UserProfile {
   operatorCode?: string;
   permissions?: string[];
   is_admin?: boolean;
+  phone?: string;
+  whatsapp?: string;
 }
 
 interface DashboardContentProps {
@@ -1521,8 +1523,15 @@ function App() {
         }
 
         if (data) {
-          setProfile(data);
-          fetchVendedorMetrics(data);
+          const { data: authData } = await supabase.auth.getUser();
+          const authUser = authData?.user;
+          const mergedProfile = {
+            ...data,
+            phone: authUser?.user_metadata?.phone || authUser?.phone || "",
+            whatsapp: authUser?.user_metadata?.whatsapp || "",
+          };
+          setProfile(mergedProfile);
+          fetchVendedorMetrics(mergedProfile);
 
           // Script temporário para atualizar ganhadores antigos:
           if (data.email === "marketing@carflax.com.br" || data.is_admin || data.role?.toUpperCase() === "ADMIN") {

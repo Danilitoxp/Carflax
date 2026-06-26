@@ -269,11 +269,23 @@ function getStrength(pw: string): number {
    MEU PERFIL - REDESIGN ESTRUTURADO
    Foco em cards, hierarquia e organização
 ───────────────────────────────────────────── */
+function formatPhone(value: string) {
+  let digits = value.replace(/\D/g, "");
+  if (digits.startsWith("55") && digits.length > 10) {
+    digits = digits.slice(2);
+  }
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+}
+
 function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
   const [form, setForm] = useState(() => ({
     nome: userProfile?.name || "",
     email: userProfile?.email || "",
-    telefone: userProfile?.phone || userProfile?.whatsapp || "",
+    telefone: formatPhone(userProfile?.phone || userProfile?.whatsapp || ""),
     cargo: userProfile?.role || "",
     avatar: userProfile?.avatar || "",
   }));
@@ -286,7 +298,7 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
     setForm({
       nome: userProfile.name || "",
       email: userProfile.email || "",
-      telefone: userProfile.phone || userProfile.whatsapp || "",
+      telefone: formatPhone(userProfile.phone || userProfile.whatsapp || ""),
       cargo: userProfile.role || "",
       avatar: userProfile.avatar || "",
     });
@@ -330,9 +342,41 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
     }
   }
 
-  function handleSave() {
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+  async function handleSave() {
+    if (!userProfile?.id) return;
+    try {
+      // 1. Salvar campos de texto no banco de dados
+      const { error: dbError } = await supabase
+        .from("usuarios")
+        .update({
+          name: form.nome,
+          email: form.email,
+          role: form.cargo,
+        })
+        .eq("id", userProfile.id);
+
+      if (dbError) throw dbError;
+
+      // 2. Salvar telefone/whatsapp no user_metadata do Supabase Auth
+      const { error: authError } = await supabase.auth.updateUser({
+        data: {
+          phone: form.telefone,
+          whatsapp: form.telefone,
+        }
+      });
+
+      if (authError) throw authError;
+
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+
+      // Disparar evento para atualizar o perfil globalmente sem refresh
+      window.dispatchEvent(new CustomEvent("carflax-profile-updated"));
+    } catch (err: unknown) {
+      console.error("[Settings] Erro ao salvar dados do perfil:", err);
+      const error = err as Error;
+      alert(`Erro ao salvar dados do perfil: ${error.message || String(error)}`);
+    }
   }
 
   return (
@@ -431,7 +475,7 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
             <SettingsInput 
               label="WHATSAPP / CELULAR" 
               value={form.telefone} 
-              onChange={(v) => setForm({ ...form, telefone: v })} 
+              onChange={(v) => setForm({ ...form, telefone: formatPhone(v) })} 
               icon={Smartphone} 
               type="tel" 
             />
@@ -534,7 +578,8 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
       let phone = resp.telefone.replace(/\D/g, "");
       if (phone.length >= 10 && !phone.startsWith("55")) phone = "55" + phone;
 
-      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3002";
+      const VITE_BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "/api-marketing";
+      const BACKEND_URL = VITE_BACKEND_URL.startsWith("http") ? VITE_BACKEND_URL : window.location.origin + VITE_BACKEND_URL;
       const msg = [
         `Olá, *${resp.nome}*.`,
         ``,

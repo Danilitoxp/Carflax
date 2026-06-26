@@ -36,6 +36,7 @@ export interface MarketingMessage {
   reacao?: string;
   vendedor_id?: string;
   created_at?: string;
+  editado?: boolean;
 }
 
 export interface MarketingVenda {

@@ -19,11 +19,14 @@ import {
   Sun,
   Star,
   Activity,
-  X
+  X,
+  Camera
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import html2canvas from "html2canvas-pro";
+import { uploadImage } from "@/lib/uploadImage";
 import { apiDashboardGeral, type VendedorResumo, apiEntregasConcluidas, apiCampanhaMetas, apiVendasDiarias, type VendaDiaria } from "@/lib/api";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { calculateMonthlyWinner } from "@/lib/highlights_automation";
@@ -35,6 +38,8 @@ interface UserProfileLite {
   name?: string;
   avatar?: string;
   role?: string;
+  phone?: string;
+  whatsapp?: string;
 }
 const MOTIVATIONAL_QUOTES = [
   { text: "O sucesso é a soma de pequenos esforços repetidos dia após dia.", author: "Robert Collier", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Robert%20Collier" },
@@ -159,6 +164,12 @@ const MOTIVATIONAL_QUOTES = [
   { text: "A vitória mais bela é a que se consegue sobre si mesmo.", author: "Ayrton Senna", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Ayrton%20Senna" }
 ];
 
+const formatNameTitleCase = (name: string) => {
+  if (!name) return "";
+  const trimmed = name.trim().split(' ')[0];
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+};
+
 export function SalesMetricsCard({ isCompact, userProfile, data: externalData, loading: externalLoading, perdidoMap = new Map() }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo, loading?: boolean, perdidoMap?: Map<string, number> }) {
   const [internalLoading, setInternalLoading] = useState(!externalData);
   const [data, setData] = useState<VendedorResumo | null>(externalData || null);
@@ -189,6 +200,151 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     const now = new Date();
     return now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   });
+
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isSendingPhoto, setIsSendingPhoto] = useState(false);
+
+  const sendPanelPhoto = async () => {
+    const phone = userProfile?.whatsapp || userProfile?.phone;
+    if (!phone) {
+      alert("Aviso: Cadastre o seu número de WhatsApp no seu Perfil antes de enviar a foto.");
+      return;
+    }
+
+    setIsSendingPhoto(true);
+    let tempContainer: HTMLDivElement | null = null;
+    try {
+      const greeting = getGreeting();
+      const rawName = userProfile?.name 
+        ? userProfile.name 
+        : (data?.NOME_VENDEDOR && selectedCod !== "MEDIA" && selectedCod !== "TOTAL" 
+          ? data.NOME_VENDEDOR 
+          : 'Time');
+      const name = formatNameTitleCase(rawName);
+      
+      const avatarUrl = userProfile?.avatar || data?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || data?.NOME_VENDEDOR || "vendedor"}`;
+      const quoteText = activeQuote?.text || "";
+      const quoteAuthor = activeQuote?.author || "";
+
+      // Criar o container temporário fora da tela (Story vertical 9:16 - 1080x1920)
+      tempContainer = document.createElement("div");
+      tempContainer.style.position = "fixed";
+      tempContainer.style.left = "-9999px";
+      tempContainer.style.top = "-9999px";
+      tempContainer.style.width = "1080px";
+      tempContainer.style.height = "1920px";
+      tempContainer.style.display = "flex";
+      tempContainer.style.flexDirection = "column";
+      tempContainer.style.alignItems = "center";
+      tempContainer.style.justifyContent = "space-between";
+      tempContainer.style.padding = "140px 80px 120px 80px";
+      tempContainer.style.backgroundColor = "#030712";
+      tempContainer.style.background = "linear-gradient(to bottom, #030712 0%, #071124 50%, #030712 100%)";
+      tempContainer.style.fontFamily = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+      tempContainer.style.color = "#ffffff";
+      tempContainer.style.boxSizing = "border-box";
+      tempContainer.style.zIndex = "-1000";
+
+      tempContainer.innerHTML = `
+        <!-- Top header -->
+        <div style="display: flex; align-items: center; gap: 12px; opacity: 0.5;">
+          <span style="font-size: 26px; font-weight: 900; letter-spacing: 0.35em; text-transform: uppercase;">CARFLAX HUB</span>
+        </div>
+
+        <!-- Greeting -->
+        <div style="text-align: center; margin-top: 40px; margin-bottom: 20px; background: transparent !important; border: none; outline: none; box-shadow: none;">
+          <div style="font-size: 72px; font-weight: 900; margin: 0; letter-spacing: -0.02em; color: #ffffff; text-transform: none !important; background: transparent !important; background-color: transparent !important; border: none !important; outline: none !important; box-shadow: none !important; -webkit-background-clip: unset !important; -webkit-text-fill-color: currentColor !important;">
+            ${greeting}, ${name}!
+          </div>
+        </div>
+
+        <!-- Avatar Container -->
+        <div style="position: relative; display: flex; justify-content: center; margin: 50px 0;">
+          <div style="width: 380px; height: 380px; border-radius: 50%; border: 6px solid #3b82f6; padding: 10px; background: #030712; box-shadow: 0 0 60px rgba(59, 130, 246, 0.4); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+            <img src="${avatarUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" crossorigin="anonymous" />
+          </div>
+        </div>
+
+        <!-- Quote -->
+        <div style="max-width: 860px; width: 100%; text-align: center; position: relative; padding: 60px 40px; margin: 40px 0; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 36px; backdrop-filter: blur(25px);">
+          <span style="font-size: 150px; line-height: 0; font-family: serif; color: #3b82f6; opacity: 0.15; position: absolute; left: 30px; top: 80px; user-select: none;">“</span>
+          <p style="font-size: 40px; font-weight: 700; font-style: italic; line-height: 1.6; margin: 0 0 30px 0; color: #f3f4f6; padding: 0 30px;">
+            ${quoteText}
+          </p>
+          <span style="font-size: 30px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.25em; color: #9ca3af; opacity: 0.8;">
+            — ${quoteAuthor}
+          </span>
+        </div>
+
+        <!-- Clock & Footer -->
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 50px; width: 100%; margin-top: auto;">
+          <!-- Time -->
+          <div style="font-size: 180px; font-weight: 700; letter-spacing: -0.05em; color: #ffffff; text-shadow: 0 0 40px rgba(255, 255, 255, 0.15);">
+            ${currentTime}
+          </div>
+
+          <!-- Bora pra Cima Button -->
+          <div style="padding: 24px 64px; border-radius: 100px; border: 2px solid rgba(255,255,255,0.15); background: rgba(59, 130, 246, 0.1); font-size: 28px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; display: flex; align-items: center; gap: 15px; color: #ffffff; box-shadow: 0 10px 40px rgba(59, 130, 246, 0.15);">
+            <span>Bora pra cima</span>
+            <span style="color: #3b82f6; font-size: 32px;">⚡</span>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(tempContainer);
+
+      const img = tempContainer.querySelector("img");
+      if (img && !img.complete) {
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }
+
+      // Capturar o container como canvas
+      const canvas = await html2canvas(tempContainer, {
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        scale: 2, // Garante alta definição
+        logging: false,
+        width: 1080,
+        height: 1920
+      });
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((b) => resolve(b), "image/png");
+      });
+
+      if (!blob) throw new Error("Falha ao gerar imagem do painel.");
+
+      const file = new File([blob], `story-boa-tarde-${Date.now()}.png`, { type: "image/png" });
+
+      // Envia com skipCompression: true para qualidade máxima
+      const imageUrl = await uploadImage(file, "whatsapp-media", true);
+      if (!imageUrl) throw new Error("Erro ao fazer upload da imagem no Supabase Storage.");
+
+      let cleanPhone = phone.replace(/\D/g, "");
+      if (cleanPhone.length >= 10 && !cleanPhone.startsWith("55")) {
+        cleanPhone = "55" + cleanPhone;
+      }
+      const remoteJid = `${cleanPhone}@s.whatsapp.net`;
+
+      const { evolutionApi } = await import("@/lib/evolution-v2");
+      await evolutionApi.sendImage(remoteJid, imageUrl, `Boa tarde! Painel enviado por ${userProfile?.name || 'Vendedor'}. 🚀`);
+
+      alert("Painel de Boa tarde (Story) enviado com sucesso para o seu WhatsApp!");
+    } catch (err: unknown) {
+      console.error("[SendPanelPhoto] Erro:", err);
+      const error = err as Error;
+      alert(`Falha ao enviar painel: ${error.message || String(error)}`);
+    } finally {
+      if (tempContainer && tempContainer.parentNode) {
+        tempContainer.parentNode.removeChild(tempContainer);
+      }
+      setIsSendingPhoto(false);
+    }
+  };
 
   const dismissSocialToday = () => {
     setShowSocial(false);
@@ -413,10 +569,13 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                           userProfile?.role?.toUpperCase() === "ADMIN";
 
   return (
-    <div className={cn(
-      "bg-card border border-border rounded-xl shadow-sm flex flex-col",
-      isCompact ? "p-4" : "p-5"
-    )}>
+    <div 
+      ref={cardRef}
+      className={cn(
+        "bg-card border border-border rounded-xl shadow-sm flex flex-col",
+        isCompact ? "p-4" : "p-5"
+      )}
+    >
       {/* 1. HEADER (Com controles de Stories) */}
       <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-border/10">
         <div className="flex items-center gap-1 z-10 flex-shrink-0">
@@ -437,7 +596,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             </span>
           )}
         </div>
-        <div className="relative z-10 flex-shrink-0 flex items-center gap-1 justify-end">
+        <div className="relative z-10 flex-shrink-0 flex flex-col items-center gap-0.5 justify-start">
           <button
             onClick={() => {
               const next = !showSocial;
@@ -454,6 +613,24 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
           >
             <Star className="w-4 h-4 fill-current" />
           </button>
+
+          {showSocial && (
+            <button
+              onClick={sendPanelPhoto}
+              disabled={isSendingPhoto}
+              className={cn(
+                "p-1.5 rounded-lg transition-all",
+                isSendingPhoto ? "text-blue-500 hover:bg-secondary" : "text-slate-400 hover:text-blue-500 hover:bg-secondary"
+              )}
+              title="Enviar painel para meu WhatsApp"
+            >
+              {isSendingPhoto ? (
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Camera className="w-4 h-4" />
+              )}
+            </button>
+          )}
 
           {canChangeSeller && (
             <button 
@@ -529,7 +706,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             : "opacity-0 scale-95 pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden"
         )}>
           <h2 className="text-base font-black tracking-tight text-foreground">
-            {getGreeting()}, {userProfile?.name ? userProfile.name.trim().split(' ')[0] : (data?.NOME_VENDEDOR && selectedCod !== "MEDIA" && selectedCod !== "TOTAL" ? data.NOME_VENDEDOR.trim().split(' ')[0] : 'Time')}!
+            {getGreeting()}, {userProfile?.name ? formatNameTitleCase(userProfile.name) : (data?.NOME_VENDEDOR && selectedCod !== "MEDIA" && selectedCod !== "TOTAL" ? formatNameTitleCase(data.NOME_VENDEDOR) : 'Time')}!
           </h2>
 
           <div className="relative mt-3">
