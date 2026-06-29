@@ -16,8 +16,7 @@ import {
   Download,
   Tag,
   PhoneIncoming,
-  PhoneOff,
-  CheckCircle2
+  PhoneOff
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -281,7 +280,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
   // Follow-up fields (inside "Enviado" status step)
   const [fuContatoRealizado, setFuContatoRealizado] = useState<boolean | null>(null);
-  const [fuClienteAtendeu, setFuClienteAtendeu] = useState<boolean | null>(null);
   const [fuCanalContato, setFuCanalContato] = useState<"whatsapp" | "ligacao" | null>(null);
 
   // Filtro padrão: do dia 1 do mês atual até hoje
@@ -686,7 +684,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       setStatusObs(""); // Resetar obs após envio
       setLostItemsIds([]); // Resetar itens selecionados
       setFuContatoRealizado(null);
-      setFuClienteAtendeu(null);
       setFuCanalContato(null);
     } catch (err) {
       console.error("Erro ao atualizar status:", err);
@@ -1001,7 +998,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         onClick={() => {
           const next = !insightsOpen;
           setInsightsOpen(next);
-          try { sessionStorage.setItem("crm_insights_open", String(next)); } catch {}
+          try { sessionStorage.setItem("crm_insights_open", String(next)); } catch (err) { console.warn(err); }
         }}
         className="flex items-center gap-2 mb-2 px-1 group shrink-0"
       >
@@ -1218,7 +1215,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                         setStatusMotivoPerdido(o.lossReason || "");
                         setStatusObs("");
                         setFuContatoRealizado(null);
-                        setFuClienteAtendeu(null);
                         setIsStatusModalOpen(true);
                         setStatusStep("selection");
                       }}
@@ -1394,7 +1390,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Realizou contato com o cliente?</label>
                       <div className="grid grid-cols-2 gap-2">
                         <button
-                          onClick={() => { setFuContatoRealizado(true); setFuClienteAtendeu(null); setFuCanalContato(null); }}
+                          onClick={() => { setFuContatoRealizado(true); setFuCanalContato(null); }}
                           className={cn(
                             "py-2.5 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
                             fuContatoRealizado === true
@@ -1405,7 +1401,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                           <PhoneIncoming className="w-3.5 h-3.5" /> Conectou
                         </button>
                         <button
-                          onClick={() => { setFuContatoRealizado(false); setFuClienteAtendeu(false); setFuCanalContato(null); }}
+                          onClick={() => { setFuContatoRealizado(false); setFuCanalContato(null); }}
                           className={cn(
                             "py-2.5 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
                             fuContatoRealizado === false
