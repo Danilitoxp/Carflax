@@ -3,7 +3,6 @@ import {
   LayoutGrid,
   Settings,
   LogOut,
-  ChevronRight,
   ChevronDown,
   ChevronLeft,
   Calendar,
