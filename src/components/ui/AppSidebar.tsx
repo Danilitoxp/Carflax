@@ -30,7 +30,6 @@ import {
   Kanban,
   type LucideIcon,
 } from "lucide-react";
-import organogramaIcon from "@/assets/organograma.svg";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/context/theme-provider";
 import { NAV_SECTIONS } from "@/lib/menu-config";
@@ -181,7 +180,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     >
       {/* Profile Section */}
       <div className="border-b border-border/50 p-4 overflow-hidden">
-        <div className="flex items-center gap-3">
+        <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
           <button
             onClick={isCollapsed ? onToggle : undefined}
             className={cn(
@@ -202,8 +201,8 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
           </button>
 
           <div className={cn(
-            "flex items-center gap-3 flex-1 min-w-0 transition-all duration-300 overflow-hidden",
-            isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+            "flex items-center gap-3 min-w-0 transition-all duration-300 overflow-hidden",
+            isCollapsed ? "w-0 opacity-0 pointer-events-none" : "flex-1 w-auto opacity-100"
           )}>
             {(!userProfile || loading) ? (
               <div className="flex flex-col gap-2 flex-1">
@@ -243,11 +242,17 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
             {(!userProfile || loading) ? (
               // Navigation Skeletons
               Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg overflow-hidden">
-                  <div className={cn("w-4.5 h-4.5 rounded bg-secondary animate-pulse shrink-0", isCollapsed && "mx-auto")} />
+                <div
+                  key={i}
+                  className={cn(
+                    "flex items-center rounded-lg overflow-hidden",
+                    isCollapsed ? "justify-center h-11 px-0" : "gap-3 px-3 py-2"
+                  )}
+                >
+                  <div className={cn("w-4.5 h-4.5 rounded bg-secondary animate-pulse shrink-0")} />
                   <div className={cn(
-                    "h-2 w-24 bg-secondary animate-pulse rounded transition-all duration-300",
-                    isCollapsed ? "opacity-0 w-0" : "opacity-100"
+                    "h-2 bg-secondary animate-pulse rounded transition-all duration-300",
+                    isCollapsed ? "w-0 opacity-0 pointer-events-none" : "w-24 opacity-100"
                   )} />
                 </div>
               ))
@@ -292,8 +297,8 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                         strokeWidth={isActive ? 2 : 1.5}
                       />
                       <div className={cn(
-                        "flex items-center flex-1 overflow-hidden transition-all duration-300",
-                        isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+                        "flex items-center overflow-hidden transition-all duration-300",
+                        isCollapsed ? "w-0 opacity-0 pointer-events-none" : "flex-1 w-auto opacity-100"
                       )}>
                           <span className={cn(
                             "text-xs font-bold flex-1 tracking-tight truncate whitespace-nowrap",
@@ -403,8 +408,8 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                       strokeWidth={isActive ? 2 : 1.5}
                     />
                     <div className={cn(
-                      "flex items-center flex-1 overflow-hidden transition-all duration-300",
-                      isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+                      "flex items-center overflow-hidden transition-all duration-300",
+                      isCollapsed ? "w-0 opacity-0 pointer-events-none" : "flex-1 w-auto opacity-100"
                     )}>
                         <span className={cn(
                           "text-xs font-bold flex-1 tracking-tight truncate whitespace-nowrap",
@@ -470,36 +475,31 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
         <button
           onClick={() => onActiveItemChange("Organograma")}
           className={cn(
-            "w-full mb-4 flex items-center gap-3 bg-gradient-to-br from-[#2563eb] via-[#1d4ed8] to-[#1e40af] hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 text-white rounded-xl p-3 transition-all duration-300 relative overflow-hidden group border border-white/10 active:scale-95",
-            isCollapsed && "justify-center px-2"
+            "w-full mb-4 flex items-center bg-secondary/30 hover:bg-secondary/70 text-muted-foreground hover:text-foreground dark:hover:text-slate-200 rounded-xl p-3 transition-all duration-300 relative overflow-hidden group border border-border active:scale-95",
+            isCollapsed ? "justify-center px-2" : "gap-3"
           )}
         >
           {/* Subtle Shine Effect */}
           <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
           
-          <div className={cn(
-            "p-1.5 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 shrink-0",
-            isCollapsed && "mx-auto"
-          )}>
-            <img 
-              src={organogramaIcon} 
-              alt="Organograma" 
-              className="w-5 h-5 invert brightness-0" 
-            />
-          </div>
+          <img 
+            src="https://cdn-icons-png.flaticon.com/512/9152/9152339.png" 
+            alt="Organograma" 
+            className="w-5 h-5 transition-all duration-300 dark:invert opacity-70 group-hover:opacity-100 group-hover:scale-110 shrink-0"
+          />
           
           <div className={cn(
             "text-left overflow-hidden transition-all duration-300",
-            isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+            isCollapsed ? "w-0 opacity-0 pointer-events-none" : "w-auto opacity-100"
           )}>
-            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-white/90 leading-none mb-0.5 whitespace-nowrap">Organograma</p>
-            <p className="text-[8px] font-medium text-blue-200/80 leading-tight whitespace-nowrap">Estrutura Corporativa</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-foreground/90 leading-none mb-0.5 whitespace-nowrap">Organograma</p>
+            <p className="text-[8px] font-medium text-muted-foreground leading-tight whitespace-nowrap">Estrutura Corporativa</p>
           </div>
         </button>
-        <div className="flex items-center gap-3 px-2 py-2">
+        <div className={cn("flex items-center px-2 py-2", isCollapsed ? "justify-center" : "gap-3")}>
            <span className={cn(
-             "text-[10px] font-bold text-muted-foreground uppercase flex-1 whitespace-nowrap overflow-hidden transition-all duration-300",
-             isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+             "text-[10px] font-bold text-muted-foreground uppercase whitespace-nowrap overflow-hidden transition-all duration-300",
+             isCollapsed ? "w-0 opacity-0 pointer-events-none" : "flex-1 w-auto opacity-100"
            )}>
              v2.4.0
            </span>
