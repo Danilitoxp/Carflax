@@ -279,7 +279,6 @@ function DashboardContent({
       } catch { /* silently fail */ }
     };
     markRead();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openChatDoc, userProfile?.id]);
 
   useEffect(() => {
@@ -1124,6 +1123,7 @@ function DashboardContent({
     } else {
       setActiveItem(item);
       localStorage.setItem("carflax-active-section", item);
+      setIsSidebarCollapsed(true);
     }
   };
 
@@ -1199,7 +1199,7 @@ function DashboardContent({
 
       <main
         className={cn(
-          "flex-1 flex flex-col h-screen w-full",
+          "flex-1 flex flex-col h-screen w-full transition-[padding] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
           isSidebarCollapsed ? "lg:pl-20" : "lg:pl-64",
           showRightPanel ? "xl:pr-80" : "pr-0",
         )}
@@ -1269,7 +1269,7 @@ function DashboardContent({
           ) : activeItem === "Organograma" ? (
             <OrgChartView />
           ) : isDashboardView ? (
-            <CommunicationSection />
+            <CommunicationSection userProfile={userProfile || undefined} />
           ) : (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="text-center">

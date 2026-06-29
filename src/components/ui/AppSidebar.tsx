@@ -6,8 +6,6 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronLeft,
-  Sun,
-  Moon,
   Calendar,
   BarChart3,
   Megaphone,
@@ -124,13 +122,17 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout, loading }: AppSidebarProps) {
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
   const [openMenus, setOpenMenus] = useState<string[]>(["Dashboard"]);
 
   const userAvatar = userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}`;
 
   const toggleMenu = (label: string) => {
-    if (isCollapsed) return;
+    if (isCollapsed) {
+      onToggle();
+      setOpenMenus([label]);
+      return;
+    }
     setOpenMenus((prev) =>
       prev.includes(label) ? [] : [label]
     );
@@ -172,77 +174,66 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 h-screen bg-card border-r border-border flex flex-col z-50 transition-all duration-300",
+        "fixed left-0 top-0 h-screen bg-card border-r border-border flex flex-col z-50 transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
         isCollapsed ? "w-20" : "w-64",
         "lg:translate-x-0",
         isMobileOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"
       )}
     >
-      {/* Profile Section - Cleaner */}
-      <div
-        className={cn(
-          "border-b border-border/50",
-          isCollapsed ? "p-4" : "p-5",
-        )}
-      >
-        <div
-          className={cn(
-            "flex items-center transition-all duration-300",
-            isCollapsed ? "justify-center" : "justify-between gap-3",
-          )}
-        >
-          {!isCollapsed && (
-            <div className="flex items-center gap-3 overflow-hidden flex-1 px-1">
-              {(!userProfile || loading) ? (
-                // Profile Skeleton
-                <>
-                  <div className="w-10 h-10 rounded-lg bg-secondary animate-pulse shrink-0" />
-                  <div className="flex flex-col gap-2 flex-1">
-                    <div className="h-2 w-20 bg-secondary animate-pulse rounded" />
-                    <div className="h-1.5 w-12 bg-secondary animate-pulse rounded" />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="w-10 h-10 rounded-lg border border-border flex items-center justify-center bg-secondary/50 shrink-0">
-                    <img
-                      src={userAvatar}
-                      alt="Profile"
-                      className="w-full h-full rounded-lg object-cover"
-                    />
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className={cn(
-                      "text-[10px] font-black truncate uppercase",
-                      theme === "dark" ? "text-white" : "text-black"
-                    )}>
-                      {userProfile?.name}
-                    </span>
-                    <span className={cn(
-                      "text-[9px] font-medium uppercase tracking-widest leading-none mt-1",
-                      theme === "dark" ? "text-slate-400" : "text-slate-500"
-                    )}>
-                      {userProfile?.role || "Membro"}
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
+      {/* Profile Section */}
+      <div className="border-b border-border/50 p-4 overflow-hidden">
+        <div className="flex items-center gap-3">
           <button
-            onClick={onToggle}
+            onClick={isCollapsed ? onToggle : undefined}
             className={cn(
-              "p-1.5 text-muted-foreground hover:text-primary hover:bg-secondary rounded-md transition-all shrink-0",
-              isCollapsed && "mx-auto",
+              "w-10 h-10 rounded-lg overflow-hidden border border-border bg-secondary/50 shrink-0 transition-all duration-300",
+              isCollapsed && "hover:ring-2 hover:ring-primary/50 cursor-pointer mx-auto"
             )}
+            title={isCollapsed ? (userProfile?.name || "Expandir") : undefined}
           >
-            {isCollapsed ? (
-              <ChevronRight className="w-4 h-4" strokeWidth={2} />
+            {(!userProfile || loading) ? (
+              <div className="w-full h-full bg-secondary animate-pulse" />
             ) : (
-              <ChevronLeft className="w-4 h-4" strokeWidth={2} />
+              <img
+                src={userAvatar}
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
             )}
           </button>
+
+          <div className={cn(
+            "flex items-center gap-3 flex-1 min-w-0 transition-all duration-300 overflow-hidden",
+            isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+          )}>
+            {(!userProfile || loading) ? (
+              <div className="flex flex-col gap-2 flex-1">
+                <div className="h-2 w-20 bg-secondary animate-pulse rounded" />
+                <div className="h-1.5 w-12 bg-secondary animate-pulse rounded" />
+              </div>
+            ) : (
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className={cn(
+                  "text-[10px] font-black truncate uppercase whitespace-nowrap",
+                  theme === "dark" ? "text-white" : "text-black"
+                )}>
+                  {userProfile?.name}
+                </span>
+                <span className={cn(
+                  "text-[9px] font-medium uppercase tracking-widest leading-none mt-1 whitespace-nowrap",
+                  theme === "dark" ? "text-slate-400" : "text-slate-500"
+                )}>
+                  {userProfile?.role || "Membro"}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={onToggle}
+              className="p-1.5 text-muted-foreground hover:text-primary hover:bg-secondary rounded-md transition-all shrink-0"
+            >
+              <ChevronLeft className="w-4 h-4" strokeWidth={2} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -253,9 +244,12 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
             {(!userProfile || loading) ? (
               // Navigation Skeletons
               Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg">
+                <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg overflow-hidden">
                   <div className={cn("w-4.5 h-4.5 rounded bg-secondary animate-pulse shrink-0", isCollapsed && "mx-auto")} />
-                  {!isCollapsed && <div className="h-2 w-24 bg-secondary animate-pulse rounded" />}
+                  <div className={cn(
+                    "h-2 w-24 bg-secondary animate-pulse rounded transition-all duration-300",
+                    isCollapsed ? "opacity-0 w-0" : "opacity-100"
+                  )} />
                 </div>
               ))
             ) : (
@@ -298,10 +292,12 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                         )}
                         strokeWidth={isActive ? 2 : 1.5}
                       />
-                      {!isCollapsed && (
-                        <div className="flex items-center flex-1 duration-200 overflow-hidden">
+                      <div className={cn(
+                        "flex items-center flex-1 overflow-hidden transition-all duration-300",
+                        isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+                      )}>
                           <span className={cn(
-                            "text-xs font-bold flex-1 tracking-tight truncate",
+                            "text-xs font-bold flex-1 tracking-tight truncate whitespace-nowrap",
                             isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                           )}>
                             {item.label}
@@ -315,14 +311,13 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                               strokeWidth={2}
                             />
                           )}
-                        </div>
-                      )}
+                      </div>
                     </div>
 
-                    {/* Dropdown items - Subtler */}
+                    {/* Dropdown items */}
                     <div
                       className={cn(
-                        "grid transition-all duration-300 ease-in-out",
+                        "grid transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
                         isOpen && !isCollapsed
                           ? "grid-rows-[1fr] opacity-100"
                           : "grid-rows-[0fr] opacity-0 overflow-hidden",
@@ -408,10 +403,12 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                       )}
                       strokeWidth={isActive ? 2 : 1.5}
                     />
-                    {!isCollapsed && (
-                      <div className="flex items-center flex-1 duration-200 overflow-hidden">
+                    <div className={cn(
+                      "flex items-center flex-1 overflow-hidden transition-all duration-300",
+                      isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+                    )}>
                         <span className={cn(
-                          "text-xs font-bold flex-1 tracking-tight truncate",
+                          "text-xs font-bold flex-1 tracking-tight truncate whitespace-nowrap",
                         )}>
                           {item.label}
                         </span>
@@ -424,13 +421,12 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                             strokeWidth={2}
                           />
                         )}
-                      </div>
-                    )}
+                    </div>
                   </div>
 
                   <div
                     className={cn(
-                      "grid transition-all duration-300 ease-in-out",
+                      "grid transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
                       isOpen && !isCollapsed
                         ? "grid-rows-[1fr] opacity-100"
                         : "grid-rows-[0fr] opacity-0 overflow-hidden",
@@ -493,26 +489,21 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
             />
           </div>
           
-          {!isCollapsed && (
-            <div className="text-left">
-              <p className="text-[10px] font-black uppercase tracking-[0.1em] text-white/90 leading-none mb-0.5">Organograma</p>
-              <p className="text-[8px] font-medium text-blue-200/80 leading-tight">Estrutura Corporativa</p>
-            </div>
-          )}
+          <div className={cn(
+            "text-left overflow-hidden transition-all duration-300",
+            isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+          )}>
+            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-white/90 leading-none mb-0.5 whitespace-nowrap">Organograma</p>
+            <p className="text-[8px] font-medium text-blue-200/80 leading-tight whitespace-nowrap">Estrutura Corporativa</p>
+          </div>
         </button>
         <div className="flex items-center gap-3 px-2 py-2">
-           <button 
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-secondary dark:hover:bg-slate-800/50 transition-all font-bold"
-              title="Mudar Tema"
-           >
-              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-           </button>
-           {!isCollapsed && (
-             <span className="text-[10px] font-bold text-muted-foreground uppercase flex-1">
-               v2.4.0
-             </span>
-           )}
+           <span className={cn(
+             "text-[10px] font-bold text-muted-foreground uppercase flex-1 whitespace-nowrap overflow-hidden transition-all duration-300",
+             isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+           )}>
+             v2.4.0
+           </span>
            <button 
               onClick={onLogout}
               className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all"

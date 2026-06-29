@@ -15,7 +15,8 @@ import {
   Ticket,
   Printer,
   Copy,
-  Share2
+  Share2,
+  Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiCrmAlugueisClientes, apiGeraPix, apiCancelaPix, API_BASE } from "@/lib/api";
@@ -46,6 +47,7 @@ interface Machine {
   status: "available" | "rented" | "maintenance";
   image?: string;
   currentRental?: Rental;
+  defaultPrice?: number;
 }
 
 
@@ -73,14 +75,16 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
       name: "Termofusora Grande",
       model: "75 a 110mm (220V)",
       status: "available",
-      image: "https://casadosoldador.com.br/files/products_images/33231/termofusora-1200w-p-tubos-ppr-75-a-110mm-220v-top-fusion-casa-do-soldador-1%20(1).webp?1691430838"
+      image: "https://casadosoldador.com.br/files/products_images/33231/termofusora-1200w-p-tubos-ppr-75-a-110mm-220v-top-fusion-casa-do-soldador-1%20(1).webp?1691430838",
+      defaultPrice: 200.00
     },
     {
       id: "TRM20633",
       name: "Termofusora Pequena",
       model: "20 a 63mm (220V)",
       status: "available",
-      image: "https://images.tcdn.com.br/img/img_prod/1100542/90_termofusora_ppr_6_bocais_20_a_63mm_800w_220v_trm20633_topfusion_12979_2_786e8cd03e10868e40be143611963701.jpg"
+      image: "https://images.tcdn.com.br/img/img_prod/1100542/90_termofusora_ppr_6_bocais_20_a_63mm_800w_220v_trm20633_topfusion_12979_2_786e8cd03e10868e40be143611963701.jpg",
+      defaultPrice: 150.00
     }
   ]);
   const [history, setHistory] = useState<Rental[]>([]);
@@ -203,6 +207,100 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
   const [isProcessingPreference, setIsProcessingPreference] = useState(false);
   const [pixData, setPixData] = useState<PixResponse | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>("ATIVA");
+
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configMachines, setConfigMachines] = useState<Machine[]>([]);
+
+  const isUserAdmin = userProfile ? (
+    userProfile.role?.toUpperCase().includes("ADMIN") || 
+    userProfile.role?.toUpperCase().includes("TI") || 
+    userProfile.role?.toUpperCase().includes("DIRETOR") || 
+    userProfile.is_admin
+  ) : false;
+
+  const handleSaveConfigs = async () => {
+    try {
+      const { error } = await supabase
+        .from("crm_config")
+        .upsert({
+          key: "crm_rental_machines",
+          value: JSON.stringify(configMachines.map(m => ({
+            id: m.id,
+            name: m.name,
+            model: m.model,
+            image: m.image,
+            defaultPrice: m.defaultPrice
+          })))
+        });
+
+      if (error) throw error;
+
+      setMachines(prev => prev.map(m => {
+        const match = configMachines.find(x => x.id === m.id);
+        if (match) {
+          return {
+            ...m,
+            name: match.name,
+            model: match.model,
+            image: match.image,
+            defaultPrice: match.defaultPrice
+          };
+        }
+        return m;
+      }));
+
+      setShowConfigModal(false);
+      alert("Configurações das termofusoras salvas com sucesso!");
+    } catch (err) {
+      console.error("Erro ao salvar configurações:", err);
+      alert("Não foi possível salvar as configurações.");
+    }
+  };
+
+  useEffect(() => {
+    if (showConfigModal) {
+      setConfigMachines(JSON.parse(JSON.stringify(machines)));
+    }
+  }, [showConfigModal, machines]);
+
+  useEffect(() => {
+    const fetchConfigs = async () => {
+      try {
+        const { data } = await supabase
+          .from("crm_config")
+          .select("value")
+          .eq("key", "crm_rental_machines")
+          .maybeSingle();
+
+        if (data?.value) {
+          interface MachineConfig {
+            id: string;
+            name?: string;
+            model?: string;
+            image?: string;
+            defaultPrice?: number;
+          }
+          const loadedMachines = JSON.parse(data.value) as MachineConfig[];
+          setMachines(prev => prev.map(m => {
+            const match = loadedMachines.find((x) => x.id === m.id);
+            if (match) {
+              return {
+                ...m,
+                name: match.name || m.name,
+                model: match.model || m.model,
+                image: match.image || m.image,
+                defaultPrice: typeof match.defaultPrice === 'number' ? match.defaultPrice : m.defaultPrice
+              };
+            }
+            return m;
+          }));
+        }
+      } catch (err) {
+        console.error("Erro ao carregar configurações das termofusoras:", err);
+      }
+    };
+    fetchConfigs();
+  }, []);
 
 
   const resetForm = useCallback(() => {
@@ -355,6 +453,15 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
       alert("Pagamento confirmado, mas erro ao registrar no banco.");
     }
   }, [selectedMachine, search, startDate, endDate, dailyValue, totalCalculation.total, userProfile?.name]);
+
+  const handleManualConfirm = async () => {
+    try {
+      setPaymentStatus("CONCLUIDA");
+      await saveRentalToDb();
+    } catch (err) {
+      console.error("Erro ao confirmar pagamento manualmente:", err);
+    }
+  };
 
   useEffect(() => {
     let controller: AbortController | null = null;
@@ -527,13 +634,24 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
           <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none mb-1">Aluguéis</h1>
           <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-widest">Controle de Equipamentos</p>
         </div>
-        <button 
-          onClick={() => setShowNewRentalModal(true)}
-          className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:opacity-90 transition-all active:scale-95"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Novo Aluguel
-        </button>
+        <div className="flex items-center gap-2">
+          {isUserAdmin && (
+            <button 
+              onClick={() => setShowConfigModal(true)}
+              className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-750 dark:text-white px-3 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 border border-slate-200 dark:border-slate-700 transition-all active:scale-95"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Configurar
+            </button>
+          )}
+          <button 
+            onClick={() => setShowNewRentalModal(true)}
+            className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:opacity-90 transition-all active:scale-95"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Novo Aluguel
+          </button>
+        </div>
       </div>
 
       {/* Stats - More Compact */}
@@ -664,7 +782,7 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
                   <button 
                     onClick={() => { 
                       setSelectedMachine(machine); 
-                      setDailyValue(machine.id === "TRM20633" ? "150,00" : "0,01");
+                      setDailyValue(machine.defaultPrice !== undefined ? machine.defaultPrice.toFixed(2).replace('.', ',') : (machine.id === "TRM20633" ? "150,00" : "200,00"));
                       setShowNewRentalModal(true); 
                     }}
                     className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest hover:opacity-90 transition-all flex items-center gap-2 group/btn"
@@ -809,7 +927,7 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
                           disabled={m.status !== "available"}
                           onClick={() => {
                             setSelectedMachine(m);
-                            setDailyValue(m.id === "TRM20633" ? "150,00" : "0,01");
+                            setDailyValue(m.defaultPrice !== undefined ? m.defaultPrice.toFixed(2).replace('.', ',') : (m.id === "TRM20633" ? "150,00" : "200,00"));
                           }}
                           className={cn(
                             "p-2 rounded-xl border flex items-center gap-2 transition-all text-left relative",
@@ -1009,6 +1127,12 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
                         className="w-full py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all flex items-center justify-center gap-2"
                       >
                         Copiar Código Pix
+                      </button>
+                      <button 
+                        onClick={handleManualConfirm}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                      >
+                        Pagamento Efetuado
                       </button>
                       <button 
                         onClick={handleCancelPix}
@@ -1309,6 +1433,116 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
               }
             }
           `}</style>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0" onClick={() => setShowConfigModal(false)} />
+          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                  <Settings className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-950 dark:text-white uppercase tracking-tight">Configurações das Termofusoras</h3>
+                  <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">Gerenciar preços, nomes e imagens</p>
+                </div>
+              </div>
+              <button onClick={() => setShowConfigModal(false)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                <Plus className="w-5 h-5 rotate-45 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-5 space-y-6 pr-1 scrollbar-hide">
+              {configMachines.map((m, idx) => (
+                <div key={m.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-primary uppercase tracking-wider">#{m.id}</span>
+                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">{m.name}</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Nome</label>
+                      <input 
+                        type="text" 
+                        value={m.name} 
+                        onChange={(e) => {
+                          const copy = [...configMachines];
+                          copy[idx].name = e.target.value;
+                          setConfigMachines(copy);
+                        }}
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none focus:border-primary text-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Modelo</label>
+                      <input 
+                        type="text" 
+                        value={m.model} 
+                        onChange={(e) => {
+                          const copy = [...configMachines];
+                          copy[idx].model = e.target.value;
+                          setConfigMachines(copy);
+                        }}
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none focus:border-primary text-slate-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Preço Diária (R$)</label>
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        value={m.defaultPrice ?? 0} 
+                        onChange={(e) => {
+                          const copy = [...configMachines];
+                          copy[idx].defaultPrice = parseFloat(e.target.value) || 0;
+                          setConfigMachines(copy);
+                        }}
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none focus:border-primary text-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">URL Imagem</label>
+                      <input 
+                        type="text" 
+                        value={m.image || ''} 
+                        onChange={(e) => {
+                          const copy = [...configMachines];
+                          copy[idx].image = e.target.value;
+                          setConfigMachines(copy);
+                        }}
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none focus:border-primary text-slate-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-slate-100 dark:border-slate-800 pt-4 shrink-0 flex gap-3">
+              <button 
+                onClick={() => setShowConfigModal(false)}
+                className="flex-1 py-3 border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleSaveConfigs}
+                className="flex-1 py-3 bg-slate-900 hover:bg-slate-850 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+              >
+                Salvar Alterações
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

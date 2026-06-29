@@ -221,7 +221,7 @@ export async function getCrmStatusMap(
   for (const chunk of chunks) {
     const { data, error } = await supabase
       .from("crm_status")
-      .select("*")
+      .select("documento,empresa,status_crm,motivo_perda,lembrete_data,fechamento_previsto,entrega_prevista,endereco_obra,vendedor,vendedor_codigo,updated_at")
       .in("documento", chunk);
 
     if (error) {

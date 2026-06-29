@@ -1477,21 +1477,35 @@ export function CommunicationSection({
               key={i}
               className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col sm:flex-row h-auto sm:min-h-[220px] animate-pulse"
             >
-              <div className="w-full sm:w-64 bg-secondary dark:bg-slate-800/50 shrink-0" />
-              <div className="flex-1 p-8 space-y-4">
-                <div className="flex gap-3">
-                  <div className="h-6 w-20 bg-secondary dark:bg-slate-800 rounded-lg" />
-                  <div className="h-6 w-24 bg-secondary dark:bg-slate-800 rounded-lg" />
+              <div className="w-full min-h-[160px] sm:w-64 sm:min-h-0 bg-secondary dark:bg-slate-800/50 shrink-0" />
+              <div className="flex-1 p-6 flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-5 w-16 bg-secondary dark:bg-slate-800 rounded-lg" />
+                  <div className="h-4 w-20 bg-secondary dark:bg-slate-800 rounded" />
                 </div>
-                <div className="h-8 w-3/4 bg-secondary dark:bg-slate-800/50 rounded-xl" />
-                <div className="space-y-2">
-                  <div className="h-4 w-full bg-secondary dark:bg-slate-800 rounded-md" />
-                  <div className="h-4 w-full bg-secondary dark:bg-slate-800 rounded-md" />
-                  <div className="h-4 w-2/3 bg-secondary dark:bg-slate-800 rounded-md" />
+                <div className="h-6 w-3/4 bg-secondary dark:bg-slate-800/50 rounded-lg" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-3.5 w-full bg-secondary dark:bg-slate-800 rounded" />
+                  <div className="h-3.5 w-full bg-secondary dark:bg-slate-800 rounded" />
+                  <div className="h-3.5 w-2/3 bg-secondary dark:bg-slate-800 rounded" />
                 </div>
                 <div className="pt-4 border-t border-border flex justify-between items-center">
-                  <div className="h-8 w-24 bg-secondary dark:bg-slate-800 rounded-xl" />
-                  <div className="h-10 w-32 bg-secondary dark:bg-slate-800 rounded-xl" />
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-16 bg-secondary dark:bg-slate-800 rounded-xl" />
+                    <div className="h-8 w-16 bg-secondary dark:bg-slate-800 rounded-xl" />
+                    <div className="flex -space-x-2">
+                      {[1, 2, 3].map((j) => (
+                        <div key={j} className="w-8 h-8 rounded-full bg-secondary dark:bg-slate-800 border-2 border-card" />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 bg-secondary/50 px-3 py-1.5 rounded-xl border border-border">
+                    <div className="w-7 h-7 rounded-full bg-secondary dark:bg-slate-700" />
+                    <div className="flex flex-col gap-1">
+                      <div className="h-2.5 w-14 bg-secondary dark:bg-slate-700 rounded" />
+                      <div className="h-2 w-8 bg-secondary dark:bg-slate-700 rounded" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

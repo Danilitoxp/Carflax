@@ -14,7 +14,10 @@ import {
   Handshake,
   XCircle,
   Download,
-  Tag
+  Tag,
+  PhoneIncoming,
+  PhoneOff,
+  CheckCircle2
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -255,6 +258,9 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [filterStatus, setFilterStatus] = useState("Todos os Status");
   const [filterSeller, setFilterSeller] = useState("Todos os Vendedores");
   const [filterReason, setFilterReason] = useState("Todos os Motivos");
+  const [insightsOpen, setInsightsOpen] = useState(() => {
+    try { return sessionStorage.getItem("crm_insights_open") !== "false"; } catch { return true; }
+  });
   const [searchTerm, setSearchTerm] = useState("");
 
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
@@ -272,6 +278,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [statusEntrega, setStatusEntrega] = useState("");
   const [statusMotivoPerdido, setStatusMotivoPerdido] = useState("");
   const [lostItemsIds, setLostItemsIds] = useState<string[]>([]);
+
+  // Follow-up fields (inside "Enviado" status step)
+  const [fuContatoRealizado, setFuContatoRealizado] = useState<boolean | null>(null);
+  const [fuClienteAtendeu, setFuClienteAtendeu] = useState<boolean | null>(null);
 
   // Filtro padrão: do dia 1 do mês atual até hoje
   const [startDate, setStartDate] = useState<Date | null>(() => {
@@ -538,6 +548,8 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
               `👤 *VENDEDOR:*   ${selectedItem.seller}`,
               ``,
               `📢 *STATUS:*     ${statusEmblema[newStatus.toUpperCase()] || newStatus.toUpperCase()}`,
+              newStatus.toUpperCase() === "ENVIADO" && fuContatoRealizado !== null ? `📞 *LIGOU:*      ${fuContatoRealizado ? "SIM" : "NÃO"}` : "",
+              newStatus.toUpperCase() === "ENVIADO" && fuContatoRealizado === true ? `👥 *ATENDEU:*    ${fuClienteAtendeu ? "SIM" : "NÃO"}` : "",
               extra?.motivo_perda ? `📉 *MOTIVO:*     ${extra.motivo_perda.toUpperCase()}` : "",
               lostItemsList ? `\n📦 *ITENS AFETADOS:*\n${lostItemsList}` : "",
               statusObs && !lostItemsList ? `\n💬 *OBSERVAÇÃO:*\n${statusObs}` : "",
@@ -683,8 +695,6 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     if (start && end) setIsDateModalOpen(false);
   };
 
-
-
   const uniqueSellers = useMemo(() => {
     const sellers = new Set(orçamentosData.map((item) => item.seller));
     return ["Todos os Vendedores", ...Array.from(sellers)];
@@ -717,8 +727,21 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
     if (filterStatus !== "Todos os Status") {
       if (filterStatus === "Em Aberto") {
-        // "Em Aberto" agora mostra tudo que não é finalizado (Venda ou Perdido)
         result = result.filter((item) => !["VENDA", "PERDIDO"].includes(item.status));
+      } else if (filterStatus === "Follow-ups") {
+        const todayStr = new Date().toISOString().split("T")[0];
+        result = result.filter((item) => {
+          if (item.status !== "ENVIADO") return false;
+          if (!item.lembreteData) return false;
+          const raw = item.lembreteData.trim();
+          let iso: string | null = null;
+          if (/^\d{4}-\d{2}-\d{2}/.test(raw)) iso = raw.slice(0, 10);
+          else if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+            const [d, m, y] = raw.split("/");
+            iso = `${y}-${m}-${d}`;
+          }
+          return iso !== null && iso <= todayStr;
+        });
       } else {
         const statusMap: Record<string, string> = {
           Emitido: "EMITIDO",
@@ -923,7 +946,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
             )}
           </div>
 
-          <TinyDropdown value={filterStatus} options={["Todos os Status", "Em Aberto", "Emitido", "Enviado", "Negociação", "Lib. Crédito", "Aguard. Pedido", "Venda", "Perdido"]} onChange={setFilterStatus} icon={FileCheck} variant="blue" placeholder="Todos os Status" />
+          <TinyDropdown value={filterStatus} options={["Todos os Status", "Em Aberto", "Follow-ups", "Emitido", "Enviado", "Negociação", "Lib. Crédito", "Aguard. Pedido", "Venda", "Perdido"]} onChange={setFilterStatus} icon={FileCheck} variant="blue" placeholder="Todos os Status" />
           
           {isGerente(userProfile?.role) && (
             <TinyDropdown value={filterSeller} options={uniqueSellers} onChange={setFilterSeller} icon={UserIcon} variant="slate" placeholder="Todos os Vendedores" />
@@ -945,8 +968,22 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
 
 
-      {/* INSIGHTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 shrink-0">
+      {/* INSIGHTS toggle */}
+      <button
+        onClick={() => {
+          const next = !insightsOpen;
+          setInsightsOpen(next);
+          try { sessionStorage.setItem("crm_insights_open", String(next)); } catch {}
+        }}
+        className="flex items-center gap-2 mb-2 px-1 group shrink-0"
+      >
+        <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform duration-200", !insightsOpen && "-rotate-90")} />
+        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest group-hover:text-foreground transition-colors">Insights</span>
+      </button>
+      <div className={cn(
+        "grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 shrink-0 transition-all duration-300 overflow-hidden",
+        insightsOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0 mb-0"
+      )}>
         {/* Distribuição por Status */}
         <div className="lg:col-span-4 bg-card border border-border rounded-xl p-4 shadow-sm">
           <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">Distribuição por Status</h3>
@@ -1146,13 +1183,14 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       }}
                       onOpenStatus={(o) => {
                         setSelectedItem(o);
-                        // Pré-popular campos do modal
                         setStatusData(o.lembreteData || "");
                         setStatusFechamento(o.fechamentoPrevisto || "");
                         setStatusEntrega(o.entregaPrevista || "");
                         setStatusEnderecoObra(o.enderecoObra || "");
                         setStatusMotivoPerdido(o.lossReason || "");
                         setStatusObs("");
+                        setFuContatoRealizado(null);
+                        setFuClienteAtendeu(null);
                         setIsStatusModalOpen(true);
                         setStatusStep("selection");
                       }}
@@ -1323,6 +1361,68 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     </div>
                   </div>
                   <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-2 scrollbar-hide">
+                    {/* Follow-up: Ligou? */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Realizou contato com o cliente?</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => { setFuContatoRealizado(true); setFuClienteAtendeu(null); }}
+                          className={cn(
+                            "py-2.5 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
+                            fuContatoRealizado === true
+                              ? "bg-blue-600/10 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                              : "bg-secondary/20 border-border hover:bg-secondary/60 text-muted-foreground"
+                          )}
+                        >
+                          <PhoneIncoming className="w-3.5 h-3.5" /> Conectou
+                        </button>
+                        <button
+                          onClick={() => { setFuContatoRealizado(false); setFuClienteAtendeu(false); }}
+                          className={cn(
+                            "py-2.5 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
+                            fuContatoRealizado === false
+                              ? "bg-rose-600/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                              : "bg-secondary/20 border-border hover:bg-secondary/60 text-muted-foreground"
+                          )}
+                        >
+                          <PhoneOff className="w-3.5 h-3.5" /> Não Conectou
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Follow-up: Atendeu? */}
+                    {fuContatoRealizado === true && (
+                      <div className="space-y-1.5 animate-fadeIn">
+                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">O cliente atendeu?</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => setFuClienteAtendeu(true)}
+                            className={cn(
+                              "py-2.5 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
+                              fuClienteAtendeu === true
+                                ? "bg-emerald-600/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                                : "bg-secondary/20 border-border hover:bg-secondary/60 text-muted-foreground"
+                            )}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Sim, Atendeu
+                          </button>
+                          <button
+                            onClick={() => setFuClienteAtendeu(false)}
+                            className={cn(
+                              "py-2.5 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
+                              fuClienteAtendeu === false
+                                ? "bg-rose-600/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                                : "bg-secondary/20 border-border hover:bg-secondary/60 text-muted-foreground"
+                            )}
+                          >
+                            <XCircle className="w-3.5 h-3.5" /> Não atendeu
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="border-t border-border/30 my-1" />
+
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Endereço da Obra</label>
                       <input type="text" placeholder="Logradouro, número, bairro..." value={statusEnderecoObra} onChange={(e) => setStatusEnderecoObra(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all placeholder:text-muted-foreground/30" />
@@ -1331,11 +1431,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Fechamento</label>
                         <div className="relative group">
-                          <input 
-                            type="date" 
-                            value={statusFechamento} 
-                            onChange={(e) => setStatusFechamento(e.target.value)} 
-                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
+                          <input
+                            type="date"
+                            value={statusFechamento}
+                            onChange={(e) => setStatusFechamento(e.target.value)}
+                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
                           />
                           <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
                         </div>
@@ -1343,11 +1443,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Entrega</label>
                         <div className="relative group">
-                          <input 
-                            type="date" 
-                            value={statusEntrega} 
-                            onChange={(e) => setStatusEntrega(e.target.value)} 
-                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
+                          <input
+                            type="date"
+                            value={statusEntrega}
+                            onChange={(e) => setStatusEntrega(e.target.value)}
+                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
                           />
                           <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
                         </div>
@@ -1356,11 +1456,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Próximo Contato / Data de Retorno</label>
                       <div className="relative group">
-                        <input 
-                          type="date" 
-                          value={statusData} 
-                          onChange={(e) => setStatusData(e.target.value)} 
-                          className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
+                        <input
+                          type="date"
+                          value={statusData}
+                          onChange={(e) => setStatusData(e.target.value)}
+                          className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
                         />
                         <CalendarDays className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
                       </div>
@@ -1370,7 +1470,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <textarea placeholder="Ex: Cliente solicitou retorno na segunda..." rows={3} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all resize-none placeholder:text-muted-foreground/30" />
                     </div>
                     <button onClick={() => {
-                      handleUpdateStatus("ENVIADO", { 
+                      handleUpdateStatus("ENVIADO", {
                         lembrete_data: statusData,
                         endereco_obra: statusEnderecoObra,
                         fechamento_previsto: statusFechamento,
@@ -1491,6 +1591,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           </div>
         </div>
       )}
+
     </div>
   );
 }
