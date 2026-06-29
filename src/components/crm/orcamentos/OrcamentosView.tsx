@@ -52,6 +52,9 @@ export interface Orcamento {
   items: CrmItem[];
   sellerCode?: string;
   phone?: string;
+  enderecoObra?: string;
+  fechamentoPrevisto?: string;
+  entregaPrevista?: string;
 }
 
 
@@ -357,6 +360,9 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
             ...o,
             lossReason: o.lossReason ?? crm.motivo_perda ?? undefined,
             lembreteData: crm.lembrete_data ?? undefined,
+            enderecoObra: crm.endereco_obra ?? undefined,
+            fechamentoPrevisto: crm.fechamento_previsto ?? undefined,
+            entregaPrevista: crm.entrega_prevista ?? undefined,
           };
         }
 
@@ -370,6 +376,9 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           status: crmStatus,
           lossReason: o.lossReason ?? crm.motivo_perda ?? undefined,
           lembreteData: crm.lembrete_data ?? crm.fechamento_previsto ?? undefined,
+          enderecoObra: crm.endereco_obra ?? undefined,
+          fechamentoPrevisto: crm.fechamento_previsto ?? undefined,
+          entregaPrevista: crm.entrega_prevista ?? undefined,
         };
       });
 
@@ -439,9 +448,9 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       vendedor_codigo: selectedItem.sellerCode,
       motivo_perda: extra?.motivo_perda?.toUpperCase() ?? null,
       lembrete_data: extra?.lembrete_data ?? null,
-      endereco_obra: extra?.endereco_obra ?? null,
-      fechamento_previsto: extra?.fechamento_previsto ?? null,
-      entrega_prevista: extra?.entrega_prevista ?? null,
+      endereco_obra: extra?.endereco_obra !== undefined ? (extra.endereco_obra ?? null) : (selectedItem.enderecoObra ?? null),
+      fechamento_previsto: extra?.fechamento_previsto !== undefined ? (extra.fechamento_previsto ?? null) : (selectedItem.fechamentoPrevisto ?? null),
+      entrega_prevista: extra?.entrega_prevista !== undefined ? (extra.entrega_prevista ?? null) : (selectedItem.entregaPrevista ?? null),
       updated_at: new Date().toISOString()
     };
 
@@ -643,7 +652,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                 ...item, 
                 status: newStatus.toUpperCase(), 
                 lossReason: extra?.motivo_perda ?? item.lossReason,
-                lembreteData: extra?.lembrete_data ?? extra?.fechamento_previsto ?? item.lembreteData
+                lembreteData: extra?.lembrete_data ?? extra?.fechamento_previsto ?? item.lembreteData,
+                enderecoObra: extra?.endereco_obra !== undefined ? (extra.endereco_obra ?? undefined) : item.enderecoObra,
+                fechamentoPrevisto: extra?.fechamento_previsto !== undefined ? (extra.fechamento_previsto ?? undefined) : item.fechamentoPrevisto,
+                entregaPrevista: extra?.entrega_prevista !== undefined ? (extra.entrega_prevista ?? undefined) : item.entregaPrevista
               }
             : item
         )
@@ -688,6 +700,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     "Mão de Obra e Material",
     "Comparativo de Linhas",
     "Alteração de Preço",
+    "Liberação Financeira",
   ];
 
   const filteredAndSortedItems = useMemo(() => {
@@ -1135,8 +1148,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                         setSelectedItem(o);
                         // Pré-popular campos do modal
                         setStatusData(o.lembreteData || "");
-                        setStatusFechamento(o.lembreteData || "");
+                        setStatusFechamento(o.fechamentoPrevisto || "");
+                        setStatusEntrega(o.entregaPrevista || "");
+                        setStatusEnderecoObra(o.enderecoObra || "");
                         setStatusMotivoPerdido(o.lossReason || "");
+                        setStatusObs("");
                         setIsStatusModalOpen(true);
                         setStatusStep("selection");
                       }}
@@ -1306,9 +1322,39 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mt-0.5">Registro de Contato</p>
                     </div>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-2 scrollbar-hide">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Data de Retorno</label>
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Endereço da Obra</label>
+                      <input type="text" placeholder="Logradouro, número, bairro..." value={statusEnderecoObra} onChange={(e) => setStatusEnderecoObra(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all placeholder:text-muted-foreground/30" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Fechamento</label>
+                        <div className="relative group">
+                          <input 
+                            type="date" 
+                            value={statusFechamento} 
+                            onChange={(e) => setStatusFechamento(e.target.value)} 
+                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
+                          />
+                          <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Entrega</label>
+                        <div className="relative group">
+                          <input 
+                            type="date" 
+                            value={statusEntrega} 
+                            onChange={(e) => setStatusEntrega(e.target.value)} 
+                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
+                          />
+                          <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Próximo Contato / Data de Retorno</label>
                       <div className="relative group">
                         <input 
                           type="date" 
@@ -1321,10 +1367,15 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Observação</label>
-                      <textarea placeholder="Ex: Cliente solicitou retorno na segunda..." rows={4} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all resize-none placeholder:text-muted-foreground/30" />
+                      <textarea placeholder="Ex: Cliente solicitou retorno na segunda..." rows={3} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all resize-none placeholder:text-muted-foreground/30" />
                     </div>
                     <button onClick={() => {
-                      handleUpdateStatus("ENVIADO", { lembrete_data: statusData });
+                      handleUpdateStatus("ENVIADO", { 
+                        lembrete_data: statusData,
+                        endereco_obra: statusEnderecoObra,
+                        fechamento_previsto: statusFechamento,
+                        entrega_prevista: statusEntrega
+                      });
                     }} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/10 active:scale-[0.98] transition-all">
                       Confirmar Envio
                     </button>
@@ -1341,43 +1392,25 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mt-0.5">Dados da Proposta</p>
                     </div>
                   </div>
-                  <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
+                  <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-2 scrollbar-hide">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Endereço da Obra *</label>
-                      <input type="text" placeholder="Logradouro, número, bairro..." value={statusEnderecoObra} onChange={(e) => setStatusEnderecoObra(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 focus:ring-4 focus:ring-amber-600/5 transition-all placeholder:text-muted-foreground/30" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Fechamento *</label>
-                        <div className="relative group">
-                          <input 
-                            type="date" 
-                            value={statusFechamento} 
-                            onChange={(e) => setStatusFechamento(e.target.value)} 
-                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
-                          />
-                          <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-amber-500 transition-colors pointer-events-none" />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Prev. Entrega *</label>
-                        <div className="relative group">
-                          <input 
-                            type="date" 
-                            value={statusEntrega} 
-                            onChange={(e) => setStatusEntrega(e.target.value)} 
-                            className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
-                          />
-                          <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 group-focus-within:text-amber-500 transition-colors pointer-events-none" />
-                        </div>
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Data de Retorno</label>
+                      <div className="relative group">
+                        <input 
+                          type="date" 
+                          value={statusData} 
+                          onChange={(e) => setStatusData(e.target.value)} 
+                          className="w-full bg-secondary/40 border border-border rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-amber-600/50 uppercase [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0" 
+                        />
+                        <CalendarDays className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-amber-500 transition-colors pointer-events-none" />
                       </div>
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Observações</label>
-                      <textarea placeholder="Detalhes da negociação..." rows={3} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none resize-none placeholder:text-muted-foreground/30" />
+                      <textarea placeholder="Detalhes da negociação..." rows={4} value={statusObs} onChange={(e) => setStatusObs(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none resize-none placeholder:text-muted-foreground/30 focus:border-amber-600/50 focus:ring-4 focus:ring-amber-600/5 transition-all" />
                     </div>
                     <button
-                      onClick={() => handleUpdateStatus("NEGOCIAÇÃO", { endereco_obra: statusEnderecoObra, fechamento_previsto: statusFechamento, entrega_prevista: statusEntrega })}
+                      onClick={() => handleUpdateStatus("NEGOCIAÇÃO", { lembrete_data: statusData })}
                       className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all"
                     >
                       Salvar Negociação
@@ -1400,7 +1433,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Selecione o Motivo *</label>
                       <TinyDropdown 
                         value={statusMotivoPerdido} 
-                        options={["Preço Alto", "Falta de Estoque", "Furo de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas", "Alteração de Preço"]} 
+                        options={["Preço Alto", "Falta de Estoque", "Furo de Estoque", "Desistiu", "Prazo de Entrega", "Mão de Obra e Material", "Comparativo de Linhas", "Alteração de Preço", "Liberação Financeira"]} 
                         onChange={(val) => setStatusMotivoPerdido(val)} 
                         icon={Tag} 
                         variant="slate" 

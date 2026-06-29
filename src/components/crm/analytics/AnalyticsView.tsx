@@ -16,6 +16,7 @@ export function AnalyticsView() {
     { label: "FALTA DE ESTOQUE", value: 2, color: "from-orange-600 to-orange-400" },
     { label: "DESISTIU", value: 2, color: "from-amber-600 to-amber-400" },
     { label: "PRAZO DE ENTREGA", value: 1, color: "from-orange-500/80 to-orange-300/80" },
+    { label: "LIBERAÇÃO FINANCEIRA", value: 0, color: "from-blue-600/80 to-blue-300/80" },
   ];
 
   return (

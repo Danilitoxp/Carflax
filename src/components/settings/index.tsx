@@ -760,6 +760,7 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
                         <option value="Mão de Obra e Material">Mão de Obra e Material</option>
                         <option value="Comparativo de Linhas">Comparativo de Linhas</option>
                         <option value="Alteração de Preço">Alteração de Preço</option>
+                        <option value="Liberação Financeira">Liberação Financeira</option>
                       </select>
                     </td>
                     <td className="px-3 py-2.5">
