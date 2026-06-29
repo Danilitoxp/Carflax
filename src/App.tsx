@@ -38,6 +38,7 @@ import { SorteioRealtimeModal } from "@/components/ui/SorteioRealtimeModal";
 import { RankingCopaView } from "@/components/crm/campanhas/RankingCopaView";
 import { PrivacyPolicyView } from "@/components/public/PrivacyPolicyView";
 import { TermsOfServiceView } from "@/components/public/TermsOfServiceView";
+import { FollowUpReminder } from "@/components/ui/FollowUpReminder";
 
 export interface UserProfile {
   id?: string;
@@ -1384,6 +1385,16 @@ function DashboardContent({
         forcedChatDoc={forcedChatDoc}
         onForcedChatResolved={handleForcedChatResolved}
       />
+      <FollowUpReminder
+        userProfile={userProfile}
+        onNavigateToFollowUps={() => {
+          handleActiveItemChange("Orçamentos");
+          // Aguarda o OrcamentosView montar antes de disparar o filtro
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("carflax-filter-followups"));
+          }, 150);
+        }}
+      />
 
     </div>
   );
@@ -1487,8 +1498,9 @@ function App() {
         // 2. AUTO-CURA: Se não achou pelo ID, tenta pelo e-mail da sessão
         if (!data) {
           const {
-            data: { user },
-          } = await supabase.auth.getUser();
+            data: { session },
+          } = await supabase.auth.getSession();
+          const user = session?.user;
           if (user?.email) {
             console.log(
               "[App] Perfil não achou ID, tentando por e-mail:",
@@ -1523,8 +1535,8 @@ function App() {
         }
 
         if (data) {
-          const { data: authData } = await supabase.auth.getUser();
-          const authUser = authData?.user;
+          const { data: sessionData } = await supabase.auth.getSession();
+          const authUser = sessionData?.session?.user;
           const mergedProfile = {
             ...data,
             phone: authUser?.user_metadata?.phone || authUser?.phone || "",
@@ -1564,8 +1576,9 @@ function App() {
         } else {
           // Fallback total para não travar a UI se o usuário for novo no banco
           const {
-            data: { user },
-          } = await supabase.auth.getUser();
+            data: { session },
+          } = await supabase.auth.getSession();
+          const user = session?.user;
           const fallbackProfile = {
             name: user?.email?.split("@")[0].toUpperCase() || "Usuário",
             email: user?.email || "",

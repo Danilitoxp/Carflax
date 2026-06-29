@@ -282,6 +282,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   // Follow-up fields (inside "Enviado" status step)
   const [fuContatoRealizado, setFuContatoRealizado] = useState<boolean | null>(null);
   const [fuClienteAtendeu, setFuClienteAtendeu] = useState<boolean | null>(null);
+  const [fuCanalContato, setFuCanalContato] = useState<"whatsapp" | "ligacao" | null>(null);
 
   // Filtro padrão: do dia 1 do mês atual até hoje
   const [startDate, setStartDate] = useState<Date | null>(() => {
@@ -441,6 +442,13 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     apiCrmFaturamento(params).then(setFaturamento).catch(() => {});
   }, [filterSeller, startDate, endDate, userProfile]);
 
+  // ── Ouve evento do FollowUpReminder para aplicar o filtro automaticamente ──
+  useEffect(() => {
+    const handler = () => setFilterStatus("Follow-ups");
+    window.addEventListener("carflax-filter-followups", handler);
+    return () => window.removeEventListener("carflax-filter-followups", handler);
+  }, []);
+
   // ── Status update ────────────────────────────────────────────────────────
 
 
@@ -548,8 +556,8 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
               `👤 *VENDEDOR:*   ${selectedItem.seller}`,
               ``,
               `📢 *STATUS:*     ${statusEmblema[newStatus.toUpperCase()] || newStatus.toUpperCase()}`,
-              newStatus.toUpperCase() === "ENVIADO" && fuContatoRealizado !== null ? `📞 *LIGOU:*      ${fuContatoRealizado ? "SIM" : "NÃO"}` : "",
-              newStatus.toUpperCase() === "ENVIADO" && fuContatoRealizado === true ? `👥 *ATENDEU:*    ${fuClienteAtendeu ? "SIM" : "NÃO"}` : "",
+              newStatus.toUpperCase() === "ENVIADO" && fuContatoRealizado !== null ? `📞 *CONTATO:*    ${fuContatoRealizado ? "CONECTOU" : "NÃO CONECTOU"}` : "",
+              newStatus.toUpperCase() === "ENVIADO" && fuCanalContato ? `📱 *CANAL:*      ${fuCanalContato === "whatsapp" ? "WhatsApp" : "Ligação"}` : "",
               extra?.motivo_perda ? `📉 *MOTIVO:*     ${extra.motivo_perda.toUpperCase()}` : "",
               lostItemsList ? `\n📦 *ITENS AFETADOS:*\n${lostItemsList}` : "",
               statusObs && !lostItemsList ? `\n💬 *OBSERVAÇÃO:*\n${statusObs}` : "",
@@ -677,6 +685,9 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       setIsStatusModalOpen(false);
       setStatusObs(""); // Resetar obs após envio
       setLostItemsIds([]); // Resetar itens selecionados
+      setFuContatoRealizado(null);
+      setFuClienteAtendeu(null);
+      setFuCanalContato(null);
     } catch (err) {
       console.error("Erro ao atualizar status:", err);
       showNotification("error", "Erro ao Salvar", "Não foi possível salvar a alteração. Tente novamente.");
@@ -773,6 +784,23 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
     if (sortConfig.key !== null && sortConfig.direction !== null) {
       result.sort((a, b) => {
+        // Quando filtro = Follow-ups e coluna = Status, ordenar por data de retorno
+        if (sortConfig.key === "status" && filterStatus === "Follow-ups") {
+          const parseDate = (raw?: string) => {
+            if (!raw) return 0;
+            const t = raw.trim();
+            if (/^\d{4}-\d{2}-\d{2}/.test(t)) return new Date(t.slice(0, 10)).getTime();
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(t)) {
+              const [d, m, y] = t.split("/");
+              return new Date(`${y}-${m}-${d}`).getTime();
+            }
+            return 0;
+          };
+          const aTime = parseDate(a.lembreteData);
+          const bTime = parseDate(b.lembreteData);
+          return sortConfig.direction === "asc" ? aTime - bTime : bTime - aTime;
+        }
+
         let aValue: string | number = a[sortConfig.key as keyof Orcamento] as string | number;
         let bValue: string | number = b[sortConfig.key as keyof Orcamento] as string | number;
         if (sortConfig.key === "total") { aValue = a.totalValue; bValue = b.totalValue; }
@@ -1366,7 +1394,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Realizou contato com o cliente?</label>
                       <div className="grid grid-cols-2 gap-2">
                         <button
-                          onClick={() => { setFuContatoRealizado(true); setFuClienteAtendeu(null); }}
+                          onClick={() => { setFuContatoRealizado(true); setFuClienteAtendeu(null); setFuCanalContato(null); }}
                           className={cn(
                             "py-2.5 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
                             fuContatoRealizado === true
@@ -1377,7 +1405,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                           <PhoneIncoming className="w-3.5 h-3.5" /> Conectou
                         </button>
                         <button
-                          onClick={() => { setFuContatoRealizado(false); setFuClienteAtendeu(false); }}
+                          onClick={() => { setFuContatoRealizado(false); setFuClienteAtendeu(false); setFuCanalContato(null); }}
                           className={cn(
                             "py-2.5 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
                             fuContatoRealizado === false
@@ -1390,32 +1418,35 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       </div>
                     </div>
 
-                    {/* Follow-up: Atendeu? */}
-                    {fuContatoRealizado === true && (
+                    {/* Follow-up: Canal de Contato */}
+                    {fuContatoRealizado !== null && (
                       <div className="space-y-1.5 animate-fadeIn">
-                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">O cliente atendeu?</label>
+                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">
+                          {fuContatoRealizado ? "Via qual canal conectou?" : "Via qual canal tentou?"}
+                        </label>
                         <div className="grid grid-cols-2 gap-2">
                           <button
-                            onClick={() => setFuClienteAtendeu(true)}
+                            onClick={() => setFuCanalContato("whatsapp")}
                             className={cn(
                               "py-2.5 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
-                              fuClienteAtendeu === true
+                              fuCanalContato === "whatsapp"
                                 ? "bg-emerald-600/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
                                 : "bg-secondary/20 border-border hover:bg-secondary/60 text-muted-foreground"
                             )}
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Sim, Atendeu
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.85L.057 23.93l6.225-1.635A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.372l-.36-.213-3.694.97.985-3.6-.234-.37A9.818 9.818 0 0112 2.182c5.424 0 9.818 4.394 9.818 9.818S17.424 21.818 12 21.818z"/></svg>
+                            WhatsApp
                           </button>
                           <button
-                            onClick={() => setFuClienteAtendeu(false)}
+                            onClick={() => setFuCanalContato("ligacao")}
                             className={cn(
                               "py-2.5 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
-                              fuClienteAtendeu === false
-                                ? "bg-rose-600/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                              fuCanalContato === "ligacao"
+                                ? "bg-blue-600/10 border-blue-500/30 text-blue-600 dark:text-blue-400"
                                 : "bg-secondary/20 border-border hover:bg-secondary/60 text-muted-foreground"
                             )}
                           >
-                            <XCircle className="w-3.5 h-3.5" /> Não atendeu
+                            <PhoneIncoming className="w-3.5 h-3.5" /> Ligação
                           </button>
                         </div>
                       </div>
