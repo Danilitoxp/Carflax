@@ -19,7 +19,8 @@ interface Props {
   onNavigateToFollowUps?: () => void;
 }
 
-const SNOOZE_DURATION_MS = 5 * 60 * 1000; // 5 minutos
+const SNOOZE_DURATION_SELLER_MS = 5 * 60 * 1000; // 5 minutos
+const SNOOZE_DURATION_ADMIN_MS = 24 * 60 * 60 * 1000; // 1 dia
 const STORAGE_KEY = "carflax-followup-snoozed-until";
 
 export function FollowUpReminder({ userProfile, onNavigateToFollowUps }: Props) {
@@ -48,13 +49,14 @@ export function FollowUpReminder({ userProfile, onNavigateToFollowUps }: Props) 
         .from("crm_status")
         .select("documento, lembrete_data, status_crm, vendedor, vendedor_codigo")
         .eq("status_crm", "ENVIADO")
-        .lte("lembrete_data", todayStr)
+        .lt("lembrete_data", todayStr)
         .not("lembrete_data", "is", null);
 
       const role = userProfile.role?.toUpperCase() || "";
       const isManager = role.includes("ADMIN") || role.includes("GERENTE") || role.includes("DIRETOR");
 
-      if (!isManager && operatorCode) {
+      if (!isManager) {
+        if (!operatorCode) return;
         query = query.eq("vendedor_codigo", operatorCode);
       }
 
@@ -137,15 +139,21 @@ export function FollowUpReminder({ userProfile, onNavigateToFollowUps }: Props) 
     };
   }, []);
 
+  const isManager = (() => {
+    const role = userProfile?.role?.toUpperCase() || "";
+    return role.includes("ADMIN") || role.includes("GERENTE") || role.includes("DIRETOR");
+  })();
+
   const handleSnooze = () => {
-    localStorage.setItem(STORAGE_KEY, String(Date.now() + SNOOZE_DURATION_MS));
+    const duration = isManager ? SNOOZE_DURATION_ADMIN_MS : SNOOZE_DURATION_SELLER_MS;
+    localStorage.setItem(STORAGE_KEY, String(Date.now() + duration));
     setVisible(false);
 
     if (snoozeTimerRef.current) clearTimeout(snoozeTimerRef.current);
     snoozeTimerRef.current = setTimeout(() => {
       localStorage.removeItem(STORAGE_KEY);
       fetchFollowUps();
-    }, SNOOZE_DURATION_MS);
+    }, duration);
   };
 
   const handleNavigate = () => {
@@ -273,10 +281,10 @@ export function FollowUpReminder({ userProfile, onNavigateToFollowUps }: Props) 
             <button
               onClick={handleSnooze}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95"
-              title="Lembrar em 5 minutos"
+              title={isManager ? "Fechar por 1 dia" : "Lembrar em 5 minutos"}
             >
               <Clock className="w-3 h-3" />
-              Lembrar em 5 min
+              {isManager ? "Fechar por 1 dia" : "Lembrar em 5 min"}
             </button>
             <button
               onClick={handleNavigate}
