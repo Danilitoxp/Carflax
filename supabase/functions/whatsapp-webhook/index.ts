@@ -44,22 +44,71 @@ Deno.serve(async (req: Request) => {
 
     for (const msg of messages) {
       const key = msg.key as Record<string, unknown> | undefined;
-      if (!key || key.fromMe) continue;
+      if (!key) continue;
       if (!String(key.remoteJid ?? '').endsWith('@s.whatsapp.net')) continue;
 
-      const senderName = String(msg.pushName || String(key.remoteJid ?? '').split('@')[0]);
+      const remoteJid = String(key.remoteJid);
+      const msgId = String(key.id);
+      const fromMe = Boolean(key.fromMe);
+      const senderName = String(msg.pushName || remoteJid.split('@')[0]);
       const msgContent = msg.message as Record<string, unknown> | undefined;
+
+      // Detecta tipo de mídia
+      const hasImage = !!msgContent?.imageMessage;
+      const hasVideo = !!msgContent?.videoMessage;
+      const hasAudio = !!msgContent?.audioMessage;
+      const hasDoc = !!msgContent?.documentMessage;
+      const hasSticker = !!msgContent?.stickerMessage;
+      const tipo = hasImage ? 'image' : hasVideo ? 'video' : hasAudio ? 'audio' : hasDoc ? 'document' : hasSticker ? 'sticker' : 'text';
+
       const text = String(
         msgContent?.conversation ||
         (msgContent?.extendedTextMessage as Record<string, unknown> | undefined)?.text ||
-        '📎 Mídia recebida'
+        (hasImage ? (msgContent?.imageMessage as Record<string, unknown>)?.caption || '' : '') ||
+        (hasVideo ? (msgContent?.videoMessage as Record<string, unknown>)?.caption || '' : '') ||
+        (hasDoc ? (msgContent?.documentMessage as Record<string, unknown>)?.fileName || '' : '') ||
+        (tipo !== 'text' ? '📎 Mídia recebida' : '')
       );
 
+      // Persiste a mensagem no banco (upsert para evitar duplicatas)
+      try {
+        await supabase
+          .from('marketing_whatsapp')
+          .upsert({
+            message_id: msgId,
+            remote_jid: remoteJid,
+            texto: text || (tipo !== 'text' ? '📎 Mídia recebida' : ''),
+            tipo,
+            sender: fromMe ? 'me' : 'contact',
+            status: fromMe ? 'sent' : 'received',
+            timestamp: new Date().toISOString(),
+          }, { onConflict: 'message_id' });
+
+        // Atualiza ou cria o registro do cliente
+        if (!fromMe) {
+          await supabase
+            .from('marketing_clientes')
+            .upsert({
+              remote_jid: remoteJid,
+              push_name: senderName,
+              ultima_mensagem: text || '📎 Mídia recebida',
+              ultima_conversa_em: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'remote_jid', ignoreDuplicates: false });
+        }
+      } catch (e) {
+        console.error('Erro ao salvar mensagem no banco:', e);
+      }
+
+      // Push notification apenas para mensagens recebidas
+      if (fromMe) continue;
+
+      const notifText = text || '📎 Mídia recebida';
       const notification = JSON.stringify({
         title: `💬 ${senderName}`,
-        body: text,
+        body: notifText,
         icon: '/favicon.svg',
-        tag: `wpp-${String(key.remoteJid)}`,
+        tag: `wpp-${remoteJid}`,
         section: 'Marketing',
       });
 
@@ -92,8 +141,7 @@ Deno.serve(async (req: Request) => {
       const msgParsed = msg as unknown as EvoMsg;
       const mediaBase64 = msgParsed.base64 || msgParsed.message?.base64;
       const mimetype = msgParsed.message?.imageMessage?.mimetype || msgParsed.message?.videoMessage?.mimetype || msgParsed.message?.documentMessage?.mimetype || msgParsed.message?.audioMessage?.mimetype;
-      const msgId = String(key.id);
-      
+
       if (mediaBase64 && mimetype) {
         try {
           const ext = mimetype.split('/')[1]?.split(';')[0] || 'bin';

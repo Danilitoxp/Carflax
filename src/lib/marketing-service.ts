@@ -192,15 +192,15 @@ export const marketingService = {
       return false;
     }
 
-    // Atualiza o resumo no cliente
+    // Atualiza ou cria o registro do cliente
     await supabase
       .from("marketing_clientes")
-      .update({
+      .upsert({
+        remote_jid: msg.remote_jid,
         ultima_mensagem: msg.texto,
         ultima_conversa_em: msg.timestamp,
         updated_at: new Date().toISOString()
-      })
-      .eq("remote_jid", msg.remote_jid);
+      }, { onConflict: "remote_jid", ignoreDuplicates: false });
 
     return true;
   },
