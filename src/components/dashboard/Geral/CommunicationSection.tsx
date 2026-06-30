@@ -334,16 +334,24 @@ function CommentBubble({
   );
 }
 
+function getUserCache(): Record<string, { id: string; name: string; avatar: string | null }> {
+  return (window as unknown as { _carflaxUserCache?: Record<string, { id: string; name: string; avatar: string | null }> })._carflaxUserCache || {};
+}
+
 export function CommunicationCard({
   data,
   onEdit,
   onHide,
   userProfile,
+  initialCommentCount = 0,
+  onCommentCountChange,
 }: {
   data: CommunicationPost;
   onEdit: (d: CommunicationPost) => void;
   onHide: (id: string | number) => void;
   userProfile?: UserProfile;
+  initialCommentCount?: number;
+  onCommentCountChange?: (dbId: string | number, count: number) => void;
 }) {
   const currentUserId = userProfile?.id;
   const canManage =
@@ -359,7 +367,7 @@ export function CommunicationCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<ComunicadoComment[]>([]);
-  const [commentCount, setCommentCount] = useState(0);
+  const [commentCount, setCommentCount] = useState(initialCommentCount);
   const [newComment, setNewComment] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -449,48 +457,31 @@ export function CommunicationCard({
   }
 
   useEffect(() => {
-    const fetchAvatars = async () => {
-      if (!data.likedBy || data.likedBy.length === 0) {
-        setLikersAvatars([]);
-        return;
+    if (!data.likedBy || data.likedBy.length === 0) {
+      setLikersAvatars([]);
+      return;
+    }
+    const cache = getUserCache();
+    const sortedIds = [...data.likedBy].reverse().slice(0, 5);
+    let finalAvatars = sortedIds
+      .map((id) => cache[id])
+      .filter(Boolean)
+      .map(
+        (u) =>
+          u.avatar ||
+          `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`,
+      );
+    if (currentUserId && data.likedBy.includes(currentUserId)) {
+      if (!finalAvatars.includes(userAvatar)) {
+        finalAvatars = [userAvatar, ...finalAvatars].slice(0, 5);
       }
-      const sortedIds = [...data.likedBy].reverse().slice(0, 5);
-      const { data: users } = await supabase
-        .from("usuarios")
-        .select("id, avatar, name")
-        .in("id", sortedIds);
-      let finalAvatars: string[] = [];
-      if (users) {
-        finalAvatars = sortedIds
-          .map((id) => users.find((u) => String(u.id) === String(id)))
-          .filter(Boolean)
-          .map(
-            (u) =>
-              u!.avatar ||
-              `https://api.dicebear.com/7.x/avataaars/svg?seed=${u!.name}`,
-          );
-      }
-      if (currentUserId && data.likedBy.includes(currentUserId)) {
-        const alreadyIn = finalAvatars.includes(userAvatar);
-        if (!alreadyIn) {
-          finalAvatars = [userAvatar, ...finalAvatars].slice(0, 5);
-        }
-      }
-      setLikersAvatars(finalAvatars);
-    };
-    fetchAvatars();
+    }
+    setLikersAvatars(finalAvatars);
   }, [data.likedBy, currentUserId, userAvatar]);
 
   useEffect(() => {
-    const fetchCount = async () => {
-      const { count } = await supabase
-        .from("comunicado_comentarios")
-        .select("*", { count: "exact", head: true })
-        .eq("comunicado_id", data.dbId);
-      if (count !== null) setCommentCount(count);
-    };
-    fetchCount();
-  }, [data.dbId]);
+    setCommentCount(initialCommentCount);
+  }, [initialCommentCount]);
 
   useEffect(() => {
     if (!showEmojiPicker) return;
@@ -539,26 +530,27 @@ export function CommunicationCard({
       parent_id?: string | number | null;
     }
 
-    interface DbUserRow {
-      id: string | number;
-      name: string;
-      avatar: string | null;
-    }
-
     if (rows && rows.length > 0) {
       const commentRows = rows as unknown as DbCommentRow[];
-      const userIds = [...new Set(commentRows.map((r) => r.user_id))];
-      const { data: users } = await supabase
-        .from("usuarios")
-        .select("id, name, avatar")
-        .in("id", userIds);
-
-      const userRows = (users || []) as unknown as DbUserRow[];
-      const userMap = new Map<string, DbUserRow>(
-        userRows.map((u) => [String(u.id), u]),
+      const cache = getUserCache();
+      const missingIds = [...new Set(commentRows.map((r) => r.user_id))].filter(
+        (id) => !cache[id],
       );
+
+      if (missingIds.length > 0) {
+        const { data: users } = await supabase
+          .from("usuarios")
+          .select("id, name, avatar")
+          .in("id", missingIds);
+        if (users) {
+          users.forEach((u) => {
+            cache[u.id] = u;
+          });
+        }
+      }
+
       const mapped: ComunicadoComment[] = commentRows.map((c) => {
-        const user = userMap.get(String(c.user_id));
+        const user = cache[c.user_id];
         return {
           id: c.id,
           content: c.content,
@@ -589,13 +581,16 @@ export function CommunicationCard({
       }
 
       setComments(topLevel);
-      setCommentCount(mapped.length);
+      const newCount = mapped.length;
+      setCommentCount(newCount);
+      onCommentCountChange?.(data.dbId, newCount);
     } else {
       setComments([]);
       setCommentCount(0);
+      onCommentCountChange?.(data.dbId, 0);
     }
     setLoadingComments(false);
-  }, [data.dbId]);
+  }, [data.dbId, onCommentCountChange]);
 
   const handleToggleComments = () => {
     if (!showComments) fetchComments();
@@ -639,6 +634,21 @@ export function CommunicationCard({
         : { ...c, replies: updateCommentDeep(c.replies, id, patch) },
     );
 
+  const persistCommentUpdate = async (
+    commentId: string | number,
+    patch: { likes: number; liked_by: string[]; reactions: Record<string, string[]> },
+    prevComments: ComunicadoComment[],
+  ) => {
+    const { error } = await supabase
+      .from("comunicado_comentarios")
+      .update(patch)
+      .eq("id", Number(commentId));
+    if (error) {
+      console.error("Erro ao salvar reação/like:", error);
+      setComments(prevComments);
+    }
+  };
+
   const handleCommentLike = async (
     commentId: string | number,
     currentLikedBy: string[],
@@ -667,26 +677,20 @@ export function CommunicationCard({
       });
     }
 
-    setComments((prev) =>
-      updateCommentDeep(prev, commentId, {
+    const prev = comments;
+    setComments((p) =>
+      updateCommentDeep(p, commentId, {
         likes: newLikes,
         liked_by: newLikedBy,
         reactions: newReactions,
       }),
     );
 
-    try {
-      await supabase
-        .from("comunicado_comentarios")
-        .update({
-          likes: newLikes,
-          liked_by: newLikedBy,
-          reactions: newReactions,
-        })
-        .eq("id", commentId);
-    } catch (err) {
-      console.error("Erro ao curtir comentário:", err);
-    }
+    await persistCommentUpdate(commentId, {
+      likes: newLikes,
+      liked_by: newLikedBy,
+      reactions: newReactions,
+    }, prev);
   };
 
   const handleCommentReaction = async (
@@ -721,26 +725,20 @@ export function CommunicationCard({
       newLikes = Math.max(0, newLikes - 1);
     }
 
-    setComments((prev) =>
-      updateCommentDeep(prev, commentId, {
+    const prev = comments;
+    setComments((p) =>
+      updateCommentDeep(p, commentId, {
         reactions: newReactions,
         likes: newLikes,
         liked_by: newLikedBy,
       }),
     );
 
-    try {
-      await supabase
-        .from("comunicado_comentarios")
-        .update({
-          reactions: newReactions,
-          likes: newLikes,
-          liked_by: newLikedBy,
-        })
-        .eq("id", commentId);
-    } catch (err) {
-      console.error("Erro ao reagir ao comentário:", err);
-    }
+    await persistCommentUpdate(commentId, {
+      reactions: newReactions,
+      likes: newLikes,
+      liked_by: newLikedBy,
+    }, prev);
   };
 
   const handleLike = async () => {
@@ -1074,6 +1072,7 @@ export function CommunicationSection({
   const [activeCategory, setActiveCategory] = useState("Todos");
   const [comms, setComms] = useState<CommunicationPost[]>([]);
   const [internalLoading, setInternalLoading] = useState(true);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
 
   const canManage =
     userProfile?.permissions?.includes("Gerenciar Comunicados") ||
@@ -1101,7 +1100,6 @@ export function CommunicationSection({
 
   const fetchComunicados = useCallback(async (silent = false) => {
     if (!silent) setInternalLoading(true);
-    // Buscamos o comunicado e os dados do autor (usuários) em uma única tacada
     const { data, error } = await supabase
       .from("comunicados")
       .select(
@@ -1110,15 +1108,19 @@ export function CommunicationSection({
         usuarios (
           name,
           avatar
-        )
+        ),
+        comunicado_comentarios (count)
       `,
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setComms(
-        (data as unknown as DbComunicado[]).map((c) => ({
+      const counts: Record<string, number> = {};
+      const posts = (data as unknown as (DbComunicado & { comunicado_comentarios: { count: number }[] })[]).map((c) => {
+        const count = c.comunicado_comentarios?.[0]?.count ?? 0;
+        counts[String(c.id)] = count;
+        return {
           id: String(c.id),
           dbId: String(c.id),
           title: c.titulo,
@@ -1136,8 +1138,10 @@ export function CommunicationSection({
             `https://api.dicebear.com/7.x/shapes/svg?seed=${c.id}`,
           likes: c.likes || 0,
           likedBy: c.liked_by || [],
-        })),
-      );
+        };
+      });
+      setComms(posts);
+      setCommentCounts(counts);
     }
     setInternalLoading(false);
   }, []);
@@ -1531,6 +1535,10 @@ export function CommunicationSection({
               onEdit={handleEdit}
               onHide={handleHidePost}
               userProfile={userProfile}
+              initialCommentCount={commentCounts[String(item.dbId)] ?? 0}
+              onCommentCountChange={(dbId, count) =>
+                setCommentCounts((prev) => ({ ...prev, [String(dbId)]: count }))
+              }
             />
           ))}
       </div>
