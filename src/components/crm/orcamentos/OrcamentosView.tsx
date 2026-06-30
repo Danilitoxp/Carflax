@@ -807,7 +807,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       result = result.filter((item) => item.seller === filterSeller);
 
     if (filterReason !== "Todos os Motivos")
-      result = result.filter((item) => item.lossReason === filterReason);
+      result = result.filter((item) => item.lossReason?.toUpperCase().trim() === filterReason.toUpperCase().trim());
 
     if (startDate !== null && endDate !== null) {
       result = result.filter((item) => {
