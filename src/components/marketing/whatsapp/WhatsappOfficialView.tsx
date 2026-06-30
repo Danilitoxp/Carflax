@@ -3022,13 +3022,18 @@ export function WhatsappOfficialView({ vendedorId }: { vendedorId?: string }) {
                               const inCart = cartMap.has(p.cod);
                               const [gradient] = getBrandStyle(p.marca || p.descricao);
                               const initials = getBrandInitials(p.marca || p.descricao);
+                              const stockColor = p.disponivel <= 0
+                                ? "border-l-4 border-l-rose-500 bg-rose-500/5"
+                                : p.disponivel <= 10
+                                ? "border-l-4 border-l-amber-500 bg-amber-500/5"
+                                : "border-l-4 border-l-emerald-500 bg-emerald-500/5";
                               return (
                                 <button
                                   key={p.cod}
                                   onClick={() => handleToggleCart(p)}
                                   className={cn(
                                     "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all group",
-                                    inCart ? "bg-primary/8" : "hover:bg-secondary/40"
+                                    inCart ? "bg-primary/8" : stockColor
                                   )}
                                 >
                                   {/* Imagem / Placeholder da marca */}
@@ -3065,6 +3070,13 @@ export function WhatsappOfficialView({ vendedorId }: { vendedorId?: string }) {
                                       <span className="text-border/60">·</span>
                                       <span className="text-[11px] font-black text-primary">
                                         💳 R$ {p.credito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </span>
+                                      <span className="text-border/60">·</span>
+                                      <span className={cn(
+                                        "text-[10px] font-bold",
+                                        p.disponivel <= 0 ? "text-rose-500" : p.disponivel <= 10 ? "text-amber-500" : "text-emerald-500"
+                                      )}>
+                                        Est: {p.disponivel}
                                       </span>
                                     </div>
                                   </div>
