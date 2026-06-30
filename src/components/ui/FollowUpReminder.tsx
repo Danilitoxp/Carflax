@@ -87,13 +87,36 @@ export function FollowUpReminder({ userProfile, onNavigateToFollowUps }: Props) 
 
           if (orcamentos && orcamentos.length > 0) {
             const clientMap = new Map<string, string>();
+            const finalizadosSet = new Set<string>();
             for (const o of orcamentos) {
-              clientMap.set(o.ORCAMENTO?.trim(), o.CLIENTE || o.CLIENTE_NOME || "");
+              const doc = o.ORCAMENTO?.trim();
+              clientMap.set(doc, o.CLIENTE || o.CLIENTE_NOME || "");
+              const isCancelled = o.MOTIVO_CANCELAMENTO && o.MOTIVO_CANCELAMENTO !== "SEM MOTIVO";
+              const isVenda = o.PEDIDO === "Sim" || o.NOTA_FISCAL || (o.DATA_BAIXA && o.DATA_BAIXA !== "SEM DATA");
+              if (isCancelled || isVenda) finalizadosSet.add(doc);
             }
-            items = items.map((f) => ({
-              ...f,
-              clientName: clientMap.get(f.documento?.trim()) || undefined,
-            }));
+            items = items
+              .filter((f) => !finalizadosSet.has(f.documento?.trim()))
+              .map((f) => ({
+                ...f,
+                clientName: clientMap.get(f.documento?.trim()) || undefined,
+              }));
+
+            // Sincronizar crm_status dos finalizados no Supabase
+            const docsToUpdate = data!.filter((d) => finalizadosSet.has(d.documento?.trim()));
+            if (docsToUpdate.length > 0) {
+              Promise.all(
+                docsToUpdate.map((d) => {
+                  const doc = d.documento?.trim();
+                  const orc = orcamentos.find((o) => o.ORCAMENTO?.trim() === doc);
+                  const isVenda = orc && (orc.PEDIDO === "Sim" || orc.NOTA_FISCAL || (orc.DATA_BAIXA && orc.DATA_BAIXA !== "SEM DATA"));
+                  return supabase.from("crm_status").update({
+                    status_crm: isVenda ? "VENDA" : "PERDIDO",
+                    updated_at: new Date().toISOString(),
+                  }).eq("documento", d.documento);
+                })
+              ).catch(() => {});
+            }
           }
         } catch {
           // silêncio — usa o documento como fallback

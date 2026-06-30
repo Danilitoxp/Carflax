@@ -359,11 +359,23 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       const docs = orcamentos.map((o) => o.id.trim());
       const statusMap = await getCrmStatusMap(docs);
 
+      const docsToSync: { documento: string; empresa: string; status_crm: string; vendedor?: string; vendedor_codigo?: string; motivo_perda?: string | null }[] = [];
+
       const merged = orcamentos.map((o) => {
         const crm = statusMap.get(o.id.trim());
 
         // Prioridade ABSOLUTA para o ERP se for VENDA ou PERDIDO
         if (o.status === "VENDA" || o.status === "PERDIDO") {
+          if (crm && crm.status_crm.toUpperCase() !== o.status) {
+            docsToSync.push({
+              documento: o.id.trim(),
+              empresa: o.empresa ?? "001",
+              status_crm: o.status,
+              vendedor: o.seller,
+              vendedor_codigo: o.sellerCode,
+              motivo_perda: o.lossReason ?? crm.motivo_perda ?? null,
+            });
+          }
           if (!crm) return o;
           return {
             ...o,
@@ -390,6 +402,14 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           entregaPrevista: crm.entrega_prevista ?? undefined,
         };
       });
+
+      if (docsToSync.length > 0) {
+        Promise.all(
+          docsToSync.map((d) =>
+            supabase.from("crm_status").update({ status_crm: d.status_crm, motivo_perda: d.motivo_perda, updated_at: new Date().toISOString() }).eq("documento", d.documento)
+          )
+        ).catch(() => {});
+      }
 
       setOrçamentosData(merged);
 
