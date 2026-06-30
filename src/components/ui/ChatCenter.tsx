@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { MessageSquare, X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChatModal } from "./ChatModal";
@@ -41,7 +41,6 @@ interface ChatCenterProps {
 }
 
 const PAGE_SIZE = 20;
-const MAX_OPEN_CHATS = 3;
 
 export function ChatCenter({
   activeChats,

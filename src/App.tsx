@@ -963,7 +963,6 @@ function DashboardContent({
                     body: newMsg.obs || "Nova mensagem recebida",
                     icon: "/favicon.svg",
                     tag: `carflax-chat-${newMsg.documento}`,
-                    renotify: true,
                     silent: false,
                   });
                   notif.onclick = () => {
