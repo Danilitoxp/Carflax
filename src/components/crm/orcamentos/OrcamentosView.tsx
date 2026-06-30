@@ -332,6 +332,24 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       const raw = await apiCrmOrcamentos(params);
       let orcamentos = parseOrcamentos(raw);
 
+      // Deduplicar: mesmo documento em lojas diferentes → manter o de status mais avançado
+      const statusPriority: Record<string, number> = { "VENDA": 3, "PERDIDO": 2 };
+      const byDoc = new Map<string, typeof orcamentos[number]>();
+      for (const o of orcamentos) {
+        const key = o.id.trim();
+        const existing = byDoc.get(key);
+        if (!existing) {
+          byDoc.set(key, o);
+        } else {
+          const existingPrio = statusPriority[existing.status] || 0;
+          const currentPrio = statusPriority[o.status] || 0;
+          if (currentPrio > existingPrio) {
+            byDoc.set(key, o);
+          }
+        }
+      }
+      orcamentos = Array.from(byDoc.values());
+
       // Atualizar mapa de sellerCode (ref, sem causar re-render)
       const map = new Map<string, string>();
       orcamentos.forEach((o) => { if (o.sellerCode) map.set(o.seller, o.sellerCode); });

@@ -268,12 +268,13 @@ interface EvoMessageResponse {
 }
 
 const ARCHIVE_REASONS = [
-  "Cliente Curioso",
-  "Não vendemos o material",
-  "Preço Alto",
-  "Prazo Longo",
-  "Convertido",
-  "Outros"
+  { text: "Cliente Curioso", icon: "🧐" },
+  { text: "Não vendemos o material", icon: "📦" },
+  { text: "Falta de Estoque", icon: "⚠️" },
+  { text: "Preço Alto", icon: "💵" },
+  { text: "Prazo Longo", icon: "⏳" },
+  { text: "Convertido", icon: "🎉" },
+  { text: "Outros", icon: "💬" }
 ];
 
 const getTempColor = (temp?: string) => {
@@ -2564,20 +2565,29 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
             </div>
 
             {!isEnteringCustomReason ? (
-              <div className="p-6 space-y-2">
+              <div className="p-6 space-y-1.5 max-h-[420px] overflow-y-auto">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">
+                  Selecione o motivo da perda ou encerramento:
+                </p>
                 {ARCHIVE_REASONS.map(r => (
                   <button 
-                    key={r} 
+                    key={r.text} 
                     onClick={() => {
-                      if (r === "Outros") {
+                      if (r.text === "Outros") {
                         setIsEnteringCustomReason(true);
                       } else {
-                        handleArchiveChat(r);
+                        handleArchiveChat(r.text);
                       }
                     }} 
-                    className="w-full p-3.5 text-left hover:bg-secondary rounded-2xl text-xs font-bold transition-colors border border-transparent hover:border-border active:scale-[0.98]"
+                    className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-secondary/50 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground border border-transparent hover:border-border/30 transition-all duration-200 active:scale-[0.99] group"
                   >
-                    {r}
+                    <span className="flex items-center gap-2">
+                      <span className="opacity-70 group-hover:opacity-100 transition-opacity">{r.icon}</span>
+                      <span>{r.text}</span>
+                    </span>
+                    <span className="text-[10px] opacity-0 group-hover:opacity-60 transition-all transform translate-x-2 group-hover:translate-x-0">
+                      →
+                    </span>
                   </button>
                 ))}
               </div>

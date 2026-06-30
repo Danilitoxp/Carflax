@@ -1,20 +1,23 @@
 import { supabase } from "./supabase";
 import { apiDashboardGeral } from "./api";
 
-
-/**
- * Announcement Automation Service (Birthdays, Work Anniversaries & Calendar Events)
- */
-
 let isAutomationRunning = false;
+const DAILY_KEY = "carflax-goal-automation-date";
 
 export async function runAnnouncementAutomation() {
   if (isAutomationRunning) {
     return { birthdays: 0, workAnniversaries: 0, events: 0, goals: 0 };
   }
-  
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  try {
+    if (localStorage.getItem(DAILY_KEY) === todayStr) {
+      return { birthdays: 0, workAnniversaries: 0, events: 0, goals: 0 };
+    }
+  } catch {}
+
   isAutomationRunning = true;
-  
+
   const results = {
     birthdays: 0,
     workAnniversaries: 0,
@@ -23,10 +26,8 @@ export async function runAnnouncementAutomation() {
   };
 
   try {
-    results.workAnniversaries = await checkAndPostWorkAnniversaries();
-    results.events = await checkAndPostEvents();
     results.goals = await checkAndPostGoalAchievements();
-
+    try { localStorage.setItem(DAILY_KEY, todayStr); } catch {}
     return results;
   } catch (error) {
     console.error("Error in announcement automation:", error);
@@ -34,102 +35,6 @@ export async function runAnnouncementAutomation() {
   } finally {
     isAutomationRunning = false;
   }
-}
-
-async function checkAndPostWorkAnniversaries() {
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-
-  const { data: allUsers } = await supabase
-    .from("usuarios")
-    .select("id, name, avatar, admission_date");
-
-  if (!allUsers || allUsers.length === 0) return 0;
-
-  const users = allUsers.filter(user => {
-    if (!user.admission_date) return false;
-    return user.admission_date.includes(`-${month}-${day}`);
-  });
-
-  if (users.length === 0) return 0;
-
-  let postsCreated = 0;
-  for (const user of users) {
-    if (!user.admission_date) continue;
-    
-    const admissionYear = parseInt(user.admission_date.split('-')[0]);
-    const years = currentYear - admissionYear;
-    
-    if (years <= 0) continue; 
-
-    const postTitle = `PARABÉNS PELO ANIVERSÁRIO DE EMPRESA, ${user.name.toUpperCase()}! 🎖️`;
-    
-    const { data: existingPost } = await supabase
-      .from("comunicados")
-      .select("id")
-      .eq("titulo", postTitle)
-      .gte("created_at", `${currentYear}-${month}-${day}T00:00:00`)
-      .maybeSingle();
-
-    if (!existingPost) {
-      await supabase.from("comunicados").insert([{
-        titulo: postTitle,
-        descricao: `Hoje comemoramos os ${years} ${years === 1 ? 'ano' : 'anos'} de dedicação e história do(a) ${user.name} na Carflax! 🚀\n\nÉ um orgulho ter você em nosso time. Obrigado por toda a parceria, empenho e por fazer parte da nossa trajetória. Que venham muitos outros anos de sucesso juntos! 🥂✨`,
-        filtro: "Empresa",
-        image_url: user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`,
-        tag: "Carflax",
-        likes: 0,
-        liked_by: []
-      }]);
-      postsCreated++;
-    }
-  }
-  return postsCreated;
-}
-
-async function checkAndPostEvents() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth() + 1;
-  const day = today.getDate();
-
-  const { data: events } = await supabase
-    .from("eventos_calendario")
-    .select("*")
-    .eq("year", year)
-    .eq("month", month)
-    .eq("day", day)
-    .neq("type", "follow-up");
-
-  if (!events || events.length === 0) return 0;
-
-  let postsCreated = 0;
-  for (const event of events) {
-    const postTitle = event.title.toUpperCase();
-
-    const { data: existingPost } = await supabase
-      .from("comunicados")
-      .select("id")
-      .eq("titulo", postTitle)
-      .gte("created_at", `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00`)
-      .maybeSingle();
-
-    if (!existingPost) {
-      await supabase.from("comunicados").insert([{
-        titulo: postTitle,
-        descricao: `Fiquem atentos! Hoje temos um evento importante em nossa agenda: ${event.title}. Não esqueçam de participar!`,
-        filtro: "Eventos",
-        image_url: `https://api.dicebear.com/7.x/shapes/svg?seed=${event.id}`,
-        tag: "Carflax",
-        likes: 0,
-        liked_by: []
-      }]);
-      postsCreated++;
-    }
-  }
-  return postsCreated;
 }
 
 async function checkAndPostGoalAchievements() {
@@ -155,31 +60,30 @@ async function checkAndPostGoalAchievements() {
       const sellerName = winner.NOME_VENDEDOR.toUpperCase();
       const postTitle = `META BATIDA: ${sellerName} - ${mesAno} 🏆`;
 
-      const { data: existingPost } = await supabase
+      const { data: existing } = await supabase
         .from("comunicados")
         .select("id")
         .eq("titulo", postTitle)
+        .limit(1);
+
+      if (existing && existing.length > 0) continue;
+
+      const { data: userData } = await supabase
+        .from("usuarios")
+        .select("avatar")
+        .eq("operator_code", String(winner.COD_VENDEDOR))
         .maybeSingle();
 
-      if (!existingPost) {
-        // Busca o avatar usando o código do vendedor para ser 100% preciso
-        const { data: userData } = await supabase
-          .from("usuarios")
-          .select("avatar")
-          .eq("operator_code", String(winner.COD_VENDEDOR))
-          .maybeSingle();
-
-        await supabase.from("comunicados").insert([{
-          titulo: postTitle,
-          descricao: `É com imenso orgulho que anunciamos: ${winner.NOME_VENDEDOR} ACABA DE BATER A META DE ${mesAno}! 🚀✨\n\nParabéns por todo o empenho, resiliência e foco nos resultados. Você é um exemplo de excellence para toda a equipe Carflax. Que essa conquista seja apenas o começo de um mês extraordinário! Vamos pra cima! 🥂👊`,
-          filtro: "Empresa",
-          image_url: userData?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${winner.NOME_VENDEDOR}`,
-          tag: "Carflax",
-          likes: 0,
-          liked_by: []
-        }]);
-        postsCreated++;
-      }
+      await supabase.from("comunicados").insert([{
+        titulo: postTitle,
+        descricao: `É com imenso orgulho que anunciamos: ${winner.NOME_VENDEDOR} ACABA DE BATER A META DE ${mesAno}! 🚀✨\n\nParabéns por todo o empenho, resiliência e foco nos resultados. Você é um exemplo de excellence para toda a equipe Carflax. Que essa conquista seja apenas o começo de um mês extraordinário! Vamos pra cima! 🥂👊`,
+        filtro: "Empresa",
+        image_url: userData?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${winner.NOME_VENDEDOR}`,
+        tag: "Carflax",
+        likes: 0,
+        liked_by: []
+      }]);
+      postsCreated++;
     }
     return postsCreated;
   } catch (error) {

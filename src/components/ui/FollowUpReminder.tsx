@@ -53,9 +53,9 @@ export function FollowUpReminder({ userProfile, onNavigateToFollowUps }: Props) 
         .not("lembrete_data", "is", null);
 
       const role = userProfile.role?.toUpperCase() || "";
-      const isManager = role.includes("ADMIN") || role.includes("GERENTE") || role.includes("DIRETOR");
+      const isSalesManager = role === "ADMIN" || role.includes("DIRETOR") || role.includes("GERENTE COMERCIAL") || role.includes("GERENTE DE VENDAS");
 
-      if (!isManager) {
+      if (!isSalesManager) {
         if (!operatorCode) return;
         query = query.eq("vendedor_codigo", operatorCode);
       }
@@ -81,7 +81,7 @@ export function FollowUpReminder({ userProfile, onNavigateToFollowUps }: Props) 
           const fim = `${yyyy}-${mm}-${String(today.getDate()).padStart(2, "0")}`;
 
           const params: Record<string, string> = { inicio, fim };
-          if (!isManager && operatorCode) params.vendedor = String(operatorCode);
+          if (!isSalesManager && operatorCode) params.vendedor = String(operatorCode);
 
           const orcamentos = await apiCrmOrcamentos(params).catch(() => null);
 

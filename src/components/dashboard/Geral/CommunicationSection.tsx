@@ -34,7 +34,7 @@ export interface CommunicationPost {
 }
 
 interface ComunicadoComment {
-  id: number;
+  id: string | number;
   content: string;
   author: string;
   authorAvatar: string;
@@ -43,7 +43,7 @@ interface ComunicadoComment {
   likes: number;
   liked_by: string[];
   reactions: Record<string, string[]>;
-  parent_id: number | null;
+  parent_id: string | number | null;
   replies: ComunicadoComment[];
 }
 
@@ -171,21 +171,23 @@ function CommentBubble({
   onReply,
   replyingToId,
   isReply = false,
+  parentAuthor,
 }: {
   comment: ComunicadoComment;
   currentUserId?: string;
-  openReactionPicker: number | null;
-  setOpenReactionPicker: (id: number | null) => void;
+  openReactionPicker: string | number | null;
+  setOpenReactionPicker: (id: string | number | null) => void;
   reactionPickerRef: React.RefObject<HTMLDivElement | null>;
-  onLike: (id: number, liked_by: string[], likes: number) => void;
+  onLike: (id: string | number, liked_by: string[], likes: number) => void;
   onReaction: (
-    id: number,
+    id: string | number,
     emoji: string,
     reactions: Record<string, string[]>,
   ) => void;
-  onReply: (id: number, author: string) => void;
-  replyingToId: number | null;
+  onReply: (id: string | number, author: string) => void;
+  replyingToId: string | number | null;
   isReply?: boolean;
+  parentAuthor?: string;
 }) {
   return (
     <div className={cn("flex gap-2 items-start", isReply && "ml-10")}>
@@ -202,12 +204,17 @@ function CommentBubble({
           <div
             className={cn(
               "bg-slate-100 dark:bg-slate-800/80 rounded-2xl px-3 py-2 w-fit max-w-full",
-              replyingToId === comment.id &&
+              String(replyingToId) === String(comment.id) &&
                 "ring-2 ring-blue-400 dark:ring-blue-600",
             )}
           >
             <span className="text-[11px] font-bold text-slate-900 dark:text-white block leading-none mb-1">
               {comment.author}
+              {isReply && parentAuthor && (
+                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 ml-1">
+                  ▸ {parentAuthor}
+                </span>
+              )}
             </span>
             <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug break-words">
               {comment.content}
@@ -250,13 +257,13 @@ function CommentBubble({
           <div
             className="relative"
             ref={
-              openReactionPicker === comment.id ? reactionPickerRef : undefined
+              String(openReactionPicker) === String(comment.id) ? reactionPickerRef : undefined
             }
           >
             <button
               onClick={() =>
                 setOpenReactionPicker(
-                  openReactionPicker === comment.id ? null : comment.id,
+                  String(openReactionPicker) === String(comment.id) ? null : comment.id,
                 )
               }
               className={cn(
@@ -268,7 +275,7 @@ function CommentBubble({
             >
               Curtir
             </button>
-            {openReactionPicker === comment.id && (
+            {String(openReactionPicker) === String(comment.id) && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
                 <div className="bg-card border border-border shadow-[0_4px_12px_rgba(0,0,0,0.1)] rounded-full px-1.5 py-1 flex items-center gap-1">
                   {["👍", "❤️", "😂", "👏", "😢", "🚀"].map((emoji) => (
@@ -317,6 +324,7 @@ function CommentBubble({
                 onReply={onReply}
                 replyingToId={replyingToId}
                 isReply
+                parentAuthor={comment.author}
               />
             ))}
           </div>
@@ -358,12 +366,12 @@ export function CommunicationCard({
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [openReactionPicker, setOpenReactionPicker] = useState<number | null>(
+  const [openReactionPicker, setOpenReactionPicker] = useState<string | number | null>(
     null,
   );
   const reactionPickerRef = useRef<HTMLDivElement>(null);
   const [replyingTo, setReplyingTo] = useState<{
-    id: number;
+    id: string | number;
     author: string;
   } | null>(null);
   const replyInputRef = useRef<HTMLTextAreaElement>(null);
@@ -516,21 +524,19 @@ export function CommunicationCard({
     setLoadingComments(true);
     const { data: rows } = await supabase
       .from("comunicado_comentarios")
-      .select(
-        "id, content, created_at, user_id, likes, liked_by, reactions, parent_id",
-      )
+      .select("id, content, created_at, user_id, likes, liked_by, reactions, parent_id")
       .eq("comunicado_id", data.dbId)
       .order("created_at", { ascending: true });
 
     interface DbCommentRow {
-      id: number;
+      id: string | number;
       content: string;
       created_at: string;
       user_id: string;
       likes?: number;
       liked_by?: string[];
       reactions?: Record<string, string[]>;
-      parent_id?: number | null;
+      parent_id?: string | number | null;
     }
 
     interface DbUserRow {
@@ -570,9 +576,8 @@ export function CommunicationCard({
         };
       });
 
-      // Agrupa respostas sob o comentário pai
       const topLevel: ComunicadoComment[] = [];
-      const byId = new Map<number, ComunicadoComment>(
+      const byId = new Map<string | number, ComunicadoComment>(
         mapped.map((c) => [c.id, c]),
       );
       for (const c of mapped) {
@@ -618,8 +623,24 @@ export function CommunicationCard({
     setSubmittingComment(false);
   };
 
+  const findComment = (list: ComunicadoComment[], id: string | number): ComunicadoComment | undefined => {
+    for (const c of list) {
+      if (String(c.id) === String(id)) return c;
+      const found = findComment(c.replies, id);
+      if (found) return found;
+    }
+    return undefined;
+  };
+
+  const updateCommentDeep = (list: ComunicadoComment[], id: string | number, patch: Partial<ComunicadoComment>): ComunicadoComment[] =>
+    list.map((c) =>
+      String(c.id) === String(id)
+        ? { ...c, ...patch }
+        : { ...c, replies: updateCommentDeep(c.replies, id, patch) },
+    );
+
   const handleCommentLike = async (
-    commentId: number,
+    commentId: string | number,
     currentLikedBy: string[],
     currentLikes: number,
   ) => {
@@ -633,8 +654,7 @@ export function CommunicationCard({
       ? currentLikes + 1
       : Math.max(0, currentLikes - 1);
 
-    // Remove the user from emoji reactions if they are liking
-    const comment = comments.find((c) => c.id === commentId);
+    const comment = findComment(comments, commentId);
     const newReactions = { ...(comment?.reactions || {}) };
     if (isLiking) {
       Object.keys(newReactions).forEach((e) => {
@@ -648,16 +668,11 @@ export function CommunicationCard({
     }
 
     setComments((prev) =>
-      prev.map((c) =>
-        c.id === commentId
-          ? {
-              ...c,
-              likes: newLikes,
-              liked_by: newLikedBy,
-              reactions: newReactions,
-            }
-          : c,
-      ),
+      updateCommentDeep(prev, commentId, {
+        likes: newLikes,
+        liked_by: newLikedBy,
+        reactions: newReactions,
+      }),
     );
 
     try {
@@ -675,7 +690,7 @@ export function CommunicationCard({
   };
 
   const handleCommentReaction = async (
-    commentId: number,
+    commentId: string | number,
     emoji: string,
     currentReactions: Record<string, string[]>,
   ) => {
@@ -684,7 +699,6 @@ export function CommunicationCard({
     const newReactions = { ...currentReactions };
     let hadThisReactionAlready = false;
 
-    // Remove o usuário de qualquer reação que ele já tenha dado
     Object.keys(newReactions).forEach((e) => {
       if (newReactions[e].includes(currentUserId)) {
         if (e === emoji) hadThisReactionAlready = true;
@@ -693,14 +707,12 @@ export function CommunicationCard({
       }
     });
 
-    // Se ele não tinha essa reação específica, adiciona. Se tinha, já foi removida no passo acima (toggle).
     if (!hadThisReactionAlready) {
       if (!newReactions[emoji]) newReactions[emoji] = [];
       newReactions[emoji].push(currentUserId);
     }
 
-    // Removendo do Curtir (Likes normais) se ele estiver reagindo com emoji
-    const comment = comments.find((c) => c.id === commentId);
+    const comment = findComment(comments, commentId);
     let newLikedBy = [...(comment?.liked_by || [])];
     let newLikes = comment?.likes || 0;
 
@@ -710,16 +722,11 @@ export function CommunicationCard({
     }
 
     setComments((prev) =>
-      prev.map((c) =>
-        c.id === commentId
-          ? {
-              ...c,
-              reactions: newReactions,
-              likes: newLikes,
-              liked_by: newLikedBy,
-            }
-          : c,
-      ),
+      updateCommentDeep(prev, commentId, {
+        reactions: newReactions,
+        likes: newLikes,
+        liked_by: newLikedBy,
+      }),
     );
 
     try {
@@ -1106,6 +1113,7 @@ export function CommunicationSection({
         )
       `,
       )
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
     if (!error && data) {
@@ -1225,14 +1233,14 @@ export function CommunicationSection({
     try {
       const { error } = await supabase
         .from("comunicados")
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq("id", editingId);
       if (error) throw error;
 
       showNotification(
         "success",
         "Comunicado Removido",
-        "O post foi excluído permanentemente do feed.",
+        "O post foi excluído do feed.",
       );
       await fetchComunicados(true);
       setIsModalOpen(false);

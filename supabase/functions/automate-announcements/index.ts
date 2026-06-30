@@ -110,7 +110,7 @@ Deno.serve(async () => {
       });
     }
 
-    // 2. Publicar posts
+    // 2. Publicar posts (inclui deletados na verificação para não recriar posts removidos pelo admin)
     let createdCount = 0;
     for (const post of posts) {
       const { data: exists } = await supabase
@@ -118,9 +118,9 @@ Deno.serve(async () => {
         .select("id")
         .eq("titulo", post.titulo)
         .gte("created_at", `${dateStr}T00:00:00`)
-        .maybeSingle();
+        .limit(1);
 
-      if (!exists) {
+      if (!exists || exists.length === 0) {
         await supabase.from("comunicados").insert([{
           ...post,
           likes: 0,
