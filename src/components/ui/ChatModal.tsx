@@ -276,9 +276,6 @@ export function ChatModal({
         const exists = prev.some(m => m.id === newMsg.id || (m.obs === newMsg.obs && m.enviado_por === newMsg.enviado_por));
         if (exists) return prev;
 
-        const senderName = newMsg.enviado_por_nome || "Mensagem no Chat";
-        notifyMessage(`Carflax: ${senderName}`, newMsg.obs);
-
         return [...prev, newMsg];
       });
     };

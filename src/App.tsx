@@ -69,6 +69,7 @@ function DashboardContent({
   onLogout,
 }: DashboardContentProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVendedor, setIsVendedor] = useState(false); // Mock role
   const [activeItem, setActiveItem] = useState(() => {
@@ -245,42 +246,49 @@ function DashboardContent({
     localStorage.setItem("carflax-dismissed-chats", JSON.stringify([...dismissedChatDocs]));
   }, [dismissedChatDocs]);
 
-  const [openChatDoc, setOpenChatDoc] = useState<string | null>(null);
+  const [openChatDocs, setOpenChatDocs] = useState<string[]>([]);
 
   const isCentRef = useRef(false);
-  const openChatDocRef = useRef<string | null>(openChatDoc);
+  const openChatDocsRef = useRef<string[]>(openChatDocs);
   useEffect(() => {
-    openChatDocRef.current = openChatDoc;
-  }, [openChatDoc]);
+    openChatDocsRef.current = openChatDocs;
+  }, [openChatDocs]);
 
-  const handleSelectChat = useCallback((doc: string | null) => {
-    setOpenChatDoc(doc);
-    if (doc) {
-      setActiveChats((prev) =>
-        prev.map((c) => (c.doc === doc ? { ...c, unreadCount: 0 } : c)),
-      );
-    }
+  const handleToggleChatDoc = useCallback((doc: string) => {
+    setOpenChatDocs((prev) => {
+      if (prev.includes(doc)) return prev.filter((d) => d !== doc);
+      const next = [...prev, doc];
+      if (next.length > 3) next.shift();
+      return next;
+    });
+    setActiveChats((prev) =>
+      prev.map((c) => (c.doc === doc ? { ...c, unreadCount: 0 } : c)),
+    );
   }, []);
 
-  // Marca mensagens como lidas no banco quando o usuário abre um chat
+  const handleCloseChatDoc = useCallback((doc: string) => {
+    setOpenChatDocs((prev) => prev.filter((d) => d !== doc));
+  }, []);
+
+  const markChatRead = useCallback(async (doc: string) => {
+    if (!userProfile?.id) return;
+    try {
+      let query = supabase
+        .from("crm_conversas")
+        .update({ lida: true })
+        .eq("documento", doc)
+        .eq("lida", false)
+        .neq("enviado_por", userProfile.id);
+      if (!isCentRef.current) {
+        query = query.eq("destino", userProfile.id);
+      }
+      await query;
+    } catch { /* silently fail */ }
+  }, [userProfile?.id]);
+
   useEffect(() => {
-    if (!openChatDoc || !userProfile?.id) return;
-    const markRead = async () => {
-      try {
-        let query = supabase
-          .from("crm_conversas")
-          .update({ lida: true })
-          .eq("documento", openChatDoc)
-          .eq("lida", false)
-          .neq("enviado_por", userProfile.id);
-        if (!isCentRef.current) {
-          query = query.eq("destino", userProfile.id);
-        }
-        await query;
-      } catch { /* silently fail */ }
-    };
-    markRead();
-  }, [openChatDoc, userProfile?.id]);
+    openChatDocs.forEach((doc) => markChatRead(doc));
+  }, [openChatDocs, markChatRead]);
 
   useEffect(() => {
     localStorage.setItem("carflax-active-chats", JSON.stringify(activeChats));
@@ -475,10 +483,13 @@ function DashboardContent({
       const reg = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
 
-      // Ouve mensagens do SW (clique na notificação → navega para a seção)
+      // Ouve mensagens do SW (clique na notificação → navega para a seção ou abrir chat)
       navigator.serviceWorker.onmessage = (e) => {
         if (e.data?.type === 'carflax-navigate') {
           window.dispatchEvent(new CustomEvent('carflax-change-tab', { detail: e.data.section }));
+        }
+        if (e.data?.type === 'carflax-open-chat' && e.data.documento) {
+          window.dispatchEvent(new CustomEvent('carflax-open-chat', { detail: e.data.documento }));
         }
       };
 
@@ -780,8 +791,8 @@ function DashboardContent({
             (m.destino === myId ||
               (isCentRef.current && m.destino === "todos"))
         );
-        if (primeiraComUnread && !openChatDocRef.current) {
-          handleSelectChat(primeiraComUnread.documento);
+        if (primeiraComUnread && openChatDocsRef.current.length === 0) {
+          handleToggleChatDoc(primeiraComUnread.documento);
         }
 
         // Se vendedor tem mensagem não respondida do centralizador, força o modal
@@ -801,7 +812,7 @@ function DashboardContent({
               );
               if (!respondeuDepois) {
                 setForcedChatDoc(doc);
-                handleSelectChat(doc);
+                handleToggleChatDoc(doc);
                 break;
               }
             }
@@ -900,7 +911,7 @@ function DashboardContent({
               if (existing) {
                 const updated = {
                   ...existing,
-                  unreadCount: openChatDocRef.current !== newMsg.documento ? (existing.unreadCount || 0) + 1 : 0,
+                  unreadCount: !openChatDocsRef.current.includes(newMsg.documento) ? (existing.unreadCount || 0) + 1 : 0,
                   lastMessage: newMsg.obs,
                   lastMessageTime: newMsg.timestamp,
                   ...(resolvedSellerName && resolvedSellerCode ? {
@@ -928,8 +939,8 @@ function DashboardContent({
               ];
             });
 
-            if (isForMe && !openChatDocRef.current) {
-              handleSelectChat(newMsg.documento);
+            if (isForMe && openChatDocsRef.current.length === 0) {
+              handleToggleChatDoc(newMsg.documento);
             }
 
             // Centralizador → vendedor: bloqueia a tela até responder
@@ -941,19 +952,26 @@ function DashboardContent({
               newMsg.enviado_por === centralizerIdNow
             ) {
               setForcedChatDoc(newMsg.documento);
-              handleSelectChat(newMsg.documento);
+              handleToggleChatDoc(newMsg.documento);
             }
 
             // Notificação Nativa (Chrome/Edge/Safari)
             if ("Notification" in window) {
               if (Notification.permission === "granted") {
                 try {
-                  new Notification(displayTitle, {
+                  const notif = new Notification(displayTitle, {
                     body: newMsg.obs || "Nova mensagem recebida",
-                    icon: "/favicon.svg", // Certifique-se que este arquivo existe em /public
-                    tag: "carflax-chat-msg",
+                    icon: "/favicon.svg",
+                    tag: `carflax-chat-${newMsg.documento}`,
+                    renotify: true,
                     silent: false,
                   });
+                  notif.onclick = () => {
+                    window.focus();
+                    if (!openChatDocsRef.current.includes(newMsg.documento)) {
+                      handleToggleChatDoc(newMsg.documento);
+                    }
+                  };
                 } catch (err) {
                   console.error("[CRM] Erro ao disparar notificação:", err);
                 }
@@ -1081,10 +1099,10 @@ function DashboardContent({
 
         setActiveChats((prev) => {
           if (prev.some((c) => c.doc === detail.doc)) {
-            handleSelectChat(detail.doc);
+            handleToggleChatDoc(detail.doc);
             return prev;
           }
-          handleSelectChat(detail.doc);
+          handleToggleChatDoc(detail.doc);
           return [
             ...prev,
             {
@@ -1102,14 +1120,23 @@ function DashboardContent({
     };
     window.addEventListener("open-crm-chat", handleOpenChat);
 
+    const handlePushOpenChat = (e: Event) => {
+      const doc = (e as CustomEvent<string>).detail;
+      if (doc && !openChatDocsRef.current.includes(doc)) {
+        handleToggleChatDoc(doc);
+      }
+    };
+    window.addEventListener("carflax-open-chat", handlePushOpenChat);
+
     return () => {
       supabase.removeChannel(channel);
       clearInterval(pollInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("open-crm-chat", handleOpenChat);
+      window.removeEventListener("carflax-open-chat", handlePushOpenChat);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userProfile?.id, handleSelectChat]);
+  }, [userProfile?.id, handleToggleChatDoc]);
 
   const handleActiveItemChange = (item: string) => {
     if (item === "Sugestões") {
@@ -1189,6 +1216,9 @@ function DashboardContent({
         onMobileClose={() => setIsMobileMenuOpen(false)}
         onLogout={onLogout}
         loading={geralLoading}
+        isChatOpen={isChatPanelOpen}
+        onToggleChat={() => setIsChatPanelOpen(prev => !prev)}
+        chatUnreadCount={activeChats.reduce((acc, c) => acc + (c.unreadCount || 0), 0)}
       />
 
       {isMobileMenuOpen && (
@@ -1341,20 +1371,19 @@ function DashboardContent({
       )}
 
       {/* Blur overlay when centralizador forces chat — only if the forced chat is actually open */}
-      {forcedChatDoc && openChatDoc === forcedChatDoc && activeChats.some(c => c.doc === forcedChatDoc) && (
+      {forcedChatDoc && openChatDocs.includes(forcedChatDoc) && activeChats.some(c => c.doc === forcedChatDoc) && (
         <div className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm pointer-events-auto" />
       )}
 
-      {/* Chat Center - Consolidated View */}
+      {/* Chat Center - Side Panel */}
       <ChatCenter
         activeChats={activeChats}
         onCloseChat={async (doc) => {
           if (doc === forcedChatDoc) return;
           setActiveChats((prev) => prev.filter((c) => c.doc !== doc));
           setDismissedChatDocs((prev) => new Set(prev).add(doc));
-          if (openChatDoc === doc) setOpenChatDoc(null);
+          setOpenChatDocs((prev) => prev.filter((d) => d !== doc));
 
-          // Marca como lida no banco para não voltar a notificar/abrir no reload
           if (userProfile?.id) {
             try {
               let query = supabase
@@ -1363,7 +1392,7 @@ function DashboardContent({
                 .eq("documento", doc)
                 .eq("lida", false)
                 .neq("enviado_por", userProfile.id);
-                
+
               if (!isCentralizer) {
                  query = query.eq("destino", userProfile.id);
               }
@@ -1375,8 +1404,9 @@ function DashboardContent({
         }}
         userProfile={userProfile || undefined}
         amICentralizer={isCentralizer}
-        openChatDoc={openChatDoc}
-        setOpenChatDoc={handleSelectChat}
+        openChatDocs={openChatDocs}
+        onToggleChatDoc={handleToggleChatDoc}
+        onCloseChatDoc={handleCloseChatDoc}
         onUpdateChat={(doc, data) => {
           setActiveChats((prev) =>
             prev.map((c) => (c.doc === doc ? { ...c, ...data } : c)),
@@ -1384,6 +1414,8 @@ function DashboardContent({
         }}
         forcedChatDoc={forcedChatDoc}
         onForcedChatResolved={handleForcedChatResolved}
+        isOpen={isChatPanelOpen}
+        onClose={() => setIsChatPanelOpen(false)}
       />
       <FollowUpReminder
         userProfile={userProfile}

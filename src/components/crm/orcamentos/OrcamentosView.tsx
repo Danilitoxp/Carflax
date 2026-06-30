@@ -16,7 +16,9 @@ import {
   Download,
   Tag,
   PhoneIncoming,
-  PhoneOff
+  PhoneOff,
+  MapPin,
+  Loader2
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -273,10 +275,28 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [statusObs, setStatusObs] = useState("");
   const [statusData, setStatusData] = useState("");
   const [statusEnderecoObra, setStatusEnderecoObra] = useState("");
+  const [cepLoading, setCepLoading] = useState(false);
   const [statusFechamento, setStatusFechamento] = useState("");
   const [statusEntrega, setStatusEntrega] = useState("");
   const [statusMotivoPerdido, setStatusMotivoPerdido] = useState("");
   const [lostItemsIds, setLostItemsIds] = useState<string[]>([]);
+
+  const handleEnderecoObraChange = useCallback(async (value: string) => {
+    setStatusEnderecoObra(value);
+    const digits = value.replace(/\D/g, "");
+    if (digits.length === 8 && /^\d{5}-?\d{3}$/.test(value.trim())) {
+      setCepLoading(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          const parts = [data.logradouro, data.bairro, `${data.localidade}/${data.uf}`].filter(Boolean);
+          setStatusEnderecoObra(parts.join(", "));
+        }
+      } catch { /* silêncio */ }
+      setCepLoading(false);
+    }
+  }, []);
 
   // Follow-up fields (inside "Enviado" status step)
   const [fuContatoRealizado, setFuContatoRealizado] = useState<boolean | null>(null);
@@ -719,8 +739,8 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       
       showNotification("success", "Status Atualizado", "O status e lembretes foram salvos com sucesso.");
       setIsStatusModalOpen(false);
-      setStatusObs(""); // Resetar obs após envio
-      setLostItemsIds([]); // Resetar itens selecionados
+      setStatusObs("");
+      setLostItemsIds([]);
       setFuContatoRealizado(null);
       setFuCanalContato(null);
     } catch (err) {
@@ -1490,7 +1510,17 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Endereço da Obra</label>
-                      <input type="text" placeholder="Logradouro, número, bairro..." value={statusEnderecoObra} onChange={(e) => setStatusEnderecoObra(e.target.value)} className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all placeholder:text-muted-foreground/30" />
+                      <div className="relative">
+                        <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
+                        <input
+                          type="text"
+                          placeholder="CEP ou endereço completo..."
+                          value={statusEnderecoObra}
+                          onChange={(e) => handleEnderecoObraChange(e.target.value)}
+                          className="w-full bg-secondary/40 border border-border rounded-xl pl-10 pr-10 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/5 transition-all placeholder:text-muted-foreground/30"
+                        />
+                        {cepLoading && <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-500 animate-spin" />}
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">

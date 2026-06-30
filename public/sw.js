@@ -7,9 +7,9 @@ self.addEventListener('push', event => {
       body: data.body || '',
       icon: data.icon || '/favicon.svg',
       badge: '/favicon.svg',
-      tag: data.tag || 'whatsapp',
+      tag: data.tag || 'carflax-push',
       renotify: true,
-      data: { section: data.section || 'Marketing' }
+      data: { section: data.section || 'Marketing', documento: data.documento }
     })
   );
 });
@@ -17,6 +17,7 @@ self.addEventListener('push', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const section = event.notification.data?.section || 'Marketing';
+  const documento = event.notification.data?.documento;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
@@ -24,6 +25,9 @@ self.addEventListener('notificationclick', event => {
         if ('focus' in client) {
           client.focus();
           client.postMessage({ type: 'carflax-navigate', section });
+          if (documento) {
+            client.postMessage({ type: 'carflax-open-chat', documento });
+          }
           return;
         }
       }

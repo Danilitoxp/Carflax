@@ -28,6 +28,7 @@ import {
   Crosshair,
   Package,
   Kanban,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -117,9 +118,12 @@ interface AppSidebarProps {
   onActiveItemChange: (item: string) => void;
   onLogout: () => void;
   loading?: boolean;
+  isChatOpen?: boolean;
+  onToggleChat?: () => void;
+  chatUnreadCount?: number;
 }
 
-export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout, loading }: AppSidebarProps) {
+export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout, loading, isChatOpen, onToggleChat, chatUnreadCount = 0 }: AppSidebarProps) {
   const { theme } = useTheme();
   const [openMenus, setOpenMenus] = useState<string[]>(["Dashboard"]);
 
@@ -469,25 +473,65 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
         </div>
       </div>
 
-      {/* Footer - Minimalist */}
+      {/* Footer */}
       <div className="p-4 mt-auto border-t border-border/50">
-        {/* Organograma Card - Modernized */}
+        {/* Chat Button */}
+        <button
+          onClick={onToggleChat}
+          className={cn(
+            "w-full mb-2 flex items-center rounded-xl p-3 transition-all duration-300 relative overflow-hidden group border active:scale-95",
+            isChatOpen
+              ? "bg-blue-500/10 border-blue-500/20 text-blue-500"
+              : "bg-secondary/30 hover:bg-secondary/70 text-muted-foreground hover:text-foreground dark:hover:text-slate-200 border-border",
+            isCollapsed ? "justify-center px-2" : "gap-3"
+          )}
+          title={isCollapsed ? "Conversas" : undefined}
+        >
+          <div className="relative shrink-0">
+            <MessageSquare
+              className={cn(
+                "w-5 h-5 transition-all duration-300",
+                isChatOpen ? "text-blue-500" : "opacity-70 group-hover:opacity-100 group-hover:scale-110"
+              )}
+              strokeWidth={isChatOpen ? 2 : 1.5}
+            />
+            {chatUnreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-0.5 bg-blue-600 text-white text-[8px] font-black flex items-center justify-center rounded-full shadow-lg border-2 border-card">
+                {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+              </span>
+            )}
+          </div>
+          <div className={cn(
+            "text-left overflow-hidden transition-all duration-300",
+            isCollapsed ? "w-0 opacity-0 pointer-events-none" : "w-auto opacity-100"
+          )}>
+            <p className={cn(
+              "text-[10px] font-black uppercase tracking-[0.1em] leading-none mb-0.5 whitespace-nowrap",
+              isChatOpen ? "text-blue-500" : "text-foreground/90"
+            )}>Conversas</p>
+            <p className="text-[8px] font-medium text-muted-foreground leading-tight whitespace-nowrap">
+              {chatUnreadCount > 0 ? `${chatUnreadCount} não lida${chatUnreadCount > 1 ? "s" : ""}` : "Chat Center"}
+            </p>
+          </div>
+        </button>
+
+        {/* Organograma Card */}
         <button
           onClick={() => onActiveItemChange("Organograma")}
           className={cn(
             "w-full mb-4 flex items-center bg-secondary/30 hover:bg-secondary/70 text-muted-foreground hover:text-foreground dark:hover:text-slate-200 rounded-xl p-3 transition-all duration-300 relative overflow-hidden group border border-border active:scale-95",
             isCollapsed ? "justify-center px-2" : "gap-3"
           )}
+          title={isCollapsed ? "Organograma" : undefined}
         >
-          {/* Subtle Shine Effect */}
           <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-          
-          <img 
-            src="https://cdn-icons-png.flaticon.com/512/9152/9152339.png" 
-            alt="Organograma" 
+
+          <img
+            src="https://cdn-icons-png.flaticon.com/512/9152/9152339.png"
+            alt="Organograma"
             className="w-5 h-5 transition-all duration-300 dark:invert opacity-70 group-hover:opacity-100 group-hover:scale-110 shrink-0"
           />
-          
+
           <div className={cn(
             "text-left overflow-hidden transition-all duration-300",
             isCollapsed ? "w-0 opacity-0 pointer-events-none" : "w-auto opacity-100"
@@ -503,7 +547,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
            )}>
              v2.4.0
            </span>
-           <button 
+           <button
               onClick={onLogout}
               className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all"
               title="Sair"
