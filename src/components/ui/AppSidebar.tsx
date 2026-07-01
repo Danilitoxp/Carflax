@@ -34,6 +34,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/context/theme-provider";
 import { supabase } from "@/lib/supabase";
+import { useNotification } from "@/hooks/useNotification";
 import { NAV_SECTIONS } from "@/lib/menu-config";
 
 // Prefixo usado no "value" dos subquadros da Esteira, pra não colidir com
@@ -128,6 +129,7 @@ const settingsItems: MenuItem[] = [
 
 interface AppSidebarProps {
   userProfile?: {
+    id?: string;
     name: string;
     avatar?: string;
     role?: string;
@@ -179,6 +181,44 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
   }, []);
 
   const menuItems = useMemo(() => buildMenuItems(subquadros), [subquadros]);
+
+  // ── Notificações da Esteira — toast igual às demais, sem painel/histórico ──
+  const { showNotification } = useNotification();
+
+  useEffect(() => {
+    const userId = userProfile?.id;
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`sidebar-esteira-notificacoes-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "esteira_notificacoes", filter: `destino=eq.${userId}` },
+        ({ new: n }: { new: { id: string; actor_id: string | null; card_title: string; type: "assigned" | "completed" } }) => {
+          const userCache = (window as unknown as { _carflaxUserCache?: Record<string, { name: string; avatar?: string | null }> })
+            ._carflaxUserCache;
+          const actorInfo = n.actor_id ? userCache?.[n.actor_id] : undefined;
+          const actor = actorInfo?.name || "Alguém";
+          showNotification(
+            "info",
+            n.type === "assigned" ? "Nova tarefa atribuída" : "Tarefa concluída",
+            n.type === "assigned"
+              ? `${actor} te atribuiu a tarefa "${n.card_title}"`
+              : `${actor} concluiu a tarefa "${n.card_title}"`,
+            true, // persistente — só some quando a pessoa clicar no X
+            undefined,
+            undefined,
+            actorInfo?.avatar || undefined,
+          );
+          supabase.from("esteira_notificacoes").update({ lida: true }).eq("id", n.id);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userProfile?.id, showNotification]);
 
   const userAvatar = userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}`;
 

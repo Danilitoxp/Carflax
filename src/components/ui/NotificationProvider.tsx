@@ -7,13 +7,13 @@ import { NotificationContext, type Notification, type NotificationType } from "@
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const showNotification = useCallback((type: NotificationType, title: string, message: string, persistent?: boolean, tag?: string, duration?: number) => {
+  const showNotification = useCallback((type: NotificationType, title: string, message: string, persistent?: boolean, tag?: string, duration?: number, avatarUrl?: string) => {
     const id = Math.random().toString(36).substring(2, 9);
     const notifDuration = duration || 5000;
-    
+
     setNotifications((prev) => {
       if (tag && prev.some((n) => n.tag === tag)) return prev;
-      return [...prev, { id, type, title, message, persistent, tag, duration: notifDuration }];
+      return [...prev, { id, type, title, message, persistent, tag, duration: notifDuration, avatarUrl }];
     });
 
     // Auto-remove after duration ONLY if not persistent
@@ -69,16 +69,30 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                     n.type === "info" && "bg-blue-500"
                 )} />
 
-                <div className={cn(
-                    "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
-                    n.type === "success" && "bg-emerald-50 dark:bg-emerald-500/10",
-                    n.type === "error" && "bg-red-50 dark:bg-red-500/10",
-                    n.type === "info" && "bg-blue-50 dark:bg-blue-500/10"
-                )}>
-                  {n.type === "success" && <CheckCircle2 className="w-7 h-7 text-emerald-600" />}
-                  {n.type === "error" && <AlertCircle className="w-7 h-7 text-red-600" />}
-                  {n.type === "info" && <Info className="w-7 h-7 text-blue-600" />}
-                </div>
+                {n.avatarUrl ? (
+                  <img
+                    src={n.avatarUrl}
+                    alt=""
+                    className={cn(
+                      "w-14 h-14 rounded-2xl object-cover shrink-0 shadow-sm border-2",
+                      n.type === "success" && "border-emerald-500/40",
+                      n.type === "error" && "border-red-500/40",
+                      n.type === "info" && "border-blue-500/40"
+                    )}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <div className={cn(
+                      "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
+                      n.type === "success" && "bg-emerald-50 dark:bg-emerald-500/10",
+                      n.type === "error" && "bg-red-50 dark:bg-red-500/10",
+                      n.type === "info" && "bg-blue-50 dark:bg-blue-500/10"
+                  )}>
+                    {n.type === "success" && <CheckCircle2 className="w-7 h-7 text-emerald-600" />}
+                    {n.type === "error" && <AlertCircle className="w-7 h-7 text-red-600" />}
+                    {n.type === "info" && <Info className="w-7 h-7 text-blue-600" />}
+                  </div>
+                )}
 
                 <div className="flex-1 min-w-0 pt-1">
                   <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest leading-none mb-2">{n.title}</h4>
@@ -92,18 +106,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                   <X className="w-4 h-4" />
                 </button>
 
-                {/* Animated Progress Bar */}
-                <motion.div 
-                    initial={{ width: "100%" }}
-                    animate={{ width: "0%" }}
-                    transition={{ duration: (n.duration || 5000) / 1000, ease: "linear" }}
-                    className={cn(
-                        "absolute bottom-0 left-0 h-[3px]",
-                        n.type === "success" && "bg-emerald-500/30",
-                        n.type === "error" && "bg-red-500/30",
-                        n.type === "info" && "bg-blue-500/30"
-                    )}
-                />
+                {/* Animated Progress Bar — só faz sentido se ela some sozinha */}
+                {!n.persistent && (
+                  <motion.div
+                      initial={{ width: "100%" }}
+                      animate={{ width: "0%" }}
+                      transition={{ duration: (n.duration || 5000) / 1000, ease: "linear" }}
+                      className={cn(
+                          "absolute bottom-0 left-0 h-[3px]",
+                          n.type === "success" && "bg-emerald-500/30",
+                          n.type === "error" && "bg-red-500/30",
+                          n.type === "info" && "bg-blue-500/30"
+                      )}
+                  />
+                )}
               </div>
             </motion.div>
           ))}

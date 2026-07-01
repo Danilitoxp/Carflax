@@ -401,6 +401,29 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
     return ownerId === boardOwnerId || createdBy === boardOwnerId;
   };
 
+  // Notifica uma pessoa sobre um evento da Esteira (silencioso — não trava o fluxo se falhar).
+  const notifyEsteira = async (
+    destino: string,
+    cardId: string,
+    cardTitle: string,
+    type: "assigned" | "completed",
+  ) => {
+    if (!userProfile?.id || destino === userProfile.id) return; // nunca notifica a si mesmo
+    try {
+      await supabase.from("esteira_notificacoes").insert([
+        {
+          destino,
+          actor_id: userProfile.id,
+          card_id: cardId,
+          card_title: cardTitle,
+          type,
+        },
+      ]);
+    } catch (err) {
+      console.error("[EsteiraView] Erro ao criar notificação:", err);
+    }
+  };
+
   // ── Save (Insert or Update) ───────────────────────────────────────────────
   const saveCard = async (cardData: Partial<KanbanCard>) => {
     if (!cardData.title?.trim() || !cardData.owner_id) return;
@@ -433,8 +456,10 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
         if (data && belongsToCurrentView(data.owner_id, data.created_by)) {
           setCards((prev) => [...prev, data]);
         }
+        if (data) notifyEsteira(payload.owner_id, data.id, payload.title, "assigned");
       } else {
         // UPDATE
+        const origCard = cards.find((c) => c.id === cardData.id);
         const payload = {
           title: cardData.title.trim(),
           description: cardData.description?.trim() || "",
@@ -451,6 +476,20 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
           .eq("id", cardData.id);
 
         if (error) throw error;
+
+        // Reatribuído pra outra pessoa: avisa a nova responsável.
+        if (origCard && origCard.owner_id !== payload.owner_id) {
+          notifyEsteira(payload.owner_id, cardData.id!, payload.title, "assigned");
+        }
+        // Movido pra Concluídos agora: avisa quem criou o card.
+        if (
+          origCard &&
+          origCard.column_id !== "CONCLUIDOS" &&
+          payload.column_id === "CONCLUIDOS" &&
+          origCard.created_by
+        ) {
+          notifyEsteira(origCard.created_by, cardData.id!, payload.title, "completed");
+        }
 
         const stillVisible = belongsToCurrentView(
           payload.owner_id,
@@ -611,6 +650,10 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
     newCards.sort((a, b) => a.order_index - b.order_index);
     setCards(newCards);
 
+    if (targetCard.column_id !== "CONCLUIDOS" && targetColumnId === "CONCLUIDOS" && targetCard.created_by) {
+      notifyEsteira(targetCard.created_by, targetCard.id, targetCard.title, "completed");
+    }
+
     try {
       const changedCards = newCards.filter((c) => {
         const orig = cards.find((oc) => oc.id === c.id);
@@ -712,6 +755,10 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
 
     newCards.sort((a, b) => a.order_index - b.order_index);
     setCards(newCards);
+
+    if (draggedCard.column_id !== "CONCLUIDOS" && targetColumnId === "CONCLUIDOS" && draggedCard.created_by) {
+      notifyEsteira(draggedCard.created_by, draggedCard.id, draggedCard.title, "completed");
+    }
 
     try {
       const changedCards = newCards.filter((c) => {
