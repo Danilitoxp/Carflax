@@ -25,7 +25,8 @@ interface KanbanCard {
   tag_name?: string;
   tag_color?: string;
   due_date?: string;
-  created_by_name?: string;
+  owner_id: string | null;
+  created_by: string | null;
   created_at?: string;
 }
 
@@ -91,15 +92,14 @@ const TAG_OPTIONS = [
   },
 ];
 
-const getCardCreator = (createdByField?: string) => {
-  if (!createdByField) return "Marketing";
-  return createdByField.split(" | ")[0] || "Marketing";
-};
-
-const getCardResponsible = (createdByField?: string) => {
-  if (!createdByField) return "Marketing";
-  const parts = createdByField.split(" | ");
-  return parts[1] || parts[0] || "Marketing";
+const toTitleCase = (name?: string | null) => {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 };
 
 const getCleanDescriptionText = (description?: string) => {
@@ -222,18 +222,8 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   );
   const [responsibleSearch, setResponsibleSearch] = useState("");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showBoardDropdown, setShowBoardDropdown] = useState(false);
 
-  useEffect(() => {
-    if (selectedCard) {
-      if (!selectedCard.created_by_name) {
-        setResponsibleSearch("");
-      } else {
-        setResponsibleSearch(getCardResponsible(selectedCard.created_by_name) || "");
-      }
-    } else {
-      setResponsibleSearch("");
-    }
-  }, [selectedCard]);
   const [draggedOverCardId, setDraggedOverCardId] = useState<string | null>(
     null,
   );
@@ -242,69 +232,34 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   >(null);
   const [newSubtaskText, setNewSubtaskText] = useState("");
 
-  const creatorName = userProfile?.name || "Marketing";
+  const role = userProfile?.role?.toUpperCase() || "";
+  const isManager = role.includes("ADMIN") || role.includes("GERENTE");
 
-  const getResponsibleUser = (createdByField?: string) => {
-    const responsibleName = getCardResponsible(createdByField);
-    if (!responsibleName) return null;
-    const rNameLower = responsibleName.trim().toLowerCase();
+  // Esteira sendo exibida no momento — a própria, por padrão. Gerente/admin
+  // pode trocar via seletor para acompanhar a esteira de outra pessoa.
+  const [boardOwnerId, setBoardOwnerId] = useState<string>(userProfile?.id || "");
 
-    // 1. Try exact match (case insensitive)
-    let found = usersList.find(
-      (u) => u.name.trim().toLowerCase() === rNameLower,
-    );
-    if (found) return found;
+  useEffect(() => {
+    if (userProfile?.id && !boardOwnerId) setBoardOwnerId(userProfile.id);
+  }, [userProfile?.id, boardOwnerId]);
 
-    // 2. Try prefix match
-    found = usersList.find((u) => {
-      const uNameLower = u.name.trim().toLowerCase();
-      return (
-        uNameLower.startsWith(rNameLower) || rNameLower.startsWith(uNameLower)
-      );
-    });
-    if (found) return found;
-
-    // 3. Try first name match
-    const rFirstName = rNameLower.split(" ")[0];
-    found = usersList.find(
-      (u) => u.name.trim().toLowerCase().split(" ")[0] === rFirstName,
-    );
-    return found || null;
-  };
-
-  const getCreatorUser = (createdByField?: string) => {
-    const creatorName = getCardCreator(createdByField);
-    if (!creatorName) return null;
-    const cNameLower = creatorName.trim().toLowerCase();
-
-    // 1. Try exact match (case insensitive)
-    let found = usersList.find(
-      (u) => u.name.trim().toLowerCase() === cNameLower,
-    );
-    if (found) return found;
-
-    // 2. Try prefix match
-    found = usersList.find((u) => {
-      const uNameLower = u.name.trim().toLowerCase();
-      return (
-        uNameLower.startsWith(cNameLower) || cNameLower.startsWith(uNameLower)
-      );
-    });
-    if (found) return found;
-
-    // 3. Try first name match
-    const cFirstName = cNameLower.split(" ")[0];
-    found = usersList.find(
-      (u) => u.name.trim().toLowerCase().split(" ")[0] === cFirstName,
-    );
-    return found || null;
-  };
+  useEffect(() => {
+    if (selectedCard) {
+      const owner = usersList.find((u) => u.id === selectedCard.owner_id);
+      setResponsibleSearch(toTitleCase(owner?.name));
+    } else {
+      setResponsibleSearch("");
+    }
+  }, [selectedCard, usersList]);
 
   // ── Load cards and users ──────────────────────────────────────────────────
   useEffect(() => {
-    loadCards();
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    if (boardOwnerId) loadCards();
+  }, [boardOwnerId]);
 
   useEffect(() => {
     if (!isCardModalOpen) {
@@ -345,6 +300,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
       const { data, error } = await supabase
         .from("marketing_esteira")
         .select("*")
+        .eq("owner_id", boardOwnerId)
         .order("order_index", { ascending: true });
 
       if (error) throw error;
@@ -358,16 +314,12 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
 
   // ── Save (Insert or Update) ───────────────────────────────────────────────
   const saveCard = async (cardData: Partial<KanbanCard>) => {
-    if (!cardData.title?.trim()) return;
+    if (!cardData.title?.trim() || !cardData.owner_id) return;
     setSaving(true);
 
     try {
       if (!cardData.id) {
         // INSERT
-        const selectedResp = cardData.created_by_name || creatorName;
-        const respName = getCardResponsible(selectedResp);
-        const compositeCreatedBy = `${creatorName} | ${respName}`;
-
         const payload = {
           title: cardData.title.trim(),
           description: cardData.description?.trim() || "",
@@ -378,7 +330,8 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
           tag_name: cardData.tag_name || null,
           tag_color: cardData.tag_color || null,
           due_date: cardData.due_date || null,
-          created_by_name: compositeCreatedBy,
+          owner_id: cardData.owner_id,
+          created_by: userProfile?.id || null,
         };
 
         const { data, error } = await supabase
@@ -388,15 +341,12 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
           .single();
 
         if (error) throw error;
-        if (data) setCards((prev) => [...prev, data]);
+        // Só entra na lista se pertencer à esteira que está sendo exibida agora.
+        if (data && data.owner_id === boardOwnerId) {
+          setCards((prev) => [...prev, data]);
+        }
       } else {
         // UPDATE
-        const origCard = cards.find((c) => c.id === cardData.id);
-        const origCreator = getCardCreator(origCard?.created_by_name);
-        const selectedResp = cardData.created_by_name || creatorName;
-        const respName = getCardResponsible(selectedResp);
-        const compositeCreatedBy = `${origCreator} | ${respName}`;
-
         const payload = {
           title: cardData.title.trim(),
           description: cardData.description?.trim() || "",
@@ -404,7 +354,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
           tag_name: cardData.tag_name || null,
           tag_color: cardData.tag_color || null,
           due_date: cardData.due_date || null,
-          created_by_name: compositeCreatedBy,
+          owner_id: cardData.owner_id,
         };
 
         const { error } = await supabase
@@ -413,11 +363,17 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
           .eq("id", cardData.id);
 
         if (error) throw error;
-        setCards((prev) =>
-          prev.map((c) =>
-            c.id === cardData.id ? ({ ...c, ...payload } as KanbanCard) : c,
-          ),
-        );
+
+        if (payload.owner_id === boardOwnerId) {
+          setCards((prev) =>
+            prev.map((c) =>
+              c.id === cardData.id ? ({ ...c, ...payload } as KanbanCard) : c,
+            ),
+          );
+        } else {
+          // Reatribuído para outra pessoa: some da esteira que está sendo exibida agora.
+          setCards((prev) => prev.filter((c) => c.id !== cardData.id));
+        }
       }
     } catch (err) {
       console.error("[EsteiraView] Erro ao salvar card:", err);
@@ -467,13 +423,17 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   };
 
   // ── Delete ────────────────────────────────────────────────────────────────
+  const canManageCard = (card: KanbanCard) =>
+    isManager ||
+    card.created_by === userProfile?.id ||
+    card.owner_id === userProfile?.id;
+
   const deleteCard = async (cardId: string) => {
     const card = cards.find((c) => c.id === cardId);
     if (!card) return;
 
-    const creator = getCardCreator(card.created_by_name);
-    if (creator !== creatorName) {
-      alert("Apenas o criador da tarefa pode excluí-la.");
+    if (!canManageCard(card)) {
+      alert("Você não tem permissão para excluir esta tarefa.");
       return;
     }
 
@@ -699,7 +659,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   const openNewCard = (columnId: KanbanCard["column_id"] = "A FAZER") => {
     setSelectedCard({
       column_id: columnId,
-      created_by_name: `${creatorName} | ${creatorName}`,
+      owner_id: boardOwnerId || userProfile?.id || null,
     });
     setIsViewOnly(false);
     setIsCardModalOpen(true);
@@ -708,6 +668,85 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-background text-foreground p-6 overflow-hidden relative font-sans">
+      {/* Seletor de esteira — só para gerente/admin acompanhar a equipe */}
+      {isManager && (
+        <div className="flex items-center gap-3 mb-4 shrink-0">
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            Esteira de
+          </span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowBoardDropdown((v) => !v)}
+              onBlur={() => setTimeout(() => setShowBoardDropdown(false), 150)}
+              className="flex items-center gap-2 bg-secondary border border-border rounded-xl pl-2 pr-3 py-1.5 min-w-[190px] text-sm font-semibold hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            >
+              {(() => {
+                const isMe = boardOwnerId === userProfile?.id;
+                const current = usersList.find((u) => u.id === boardOwnerId);
+                return (
+                  <>
+                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0 border border-border/40">
+                      {!isMe && current?.avatar ? (
+                        <img src={current.avatar} alt={current.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-3.5 h-3.5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <span className="truncate flex-1 text-left">
+                      {isMe ? "Minha esteira" : toTitleCase(current?.name)}
+                    </span>
+                  </>
+                );
+              })()}
+              <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${showBoardDropdown ? "rotate-180" : ""}`} />
+            </button>
+
+            {showBoardDropdown && (
+              <div className="absolute z-50 left-0 mt-1 w-64 max-h-72 overflow-y-auto bg-card border border-border rounded-xl shadow-xl custom-scrollbar flex flex-col py-1">
+                {userProfile?.id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBoardOwnerId(userProfile.id!);
+                      setShowBoardDropdown(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 hover:bg-secondary text-sm font-semibold transition-colors flex items-center gap-2 ${
+                      boardOwnerId === userProfile.id ? "text-primary" : ""
+                    }`}
+                  >
+                    <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span>Minha esteira</span>
+                  </button>
+                )}
+                {usersList
+                  .filter((u) => u.id !== userProfile?.id)
+                  .map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => {
+                        setBoardOwnerId(u.id);
+                        setShowBoardDropdown(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 hover:bg-secondary text-sm font-semibold transition-colors flex items-center gap-2 ${
+                        boardOwnerId === u.id ? "text-primary" : ""
+                      }`}
+                    >
+                      {u.avatar ? (
+                        <img src={u.avatar} alt={u.name} className="w-5 h-5 rounded-full object-cover border border-border/40 shrink-0" />
+                      ) : (
+                        <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                      )}
+                      <span className="truncate">{toTitleCase(u.name)}</span>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* KANBAN BOARD */}
       <div className="flex-1 overflow-x-auto min-h-0 flex gap-4 pr-1 pb-4 select-none custom-scrollbar">
         {COLUMNS.map((col) => {
@@ -846,8 +885,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                           </div>
 
                           <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {getCardCreator(card.created_by_name) ===
-                            creatorName ? (
+                            {canManageCard(card) ? (
                               <>
                                 <button
                                   onClick={(e) => {
@@ -992,13 +1030,12 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                           <div className="flex items-center gap-1.5 shrink-0">
                             {/* Creator Avatar */}
                             {(() => {
-                              const creatorUser = getCreatorUser(
-                                card.created_by_name,
+                              const creatorUser = usersList.find(
+                                (u) => u.id === card.created_by,
                               );
                               const creatorAvatar = creatorUser?.avatar;
                               const creatorDisplayName =
-                                creatorUser?.name ||
-                                getCardCreator(card.created_by_name);
+                                toTitleCase(creatorUser?.name) || "Marketing";
 
                               return (
                                 <div
@@ -1028,13 +1065,12 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
 
                             {/* Responsible Avatar */}
                             {(() => {
-                              const responsibleUser = getResponsibleUser(
-                                card.created_by_name,
+                              const responsibleUser = usersList.find(
+                                (u) => u.id === card.owner_id,
                               );
                               const userAvatar = responsibleUser?.avatar;
                               const displayName =
-                                responsibleUser?.name ||
-                                getCardResponsible(card.created_by_name);
+                                toTitleCase(responsibleUser?.name) || "Marketing";
 
                               return (
                                 <div
@@ -1370,9 +1406,10 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                       onChange={(e) => {
                         setResponsibleSearch(e.target.value);
                         setShowUserDropdown(true);
+                        // Texto livre não corresponde a um usuário até selecionar na lista.
                         setSelectedCard(prev => prev ? {
                           ...prev,
-                          created_by_name: e.target.value
+                          owner_id: null
                         } : null);
                       }}
                       onFocus={() => {
@@ -1397,10 +1434,10 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                             key={user.id}
                             type="button"
                             onClick={() => {
-                              setResponsibleSearch(user.name);
+                              setResponsibleSearch(toTitleCase(user.name));
                               setSelectedCard(prev => prev ? {
                                 ...prev,
-                                created_by_name: user.name
+                                owner_id: user.id
                               } : null);
                               setShowUserDropdown(false);
                             }}
@@ -1411,7 +1448,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                             ) : (
                               <User className="w-4 h-4 text-muted-foreground" />
                             )}
-                            <span>{user.name}</span>
+                            <span>{toTitleCase(user.name)}</span>
                           </button>
                         ))
                       ) : (
@@ -1523,7 +1560,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                     </button>
                     <button
                       onClick={() => saveCard(selectedCard)}
-                      disabled={saving || !selectedCard.title?.trim()}
+                      disabled={saving || !selectedCard.title?.trim() || !selectedCard.owner_id}
                       className="flex-1 py-3 bg-primary text-primary-foreground font-black text-xs rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {saving ? "Salvando..." : "Salvar"}

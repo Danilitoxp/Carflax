@@ -24,6 +24,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Produtos" },
     ],
   },
+  { label: "Esteira", permGroup: "ESSENCIAL" },
   {
     label: "Calendário",
     permGroup: "CALENDÁRIO",
@@ -50,7 +51,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Whatsapp Go" },
       { label: "Leads" },
       { label: "Cronograma" },
-      { label: "Esteira" },
       { label: "Pós-Venda" },
       { label: "Relatórios", value: "Relatórios Mkt" },
     ],

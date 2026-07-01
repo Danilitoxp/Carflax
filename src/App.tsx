@@ -32,6 +32,7 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { OrgChartView } from "@/components/ui/OrgChartModal";
 import { SqlRunnerView } from "@/components/admin/SqlRunnerView";
 import { MarketingView } from "@/components/marketing/MarketingView";
+import { EsteiraView } from "@/components/marketing/EsteiraView";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { SorteioRealtimeModal } from "@/components/ui/SorteioRealtimeModal";
@@ -1190,7 +1191,6 @@ function DashboardContent({
     "Whatsapp Go",
     "Cronograma",
     "Leads",
-    "Esteira",
     "Pós-Venda",
     "Relatórios Mkt",
   ].includes(activeItem);
@@ -1275,6 +1275,8 @@ function DashboardContent({
             <CrmSection activeTab={activeItem} userProfile={userProfile || undefined} />
           ) : isMarketingView ? (
             <MarketingView activeTab={activeItem} userProfile={userProfile || undefined} />
+          ) : activeItem === "Esteira" ? (
+            <EsteiraView userProfile={userProfile || undefined} />
           ) : ["Entregas", "Romaneios"].includes(activeItem) ? (
             <EntregasView activeTab={activeItem} userProfile={userProfile || undefined} />
           ) : ["Coletor", "Painel Coletor"].includes(activeItem) ? (

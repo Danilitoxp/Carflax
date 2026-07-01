@@ -150,13 +150,13 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
       "Meu Perfil", "Aparência", "Notificações", "Segurança",
       "Dashboard", "Geral", "Produtos",
       "Calendário", "Eventos", "Férias",
-      "Sugestões"
+      "Esteira", "Sugestões"
     ];
     if (alwaysAllowed.includes(label)) return true;
 
     // Permissões específicas do departamento de MARKETING
     const isMarketingDept = userProfile?.department?.toUpperCase() === 'MARKETING';
-    const marketingItems = ["Marketing", "Whatsapp Evolution", "Whatsapp Oficial", "Leads", "Cronograma", "Esteira", "Relatórios Mkt"];
+    const marketingItems = ["Marketing", "Whatsapp Evolution", "Whatsapp Oficial", "Leads", "Cronograma", "Relatórios Mkt"];
     if (isMarketingDept && marketingItems.includes(label)) return true;
 
     // Permissões específicas do departamento de VENDAS
