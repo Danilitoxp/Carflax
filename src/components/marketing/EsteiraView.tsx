@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   Trash2,
@@ -252,22 +252,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     }
   }, [selectedCard, usersList]);
 
-  // ── Load cards and users ──────────────────────────────────────────────────
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  useEffect(() => {
-    if (boardOwnerId) loadCards();
-  }, [boardOwnerId]);
-
-  useEffect(() => {
-    if (!isCardModalOpen) {
-      setNewSubtaskText("");
-    }
-  }, [isCardModalOpen]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("usuarios")
@@ -292,9 +277,9 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
         );
       }
     }
-  };
+  }, []);
 
-  const loadCards = async () => {
+  const loadCards = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -310,7 +295,22 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [boardOwnerId]);
+
+  // ── Load cards and users ──────────────────────────────────────────────────
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    if (boardOwnerId) loadCards();
+  }, [boardOwnerId, loadCards]);
+
+  useEffect(() => {
+    if (!isCardModalOpen) {
+      setNewSubtaskText("");
+    }
+  }, [isCardModalOpen]);
 
   // ── Save (Insert or Update) ───────────────────────────────────────────────
   const saveCard = async (cardData: Partial<KanbanCard>) => {
@@ -1028,59 +1028,33 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Creator Avatar */}
                             {(() => {
                               const creatorUser = usersList.find(
                                 (u) => u.id === card.created_by,
                               );
-                              const creatorAvatar = creatorUser?.avatar;
-                              const creatorDisplayName =
-                                toTitleCase(creatorUser?.name) || "Marketing";
-
-                              return (
-                                <div
-                                  className="flex items-center gap-1.5 bg-secondary/50 pl-1.5 pr-2 py-0.5 rounded-lg border border-border/30 shrink-0"
-                                  title={`Criado por: ${creatorDisplayName}`}
-                                >
-                                  {creatorAvatar ? (
-                                    <img
-                                      src={creatorAvatar}
-                                      alt={creatorDisplayName}
-                                      className="w-4.5 h-4.5 rounded-full object-cover border border-border/40 shrink-0"
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = "none";
-                                      }}
-                                    />
-                                  ) : (
-                                    <User className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
-                                  )}
-                                  <span className="truncate max-w-[50px] text-[9.5px] uppercase tracking-wider text-muted-foreground/85 font-bold">
-                                    {creatorDisplayName.split(" ")[0]}
-                                  </span>
-                                </div>
-                              );
-                            })()}
-
-                            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/35 shrink-0" />
-
-                            {/* Responsible Avatar */}
-                            {(() => {
                               const responsibleUser = usersList.find(
                                 (u) => u.id === card.owner_id,
                               );
-                              const userAvatar = responsibleUser?.avatar;
-                              const displayName =
+                              const creatorDisplayName =
+                                toTitleCase(creatorUser?.name) || "Marketing";
+                              const responsibleDisplayName =
                                 toTitleCase(responsibleUser?.name) || "Marketing";
+                              const selfAssigned =
+                                !!card.created_by && card.created_by === card.owner_id;
 
-                              return (
+                              const ResponsibleBadge = (
                                 <div
                                   className="flex items-center gap-1.5 bg-primary/10 pl-1.5 pr-2 py-0.5 rounded-lg border border-primary/20 shrink-0"
-                                  title={`Responsável: ${displayName}`}
+                                  title={
+                                    selfAssigned
+                                      ? `Criado por: ${responsibleDisplayName}`
+                                      : `Responsável: ${responsibleDisplayName}`
+                                  }
                                 >
-                                  {userAvatar ? (
+                                  {responsibleUser?.avatar ? (
                                     <img
-                                      src={userAvatar}
-                                      alt={displayName}
+                                      src={responsibleUser.avatar}
+                                      alt={responsibleDisplayName}
                                       className="w-4.5 h-4.5 rounded-full object-cover border border-border/40 shrink-0"
                                       onError={(e) => {
                                         e.currentTarget.style.display = "none";
@@ -1090,9 +1064,39 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                                     <User className="w-3.5 h-3.5 text-primary/70 shrink-0" />
                                   )}
                                   <span className="truncate max-w-[50px] text-[9.5px] uppercase tracking-wider text-primary/95 font-black">
-                                    {displayName.split(" ")[0]}
+                                    {responsibleDisplayName.split(" ")[0]}
                                   </span>
                                 </div>
+                              );
+
+                              // Criador === responsável: mostra só um avatar, sem o "X -> X" redundante.
+                              if (selfAssigned) return ResponsibleBadge;
+
+                              return (
+                                <>
+                                  <div
+                                    className="flex items-center gap-1.5 bg-secondary/50 pl-1.5 pr-2 py-0.5 rounded-lg border border-border/30 shrink-0"
+                                    title={`Criado por: ${creatorDisplayName}`}
+                                  >
+                                    {creatorUser?.avatar ? (
+                                      <img
+                                        src={creatorUser.avatar}
+                                        alt={creatorDisplayName}
+                                        className="w-4.5 h-4.5 rounded-full object-cover border border-border/40 shrink-0"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = "none";
+                                        }}
+                                      />
+                                    ) : (
+                                      <User className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+                                    )}
+                                    <span className="truncate max-w-[50px] text-[9.5px] uppercase tracking-wider text-muted-foreground/85 font-bold">
+                                      {creatorDisplayName.split(" ")[0]}
+                                    </span>
+                                  </div>
+                                  <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/35 shrink-0" />
+                                  {ResponsibleBadge}
+                                </>
                               );
                             })()}
                           </div>
