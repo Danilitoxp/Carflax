@@ -68,7 +68,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "Relatórios Mkt": FileBarChart,
   Marketing: Megaphone,
   "Whatsapp Evolution": Smartphone,
-  "Whatsapp Oficial": Smartphone,
   Leads: Users,
   Cronograma: Calendar,
   Esteira: Kanban,
@@ -252,7 +251,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
 
     // Permissões específicas do departamento de MARKETING
     const isMarketingDept = userProfile?.department?.toUpperCase() === 'MARKETING';
-    const marketingItems = ["Marketing", "Whatsapp Evolution", "Whatsapp Oficial", "Leads", "Cronograma", "Relatórios Mkt"];
+    const marketingItems = ["Marketing", "Whatsapp Evolution", "Leads", "Cronograma", "Relatórios Mkt"];
     if (isMarketingDept && marketingItems.includes(label)) return true;
 
     // Permissões específicas do departamento de VENDAS

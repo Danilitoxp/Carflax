@@ -1191,7 +1191,6 @@ function DashboardContent({
   const isMarketingView = [
     "Marketing",
     "Whatsapp Evolution",
-    "Whatsapp Oficial",
     "Whatsapp Go",
     "Cronograma",
     "Leads",

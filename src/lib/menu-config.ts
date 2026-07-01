@@ -47,7 +47,6 @@ export const NAV_SECTIONS: NavSection[] = [
     permGroup: "MARKETING",
     subItems: [
       { label: "Whatsapp Evolution" },
-      { label: "Whatsapp Oficial" },
       { label: "Whatsapp Go" },
       { label: "Leads" },
       { label: "Cronograma" },
