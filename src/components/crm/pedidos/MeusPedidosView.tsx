@@ -13,6 +13,9 @@ import {
   MessageSquare,
   CheckCircle2,
   User,
+  Boxes,
+  X,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +89,20 @@ interface FaturamentoOrder {
   FGO_CONPAG: string | null;
 }
 
+interface PedidoItem {
+  FDO_CODITE: string;
+  FDO_DESCRI: string;
+  FDO_QTDITE: number;
+  ITE_LOCFIS: string | null;
+  ITE_CODBAR: string | null;
+}
+
+interface ItemsModalTarget {
+  pedido: string;
+  empresa: string;
+  cliente: string;
+}
+
 interface UserProfile {
   id?: string;
   name: string;
@@ -156,6 +173,7 @@ export function MeusPedidosView({ userProfile }: Props) {
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [usersCache, setUsersCache] = useState<Map<string, { name: string; avatar: string }>>(new Map());
   const [namesToCodesCache, setNamesToCodesCache] = useState<Map<string, string>>(new Map());
+  const [itemsModalTarget, setItemsModalTarget] = useState<ItemsModalTarget | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -461,7 +479,12 @@ export function MeusPedidosView({ userProfile }: Props) {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 mb-6">
                       {filteredSeparated.map((order, idx) => (
-                        <SeparatedOrderCard key={`conf-${order.PEDIDO}-${idx}`} order={order} namesToCodesCache={namesToCodesCache} />
+                        <SeparatedOrderCard
+                          key={`conf-${order.PEDIDO}-${idx}`}
+                          order={order}
+                          namesToCodesCache={namesToCodesCache}
+                          onViewItems={() => setItemsModalTarget({ pedido: order.PEDIDO, empresa: order.FGO_CODEMP, cliente: order.CLIENTE })}
+                        />
                       ))}
                     </div>
                   </>
@@ -476,7 +499,11 @@ export function MeusPedidosView({ userProfile }: Props) {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 mb-6">
                       {filteredFaturamento.map((order, idx) => (
-                        <FaturamentoOrderCard key={`fat-${order.FGO_NUMDOC}-${order.FGO_CODEMP}-${idx}`} order={order} />
+                        <FaturamentoOrderCard
+                          key={`fat-${order.FGO_NUMDOC}-${order.FGO_CODEMP}-${idx}`}
+                          order={order}
+                          onViewItems={() => setItemsModalTarget({ pedido: order.FGO_NUMDOC, empresa: order.FGO_CODEMP, cliente: order.NOME_CLIENTE })}
+                        />
                       ))}
                     </div>
                   </>
@@ -503,7 +530,12 @@ export function MeusPedidosView({ userProfile }: Props) {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                     {filteredOrders.map((order, idx) => (
-                      <OrderCard key={`${order.FGO_CODEMP}-${order.FGO_NUMDOC}-${idx}`} order={order} usersCache={usersCache} />
+                      <OrderCard
+                        key={`${order.FGO_CODEMP}-${order.FGO_NUMDOC}-${idx}`}
+                        order={order}
+                        usersCache={usersCache}
+                        onViewItems={() => setItemsModalTarget({ pedido: order.FGO_NUMDOC, empresa: order.FGO_CODEMP, cliente: order.NOME_CLIENTE })}
+                      />
                     ))}
                   </div>
                 )}
@@ -521,6 +553,96 @@ export function MeusPedidosView({ userProfile }: Props) {
           </>
         )}
       </div>
+
+      {itemsModalTarget && (
+        <ItemsModal target={itemsModalTarget} onClose={() => setItemsModalTarget(null)} />
+      )}
+    </div>
+  );
+}
+
+/* ─── Modal: itens do pedido ──────────────────────────────────── */
+
+function ItemsModal({ target, onClose }: { target: ItemsModalTarget; onClose: () => void }) {
+  const [items, setItems] = useState<PedidoItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_SERVER}/api/coletor/separacao?pedido=${encodeURIComponent(target.pedido)}&empresa=${encodeURIComponent(target.empresa)}&tipo=conferencia`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success) setItems(res.data || []);
+        else setError(true);
+      })
+      .catch(() => { if (!cancelled) setError(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [target.pedido, target.empresa]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg max-h-[80vh] rounded-xl border border-border bg-card flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-2 p-4 border-b border-border/50">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Boxes className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-sm font-bold text-foreground">Itens do Pedido #{String(Number(target.pedido))}</span>
+            </div>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">{target.cliente}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-1.5 scrollbar-hide">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <span className="text-xs text-muted-foreground">Carregando itens...</span>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <AlertTriangle className="w-8 h-8 mb-2 opacity-30" />
+              <p className="text-sm font-semibold">Erro ao carregar itens</p>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Boxes className="w-8 h-8 mb-2 opacity-30" />
+              <p className="text-sm font-semibold">Nenhum item encontrado</p>
+            </div>
+          ) : (
+            items.map((item, i) => (
+              <div key={i} className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-muted/40 border border-border/30">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-foreground truncate">{item.FDO_DESCRI}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] text-muted-foreground">Cód: {item.FDO_CODITE}</span>
+                    {item.ITE_LOCFIS && (
+                      <span className="text-[10px] text-muted-foreground">· Local: {item.ITE_LOCFIS}</span>
+                    )}
+                  </div>
+                </div>
+                <span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                  {item.FDO_QTDITE}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+
+        {!loading && !error && items.length > 0 && (
+          <div className="p-3 border-t border-border/50 text-[11px] text-muted-foreground text-center">
+            {items.length} ite{items.length > 1 ? "ns" : "m"}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -530,9 +652,11 @@ export function MeusPedidosView({ userProfile }: Props) {
 function SeparatedOrderCard({
   order,
   namesToCodesCache,
+  onViewItems,
 }: {
   order: ConferenciaOrder;
   namesToCodesCache: Map<string, string>;
+  onViewItems: () => void;
 }) {
   const tipoInfo = getTipoInfo(order.TIPO, order.TIPO_MOVIMENTACAO, order.LOCAL_RETIRADA);
   const numDoc = String(order.PEDIDO).trim();
@@ -554,6 +678,13 @@ function SeparatedOrderCard({
         </div>
         {/* Status and Chat */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={onViewItems}
+            className="p-1.5 rounded-md bg-muted hover:bg-muted/70 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            title="Ver itens do pedido"
+          >
+            <Boxes className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={() => {
               window.dispatchEvent(
@@ -636,7 +767,7 @@ function SeparatedOrderCard({
 
 /* ─── Card: pedido aguardando faturamento ────────────────────── */
 
-function FaturamentoOrderCard({ order }: { order: FaturamentoOrder }) {
+function FaturamentoOrderCard({ order, onViewItems }: { order: FaturamentoOrder; onViewItems: () => void }) {
   const tipoInfo = getTipoInfo("", order.TIPO_MOVIMENTACAO, order.LOCAL_RETIRADA);
   const numDoc = String(order.FGO_NUMDOC).trim();
 
@@ -666,6 +797,13 @@ function FaturamentoOrderCard({ order }: { order: FaturamentoOrder }) {
         </div>
         {/* Status and Chat */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={onViewItems}
+            className="p-1.5 rounded-md bg-muted hover:bg-muted/70 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            title="Ver itens do pedido"
+          >
+            <Boxes className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={() => {
               window.dispatchEvent(
@@ -761,7 +899,15 @@ function FaturamentoOrderCard({ order }: { order: FaturamentoOrder }) {
 
 /* ─── Card: pedido em separação / aguardando ─────────────────── */
 
-function OrderCard({ order, usersCache }: { order: Order; usersCache: Map<string, { name: string; avatar: string }> }) {
+function OrderCard({
+  order,
+  usersCache,
+  onViewItems,
+}: {
+  order: Order;
+  usersCache: Map<string, { name: string; avatar: string }>;
+  onViewItems: () => void;
+}) {
   const delivery = getTipoInfo("", order.TIPO_MOVIMENTACAO, order.LOCAL_RETIRADA);
   const pct = order.qtdeTotal > 0 ? Math.round((order.qtdeSeparada / order.qtdeTotal) * 100) : 0;
   const operatorInfo = usersCache.get(order.separatorCode) || null;
@@ -812,27 +958,36 @@ function OrderCard({ order, usersCache }: { order: Order; usersCache: Map<string
           </div>
           <p className="text-sm font-semibold text-foreground mt-1 truncate">{order.NOME_CLIENTE}</p>
         </div>
-        {/* Chat button */}
-        <button
-          onClick={() => {
-            const numDoc = String(order.FGO_NUMDOC).trim();
-            window.dispatchEvent(
-              new CustomEvent("open-crm-chat", {
-                detail: {
-                  doc: numDoc,
-                  title: order.NOME_CLIENTE,
-                  sellerName: order.separatorName || order.NOME_SEPARADOR || "Separador",
-                  sellerCode: order.separatorCode || order.CODIGO_SEPARADOR || "",
-                },
-              })
-            );
-          }}
-          className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/15 hover:bg-primary/25 text-primary text-[10px] font-semibold transition-colors shrink-0"
-          title="Conversar"
-        >
-          <MessageSquare className="w-3.5 h-3.5" />
-          <span>Mensagem</span>
-        </button>
+        {/* Chat + items buttons */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={onViewItems}
+            className="p-1.5 rounded-md bg-muted hover:bg-muted/70 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            title="Ver itens do pedido"
+          >
+            <Boxes className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => {
+              const numDoc = String(order.FGO_NUMDOC).trim();
+              window.dispatchEvent(
+                new CustomEvent("open-crm-chat", {
+                  detail: {
+                    doc: numDoc,
+                    title: order.NOME_CLIENTE,
+                    sellerName: order.separatorName || order.NOME_SEPARADOR || "Separador",
+                    sellerCode: order.separatorCode || order.CODIGO_SEPARADOR || "",
+                  },
+                })
+              );
+            }}
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/15 hover:bg-primary/25 text-primary text-[10px] font-semibold transition-colors shrink-0"
+            title="Conversar"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Mensagem</span>
+          </button>
+        </div>
       </div>
 
       {/* Status */}

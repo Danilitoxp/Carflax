@@ -20,8 +20,8 @@ interface SupabaseUser {
   company: string;
 }
 
-const now = new Date();
-const MES_NOME = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+// Campanha encerrada: período fixo de junho/2026 (ver amancoHandler.js no backend)
+const MES_NOME = "junho de 2026";
 
 const MEDAL_COLORS = [
   { bg: "from-amber-400 to-yellow-500",  text: "text-amber-950", shadow: "shadow-amber-400/40",  border: "border-amber-400/50" },
