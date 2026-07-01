@@ -33,6 +33,7 @@ import { OrgChartView } from "@/components/ui/OrgChartModal";
 import { SqlRunnerView } from "@/components/admin/SqlRunnerView";
 import { MarketingView } from "@/components/marketing/MarketingView";
 import { EsteiraView } from "@/components/marketing/EsteiraView";
+import { ESTEIRA_SUBQUADRO_PREFIX } from "@/components/ui/AppSidebar";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { SorteioRealtimeModal } from "@/components/ui/SorteioRealtimeModal";
@@ -1275,8 +1276,13 @@ function DashboardContent({
             <CrmSection activeTab={activeItem} userProfile={userProfile || undefined} />
           ) : isMarketingView ? (
             <MarketingView activeTab={activeItem} userProfile={userProfile || undefined} />
-          ) : activeItem === "Esteira" ? (
+          ) : activeItem === "Esteira" || activeItem === "Minha Esteira" ? (
             <EsteiraView userProfile={userProfile || undefined} />
+          ) : activeItem.startsWith(ESTEIRA_SUBQUADRO_PREFIX) ? (
+            <EsteiraView
+              userProfile={userProfile || undefined}
+              subquadroId={activeItem.slice(ESTEIRA_SUBQUADRO_PREFIX.length)}
+            />
           ) : ["Entregas", "Romaneios"].includes(activeItem) ? (
             <EntregasView activeTab={activeItem} userProfile={userProfile || undefined} />
           ) : ["Coletor", "Painel Coletor"].includes(activeItem) ? (

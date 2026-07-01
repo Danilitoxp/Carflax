@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus,
   Trash2,
@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  Users,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -36,8 +37,18 @@ interface UserProfile {
   role: string;
 }
 
+interface EsteiraUser {
+  id: string;
+  name: string;
+  avatar?: string;
+  department: string | null;
+}
+
 interface EsteiraViewProps {
   userProfile?: UserProfile | null;
+  // Quando presente, mostra o quadro de equipe do subquadro (agrega os cards
+  // de todo mundo que faz parte dele), em vez da esteira pessoal.
+  subquadroId?: string;
 }
 
 const COLUMNS: {
@@ -91,6 +102,8 @@ const TAG_OPTIONS = [
     color: "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20",
   },
 ];
+
+const SEM_SETOR = "Sem setor";
 
 const toTitleCase = (name?: string | null) => {
   if (!name) return "";
@@ -196,11 +209,11 @@ const deleteSubtaskFromDescription = (
   return lines.join("\n");
 };
 
-export function EsteiraView({ userProfile }: EsteiraViewProps) {
+export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
+  const isSubquadroView = !!subquadroId;
+  const [subquadro, setSubquadro] = useState<{ id: string; name: string } | null>(null);
   const [cards, setCards] = useState<KanbanCard[]>([]);
-  const [usersList, setUsersList] = useState<
-    { id: string; name: string; avatar?: string }[]
-  >([]);
+  const [usersList, setUsersList] = useState<EsteiraUser[]>([]);
   const [isViewOnly, setIsViewOnly] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>(
     {},
@@ -234,14 +247,58 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
 
   const role = userProfile?.role?.toUpperCase() || "";
   const isManager = role.includes("ADMIN") || role.includes("GERENTE");
+  const [isCreateSubquadroOpen, setIsCreateSubquadroOpen] = useState(false);
+  const [isAddPeopleOpen, setIsAddPeopleOpen] = useState(false);
 
   // Esteira sendo exibida no momento — a própria, por padrão. Gerente/admin
   // pode trocar via seletor para acompanhar a esteira de outra pessoa.
   const [boardOwnerId, setBoardOwnerId] = useState<string>(userProfile?.id || "");
 
+  // Usuários (exceto eu) agrupados por setor, pra organizar o seletor de esteira.
+  const usersByDepartment = useMemo(() => {
+    const groups = new Map<string, EsteiraUser[]>();
+    usersList
+      .filter((u) => u.id !== userProfile?.id)
+      .forEach((u) => {
+        const dept = u.department?.trim() || SEM_SETOR;
+        if (!groups.has(dept)) groups.set(dept, []);
+        groups.get(dept)!.push(u);
+      });
+    return Array.from(groups.entries()).sort(([a], [b]) => {
+      if (a === SEM_SETOR) return 1;
+      if (b === SEM_SETOR) return -1;
+      return a.localeCompare(b);
+    });
+  }, [usersList, userProfile?.id]);
+
+  // Membros do subquadro atual (quando estamos numa visão de equipe).
+  const subquadroMembers = useMemo(() => {
+    if (!subquadro) return [];
+    return usersList.filter((u) => u.department?.trim() === subquadro.name);
+  }, [usersList, subquadro]);
+
   useEffect(() => {
-    if (userProfile?.id && !boardOwnerId) setBoardOwnerId(userProfile.id);
-  }, [userProfile?.id, boardOwnerId]);
+    if (!subquadroId) {
+      setSubquadro(null);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("esteira_subquadros")
+      .select("id, name")
+      .eq("id", subquadroId)
+      .single()
+      .then(({ data, error }) => {
+        if (!cancelled && !error) setSubquadro(data);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [subquadroId]);
+
+  useEffect(() => {
+    if (!isSubquadroView && userProfile?.id && !boardOwnerId) setBoardOwnerId(userProfile.id);
+  }, [userProfile?.id, boardOwnerId, isSubquadroView]);
 
   useEffect(() => {
     if (selectedCard) {
@@ -256,7 +313,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     try {
       const { data, error } = await supabase
         .from("usuarios")
-        .select("id, name, avatar")
+        .select("id, name, avatar, department")
         .eq("status", "ativo")
         .order("name");
 
@@ -267,7 +324,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
       try {
         const { data } = await supabase
           .from("usuarios")
-          .select("id, name, avatar")
+          .select("id, name, avatar, department")
           .order("name");
         setUsersList(data || []);
       } catch (fallbackErr) {
@@ -282,10 +339,29 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   const loadCards = useCallback(async () => {
     setLoading(true);
     try {
+      if (isSubquadroView) {
+        // Quadro de equipe: agrega os cards de todo mundo que faz parte do subquadro.
+        const memberIds = subquadroMembers.map((u) => u.id);
+        if (memberIds.length === 0) {
+          setCards([]);
+          return;
+        }
+        const { data, error } = await supabase
+          .from("marketing_esteira")
+          .select("*")
+          .in("owner_id", memberIds)
+          .order("order_index", { ascending: true });
+        if (error) throw error;
+        setCards(data || []);
+        return;
+      }
+
+      // Mostra cards em que a pessoa é a responsável OU a criadora (pra poder
+      // acompanhar o andamento do que ela delegou pra outra pessoa).
       const { data, error } = await supabase
         .from("marketing_esteira")
         .select("*")
-        .eq("owner_id", boardOwnerId)
+        .or(`owner_id.eq.${boardOwnerId},created_by.eq.${boardOwnerId}`)
         .order("order_index", { ascending: true });
 
       if (error) throw error;
@@ -295,7 +371,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [boardOwnerId]);
+  }, [boardOwnerId, isSubquadroView, subquadroMembers]);
 
   // ── Load cards and users ──────────────────────────────────────────────────
   useEffect(() => {
@@ -303,14 +379,27 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   }, [fetchUsers]);
 
   useEffect(() => {
-    if (boardOwnerId) loadCards();
-  }, [boardOwnerId, loadCards]);
+    if (isSubquadroView) {
+      if (subquadro) loadCards();
+    } else if (boardOwnerId) {
+      loadCards();
+    }
+  }, [boardOwnerId, loadCards, isSubquadroView, subquadro]);
 
   useEffect(() => {
     if (!isCardModalOpen) {
       setNewSubtaskText("");
     }
   }, [isCardModalOpen]);
+
+  // Um card pertence à vista atual se: no modo subquadro, o responsável for
+  // membro do subquadro; no modo pessoal, se eu for o responsável ou o criador.
+  const belongsToCurrentView = (ownerId: string | null, createdBy: string | null) => {
+    if (isSubquadroView) {
+      return !!ownerId && subquadroMembers.some((m) => m.id === ownerId);
+    }
+    return ownerId === boardOwnerId || createdBy === boardOwnerId;
+  };
 
   // ── Save (Insert or Update) ───────────────────────────────────────────────
   const saveCard = async (cardData: Partial<KanbanCard>) => {
@@ -341,8 +430,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
           .single();
 
         if (error) throw error;
-        // Só entra na lista se pertencer à esteira que está sendo exibida agora.
-        if (data && data.owner_id === boardOwnerId) {
+        if (data && belongsToCurrentView(data.owner_id, data.created_by)) {
           setCards((prev) => [...prev, data]);
         }
       } else {
@@ -364,14 +452,19 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
 
         if (error) throw error;
 
-        if (payload.owner_id === boardOwnerId) {
+        const stillVisible = belongsToCurrentView(
+          payload.owner_id,
+          cardData.created_by ?? null,
+        );
+
+        if (stillVisible) {
           setCards((prev) =>
             prev.map((c) =>
               c.id === cardData.id ? ({ ...c, ...payload } as KanbanCard) : c,
             ),
           );
         } else {
-          // Reatribuído para outra pessoa: some da esteira que está sendo exibida agora.
+          // Reatribuído pra fora da vista atual: some da lista.
           setCards((prev) => prev.filter((c) => c.id !== cardData.id));
         }
       }
@@ -669,7 +762,7 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-background text-foreground p-6 overflow-hidden relative font-sans">
       {/* Seletor de esteira — só para gerente/admin acompanhar a equipe */}
-      {isManager && (
+      {!isSubquadroView && isManager && (
         <div className="flex items-center gap-3 mb-4 shrink-0">
           <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
             Esteira de
@@ -719,29 +812,98 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
                     <span>Minha esteira</span>
                   </button>
                 )}
-                {usersList
-                  .filter((u) => u.id !== userProfile?.id)
-                  .map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => {
-                        setBoardOwnerId(u.id);
-                        setShowBoardDropdown(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 hover:bg-secondary text-sm font-semibold transition-colors flex items-center gap-2 ${
-                        boardOwnerId === u.id ? "text-primary" : ""
-                      }`}
-                    >
-                      {u.avatar ? (
-                        <img src={u.avatar} alt={u.name} className="w-5 h-5 rounded-full object-cover border border-border/40 shrink-0" />
-                      ) : (
-                        <User className="w-4 h-4 text-muted-foreground shrink-0" />
-                      )}
-                      <span className="truncate">{toTitleCase(u.name)}</span>
-                    </button>
-                  ))}
+                {usersByDepartment.map(([dept, people]) => (
+                  <div key={dept} className="py-0.5">
+                    <div className="px-3 pt-1.5 pb-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
+                      {dept}
+                    </div>
+                    {people.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => {
+                          setBoardOwnerId(u.id);
+                          setShowBoardDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 hover:bg-secondary text-sm font-semibold transition-colors flex items-center gap-2 ${
+                          boardOwnerId === u.id ? "text-primary" : ""
+                        }`}
+                      >
+                        {u.avatar ? (
+                          <img src={u.avatar} alt={u.name} className="w-5 h-5 rounded-full object-cover border border-border/40 shrink-0" />
+                        ) : (
+                          <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                        )}
+                        <span className="truncate">{toTitleCase(u.name)}</span>
+                      </button>
+                    ))}
+                  </div>
+                ))}
               </div>
+            )}
+          </div>
+
+          {isManager && (
+            <button
+              type="button"
+              onClick={() => setIsCreateSubquadroOpen(true)}
+              className="flex items-center gap-1.5 bg-secondary border border-border rounded-xl px-3 py-1.5 text-sm font-semibold hover:border-primary/40 transition-all"
+              title="Criar um novo subquadro da Esteira"
+            >
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <span>Criar Subquadro</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Cabeçalho do subquadro — quadro de equipe */}
+      {isSubquadroView && (
+        <div className="flex items-center justify-between gap-3 mb-4 shrink-0 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Users className="w-4.5 h-4.5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-foreground uppercase tracking-tight leading-tight">
+                {subquadro?.name || "Carregando..."}
+              </h2>
+              <p className="text-[10px] text-muted-foreground font-semibold">
+                {subquadroMembers.length} pessoa{subquadroMembers.length !== 1 ? "s" : ""} nesse subquadro
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center -space-x-2">
+              {subquadroMembers.slice(0, 6).map((u) => (
+                <div
+                  key={u.id}
+                  title={toTitleCase(u.name)}
+                  className="w-7 h-7 rounded-full bg-secondary border-2 border-background flex items-center justify-center overflow-hidden shrink-0"
+                >
+                  {u.avatar ? (
+                    <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
+                </div>
+              ))}
+              {subquadroMembers.length > 6 && (
+                <div className="w-7 h-7 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-[9px] font-black text-muted-foreground shrink-0">
+                  +{subquadroMembers.length - 6}
+                </div>
+              )}
+            </div>
+            {isManager && (
+              <button
+                type="button"
+                onClick={() => setIsAddPeopleOpen(true)}
+                className="flex items-center gap-1.5 bg-secondary border border-border rounded-xl px-3 py-1.5 text-sm font-semibold hover:border-primary/40 transition-all"
+              >
+                <Plus className="w-4 h-4 text-muted-foreground" />
+                <span>Adicionar Pessoas</span>
+              </button>
             )}
           </div>
         </div>
@@ -1577,6 +1739,26 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
         )}
       </AnimatePresence>
 
+      {isCreateSubquadroOpen && (
+        <CriarSubquadroModal
+          userId={userProfile?.id}
+          onClose={() => setIsCreateSubquadroOpen(false)}
+        />
+      )}
+
+      {isAddPeopleOpen && subquadro && (
+        <AddPeopleModal
+          subquadroName={subquadro.name}
+          usersList={usersList}
+          onClose={() => setIsAddPeopleOpen(false)}
+          onUserUpdated={(id, department) => {
+            setUsersList((prev) =>
+              prev.map((u) => (u.id === id ? { ...u, department } : u)),
+            );
+          }}
+        />
+      )}
+
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -1605,3 +1787,240 @@ export function EsteiraView({ userProfile }: EsteiraViewProps) {
     </div>
   );
 }
+
+/* ─── Modal: criar subquadro ──────────────────────────────────────────── */
+
+function CriarSubquadroModal({
+  userId,
+  onClose,
+}: {
+  userId?: string;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const confirmCreate = async () => {
+    const value = name.trim();
+    if (!value) return;
+    setSaving(true);
+    setError("");
+    try {
+      const { error: err } = await supabase
+        .from("esteira_subquadros")
+        .insert([{ name: value, created_by: userId || null }]);
+      if (err) {
+        if (err.code === "23505") {
+          setError(`Já existe um subquadro chamado "${value}".`);
+        } else {
+          throw err;
+        }
+        return;
+      }
+      onClose();
+    } catch (err) {
+      console.error("[CriarSubquadroModal] Erro ao criar subquadro:", err);
+      setError("Erro ao criar subquadro. Tente novamente.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-card border border-border rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="p-6 pb-4 border-b border-border/30 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-black uppercase tracking-tighter">Criar Subquadro</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-secondary rounded-full transition-colors">
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-3">
+          <p className="text-[11px] text-muted-foreground">
+            Ele aparece no menu, dentro de Esteira. Depois de criado, você entra nele e
+            adiciona as pessoas.
+          </p>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              Nome do quadro
+            </label>
+            <input
+              autoFocus
+              type="text"
+              placeholder='Ex: "Marketing"'
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") confirmCreate();
+              }}
+              className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            />
+            {error && <p className="text-[11px] text-red-500 font-semibold">{error}</p>}
+          </div>
+        </div>
+
+        <div className="p-6 pt-0 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-3 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs rounded-2xl border border-border transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={confirmCreate}
+            disabled={!name.trim() || saving}
+            className="flex-1 py-3 bg-primary text-primary-foreground font-black text-xs rounded-2xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? "Criando..." : "Criar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Modal: adicionar pessoas a um subquadro ─────────────────────────── */
+
+function AddPeopleModal({
+  subquadroName,
+  usersList,
+  onClose,
+  onUserUpdated,
+}: {
+  subquadroName: string;
+  usersList: EsteiraUser[];
+  onClose: () => void;
+  onUserUpdated: (id: string, department: string | null) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+
+  const available = useMemo(
+    () =>
+      usersList
+        .filter((u) => u.department?.trim() !== subquadroName)
+        .filter((u) => u.name.toLowerCase().includes(search.trim().toLowerCase())),
+    [usersList, subquadroName, search],
+  );
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const confirmAdd = async () => {
+    if (selected.size === 0) return;
+    setSaving(true);
+    try {
+      const ids = Array.from(selected);
+      const { error } = await supabase
+        .from("usuarios")
+        .update({ department: subquadroName })
+        .in("id", ids);
+      if (error) throw error;
+      ids.forEach((id) => onUserUpdated(id, subquadroName));
+      onClose();
+    } catch (err) {
+      console.error("[AddPeopleModal] Erro ao adicionar pessoas:", err);
+      alert("Erro ao adicionar pessoas. Tente novamente.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-card border border-border rounded-3xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
+        <div className="p-6 pb-4 border-b border-border/30 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-black uppercase tracking-tighter">Adicionar Pessoas</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-secondary rounded-full transition-colors">
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="px-6 pt-4 pb-2 shrink-0">
+          <p className="text-[11px] text-muted-foreground mb-3">
+            Entrar em "{subquadroName}" muda o setor real dessa pessoa — vale pro app
+            inteiro, não só pra Esteira.
+          </p>
+          <input
+            type="text"
+            placeholder="Buscar pessoa..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-secondary border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-semibold"
+          />
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 pb-2 space-y-0.5 custom-scrollbar">
+          {available.map((u) => (
+            <label
+              key={u.id}
+              className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-secondary/50 cursor-pointer text-sm font-semibold"
+            >
+              <input
+                type="checkbox"
+                checked={selected.has(u.id)}
+                onChange={() => toggle(u.id)}
+                className="accent-primary"
+              />
+              {u.avatar ? (
+                <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full object-cover shrink-0" />
+              ) : (
+                <User className="w-4 h-4 text-muted-foreground shrink-0" />
+              )}
+              <span className="truncate flex-1">{toTitleCase(u.name)}</span>
+              {u.department?.trim() && (
+                <span className="text-[9px] text-muted-foreground/60 shrink-0">{u.department}</span>
+              )}
+            </label>
+          ))}
+          {available.length === 0 && (
+            <div className="text-center py-8 text-xs text-muted-foreground font-semibold">
+              Nenhuma pessoa encontrada.
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 pt-4 flex gap-3 shrink-0 border-t border-border/30">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-3 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs rounded-2xl border border-border transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={confirmAdd}
+            disabled={selected.size === 0 || saving}
+            className="flex-1 py-3 bg-primary text-primary-foreground font-black text-xs rounded-2xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? "Adicionando..." : `Adicionar${selected.size ? ` (${selected.size})` : ""}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

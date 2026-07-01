@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   LayoutGrid,
   Settings,
@@ -33,7 +33,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/context/theme-provider";
+import { supabase } from "@/lib/supabase";
 import { NAV_SECTIONS } from "@/lib/menu-config";
+
+// Prefixo usado no "value" dos subquadros da Esteira, pra não colidir com
+// labels de outras seções do menu (ex: um subquadro chamado "Marketing").
+export const ESTEIRA_SUBQUADRO_PREFIX = "esteira-subquadro:";
 
 interface MenuItem {
   icon: LucideIcon;
@@ -75,16 +80,35 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Sugestões: Lightbulb,
 };
 
-const menuItems: MenuItem[] = NAV_SECTIONS.map(section => ({
-  icon: ICON_MAP[section.label] ?? LayoutGrid,
-  label: section.label,
-  isDropdown: !!section.subItems?.length,
-  subItems: section.subItems?.map(sub => ({
-    label: sub.label,
-    value: sub.value,
-    icon: ICON_MAP[sub.value ?? sub.label] ?? LayoutGrid,
-  })),
-}));
+function buildMenuItems(subquadros: { id: string; name: string }[]): MenuItem[] {
+  return NAV_SECTIONS.map(section => {
+    if (section.label === "Esteira") {
+      return {
+        icon: ICON_MAP.Esteira ?? LayoutGrid,
+        label: "Esteira",
+        isDropdown: true,
+        subItems: [
+          { label: "Minha Esteira", icon: ICON_MAP.Esteira ?? LayoutGrid },
+          ...subquadros.map(s => ({
+            label: s.name,
+            value: `${ESTEIRA_SUBQUADRO_PREFIX}${s.id}`,
+            icon: ICON_MAP.Esteira ?? LayoutGrid,
+          })),
+        ],
+      };
+    }
+    return {
+      icon: ICON_MAP[section.label] ?? LayoutGrid,
+      label: section.label,
+      isDropdown: !!section.subItems?.length,
+      subItems: section.subItems?.map(sub => ({
+        label: sub.label,
+        value: sub.value,
+        icon: ICON_MAP[sub.value ?? sub.label] ?? LayoutGrid,
+      })),
+    };
+  });
+}
 
 const settingsItems: MenuItem[] = [
   { 
@@ -126,6 +150,35 @@ interface AppSidebarProps {
 export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout, loading, isChatOpen, onToggleChat, chatUnreadCount = 0 }: AppSidebarProps) {
   const { theme } = useTheme();
   const [openMenus, setOpenMenus] = useState<string[]>(["Dashboard"]);
+  const [subquadros, setSubquadros] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSubquadros = async () => {
+      const { data, error } = await supabase
+        .from("esteira_subquadros")
+        .select("id, name")
+        .order("name");
+      if (!cancelled && !error) setSubquadros(data || []);
+    };
+
+    loadSubquadros();
+
+    const channel = supabase
+      .channel("sidebar-esteira-subquadros")
+      .on("postgres_changes", { event: "*", schema: "public", table: "esteira_subquadros" }, () => {
+        loadSubquadros();
+      })
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const menuItems = useMemo(() => buildMenuItems(subquadros), [subquadros]);
 
   const userAvatar = userProfile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'User'}`;
 
@@ -145,12 +198,15 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const role = userProfile?.role?.toUpperCase() || "";
     if (role.includes('ADMIN') || role.includes('GERENTE')) return true;
 
+    // Subquadros da Esteira são abertos pra todo mundo, igual a própria Esteira.
+    if (label.startsWith(ESTEIRA_SUBQUADRO_PREFIX)) return true;
+
     // Itens padrão (que todos vêem) — configurações pessoais + módulos essenciais
     const alwaysAllowed = [
       "Meu Perfil", "Aparência", "Notificações", "Segurança",
       "Dashboard", "Geral", "Produtos",
       "Calendário", "Eventos", "Férias",
-      "Esteira", "Sugestões"
+      "Esteira", "Minha Esteira", "Sugestões"
     ];
     if (alwaysAllowed.includes(label)) return true;
 
