@@ -77,6 +77,11 @@ export function PosVendaView({ userProfile }: PosVendaViewProps) {
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
   const [draggedOverCardId, setDraggedOverCardId] = useState<string | null>(null);
   const [draggedOverCardPart, setDraggedOverCardPart] = useState<"top" | "bottom" | null>(null);
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
+  const toggleCardExpanded = (cardId: string) => {
+    setExpandedCards(prev => ({ ...prev, [cardId]: !prev[cardId] }));
+  };
 
   const currentUserId = userProfile?.id;
 
@@ -502,7 +507,7 @@ export function PosVendaView({ userProfile }: PosVendaViewProps) {
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, col.id)}
               className={cn(
-                "w-80 shrink-0 flex flex-col rounded-2xl border transition-all duration-200",
+                "flex-1 min-w-[280px] flex flex-col rounded-2xl border transition-all duration-200",
                 col.bgClass,
                 col.borderClass,
                 isOver && "ring-2 ring-primary/20 scale-[0.99] border-primary/40"
@@ -531,6 +536,7 @@ export function PosVendaView({ userProfile }: PosVendaViewProps) {
                     const npsInfo = getNpsBadge(card.nps_score);
                     const responsibleUser = usersList.find(u => u.id === card.vendedor_id);
                     const cleanPhone = card.remote_jid.split('@')[0];
+                    const isExpanded = expandedCards[card.id] || false;
 
                     return (
                       <div
@@ -558,29 +564,45 @@ export function PosVendaView({ userProfile }: PosVendaViewProps) {
                           handleCardDrop(e, card.id, isBottom ? "bottom" : "top");
                         }}
                         className={cn(
-                          "bg-card hover:shadow-md border border-border hover:border-border/80 transition-all duration-150 hover:-translate-y-0.5 rounded-xl p-4 pb-14 cursor-grab active:cursor-grabbing relative overflow-hidden group h-[155px] shrink-0",
+                          "bg-card hover:shadow-md border border-border hover:border-border/80 transition-all duration-150 hover:-translate-y-0.5 rounded-xl p-4 flex flex-col gap-3 justify-between cursor-grab active:cursor-grabbing relative overflow-hidden group shrink-0",
+                          isExpanded ? "min-h-[155px] h-auto" : "h-[155px] max-h-[155px]",
                           draggedOverCardId === card.id && draggedOverCardPart === "top" && "border-t-primary border-t-2 scale-[1.01] shadow-md",
                           draggedOverCardId === card.id && draggedOverCardPart === "bottom" && "border-b-primary border-b-2 scale-[1.01] shadow-md"
                         )}
                       >
-                        {/* Tags / NPS */}
-                        <div className="flex items-start justify-between gap-2 mb-1.5 shrink-0">
-                          <span className={cn("px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider flex items-center gap-1", npsInfo.color)}>
-                            {npsInfo.icon}
-                            {npsInfo.label}
-                          </span>
+                        {/* Tags / NPS & Due Date */}
+                        <div className="flex items-start justify-between gap-2 mb-0.5 shrink-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={cn("px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider flex items-center gap-1", npsInfo.color)}>
+                              {npsInfo.icon}
+                              {npsInfo.label}
+                            </span>
+
+                            {card.due_date ? (
+                              <span className={cn("px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0", 
+                                expired ? "text-red-500 bg-red-500/5 border-red-500/10 animate-pulse" : "bg-secondary/80 text-muted-foreground/80 border-border/50"
+                              )}>
+                                <Calendar className="w-3 h-3 shrink-0" />
+                                <span>{formatDate(card.due_date)}</span>
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full border border-border/50 bg-secondary/80 text-muted-foreground/80 text-[9px] font-black uppercase tracking-wider shrink-0">
+                                {cleanPhone}
+                              </span>
+                            )}
+                          </div>
 
                           <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              onClick={() => { setSelectedCard(card); setIsCardModalOpen(true); }}
-                              className="p-1 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors animate-in fade-in"
+                              onClick={(e) => { e.stopPropagation(); setSelectedCard(card); setIsCardModalOpen(true); }}
+                              className="p-1 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors"
                               title="Editar"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => deleteCard(card.id)}
-                              className="p-1 hover:bg-red-500/10 rounded-md text-muted-foreground hover:text-red-500 transition-colors animate-in fade-in"
+                              onClick={(e) => { e.stopPropagation(); deleteCard(card.id); }}
+                              className="p-1 hover:bg-red-500/10 rounded-md text-muted-foreground hover:text-red-500 transition-colors"
                               title="Excluir"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -588,71 +610,66 @@ export function PosVendaView({ userProfile }: PosVendaViewProps) {
                           </div>
                         </div>
 
-                        {/* Title */}
-                        <h4 className="text-xs font-bold text-foreground mb-0.5 leading-snug break-words line-clamp-1" title={card.cliente_nome}>
-                          {card.cliente_nome}
-                        </h4>
+                        {/* Card Body */}
+                        <div className="flex-1 flex flex-col gap-1.5">
+                          {/* Title */}
+                          <h4 className="text-xs font-bold text-foreground leading-snug break-words line-clamp-1" title={card.cliente_nome}>
+                            {card.cliente_nome}
+                          </h4>
 
-                        {/* Produtos */}
-                        {card.produtos && (
-                          <p className="text-[10px] text-primary font-black uppercase tracking-wider line-clamp-1 mb-1">
-                            {card.produtos}
-                          </p>
-                        )}
-
-                        {/* Notes snippet */}
-                        {card.notes && (
-                          <p className="text-[11px] text-muted-foreground line-clamp-1 leading-relaxed break-words whitespace-pre-line">
-                            {card.notes}
-                          </p>
-                        )}
-
-                        {/* Bottom Bar */}
-                        <div className="absolute bottom-4 left-4 right-4 pt-2 border-t border-border/30 flex items-center justify-between gap-2 text-[10px] font-bold text-muted-foreground">
-                          
-                          {/* Due Date or phone */}
-                          {card.due_date ? (
-                            <div className={cn("flex items-center gap-1.5", expired && "text-red-500 bg-red-500/5 px-2 py-0.5 rounded-lg border border-red-500/10 animate-pulse")}>
-                              <Calendar className="w-3.5 h-3.5" />
-                              <span>{formatDate(card.due_date)}</span>
-                            </div>
-                          ) : (
-                            <span className="text-[9px] opacity-75">{cleanPhone}</span>
+                          {/* Produtos */}
+                          {card.produtos && (
+                            <p className="text-[10px] text-primary font-black uppercase tracking-wider line-clamp-1">
+                              {card.produtos}
+                            </p>
                           )}
 
-                          {/* Quick Message Button + Avatar */}
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleOpenChat(card.remote_jid)}
-                              className="p-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg transition-all border border-primary/20 shrink-0"
-                              title="Ver Conversa no WhatsApp"
+                          {/* Notes snippet */}
+                          {card.notes && (
+                            <p 
+                              onClick={(e) => { e.stopPropagation(); toggleCardExpanded(card.id); }}
+                              className={`text-[11px] text-muted-foreground/85 leading-relaxed break-words whitespace-pre-line font-medium hover:text-primary cursor-pointer transition-colors ${
+                                isExpanded ? "line-clamp-6" : "line-clamp-1"
+                              }`}
+                              title={isExpanded ? "Clique para recolher as anotações" : "Clique para ver as anotações completas"}
                             >
-                              <MessageSquare className="w-3.5 h-3.5" />
-                            </button>
+                              {card.notes}
+                            </p>
+                          )}
+                        </div>
 
-                            {responsibleUser ? (
-                              <div 
-                                className="flex items-center gap-1 bg-secondary/50 pl-1 pr-2 py-0.5 rounded-md border border-border/40 shrink-0"
-                                title={responsibleUser.name || "Responsável"}
-                              >
-                                {responsibleUser.avatar ? (
-                                  <img 
-                                    src={responsibleUser.avatar} 
-                                    alt={responsibleUser.name} 
-                                    className="w-3.5 h-3.5 rounded-full object-cover shrink-0 border border-border/40" 
-                                  />
-                                ) : (
-                                  <User className="w-2.5 h-2.5 text-muted-foreground/70" />
-                                )}
-                                <span className="truncate max-w-[50px] text-[8px] uppercase tracking-wider">
-                                  {responsibleUser.name.split(" ")[0]}
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="w-1" />
-                            )}
-                          </div>
+                        {/* Bottom Bar */}
+                        <div className="pt-2 border-t border-border/30 flex items-center justify-between gap-2 text-[10px] font-bold text-muted-foreground mt-auto shrink-0">
+                          
+                          {/* Quick Message Button */}
+                          <button
+                            onClick={() => handleOpenChat(card.remote_jid)}
+                            className="p-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg transition-all border border-primary/20 shrink-0"
+                            title="Ver Conversa no WhatsApp"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                          </button>
 
+                          {/* Responsible Seller */}
+                          {responsibleUser && (
+                            <div 
+                              className="flex items-center gap-1.5 bg-secondary/50 pl-1.5 pr-2 py-0.5 rounded-lg border border-border/30 shrink-0"
+                              title={responsibleUser.name || "Responsável"}
+                            >
+                              {responsibleUser.avatar ? (
+                                <img 
+                                  src={responsibleUser.avatar} 
+                                  alt={responsibleUser.name} 
+                                  className="w-4.5 h-4.5 rounded-full object-cover shrink-0 border border-border/40" 
+                                />
+                              ) : (
+                                <User className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />
+                              )}
+                              <span className="truncate max-w-[50px] text-[9.5px] uppercase tracking-wider text-muted-foreground/85 font-bold">
+                                {responsibleUser.name.split(" ")[0]}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
