@@ -173,24 +173,27 @@ function DashboardContent({
       "Aparência",
     ];
 
-    const isPublic = [
-      "Geral",
-      "Dashboard",
-      "Produtos",
-      "Calendário",
-      "Eventos",
-      "Férias",
-      "Sugestões",
-      "Meu Perfil",
-      "Notificações",
-      "Segurança",
-      "Aparência",
-      "Organograma",
-      "Relatórios",
-      "Relatórios Mkt",
-      "Coletor",
-      "Painel Coletor",
-    ].includes(activeItem);
+    const isPublic =
+      [
+        "Geral",
+        "Dashboard",
+        "Produtos",
+        "Calendário",
+        "Eventos",
+        "Férias",
+        "Sugestões",
+        "Meu Perfil",
+        "Notificações",
+        "Segurança",
+        "Aparência",
+        "Organograma",
+        "Relatórios",
+        "Relatórios Mkt",
+        "Coletor",
+        "Painel Coletor",
+        "Esteira",
+        "Minha Esteira",
+      ].includes(activeItem) || activeItem.startsWith(ESTEIRA_SUBQUADRO_PREFIX);
 
     const hasPermission =
       userProfile?.is_admin ||
