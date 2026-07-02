@@ -21,6 +21,7 @@ interface UserProfile {
   operatorCode?: string;
   permissions?: string[];
   is_admin?: boolean;
+  is_leader?: boolean;
 }
 
 interface CrmSectionProps {

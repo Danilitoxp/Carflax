@@ -112,6 +112,7 @@ interface UserProfile {
   operatorCode?: string;
   permissions?: string[];
   is_admin?: boolean;
+  is_leader?: boolean;
 }
 
 interface Props {
@@ -211,7 +212,14 @@ export function MeusPedidosView({ userProfile }: Props) {
 
       const meuCodigo = String(userProfile?.operator_code || userProfile?.operatorCode || "").trim();
       const meuCodigoNorm = meuCodigo.replace(/^0+/, "") || meuCodigo;
-      const isAdmin = userProfile?.is_admin === true;
+      // Admin, líderes e gerentes/diretores veem TODOS os pedidos (não filtra por vendedor).
+      // Ex: gerente de estoque não é vendedor, mas precisa acompanhar toda a operação.
+      const role = (userProfile?.role || "").toUpperCase();
+      const isAdmin =
+        userProfile?.is_admin === true ||
+        userProfile?.is_leader === true ||
+        role.includes("GERENTE") ||
+        role.includes("DIRETOR");
 
       // ── Pedidos em separação ──────────────────────────────
       if (erpRes.success && erpRes.data) {
@@ -300,7 +308,7 @@ export function MeusPedidosView({ userProfile }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [userProfile?.operator_code, userProfile?.operatorCode, userProfile?.is_admin]);
+  }, [userProfile?.operator_code, userProfile?.operatorCode, userProfile?.is_admin, userProfile?.is_leader, userProfile?.role]);
 
   useEffect(() => {
     fetchData();
