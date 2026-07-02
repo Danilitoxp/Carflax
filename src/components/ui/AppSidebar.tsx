@@ -35,11 +35,11 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/context/theme-provider";
 import { supabase } from "@/lib/supabase";
 import { useNotification } from "@/hooks/useNotification";
-import { NAV_SECTIONS } from "@/lib/menu-config";
+import { NAV_SECTIONS, ESTEIRA_SUBQUADRO_PREFIX } from "@/lib/menu-config";
 
-// Prefixo usado no "value" dos subquadros da Esteira, pra não colidir com
-// labels de outras seções do menu (ex: um subquadro chamado "Marketing").
-export const ESTEIRA_SUBQUADRO_PREFIX = "esteira-subquadro:";
+// Reexporta para não quebrar imports existentes (ex: App.tsx). A fonte da verdade
+// agora fica em menu-config.ts.
+export { ESTEIRA_SUBQUADRO_PREFIX };
 
 interface MenuItem {
   icon: LucideIcon;

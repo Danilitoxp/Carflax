@@ -29,7 +29,6 @@ interface ChatCenterProps {
   activeChats: ActiveChat[];
   onCloseChat: (doc: string) => void;
   userProfile?: UserProfileLite;
-  amICentralizer: boolean;
   openChatDocs: string[];
   onToggleChatDoc: (doc: string) => void;
   onCloseChatDoc: (doc: string) => void;
@@ -46,7 +45,6 @@ export function ChatCenter({
   activeChats,
   onCloseChat,
   userProfile,
-  amICentralizer,
   openChatDocs,
   onToggleChatDoc,
   onCloseChatDoc,
@@ -136,6 +134,7 @@ export function ChatCenter({
     return text.replace(/[-=_]{3,}/g, "").trim();
   };
 
+  console.log("[CRM] ChatCenter:", { isOpen, openChatDocs, openChatsData });
   if (!isOpen && openChatDocs.length === 0) return null;
 
   return (
@@ -161,7 +160,6 @@ export function ChatCenter({
                 sellerName={chat.sellerName}
                 sellerCode={chat.sellerCode}
                 itemsInitial={chat.items}
-                amICentralizer={amICentralizer}
                 isMinimized={false}
                 onUpdateLastMessage={handleUpdateLastMessage(chat.doc)}
                 isForced={forcedChatDoc === chat.doc}
@@ -220,14 +218,13 @@ export function ChatCenter({
         >
           {visibleChats.map((chat) => {
             const userCache = (window as unknown as { _carflaxUserCache: Record<string, UserProfileLite & { operator_code?: string }> })._carflaxUserCache || {};
-            const centralizerId = (window as unknown as Record<string, unknown>)._carflaxCentralizerId as string | undefined;
             const myId = userProfile?.id;
 
             let partnerName = "";
             let partnerAvatar = "";
             const cacheValues = Object.values(userCache);
 
-            if (chat.sellerCode && chat.sellerCode !== myId && chat.sellerCode !== centralizerId) {
+            if (chat.sellerCode && chat.sellerCode !== myId) {
               let cached = userCache[chat.sellerCode];
               if (!cached) {
                 const codeClean = chat.sellerCode.replace(/^0+/, "");
@@ -253,14 +250,6 @@ export function ChatCenter({
                   if (!partnerName) partnerName = match.name;
                   partnerAvatar = match.avatar || "";
                 }
-              }
-            }
-
-            if (!partnerName && !amICentralizer && centralizerId) {
-              const centralizerUser = userCache[centralizerId];
-              if (centralizerUser) {
-                partnerName = centralizerUser.name;
-                partnerAvatar = centralizerUser.avatar || "";
               }
             }
 

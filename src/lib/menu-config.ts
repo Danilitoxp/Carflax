@@ -119,3 +119,74 @@ export const ALL_NAV_PERMISSIONS: string[] = NAV_SECTIONS.flatMap(s =>
     ? s.subItems.map(sub => sub.value || sub.label)
     : [s.label]
 );
+
+// Prefixo usado no "value" dos subquadros da Esteira, pra não colidir com
+// labels de outras seções do menu (ex: um subquadro chamado "Marketing").
+export const ESTEIRA_SUBQUADRO_PREFIX = "esteira-subquadro:";
+
+// ─── Controle de acesso a seções ──────────────────────────────────────────────
+// Fonte única de verdade para "quem pode entrar em cada tela". Antes essa lógica
+// existia duplicada (uma no AppSidebar, para mostrar/esconder o menu, e outra no
+// App, para bloquear/redirecionar), e as duas divergiam — por isso líderes viam
+// "Usuários" no menu mas eram redirecionados ao clicar. Aqui é o superset de tudo
+// que já liberava acesso, para nunca negar algo que o usuário legitimamente vê.
+export interface AccessProfile {
+  role?: string;
+  department?: string;
+  permissions?: string[];
+  is_admin?: boolean;
+  is_leader?: boolean;
+}
+
+// Liberado para todos (configurações pessoais + dashboards + módulos essenciais)
+const PUBLIC_SECTIONS = [
+  "Meu Perfil", "Aparência", "Notificações", "Segurança",
+  "Dashboard", "Geral", "Produtos",
+  "Calendário", "Eventos", "Férias",
+  "Esteira", "Minha Esteira", "Sugestões",
+  "Organograma", "Coletor", "Painel Coletor",
+  "Relatórios", "Relatórios Mkt",
+];
+
+const VENDEDOR_SECTIONS = [
+  "Comercial", "Orçamentos", "Clientes", "Ligações", "Campanhas",
+  "Alugueis", "Logística", "Romaneios", "Entregas",
+];
+
+const MARKETING_SECTIONS = [
+  "Marketing", "Whatsapp Evolution", "Whatsapp Go", "Leads", "Cronograma", "Pós-Venda", "Relatórios Mkt",
+];
+
+const VENDAS_SECTIONS = [
+  "Comercial", "Orçamentos", "Meus Pedidos", "Prospecções", "Campanhas", "Alugueis", "Relatórios",
+];
+
+// Módulos de Gestão & Admin liberados automaticamente para líderes
+const LEADER_SECTIONS = ["Usuários", "DB Admin"];
+
+export function canAccessSection(profile: AccessProfile | null | undefined, item: string): boolean {
+  if (!item) return false;
+  if (!profile) return false;
+
+  const role = profile.role?.toUpperCase() || "";
+  // Admin e Gerente veem tudo
+  if (profile.is_admin || role.includes("ADMIN") || role.includes("GERENTE")) return true;
+
+  // Subquadros da Esteira são abertos pra todo mundo, igual a própria Esteira
+  if (item.startsWith(ESTEIRA_SUBQUADRO_PREFIX)) return true;
+
+  if (PUBLIC_SECTIONS.includes(item)) return true;
+
+  if (profile.is_leader && LEADER_SECTIONS.includes(item)) return true;
+
+  if (role.includes("VENDEDOR") && VENDEDOR_SECTIONS.includes(item)) return true;
+
+  if (profile.department?.toUpperCase() === "MARKETING" && MARKETING_SECTIONS.includes(item)) return true;
+
+  if (profile.department?.toUpperCase() === "VENDAS" && VENDAS_SECTIONS.includes(item)) return true;
+
+  // Permissões manuais atribuídas no cadastro do usuário
+  if (profile.permissions?.includes(item)) return true;
+
+  return false;
+}

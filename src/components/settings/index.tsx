@@ -22,7 +22,6 @@ import {
   Sparkles,
   Plus,
   FileBadge,
-  ChevronDown,
   Trash2,
   Send,
   Loader2,
@@ -1076,102 +1075,20 @@ interface LossResponsible {
 }
 
 function OrcamentosTab() {
-  const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      const { data: usersData } = await supabase
-        .from("usuarios")
-        .select("id, name")
-        .eq("status", "ativo")
-        .order("name");
-
-      if (usersData) setUsers(usersData);
-
-      const { data: configData } = await supabase
-        .from("crm_config")
-        .select("value")
-        .eq("key", "centralizer_user_id")
-        .maybeSingle();
-
-      if (configData) setSelectedUserId(configData.value);
-
-      setLoading(false);
-    }
-    fetchData();
-  }, []);
-
-  async function handleSave() {
-    setSaving(true);
-    const { error } = await supabase
-      .from("crm_config")
-      .upsert([
-        { key: "centralizer_user_id", value: selectedUserId || null },
-      ]);
-
-    setSaving(false);
-    if (!error) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    }
-  }
-
-  if (loading) return <div className="py-12 text-center text-[11px] font-bold text-slate-400 animate-pulse uppercase tracking-widest">Carregando configurações...</div>;
-
   return (
     <div className="max-w-[800px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
-        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-50 dark:border-white/5">
+        <div className="flex items-center gap-4 mb-2">
           <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-100 dark:border-blue-500/20">
             <FileBadge className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-2">Centralizador de Mensagens</h4>
+            <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-2">Comunicações de Orçamentos</h4>
             <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
-              Defina qual usuário receberá todas as comunicações e observações internas originadas na tela de orçamentos.
+              Cada vendedor agora tem seu próprio responsável, definido em Usuários → Editar Perfil → Responsável.
+              As notificações e mensagens do chat de orçamentos são enviadas direto para ele, não existe mais um único centralizador global.
             </p>
           </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Usuário Centralizador</label>
-            <div className="relative group">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 dark:text-slate-600 group-focus-within:text-blue-500 transition-colors" />
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="w-full pl-11 pr-4 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:bg-white dark:focus:bg-slate-800 transition-all appearance-none"
-              >
-                <option value="">Nenhum usuário selecionado</option>
-                {users.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                <ChevronDown className="w-4 h-4 text-slate-400" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-10 pt-6 border-t border-slate-50 dark:border-white/5 flex items-center justify-between">
-          <p className="text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest">Configuração Global</p>
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className={cn(
-              "h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-95",
-              saved ? "bg-emerald-600 text-white shadow-emerald-500/20" : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
-            )}
-          >
-            {saving ? "Salvando..." : saved ? "Configuração Salva!" : "Salvar Configuração"}
-          </Button>
         </div>
       </div>
     </div>

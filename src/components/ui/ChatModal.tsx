@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { X, Send, Loader2, Package, ShoppingBag, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getConversas, addConversa, type CrmConversa } from "@/lib/crm-service";
+import { getConversas, addConversa, getResponsavelIdForVendedor, type CrmConversa } from "@/lib/crm-service";
 import { supabase } from "@/lib/supabase";
 import { apiCrmOrcamentos, mapCrmItem, type CrmItem } from "@/lib/api";
 
@@ -21,7 +21,6 @@ interface ChatModalProps {
   userProfile?: UserProfile;
   sellerName?: string;
   sellerCode?: string;
-  amICentralizer?: boolean;
   itemsInitial?: CrmItem[];
   onUpdateLastMessage?: (msg: string, time: string) => void;
   isMinimized?: boolean;
@@ -39,7 +38,6 @@ export function ChatModal({
   userProfile,
   sellerName,
   sellerCode,
-  amICentralizer,
   itemsInitial,
   onUpdateLastMessage,
   isMinimized = false,
@@ -61,6 +59,27 @@ export function ChatModal({
   const [ownerProfile, setOwnerProfile] = useState<{ name: string; avatar: string } | null>(null);
   const [headerLoading, setHeaderLoading] = useState(false);
   const [centralizer, setCentralizer] = useState<{ id: string; name: string; avatar: string } | null>(null);
+
+  // Resolve, a partir do vendedor desta conversa (sellerCode), quem é o responsável dele.
+  // Isso substitui o antigo centralizador único global: cada vendedor tem o seu.
+  const [resolvedResponsavelId, setResolvedResponsavelId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!sellerCode) {
+      setResolvedResponsavelId(null);
+      return;
+    }
+    getResponsavelIdForVendedor(sellerCode).then((id) => {
+      if (!cancelled) setResolvedResponsavelId(id);
+    });
+    return () => { cancelled = true; };
+  }, [sellerCode]);
+
+  const amICentralizer = useMemo(() => {
+    const role = userProfile?.role?.toUpperCase() || "";
+    const isManager = role.includes("GERENTE") || role === "ADMIN" || role.includes("DIRETOR");
+    return isManager || (!!userProfile?.id && !!resolvedResponsavelId && resolvedResponsavelId === userProfile.id);
+  }, [userProfile, resolvedResponsavelId]);
 
   // Estados para Itens do Orçamento
   const [showItems, setShowItems] = useState(false);
@@ -111,9 +130,7 @@ export function ChatModal({
 
     // Buscar quem é a outra parte da conversa (Prioriza cache, fallback no banco)
     async function fetchOwner() {
-      const centralizerId = (window as unknown as Record<string, unknown>)?._carflaxCentralizerId as string | undefined;
-
-      // Se for chat com separador, busca o separador em vez do centralizador
+      // Se for chat com separador, busca o separador em vez do responsável
       if (isChatWithSeparator) {
         try {
           const vCode = sellerCode;
@@ -156,28 +173,27 @@ export function ChatModal({
         return;
       }
 
-      // Se sou Vendedor, busca o perfil do Centralizador
+      // Se sou Vendedor, busca o perfil do meu Responsável
       if (!amICentralizer) {
         try {
           // Tenta cache global primeiro (já resolvido pelo App.tsx)
-          if (centralizerId && userCache[centralizerId]) {
-            const cached = userCache[centralizerId];
+          if (resolvedResponsavelId && userCache[resolvedResponsavelId]) {
+            const cached = userCache[resolvedResponsavelId];
             setOwnerProfile({ name: cached.name, avatar: cached.avatar || "" });
-            setCentralizer({ id: centralizerId, name: cached.name, avatar: cached.avatar || "" });
+            setCentralizer({ id: resolvedResponsavelId, name: cached.name, avatar: cached.avatar || "" });
             setHeaderLoading(false);
             return;
           }
           // Fallback: busca no banco
-          const cId = centralizerId || (await supabase.from("crm_config").select("value").eq("key", "centralizer_user_id").maybeSingle()).data?.value;
-          if (cId) {
-            const { data: user } = await supabase.from("usuarios").select("id, name, avatar").eq("id", cId).maybeSingle();
+          if (resolvedResponsavelId) {
+            const { data: user } = await supabase.from("usuarios").select("id, name, avatar").eq("id", resolvedResponsavelId).maybeSingle();
             if (user) {
               setOwnerProfile({ name: user.name, avatar: user.avatar || "" });
               setCentralizer(user);
             }
           }
         } catch (e) {
-          console.error("[Chat] Erro ao buscar centralizador:", e);
+          console.error("[Chat] Erro ao buscar responsável:", e);
         } finally {
           setHeaderLoading(false);
         }
@@ -325,7 +341,7 @@ export function ChatModal({
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, documento, userProfile?.id, userProfile?.name, itemsInitial, amICentralizer, sellerCode, sellerName]);
+  }, [isOpen, documento, userProfile?.id, userProfile?.name, itemsInitial, amICentralizer, resolvedResponsavelId, sellerCode, sellerName]);
 
   // 2. Efeito de Resolução Dinâmica de Perfil baseada em Mensagens e Cache Global
   useEffect(() => {
@@ -414,7 +430,7 @@ export function ChatModal({
       title !== sellerName && 
       !title.includes("Aviso:") && 
       !title.includes("Divergência:") && 
-      title !== "Centralizador Carflax" &&
+      title !== "Responsável" &&
       title !== "Centralizador" &&
       title !== userProfile?.name &&
       !title.startsWith("#") &&
@@ -520,7 +536,7 @@ export function ChatModal({
     return { 
       name: (centralizer?.name) || 
             (sellerName && sellerName.toUpperCase() !== "SISTEMA" && sellerName.toUpperCase().trim() !== userProfile?.name?.toUpperCase().trim() ? sellerName : null) || 
-            "Centralizador Carflax", 
+            "Responsável",
       avatar: centralizer?.avatar || "" 
     };
   }, [conversas, userProfile?.name, ownerProfile, centralizer, amICentralizer, sellerName, title, documento]);
@@ -571,23 +587,11 @@ export function ChatModal({
     if (!text || sending) return;
     setSending(true);
 
-    let destinoId = (amICentralizer || isChatWithSeparator) ? (budgetOwner || "todos") : (centralizer?.id || "todos");
-
-    if ((amICentralizer || isChatWithSeparator) && (destinoId === "todos" || !destinoId)) {
-      if (sellerCode) {
-        const { data: user } = await supabase.from("usuarios").select("id").eq("operator_code", sellerCode).maybeSingle();
-        if (user) {
-          destinoId = user.id;
-          setBudgetOwner(user.id);
-        }
-      } else if (sellerName) {
-        const { data: user } = await supabase.from("usuarios").select("id").ilike("name", `%${sellerName}%`).maybeSingle();
-        if (user) {
-          destinoId = user.id;
-          setBudgetOwner(user.id);
-        }
-      }
-    }
+    // destinoId é resolvido antecipadamente no useEffect (fetchOwner).
+    // Não fazemos queries síncronas aqui para não bloquear o click handler.
+    const destinoId: string | null = (amICentralizer || isChatWithSeparator)
+      ? (budgetOwner || null)
+      : (resolvedResponsavelId || centralizer?.id || null);
 
     const cleanDoc = documento.replace("#", "").trim();
     const nova: Omit<CrmConversa, "id"> = {
@@ -598,7 +602,7 @@ export function ChatModal({
       enviado_por_nome: userProfile?.name || "Você",
       lida: false,
       fechada: false,
-      destino: destinoId || "todos",
+      destino: destinoId,
       timestamp: new Date().toISOString(),
     };
 
@@ -780,7 +784,7 @@ export function ChatModal({
   const handleClose = async () => {
     if (isForced) return;
     const unreadIds = conversas
-      .filter(m => !m.lida && (m.destino === userProfile?.id || (amICentralizer && m.destino === "todos")))
+      .filter(m => !m.lida && m.destino === userProfile?.id)
       .map(m => m.id)
       .filter(Boolean);
 

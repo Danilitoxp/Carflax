@@ -79,7 +79,9 @@ export interface CrmConversa {
   timestamp?: string;
   lida?: boolean;
   fechada?: boolean;
-  destino?: string;
+  // null = sem destinatário resolvido (ex: vendedor ainda sem responsável definido) — a mensagem
+  // fica registrada, mas não aparece na caixa de entrada de ninguém.
+  destino?: string | null;
 }
 
 // ─── Supabase helpers ────────────────────────────────────────────────────────
@@ -203,6 +205,34 @@ export async function sincronizarLembreteData(): Promise<{ atualizados: number; 
   }
 
   return { atualizados, erros };
+}
+
+// ─── Responsável (líder direto) de um vendedor ───────────────────────────────
+// Cada vendedor tem um "responsável" (usuarios.responsavel_id) que substitui o
+// antigo centralizador único global: agora cada um recebe as mensagens só dos
+// seus próprios subordinados. Aceita tanto o código de operador do ERP (ex:
+// "058") quanto o uuid do usuário (algumas mensagens antigas guardam o uuid
+// em enviado_por/destino), por isso tenta os dois formatos.
+export async function getResponsavelIdForVendedor(
+  sellerCodeOrId?: string | null
+): Promise<string | null> {
+  const raw = String(sellerCodeOrId || "").trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/^0+/, "");
+  if (!normalized) return null;
+
+  const { data } = await supabase
+    .from("usuarios")
+    .select("id, operator_code, responsavel_id")
+    .not("responsavel_id", "is", null);
+
+  const match = (data || []).find((u) => {
+    if (u.id === raw) return true;
+    const code = String(u.operator_code || "").trim().replace(/^0+/, "");
+    return !!code && code === normalized;
+  });
+
+  return match?.responsavel_id || null;
 }
 
 export async function getCrmStatusMap(

@@ -33,7 +33,8 @@ import { OrgChartView } from "@/components/ui/OrgChartModal";
 import { SqlRunnerView } from "@/components/admin/SqlRunnerView";
 import { MarketingView } from "@/components/marketing/MarketingView";
 import { EsteiraView } from "@/components/marketing/EsteiraView";
-import { ESTEIRA_SUBQUADRO_PREFIX } from "@/components/ui/AppSidebar";
+import { ESTEIRA_SUBQUADRO_PREFIX, canAccessSection } from "@/lib/menu-config";
+import { useNotification } from "@/hooks/useNotification";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { SorteioRealtimeModal } from "@/components/ui/SorteioRealtimeModal";
@@ -72,6 +73,7 @@ function DashboardContent({
   perdidoMap,
   onLogout,
 }: DashboardContentProps) {
+  const { showNotification } = useNotification();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -146,70 +148,16 @@ function DashboardContent({
     return () => clearTimeout(safetyTimer);
   }, [geralLoading]);
 
+  // Defesa em profundidade: se o localStorage restaurar uma seção que o usuário
+  // não pode mais acessar (ex: permissão revogada), volta para Geral silenciosamente
+  // no carregamento. A navegação por clique é barrada em handleActiveItemChange, que
+  // mostra uma notificação e não troca de tela — então isso só dispara em casos raros.
   useEffect(() => {
     if (!userProfile || geralLoading) return; // Aguarda o perfil carregar
-
-    const role = userProfile?.role?.toUpperCase();
-    const isVendedorRole = role?.includes("VENDEDOR");
-    const sellerAllowedItems = [
-      "Geral",
-      "Produtos",
-      "Calendário",
-      "Eventos",
-      "Férias",
-      "Comercial",
-      "Orçamentos",
-      "Clientes",
-      "Ligações",
-      "Campanhas",
-      "Relatórios",
-      "Alugueis",
-      "Coletor",
-      "Logística",
-      "Romaneios",
-      "Entregas",
-      "Sugestões",
-      "Meu Perfil",
-      "Notificações",
-      "Segurança",
-      "Aparência",
-    ];
-
-    const isPublic =
-      [
-        "Geral",
-        "Dashboard",
-        "Produtos",
-        "Calendário",
-        "Eventos",
-        "Férias",
-        "Sugestões",
-        "Meu Perfil",
-        "Notificações",
-        "Segurança",
-        "Aparência",
-        "Organograma",
-        "Relatórios",
-        "Relatórios Mkt",
-        "Coletor",
-        "Painel Coletor",
-        "Esteira",
-        "Minha Esteira",
-      ].includes(activeItem) || activeItem.startsWith(ESTEIRA_SUBQUADRO_PREFIX);
-
-    const hasPermission =
-      userProfile?.is_admin ||
-      userProfile?.permissions?.includes(activeItem) ||
-      (isVendedorRole && sellerAllowedItems.includes(activeItem));
-
-    if (!isPublic && !hasPermission && activeItem !== "Geral") {
-      console.warn(
-        `[Security] Acesso negado para: ${activeItem}. Redirecionando para Geral.`,
-      );
-      setTimeout(() => {
-        setActiveItem("Geral");
-        localStorage.setItem("carflax-active-section", "Geral");
-      }, 0);
+    if (activeItem === "Geral") return;
+    if (!canAccessSection(userProfile, activeItem)) {
+      setActiveItem("Geral");
+      localStorage.setItem("carflax-active-section", "Geral");
     }
   }, [activeItem, userProfile, geralLoading]);
 
@@ -255,7 +203,6 @@ function DashboardContent({
 
   const [openChatDocs, setOpenChatDocs] = useState<string[]>([]);
 
-  const isCentRef = useRef(false);
   const openChatDocsRef = useRef<string[]>(openChatDocs);
   useEffect(() => {
     openChatDocsRef.current = openChatDocs;
@@ -280,16 +227,13 @@ function DashboardContent({
   const markChatRead = useCallback(async (doc: string) => {
     if (!userProfile?.id) return;
     try {
-      let query = supabase
+      await supabase
         .from("crm_conversas")
         .update({ lida: true })
         .eq("documento", doc)
         .eq("lida", false)
-        .neq("enviado_por", userProfile.id);
-      if (!isCentRef.current) {
-        query = query.eq("destino", userProfile.id);
-      }
-      await query;
+        .neq("enviado_por", userProfile.id)
+        .eq("destino", userProfile.id);
     } catch { /* silently fail */ }
   }, [userProfile?.id]);
 
@@ -354,7 +298,6 @@ function DashboardContent({
     setDismissedChatDocs(new Set());
   }
 
-  const [isCentralizer, setIsCentralizer] = useState(false);
   const initialCheckPerformed = useRef(false);
 
   // ── Notificações de Entregas (Realtime) ─────────────────────────────
@@ -610,10 +553,11 @@ function DashboardContent({
 
     const myId = userProfile.id;
     const myRole = userProfile.role || "Membro";
+    const myResponsavelId = userProfile.responsavel_id;
 
     async function carregarTodasConversas() {
       try {
-        const isManager = isCentRef.current || myRole.toUpperCase() === "ADMIN" || myRole.toUpperCase().includes("GERENTE");
+        const isManager = myRole.toUpperCase() === "ADMIN" || myRole.toUpperCase().includes("GERENTE");
         const orConditions = [
           `enviado_por.eq.${myId}`,
           `destino.eq.${myId}`,
@@ -653,7 +597,6 @@ function DashboardContent({
           // Função auxiliar para obter vendedor e título reais
           const resolverDadosVendedor = (doc: string, msgs: CrmConversa[]) => {
             const lastMsg = msgs[0];
-            const centralizerId = (window as unknown as Record<string, unknown>)._carflaxCentralizerId as string | undefined;
 
             let sellerName: string | undefined = undefined;
             let sellerCode: string | undefined = undefined;
@@ -662,7 +605,6 @@ function DashboardContent({
             const msgToMe = msgs.find(m =>
               m.destino === myId &&
               m.enviado_por !== myId &&
-              m.enviado_por !== centralizerId &&
               m.enviado_por_nome?.toUpperCase() !== "SISTEMA"
             );
             if (msgToMe) {
@@ -676,8 +618,7 @@ function DashboardContent({
                 m.enviado_por === myId &&
                 m.destino &&
                 m.destino !== "todos" &&
-                m.destino !== myId &&
-                m.destino !== centralizerId
+                m.destino !== myId
               );
               if (msgFromMe) {
                 sellerCode = msgFromMe.destino || undefined;
@@ -705,7 +646,6 @@ function DashboardContent({
               const otherMsg = msgs.find(m =>
                 m.enviado_por &&
                 m.enviado_por !== myId &&
-                m.enviado_por !== centralizerId &&
                 m.enviado_por_nome?.toUpperCase() !== "SISTEMA"
               );
               if (otherMsg) {
@@ -740,8 +680,7 @@ function DashboardContent({
               (m) =>
                 !m.lida &&
                 m.enviado_por !== myId &&
-                (m.destino === myId ||
-                  (isCentRef.current && m.destino === "todos"))
+                m.destino === myId
             ).length;
 
             const resolved = resolverDadosVendedor(c.doc, msgs);
@@ -768,8 +707,7 @@ function DashboardContent({
               (m) =>
                 !m.lida &&
                 m.enviado_por !== myId &&
-                (m.destino === myId ||
-                  (isCentRef.current && m.destino === "todos"))
+                m.destino === myId
             ).length;
 
             const resolved = resolverDadosVendedor(doc, msgs);
@@ -795,27 +733,25 @@ function DashboardContent({
             !m.lida &&
             m.enviado_por !== myId &&
             !dismissedChatDocsRef.current.has(m.documento) &&
-            (m.destino === myId ||
-              (isCentRef.current && m.destino === "todos"))
+            m.destino === myId
         );
         if (primeiraComUnread && openChatDocsRef.current.length === 0) {
           handleToggleChatDoc(primeiraComUnread.documento);
         }
 
-        // Se vendedor tem mensagem não respondida do centralizador, força o modal
-        const centralizerId = (window as unknown as Record<string, unknown>)._carflaxCentralizerId as string | undefined;
-        if (!isCentRef.current && centralizerId) {
+        // Se tenho mensagem não respondida do meu responsável, força o modal
+        if (myResponsavelId) {
           for (const [doc, msgs] of Object.entries(byDoc)) {
-            const lastFromCentralizer = msgs.find(
-              (m) => m.enviado_por === centralizerId && m.destino === myId && !m.lida
+            const lastFromResponsavel = msgs.find(
+              (m) => m.enviado_por === myResponsavelId && m.destino === myId && !m.lida
             );
-            if (lastFromCentralizer) {
+            if (lastFromResponsavel) {
               const respondeuDepois = msgs.some(
                 (m) =>
                   m.enviado_por === myId &&
                   m.timestamp &&
-                  lastFromCentralizer.timestamp &&
-                  m.timestamp > lastFromCentralizer.timestamp
+                  lastFromResponsavel.timestamp &&
+                  m.timestamp > lastFromResponsavel.timestamp
               );
               if (!respondeuDepois) {
                 setForcedChatDoc(doc);
@@ -830,32 +766,10 @@ function DashboardContent({
       }
     }
 
-    // Função para inicializar sessão e identidade
-    async function initSession() {
-      try {
-        const { data: config } = await supabase
-          .from("crm_config")
-          .select("value")
-          .eq("key", "centralizer_user_id")
-          .maybeSingle();
-        const isCent = config?.value === myId;
-        isCentRef.current = isCent;
-        setIsCentralizer(isCent);
-        if (config?.value) {
-          (window as unknown as Record<string, unknown>)._carflaxCentralizerId = config.value;
-        }
-
-        // Agora executa o carregamento inicial das conversas após a sessão estar 100% carregada
-        if (!initialCheckPerformed.current) {
-          initialCheckPerformed.current = true;
-          carregarTodasConversas();
-        }
-      } catch (e) {
-        console.error("[CRM] Erro ao resolver identidade:", e);
-      }
+    if (!initialCheckPerformed.current) {
+      initialCheckPerformed.current = true;
+      carregarTodasConversas();
     }
-
-    initSession();
 
     // Listener de Mensagens
     const channelName = `global_crm_${myId}`;
@@ -874,19 +788,14 @@ function DashboardContent({
         }
       }
 
-          // USA O REF que é atualizado pelo initSession
-          const isForMe =
-            newMsg.destino === myId ||
-            (isCentRef.current && newMsg.destino === "todos");
+          const isForMe = newMsg.destino === myId;
 
           if (isForMe) {
             const isSystem =
               newMsg.enviado_por_nome?.toUpperCase() === "SISTEMA";
 
             // Resolve o vendedor real a partir da mensagem recebida
-            const senderIsNotMe = newMsg.enviado_por !== myId &&
-              newMsg.enviado_por !== (window as unknown as Record<string, unknown>)._carflaxCentralizerId &&
-              !isSystem;
+            const senderIsNotMe = newMsg.enviado_por !== myId && !isSystem;
 
             let resolvedSellerName = senderIsNotMe ? newMsg.enviado_por_nome : undefined;
             const resolvedSellerCode = senderIsNotMe ? newMsg.enviado_por || undefined : undefined;
@@ -950,13 +859,11 @@ function DashboardContent({
               handleToggleChatDoc(newMsg.documento);
             }
 
-            // Centralizador → vendedor: bloqueia a tela até responder
-            const centralizerIdNow = (window as unknown as Record<string, unknown>)._carflaxCentralizerId as string | undefined;
+            // Responsável → vendedor: bloqueia a tela até responder
             if (
               isForMe &&
-              !isCentRef.current &&
-              centralizerIdNow &&
-              newMsg.enviado_por === centralizerIdNow
+              myResponsavelId &&
+              newMsg.enviado_por === myResponsavelId
             ) {
               setForcedChatDoc(newMsg.documento);
               handleToggleChatDoc(newMsg.documento);
@@ -1078,6 +985,7 @@ function DashboardContent({
 
     const handleOpenChat = (e: Event) => {
       const detail = (e as CustomEvent).detail;
+      console.log("[CRM] open-crm-chat recebido:", detail);
       if (detail) {
         const isSystem =
           detail.title?.toUpperCase() === "SISTEMA" ||
@@ -1103,13 +1011,9 @@ function DashboardContent({
           return next;
         });
 
-        setActiveChats((prev) => {
-          if (prev.some((c) => c.doc === detail.doc)) {
-            handleToggleChatDoc(detail.doc);
-            return prev;
-          }
-          handleToggleChatDoc(detail.doc);
-          return [
+        const exists = activeChats.some((c) => c.doc === detail.doc);
+        if (!exists) {
+          setActiveChats((prev) => [
             ...prev,
             {
               id: Date.now(),
@@ -1120,8 +1024,9 @@ function DashboardContent({
               items: detail.items,
               unreadCount: 0,
             },
-          ];
-        });
+          ]);
+        }
+        handleToggleChatDoc(detail.doc);
       }
     };
     window.addEventListener("open-crm-chat", handleOpenChat);
@@ -1154,11 +1059,22 @@ function DashboardContent({
       } else {
         setIsSugestaoModalOpen(true);
       }
-    } else {
-      setActiveItem(item);
-      localStorage.setItem("carflax-active-section", item);
-      setIsSidebarCollapsed(true);
+      return;
     }
+
+    // Sem permissão: não troca de tela, apenas avisa. Continua onde está.
+    if (!canAccessSection(userProfile, item)) {
+      showNotification(
+        "error",
+        "Acesso Restrito",
+        "Você não tem permissão para acessar esta seção.",
+      );
+      return;
+    }
+
+    setActiveItem(item);
+    localStorage.setItem("carflax-active-section", item);
+    setIsSidebarCollapsed(true);
   };
 
   const isDashboardView = [
@@ -1397,24 +1313,19 @@ function DashboardContent({
 
           if (userProfile?.id) {
             try {
-              let query = supabase
+              await supabase
                 .from("crm_conversas")
                 .update({ lida: true })
                 .eq("documento", doc)
                 .eq("lida", false)
-                .neq("enviado_por", userProfile.id);
-
-              if (!isCentralizer) {
-                 query = query.eq("destino", userProfile.id);
-              }
-              await query;
+                .neq("enviado_por", userProfile.id)
+                .eq("destino", userProfile.id);
             } catch (err) {
               console.error("[ChatCenter] Falha ao marcar lidas no fechamento da lista:", err);
             }
           }
         }}
         userProfile={userProfile || undefined}
-        amICentralizer={isCentralizer}
         openChatDocs={openChatDocs}
         onToggleChatDoc={handleToggleChatDoc}
         onCloseChatDoc={handleCloseChatDoc}

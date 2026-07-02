@@ -33,6 +33,7 @@ import { calculateMonthlyWinner } from "@/lib/highlights_automation";
 import { supabase } from "@/lib/supabase";
 
 interface UserProfileLite {
+  id?: string;
   operator_code?: string;
   operatorCode?: string;
   name?: string;
@@ -40,6 +41,7 @@ interface UserProfileLite {
   role?: string;
   phone?: string;
   whatsapp?: string;
+  is_leader?: boolean;
 }
 const MOTIVATIONAL_QUOTES = [
   { text: "O sucesso é a soma de pequenos esforços repetidos dia após dia.", author: "Robert Collier", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Robert%20Collier" },
@@ -395,8 +397,9 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
 
     const role = userProfile?.role?.toUpperCase() || "";
     const isManager = role.includes("GERENTE") || role === "ADMIN";
+    const isSupervisor = !isManager && (role.includes("SUPERVISOR") || userProfile?.is_leader === true);
 
-    if (externalData && !isManager) return;
+    if (externalData && !isManager && !isSupervisor) return;
 
     async function fetchData() {
       try {
@@ -408,6 +411,59 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
         const dataStr = `${yyyy}-${mm}-${dd}`;
 
         const codVendedor = userProfile?.operator_code || userProfile?.operatorCode || "049";
+
+        if (isSupervisor && userProfile?.id) {
+          // Busca os vendedores sob responsabilidade deste supervisor
+          const { data: subordinados } = await supabase
+            .from("usuarios")
+            .select("operator_code")
+            .eq("responsavel_id", userProfile.id)
+            .not("operator_code", "is", null);
+
+          const codsSubordinados = (subordinados || []).map((u: { operator_code: string }) => u.operator_code).filter(Boolean);
+
+          // Busca todos os dados do dashboard e filtra
+          const response = await apiDashboardGeral(undefined, dataStr);
+
+          if (response && response.length > 0) {
+            const subSet = response.filter(r => codsSubordinados.includes(r.COD_VENDEDOR));
+            setAllVendedores(subSet);
+
+            // Total somado do time: usa a linha MEDIA se disponível, ou cria um agregado
+            const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
+            if (subSet.length === 0) {
+              // sem subordinados configurados — mostra os próprios dados
+              const myData = response.find(r => r.COD_VENDEDOR === codVendedor) || response[0];
+              setData(myData);
+              setSelectedCod(myData.COD_VENDEDOR);
+            } else if (mediaRow && codsSubordinados.length > 0) {
+              // Re-agrega manualmente: soma apenas os vendedores do supervisor
+              const totalMETA = subSet.reduce((acc, r) => acc + (parseFloat(String(r.META)) || 0), 0);
+              const totalFATURADO = subSet.reduce((acc, r) => acc + (parseFloat(String(r.FATURADO)) || 0), 0);
+              const totalEM_ABERTO = subSet.reduce((acc, r) => acc + (parseFloat(String(r.EM_ABERTO)) || 0), 0);
+              const totalTOTAL = subSet.reduce((acc, r) => acc + (parseFloat(String(r.TOTAL)) || 0), 0);
+              const totalFALTANTE = totalMETA - totalFATURADO;
+              const ticketTotal = subSet.reduce((acc, r) => acc + (parseFloat(String(r.TICKET_MEDIO)) || 0), 0);
+              const teamTotal: VendedorResumo = {
+                ...mediaRow,
+                COD_VENDEDOR: "MEDIA",
+                NOME_VENDEDOR: "Meu Time",
+                META: totalMETA,
+                FATURADO: totalFATURADO,
+                EM_ABERTO: totalEM_ABERTO,
+                TOTAL: totalTOTAL,
+                FALTANTE: totalFALTANTE,
+                TICKET_MEDIO: subSet.length > 0 ? ticketTotal / subSet.length : 0,
+              };
+              setData(teamTotal);
+              setSelectedCod("MEDIA");
+            } else {
+              setData(subSet[0]);
+              setSelectedCod(subSet[0].COD_VENDEDOR);
+            }
+          }
+          return;
+        }
 
         const response = await apiDashboardGeral(isManager ? undefined : codVendedor, dataStr);
 
@@ -564,9 +620,12 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   const total = data ? (typeof data.TOTAL === 'string' ? parseFloat(data.TOTAL) : data.TOTAL) : 0;
   const percentageVsEquilibrio = equilibrio > 0 ? (Number(total) / equilibrio) * 100 : 0;
 
-  const canChangeSeller = userProfile?.role?.toUpperCase().includes("DIRETOR") || 
-                          userProfile?.role?.toUpperCase().includes("GERENTE DE VENDAS") || 
-                          userProfile?.role?.toUpperCase() === "ADMIN";
+  const roleUpper = userProfile?.role?.toUpperCase() || "";
+  const canChangeSeller = roleUpper.includes("DIRETOR") || 
+                          roleUpper.includes("GERENTE") || 
+                          roleUpper === "ADMIN" ||
+                          roleUpper.includes("SUPERVISOR") ||
+                          (userProfile?.is_leader === true && allVendedores.length > 0);
 
   return (
     <div 

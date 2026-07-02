@@ -35,6 +35,7 @@ import {
   getCrmStatusMap,
   upsertCrmStatus,
   addConversa,
+  getResponsavelIdForVendedor,
   type CrmStatus,
 } from "@/lib/crm-service";
 import { evolutionApi } from "@/lib/evolution-v2";
@@ -625,17 +626,13 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         }
       }
 
-      // 4. Notificação Automática para o Centralizador
+      // 4. Notificação Automática para o Responsável do Vendedor
       const triggerStatuses = ["ENVIADO", "NEGOCIAÇÃO", "LIB. CRÉDITO", "AGUARD. PEDIDO", "PERDIDO"];
       if (triggerStatuses.includes(newStatus.toUpperCase())) {
         try {
-          const { data: config } = await supabase
-            .from("crm_config")
-            .select("value")
-            .eq("key", "centralizer_user_id")
-            .maybeSingle();
+          const responsavelId = await getResponsavelIdForVendedor(selectedItem.sellerCode);
 
-          if (config?.value) {
+          if (responsavelId) {
             const statusEmblema: Record<string, string> = {
               "ENVIADO": "🔵 ENVIADO",
               "NEGOCIAÇÃO": "🤝 NEGOCIAÇÃO",
@@ -674,7 +671,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
               empresa: selectedItem.empresa ?? "001",
               obs: msgFormatada,
               enviado_por_nome: "SISTEMA",
-              destino: config.value,
+              destino: responsavelId,
               timestamp: new Date().toISOString(),
             });
           }
