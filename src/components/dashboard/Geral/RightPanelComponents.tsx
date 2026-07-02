@@ -177,6 +177,9 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   const [data, setData] = useState<VendedorResumo | null>(externalData || null);
   const [allVendedores, setAllVendedores] = useState<VendedorResumo[]>([]);
   const [selectedCod, setSelectedCod] = useState<string>("TOTAL");
+  // Códigos dos vendedores do time (quando supervisor) — usado para agregar o "perdido"
+  // do time na Tx Conversão em vez de pegar o total da loja (chave "MEDIA").
+  const [teamCodes, setTeamCodes] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [vendasDiarias, setVendasDiarias] = useState<VendaDiaria[]>([]);
@@ -421,31 +424,48 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             .not("operator_code", "is", null);
 
           const codsSubordinados = (subordinados || []).map((u: { operator_code: string }) => u.operator_code).filter(Boolean);
+          setTeamCodes(codsSubordinados);
 
           // Busca todos os dados do dashboard e filtra
           const response = await apiDashboardGeral(undefined, dataStr);
 
           if (response && response.length > 0) {
             const subSet = response.filter(r => codsSubordinados.includes(r.COD_VENDEDOR));
-            setAllVendedores(subSet);
 
-            // Total somado do time: usa a linha MEDIA se disponível, ou cria um agregado
             const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
             if (subSet.length === 0) {
-              // sem subordinados configurados — mostra os próprios dados
+              // sem subordinados com dados no ERP — mostra os próprios dados
               const myData = response.find(r => r.COD_VENDEDOR === codVendedor) || response[0];
+              setAllVendedores([myData]);
               setData(myData);
               setSelectedCod(myData.COD_VENDEDOR);
-            } else if (mediaRow && codsSubordinados.length > 0) {
-              // Re-agrega manualmente: soma apenas os vendedores do supervisor
-              const totalMETA = subSet.reduce((acc, r) => acc + (parseFloat(String(r.META)) || 0), 0);
-              const totalFATURADO = subSet.reduce((acc, r) => acc + (parseFloat(String(r.FATURADO)) || 0), 0);
-              const totalEM_ABERTO = subSet.reduce((acc, r) => acc + (parseFloat(String(r.EM_ABERTO)) || 0), 0);
-              const totalTOTAL = subSet.reduce((acc, r) => acc + (parseFloat(String(r.TOTAL)) || 0), 0);
+            } else {
+              // Re-agrega manualmente somando SÓ os vendedores do supervisor.
+              // Precisa recalcular todos os campos exibidos — se herdar de mediaRow
+              // (linha da loja inteira), estatísticas como "Vendido Hoje", "Margem"
+              // e "Prazo" apareceriam com o total da loja, não o do time.
+              const sum = (key: keyof VendedorResumo) =>
+                subSet.reduce((acc, r) => acc + (parseFloat(String(r[key])) || 0), 0);
+
+              const totalMETA = sum("META");
+              const totalFATURADO = sum("FATURADO");
+              const totalEM_ABERTO = sum("EM_ABERTO");
+              const totalTOTAL = sum("TOTAL");
+              const totalVendidoHoje = sum("TOTAL_VENDIDO_HOJE");
+              const totalQtdVendas = sum("QTD_VENDAS");
+              const totalQtdOrc = sum("QTD_ORCAMENTOS");
+              const totalOrcFechados = sum("ORC_FECHADOS");
+              const totalMargemReal = sum("MARGEM_REAL");
+              const totalCusto = sum("CUSTO");
               const totalFALTANTE = totalMETA - totalFATURADO;
-              const ticketTotal = subSet.reduce((acc, r) => acc + (parseFloat(String(r.TICKET_MEDIO)) || 0), 0);
+              // Prazo médio ponderado pelo faturado de cada vendedor
+              const prazoPonderado = subSet.reduce(
+                (acc, r) => acc + (parseFloat(String(r.PRAZO_MEDIO_DIAS)) || 0) * (parseFloat(String(r.FATURADO)) || 0),
+                0,
+              );
+
               const teamTotal: VendedorResumo = {
-                ...mediaRow,
+                ...(mediaRow || subSet[0]),
                 COD_VENDEDOR: "MEDIA",
                 NOME_VENDEDOR: "Meu Time",
                 META: totalMETA,
@@ -453,13 +473,20 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                 EM_ABERTO: totalEM_ABERTO,
                 TOTAL: totalTOTAL,
                 FALTANTE: totalFALTANTE,
-                TICKET_MEDIO: subSet.length > 0 ? ticketTotal / subSet.length : 0,
+                TOTAL_VENDIDO_HOJE: totalVendidoHoje,
+                QTD_VENDAS: totalQtdVendas,
+                QTD_ORCAMENTOS: totalQtdOrc,
+                ORC_FECHADOS: totalOrcFechados,
+                CUSTO: totalCusto,
+                MARGEM_REAL: totalMargemReal,
+                MARGEM_REAL_PERC: totalFATURADO > 0 ? (totalMargemReal / totalFATURADO) * 100 : 0,
+                TICKET_MEDIO: totalQtdVendas > 0 ? totalFATURADO / totalQtdVendas : 0,
+                PRAZO_MEDIO_DIAS: totalFATURADO > 0 ? prazoPonderado / totalFATURADO : 0,
               };
+              // Inclui o "Meu Time" (linha MEDIA) + os vendedores individuais no seletor
+              setAllVendedores([teamTotal, ...subSet]);
               setData(teamTotal);
               setSelectedCod("MEDIA");
-            } else {
-              setData(subSet[0]);
-              setSelectedCod(subSet[0].COD_VENDEDOR);
             }
           }
           return;
@@ -579,7 +606,11 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     { label: m("Diário"), value: formatBRL(calculateDiarioNecessario()), icon: Zap, valueColor: "text-slate-900" },
     { label: m("Tx Conversão"), value: (() => {
         const totalNum = typeof data.TOTAL === 'string' ? parseFloat(data.TOTAL) : (data.TOTAL || 0);
-        const perdido = perdidoMap.get(String(data.COD_VENDEDOR || "").trim()) || 0;
+        // Visão "Meu Time" (supervisor): soma o perdido só dos vendedores do time,
+        // em vez de pegar o total da loja (chave "MEDIA" do perdidoMap).
+        const perdido = (teamCodes.length > 0 && selectedCod === "MEDIA")
+          ? teamCodes.reduce((acc, c) => acc + (perdidoMap.get(String(c).trim()) || 0), 0)
+          : perdidoMap.get(String(data.COD_VENDEDOR || "").trim()) || 0;
         const taxa = totalNum + perdido > 0 ? (totalNum / (totalNum + perdido)) * 100 : 0;
         return `${taxa.toFixed(2)}%`;
       })(), icon: PieChart, valueColor: "text-blue-600" },
@@ -872,18 +903,27 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
           </div>
 
           {/* Progress Bar (Meta) */}
-          <div className="mb-4 px-2">
-            <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
-              <span className="text-blue-600 dark:text-blue-500">Meta</span>
-              <span className="text-foreground">{((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100).toFixed(1)}%</span>
-            </div>
-            <div className="h-2 w-full bg-secondary dark:bg-slate-800 rounded-full overflow-hidden border border-border">
-              <div
-                className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(37,99,235,0.4)]"
-                style={{ width: `${Math.min(((Number(data?.TOTAL || 0)) / (Number(data?.META || 1)) * 100), 100)}%` }}
-              />
-            </div>
-          </div>
+          {(() => {
+            // Sem meta cadastrada (META <= 0): não há como calcular atingimento — mostra 0%
+            // em vez de estourar (TOTAL / 1 * 100 gerava percentuais absurdos).
+            const metaNum = Number(data?.META || 0);
+            const totalNum = Number(data?.TOTAL || 0);
+            const atingimento = metaNum > 0 ? (totalNum / metaNum) * 100 : 0;
+            return (
+              <div className="mb-4 px-2">
+                <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
+                  <span className="text-blue-600 dark:text-blue-500">Meta</span>
+                  <span className="text-foreground">{atingimento.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 w-full bg-secondary dark:bg-slate-800 rounded-full overflow-hidden border border-border">
+                  <div
+                    className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(37,99,235,0.4)]"
+                    style={{ width: `${Math.min(atingimento, 100)}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
 
           {/* 4. GRID DE INDICADORES (Sober/Professional) */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">

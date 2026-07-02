@@ -224,6 +224,21 @@ function DashboardContent({
     setOpenChatDocs((prev) => prev.filter((d) => d !== doc));
   }, []);
 
+  // Abre um chat de forma idempotente (nunca fecha). Usar nos disparos automáticos
+  // (mensagem recebida, chat forçado, clique em notificação): se dois disparos
+  // acontecerem para o mesmo doc, o handleToggleChatDoc os cancelaria (abre+fecha).
+  const openChatDoc = useCallback((doc: string) => {
+    setOpenChatDocs((prev) => {
+      if (prev.includes(doc)) return prev;
+      const next = [...prev, doc];
+      if (next.length > 3) next.shift();
+      return next;
+    });
+    setActiveChats((prev) =>
+      prev.map((c) => (c.doc === doc ? { ...c, unreadCount: 0 } : c)),
+    );
+  }, []);
+
   const markChatRead = useCallback(async (doc: string) => {
     if (!userProfile?.id) return;
     try {
@@ -736,7 +751,7 @@ function DashboardContent({
             m.destino === myId
         );
         if (primeiraComUnread && openChatDocsRef.current.length === 0) {
-          handleToggleChatDoc(primeiraComUnread.documento);
+          openChatDoc(primeiraComUnread.documento);
         }
 
         // Se tenho mensagem não respondida do meu responsável, força o modal
@@ -755,7 +770,7 @@ function DashboardContent({
               );
               if (!respondeuDepois) {
                 setForcedChatDoc(doc);
-                handleToggleChatDoc(doc);
+                openChatDoc(doc);
                 break;
               }
             }
@@ -855,18 +870,17 @@ function DashboardContent({
               ];
             });
 
-            if (isForMe && openChatDocsRef.current.length === 0) {
-              handleToggleChatDoc(newMsg.documento);
-            }
-
             // Responsável → vendedor: bloqueia a tela até responder
-            if (
-              isForMe &&
-              myResponsavelId &&
-              newMsg.enviado_por === myResponsavelId
-            ) {
+            const forcarChat =
+              isForMe && !!myResponsavelId && newMsg.enviado_por === myResponsavelId;
+
+            // Abre o chat quando é forçado (responsável) ou quando não há nenhum aberto.
+            // openChatDoc é idempotente, então não corre risco de abrir+fechar.
+            if (isForMe && (forcarChat || openChatDocsRef.current.length === 0)) {
+              openChatDoc(newMsg.documento);
+            }
+            if (forcarChat) {
               setForcedChatDoc(newMsg.documento);
-              handleToggleChatDoc(newMsg.documento);
             }
 
             // Notificação Nativa (Chrome/Edge/Safari)
@@ -881,9 +895,7 @@ function DashboardContent({
                   });
                   notif.onclick = () => {
                     window.focus();
-                    if (!openChatDocsRef.current.includes(newMsg.documento)) {
-                      handleToggleChatDoc(newMsg.documento);
-                    }
+                    openChatDoc(newMsg.documento);
                   };
                 } catch (err) {
                   console.error("[CRM] Erro ao disparar notificação:", err);
@@ -1026,15 +1038,15 @@ function DashboardContent({
             },
           ]);
         }
-        handleToggleChatDoc(detail.doc);
+        openChatDoc(detail.doc);
       }
     };
     window.addEventListener("open-crm-chat", handleOpenChat);
 
     const handlePushOpenChat = (e: Event) => {
       const doc = (e as CustomEvent<string>).detail;
-      if (doc && !openChatDocsRef.current.includes(doc)) {
-        handleToggleChatDoc(doc);
+      if (doc) {
+        openChatDoc(doc);
       }
     };
     window.addEventListener("carflax-open-chat", handlePushOpenChat);
@@ -1047,7 +1059,7 @@ function DashboardContent({
       window.removeEventListener("carflax-open-chat", handlePushOpenChat);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userProfile?.id, handleToggleChatDoc]);
+  }, [userProfile?.id, openChatDoc]);
 
   const handleActiveItemChange = (item: string) => {
     if (item === "Sugestões") {
