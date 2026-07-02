@@ -7,6 +7,7 @@ import {
 import { evolutionGoApi } from "../../../lib/evolution-go";
 import type { GoInstance, GoChat, GoMessage } from "../../../lib/evolution-go";
 import { marketingService } from "../../../lib/marketing-service";
+import { supabase } from "../../../lib/supabase";
 
 interface WhatsappGoViewProps {
   vendedorId?: string;
@@ -612,11 +613,60 @@ export function WhatsappGoView({ vendedorId, userProfile }: WhatsappGoViewProps)
     };
 
     loadChats();
-    const interval = setInterval(loadChats, 5000);
+
+    const channel = supabase
+      .channel("official-whatsapp-go-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "marketing_whatsapp" },
+        (payload) => {
+          const row = payload.new as any;
+          if (!row || cancelled) return;
+
+          if (selectedChatRef.current && row.remote_jid === selectedChatRef.current.jid) {
+            const newMsg: GoMessage = {
+              id: row.message_id,
+              remoteJid: row.remote_jid,
+              fromMe: row.sender === "me",
+              text: row.texto,
+              type: row.tipo || "text",
+              timestamp: Math.floor(new Date(row.timestamp).getTime() / 1000),
+              status: row.status,
+              mediaUrl: row.media_url || undefined,
+            };
+
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg].sort((a, b) => a.timestamp - b.timestamp);
+            });
+          }
+
+          loadChats();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "marketing_whatsapp" },
+        (payload) => {
+          const row = payload.new as any;
+          if (!row || cancelled) return;
+
+          setMessages(prev => prev.map(m => m.id === row.message_id ? { ...m, status: row.status } : m));
+          loadChats();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "marketing_clientes" },
+        () => {
+          if (!cancelled) loadChats();
+        }
+      )
+      .subscribe();
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      supabase.removeChannel(channel);
     };
   }, [connState, vendedorId]);
 

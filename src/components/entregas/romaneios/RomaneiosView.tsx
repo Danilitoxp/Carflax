@@ -197,8 +197,8 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
           GER_VLRCON as VALOR,
           GER_MENEX2 as OBS,
           GER_CODVEN as VENDEDOR_COD
-        FROM MOVGER 
-        WHERE GER_NUMDOC = '${nfFormatada}'
+        FROM MOVGER
+        WHERE GER_NUMDOC = '${nfFormatada}' AND GER_ESPDOC = 'NF'
         LIMIT 1
       `;
       

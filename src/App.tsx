@@ -55,6 +55,8 @@ export interface UserProfile {
   is_admin?: boolean;
   phone?: string;
   whatsapp?: string;
+  responsavel_id?: string;
+  is_leader?: boolean;
 }
 
 interface DashboardContentProps {

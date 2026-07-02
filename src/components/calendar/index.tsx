@@ -28,6 +28,7 @@ interface UserProfile {
   seller_code?: string;
   operator_code?: string; // Nome usado no App.tsx
   permissions?: string[];
+  is_leader?: boolean;
 }
 
 interface CalendarEvent {
@@ -72,8 +73,8 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
   const [viewMode, setViewMode] = useState<"events" | "vacations">(activeTab === "Férias" ? "vacations" : "events");
   const [currentDate, setCurrentDate] = useState(new Date()); // Mes Atual
   
-  const canManageFerias = userProfile?.permissions?.includes("Gerenciar Férias") || userProfile?.role === "admin";
-  const canManageEvents = userProfile?.permissions?.includes("Gerenciar Calendário") || userProfile?.role === "admin";
+  const canManageFerias = userProfile?.is_leader || userProfile?.role === "admin";
+  const canManageEvents = userProfile?.is_leader || userProfile?.role === "admin";
   const [activeFilters, setActiveFilters] = useState<string[]>(["birthday", "star", "education", "video", "holiday", "meeting", "celebration", "finance", "important", "launch", "follow-up"]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [vacations, setVacations] = useState<Vacation[]>([]);

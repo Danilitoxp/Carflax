@@ -69,6 +69,7 @@ interface UserProfile {
   avatar?: string;
   operator_code?: string;
   operatorCode?: string;
+  responsavel_id?: string;
 }
 
 function parseName(raw: string): string {
@@ -135,6 +136,12 @@ function isGerente(role?: string) {
   if (!role) return false;
   const r = role.toLowerCase();
   return r.includes("gerente") || r.includes("diretor") || r.includes("marketing") || r.includes("admin");
+}
+
+// Supervisor de vendas: vê apenas os vendedores sob sua responsabilidade (não todos)
+function isSupervisor(role?: string) {
+  if (!role) return false;
+  return role.toLowerCase().includes("supervisor");
 }
 
 interface RowProps {
@@ -254,6 +261,34 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [faturamento, setFaturamento] = useState<FaturamentoResumo | null>(null);
   const sellerCodeRef = useRef<Map<string, string>>(new Map());
   const visibleCount = 50;
+
+  // Códigos de vendedor que um supervisor pode enxergar (subordinados + ele mesmo).
+  // null = ainda não carregado; Set vazio = supervisor sem vendedores atribuídos.
+  const [subordinateCodes, setSubordinateCodes] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (!userProfile || !isSupervisor(userProfile.role) || !userProfile.id) {
+      setSubordinateCodes(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("usuarios")
+        .select("operator_code")
+        .eq("responsavel_id", userProfile.id);
+      if (cancelled) return;
+      const codes = new Set(
+        (data || [])
+          .map((u) => String(u.operator_code || "").trim().replace(/^0+/, ""))
+          .filter(Boolean)
+      );
+      const myCode = String(userProfile.operator_code || userProfile.operatorCode || "").trim().replace(/^0+/, "");
+      if (myCode) codes.add(myCode);
+      setSubordinateCodes(codes);
+    })();
+    return () => { cancelled = true; };
+  }, [userProfile]);
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "id", direction: "desc" });
   const [filterStatus, setFilterStatus] = useState("Todos os Status");
@@ -375,21 +410,28 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       orcamentos.forEach((o) => { if (o.sellerCode) map.set(o.seller, o.sellerCode); });
       sellerCodeRef.current = map;
 
-      // Vendedor só vê seus próprios orçamentos
+      // Vendedor só vê seus próprios orçamentos; supervisor vê apenas seu time
       if (userProfile && !isGerente(userProfile.role)) {
-        const myCode = String(userProfile.operator_code || userProfile.operatorCode || "").trim().replace(/^0+/, "");
-        if (myCode) {
+        if (isSupervisor(userProfile.role)) {
+          const codes = subordinateCodes ?? new Set<string>();
           orcamentos = orcamentos.filter((o) =>
-            String(o.sellerCode || "").trim().replace(/^0+/, "") === myCode
+            codes.has(String(o.sellerCode || "").trim().replace(/^0+/, ""))
           );
         } else {
-          // Fallback por nome se não tiver código de operador
-          const nomeUser = (userProfile.name || "").toUpperCase();
-          const palavras = nomeUser.split(" ").filter((p: string) => p.length > 2);
-          orcamentos = orcamentos.filter((o) => {
-            const vend = o.seller.toUpperCase();
-            return palavras.some((p: string) => vend.includes(p));
-          });
+          const myCode = String(userProfile.operator_code || userProfile.operatorCode || "").trim().replace(/^0+/, "");
+          if (myCode) {
+            orcamentos = orcamentos.filter((o) =>
+              String(o.sellerCode || "").trim().replace(/^0+/, "") === myCode
+            );
+          } else {
+            // Fallback por nome se não tiver código de operador
+            const nomeUser = (userProfile.name || "").toUpperCase();
+            const palavras = nomeUser.split(" ").filter((p: string) => p.length > 2);
+            orcamentos = orcamentos.filter((o) => {
+              const vend = o.seller.toUpperCase();
+              return palavras.some((p: string) => vend.includes(p));
+            });
+          }
         }
       }
 
@@ -467,7 +509,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate, userProfile, cacheKey]);
+  }, [startDate, endDate, userProfile, cacheKey, subordinateCodes]);
 
   useEffect(() => {
     // Se já temos dados carregados via cache (useEffect acima), fazemos o fetch "silencioso"
@@ -487,7 +529,14 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     };
 
     // Vendedor não-gerente: sempre filtra pelo próprio código
-    if (userProfile && !isGerente(userProfile.role)) {
+    if (userProfile && isSupervisor(userProfile.role)) {
+      if (filterSeller !== "Todos os Vendedores") {
+        const code = sellerCodeRef.current.get(filterSeller);
+        if (code) params.vendedor = code;
+      } else if (subordinateCodes && subordinateCodes.size > 0) {
+        params.vendedor = Array.from(subordinateCodes).join(",");
+      }
+    } else if (userProfile && !isGerente(userProfile.role)) {
       const myCode = String(userProfile.operator_code || userProfile.operatorCode || "").trim();
       if (myCode) params.vendedor = myCode;
     } else if (filterSeller !== "Todos os Vendedores") {
@@ -496,7 +545,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     }
 
     apiCrmFaturamento(params).then(setFaturamento).catch(() => {});
-  }, [filterSeller, startDate, endDate, userProfile]);
+  }, [filterSeller, startDate, endDate, userProfile, subordinateCodes]);
 
   // ── Ouve evento do FollowUpReminder para aplicar o filtro automaticamente ──
   useEffect(() => {
@@ -1031,7 +1080,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
           <TinyDropdown value={filterStatus} options={["Todos os Status", "Em Aberto", "Follow-ups", "Emitido", "Enviado", "Negociação", "Lib. Crédito", "Aguard. Pedido", "Venda", "Perdido"]} onChange={setFilterStatus} icon={FileCheck} variant="blue" placeholder="Todos os Status" />
           
-          {isGerente(userProfile?.role) && (
+          {(isGerente(userProfile?.role) || isSupervisor(userProfile?.role)) && (
             <TinyDropdown value={filterSeller} options={uniqueSellers} onChange={setFilterSeller} icon={UserIcon} variant="slate" placeholder="Todos os Vendedores" />
           )}
 
@@ -1252,7 +1301,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     <OrcamentoRow
                       key={item.id}
                       item={item}
-                      isAdmin={isGerente(userProfile?.role)}
+                      isAdmin={isGerente(userProfile?.role) || isSupervisor(userProfile?.role)}
                       onOpenItems={async (o) => {
                         setSelectedItem(o);
                         setIsItemsModalOpen(true);

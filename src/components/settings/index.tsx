@@ -42,6 +42,7 @@ interface UserProfile {
   whatsapp?: string;
   permissions?: string[];
   is_admin?: boolean;
+  is_leader?: boolean;
 }
 
 interface SettingsSectionProps {
@@ -59,7 +60,7 @@ function BannersTab({ userProfile }: { userProfile?: UserProfile | null }) {
     { id: 1, title: "Banner Promoção Abril", url: "https://images.unsplash.com/photo-1549416805-0e6d62635928?q=80&w=1200", dims: "1800 x 600px" },
     { id: 2, title: "Aviso Nova Filial", url: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=1200", dims: "1800 x 600px" },
   ]);
-  const canManage = userProfile?.permissions?.includes("Gerenciar Banners") || userProfile?.role === "admin";
+  const canManage = userProfile?.is_leader || userProfile?.role === "admin";
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

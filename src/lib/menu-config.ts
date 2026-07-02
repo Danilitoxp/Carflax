@@ -7,6 +7,7 @@ export interface NavSection {
   label: string;
   permGroup: string; // group shown in UsersView permissions panel
   subItems?: NavSubItem[];
+  leaderOnly?: boolean; // acesso liberado automaticamente para líderes, sem toggle manual no painel
 }
 
 // Single source of truth for sidebar navigation + permission groups.
@@ -64,20 +65,20 @@ export const NAV_SECTIONS: NavSection[] = [
     permGroup: "LOGÍSTICA",
     subItems: [{ label: "Romaneios" }],
   },
-  { label: "Usuários", permGroup: "GESTÃO & ADMIN" },
-  { label: "DB Admin", permGroup: "GESTÃO & ADMIN" },
+  { label: "Usuários", permGroup: "GESTÃO & ADMIN", leaderOnly: true },
+  { label: "DB Admin", permGroup: "GESTÃO & ADMIN", leaderOnly: true },
   { label: "Sugestões", permGroup: "ESSENCIAL" },
 ];
 
 // Extra action-level permissions not tied to sidebar sections.
 // These stay hardcoded here since they control in-app features, not navigation.
-export const EXTRA_PERMISSIONS: { group: string; label: string }[] = [
+export const EXTRA_PERMISSIONS: { group: string; label: string; leaderOnly?: boolean }[] = [
   { group: "COMERCIAL", label: "Criar Campanha" },
   { group: "LOGÍSTICA", label: "Lançar Entrega" },
-  { group: "GESTÃO & ADMIN", label: "Gerenciar Comunicados" },
-  { group: "GESTÃO & ADMIN", label: "Gerenciar Férias" },
-  { group: "GESTÃO & ADMIN", label: "Gerenciar Banners" },
-  { group: "GESTÃO & ADMIN", label: "Gerenciar Calendário" },
+  { group: "GESTÃO & ADMIN", label: "Gerenciar Comunicados", leaderOnly: true },
+  { group: "GESTÃO & ADMIN", label: "Gerenciar Férias", leaderOnly: true },
+  { group: "GESTÃO & ADMIN", label: "Gerenciar Banners", leaderOnly: true },
+  { group: "GESTÃO & ADMIN", label: "Gerenciar Calendário", leaderOnly: true },
 ];
 
 // Derived permission groups for UsersView — built automatically from NAV_SECTIONS + EXTRA_PERMISSIONS
@@ -89,6 +90,7 @@ function buildPermissionGroups() {
   ORDER.forEach(g => map.set(g, []));
 
   NAV_SECTIONS.forEach(section => {
+    if (section.leaderOnly) return; // liberado automaticamente para líderes, sem toggle manual
     if (!map.has(section.permGroup)) map.set(section.permGroup, []);
     const arr = map.get(section.permGroup)!;
     if (section.subItems?.length) {
@@ -98,7 +100,8 @@ function buildPermissionGroups() {
     }
   });
 
-  EXTRA_PERMISSIONS.forEach(({ group, label }) => {
+  EXTRA_PERMISSIONS.forEach(({ group, label, leaderOnly }) => {
+    if (leaderOnly) return; // liberado automaticamente para líderes, sem toggle manual
     if (!map.has(group)) map.set(group, []);
     map.get(group)!.push(label);
   });

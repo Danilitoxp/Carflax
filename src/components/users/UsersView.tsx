@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { uploadImage } from "@/lib/uploadImage";
 import { PERMISSION_GROUPS } from "@/lib/menu-config";
@@ -11,6 +11,7 @@ import {
   X,
   ShieldCheck,
   UserCog,
+  UserCheck,
   Building2,
   Briefcase,
   Camera
@@ -34,6 +35,8 @@ interface User {
   admissionDate?: string;
   coletorPermissions?: Record<string, boolean>;
   is_admin?: boolean;
+  responsavelId?: string;
+  isLeader?: boolean;
 }
 
 export function UsersView() {
@@ -62,6 +65,8 @@ export function UsersView() {
     coletorPermissions: Record<string, boolean>;
     _avatarFile?: File;
     is_admin: boolean;
+    responsavelId: string;
+    isLeader: boolean;
   }
 
   // User State for Modal
@@ -86,7 +91,9 @@ export function UsersView() {
       can_embalagens: false,
       can_inventario: false
     },
-    is_admin: false
+    is_admin: false,
+    responsavelId: "",
+    isLeader: false
   });
 
   const permissionGroups = PERMISSION_GROUPS;
@@ -134,7 +141,7 @@ export function UsersView() {
   const ROLES_BY_DEPARTMENT: Record<string, string[]> = {
     "Estoque":      ["Gerente de Estoque", "Conferente", "Auxiliar de Expedição", "Motorista"],
     "Segurança":    ["Gerente de Segurança", "Auxiliar de Segurança"],
-    "Vendas":       ["Gerente de Vendas", "Vendedor B2B", "Vendedor B2C", "Auxiliar de Vendas", "Check-out"],
+    "Vendas":       ["Gerente de Vendas", "Supervisor de Vendas", "Vendedor B2B", "Vendedor B2C", "Auxiliar de Vendas", "Check-out"],
     "Compras":      ["Gerente de Compras", "Auxiliar de Compras"],
     "Marketing":    ["Gerente de Marketing", "Auxiliar de Marketing"],
     "Recursos H":   ["Gerente de RH", "Auxiliar de RH"],
@@ -155,8 +162,6 @@ export function UsersView() {
   const allRoles = [...new Set(Object.values(ROLES_BY_DEPARTMENT).flat())].sort();
   const rolesForDepartment = (dept: string): string[] =>
     ROLES_BY_DEPARTMENT[dept] ?? allRoles;
-
-
 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -184,13 +189,23 @@ export function UsersView() {
           birthDate: isoToMasked(u.birth_date || ""),
           admissionDate: isoToMasked(u.admission_date || ""),
           coletorPermissions: u.coletor_permissions || {},
-          is_admin: u.is_admin || false
+          is_admin: u.is_admin || false,
+          responsavelId: u.responsavel_id || "",
+          isLeader: u.is_leader || false
         })));
       }
       setLoading(false);
     }
     fetchUsers();
   }, []);
+
+  const responsavelOptions = useMemo(() => {
+    const candidates = users.filter((u) => u.isLeader && u.id !== editingUser?.id);
+    return [
+      { label: "Nenhum", value: "" },
+      ...candidates.map((u) => ({ label: `${u.name} (${u.role})`, value: u.id })),
+    ];
+  }, [users, editingUser?.id]);
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -225,7 +240,9 @@ export function UsersView() {
         can_embalagens: false,
         can_inventario: false
       },
-      is_admin: user.is_admin || false
+      is_admin: user.is_admin || false,
+      responsavelId: user.responsavelId || "",
+      isLeader: user.isLeader || false
     });
     setAvatarLoading(false);
     setSaving(false);
@@ -273,7 +290,9 @@ export function UsersView() {
       birth_date: maskedToISO(newUser.birthDate || "") || null,
       admission_date: maskedToISO(newUser.admissionDate || "") || null,
       coletor_permissions: newUser.coletorPermissions,
-      is_admin: newUser.is_admin
+      is_admin: newUser.is_admin,
+      responsavel_id: newUser.responsavelId || null,
+      is_leader: newUser.isLeader
     };
 
     console.log("[Users] Salvando usuário. Payload final:", finalPayload);
@@ -324,7 +343,9 @@ export function UsersView() {
           birthDate: isoToMasked(u.birth_date || ""),
           admissionDate: isoToMasked(u.admission_date || ""),
           coletorPermissions: u.coletor_permissions || {},
-          is_admin: u.is_admin || false
+          is_admin: u.is_admin || false,
+          responsavelId: u.responsavel_id || "",
+          isLeader: u.is_leader || false
         })));
 
       }
@@ -417,7 +438,9 @@ export function UsersView() {
                   can_embalagens: false,
                   can_inventario: false
                 },
-                is_admin: false
+                is_admin: false,
+                responsavelId: "",
+                isLeader: false
               });
               setAvatarLoading(false);
               setSaving(false);
@@ -697,6 +720,30 @@ export function UsersView() {
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Data de Admissão</label>
                   <input type="text" inputMode="numeric" placeholder="dd/mm/aaaa" maxLength={10} value={newUser.admissionDate} onChange={(e) => setNewUser({ ...newUser, admissionDate: applyDateMask(e.target.value) })} className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all placeholder:text-muted-foreground/30" />
+                </div>
+
+                <div className="col-span-2 flex items-center justify-between p-3 rounded-xl border border-border bg-secondary/10">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-foreground uppercase tracking-tight">Líder</span>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tight">Pode ser selecionado como responsável de outros colaboradores</span>
+                    </div>
+                  </div>
+                  <Switch enabled={newUser.isLeader} onChange={() => setNewUser({ ...newUser, isLeader: !newUser.isLeader })} />
+                </div>
+
+                <div className="col-span-2 space-y-1.5">
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Responsável (Líder Direto)</label>
+                  <TinyDropdown
+                    value={newUser.responsavelId}
+                    options={responsavelOptions}
+                    onChange={(val) => setNewUser({ ...newUser, responsavelId: val })}
+                    icon={UserCheck}
+                    variant="blue"
+                    placeholder="Nenhum"
+                    className="w-full"
+                  />
                 </div>
               </div>
 

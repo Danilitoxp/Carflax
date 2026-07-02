@@ -70,6 +70,7 @@ export interface UserProfile {
   role: string;
   permissions?: string[];
   avatar?: string;
+  is_leader?: boolean;
 }
 
 /** Renderiza o conteúdo de comunicados de alteração de preço como linhas estruturadas */
@@ -355,7 +356,7 @@ export function CommunicationCard({
 }) {
   const currentUserId = userProfile?.id;
   const canManage =
-    userProfile?.permissions?.includes("Gerenciar Comunicados") ||
+    userProfile?.is_leader ||
     userProfile?.role === "admin";
   const isLiked = currentUserId ? data.likedBy.includes(currentUserId) : false;
   const [likes, setLikes] = useState(data.likes);
@@ -1075,7 +1076,7 @@ export function CommunicationSection({
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
 
   const canManage =
-    userProfile?.permissions?.includes("Gerenciar Comunicados") ||
+    userProfile?.is_leader ||
     userProfile?.role === "admin";
   const loading =
     externalLoading !== undefined ? externalLoading : internalLoading;
