@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   Users,
+  Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -35,6 +36,8 @@ interface UserProfile {
   id?: string;
   name: string;
   role: string;
+  department?: string;
+  is_admin?: boolean;
 }
 
 interface EsteiraUser {
@@ -120,20 +123,19 @@ const getCleanDescriptionText = (description?: string) => {
   return description
     .split("\n")
     .filter((line) => !line.match(/^\s*[-*•]?\s*\[([ xX])\]\s*(.*)$/))
-    .join("\n")
-    .trim();
+    .join("\n");
 };
 
 const updateDescriptionText = (description: string, newCleanText: string): string => {
   const lines = description.split("\n");
   const subtaskLines = lines.filter((line) => line.match(/^\s*[-*•]?\s*\[([ xX])\]\s*(.*)$/));
-  if (!newCleanText.trim()) {
+  if (newCleanText === "") {
     return subtaskLines.join("\n");
   }
   if (subtaskLines.length === 0) {
     return newCleanText;
   }
-  return `${newCleanText.trimEnd()}\n${subtaskLines.join("\n")}`;
+  return `${newCleanText}\n${subtaskLines.join("\n")}`;
 };
 
 interface Subtask {
@@ -276,6 +278,16 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
     if (!subquadro) return [];
     return usersList.filter((u) => u.department?.trim() === subquadro.name);
   }, [usersList, subquadro]);
+
+  const isAllowedToViewSubquadro = useMemo(() => {
+    if (!isSubquadroView || !subquadro || !userProfile) return true;
+    const roleUpper = userProfile.role?.toUpperCase() || "";
+    const isManagerOrAdmin = userProfile.is_admin || roleUpper.includes("ADMIN") || roleUpper.includes("GERENTE") || roleUpper.includes("DIRETOR");
+    if (isManagerOrAdmin) return true;
+
+    const userDept = userProfile.department?.trim().toLowerCase();
+    return !!userDept && subquadro.name.trim().toLowerCase() === userDept;
+  }, [isSubquadroView, subquadro, userProfile]);
 
   useEffect(() => {
     if (!subquadroId) {
@@ -806,6 +818,24 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (isSubquadroView && subquadro && !isAllowedToViewSubquadro) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-background text-foreground text-center">
+        <div className="max-w-sm space-y-4">
+          <div className="w-16 h-16 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto border border-rose-500/20">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h2 className="text-base font-black uppercase tracking-tight text-foreground">
+            Acesso Restrito
+          </h2>
+          <p className="text-xs text-muted-foreground font-semibold leading-relaxed">
+            Você não faz parte do subquadro "{subquadro.name}". Apenas membros deste departamento podem acessar esta área.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-background text-foreground p-6 overflow-hidden relative font-sans">
       {/* Seletor de esteira — só para gerente/admin acompanhar a equipe */}
@@ -1018,7 +1048,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
                     const subtasks = parseSubtasks(card.description);
                     const visibleSubtasks = subtasks.slice(0, 5);
                     const remainingCount = subtasks.length - 5;
-                    const cleanDesc = getCleanDescriptionText(card.description);
+                    const cleanDesc = getCleanDescriptionText(card.description).trim();
                     const isExpanded = expandedCards[card.id] || false;
 
                     return (
@@ -1411,7 +1441,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
                   </label>
                   {isViewOnly ? (
                     <div className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm min-h-[80px] max-h-[160px] overflow-y-auto custom-scrollbar">
-                      {getCleanDescriptionText(selectedCard.description || "") || (
+                      {getCleanDescriptionText(selectedCard.description || "").trim() || (
                         <span className="text-muted-foreground italic text-xs">
                           Nenhuma descrição informada.
                         </span>

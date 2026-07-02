@@ -135,6 +135,7 @@ interface AppSidebarProps {
     department?: string;
     permissions?: string[];
     is_leader?: boolean;
+    is_admin?: boolean;
   };
   isCollapsed: boolean;
   onToggle: () => void;
@@ -180,7 +181,21 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     };
   }, []);
 
-  const menuItems = useMemo(() => buildMenuItems(subquadros), [subquadros]);
+  const allowedSubquadros = useMemo(() => {
+    if (!userProfile) return [];
+    const role = userProfile.role?.toUpperCase() || "";
+    const isManager = userProfile.is_admin || role.includes("ADMIN") || role.includes("GERENTE") || role.includes("DIRETOR");
+    if (isManager) return subquadros;
+
+    const userDept = userProfile.department?.trim().toLowerCase();
+    if (!userDept) return [];
+
+    return subquadros.filter(
+      (s) => s.name.trim().toLowerCase() === userDept
+    );
+  }, [subquadros, userProfile]);
+
+  const menuItems = useMemo(() => buildMenuItems(allowedSubquadros), [allowedSubquadros]);
 
   // ── Notificações da Esteira — toast igual às demais, sem painel/histórico ──
   const { showNotification } = useNotification();
@@ -238,8 +253,18 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const role = userProfile?.role?.toUpperCase() || "";
     if (role.includes('ADMIN') || role.includes('GERENTE')) return true;
 
-    // Subquadros da Esteira são abertos pra todo mundo, igual a própria Esteira.
-    if (label.startsWith(ESTEIRA_SUBQUADRO_PREFIX)) return true;
+    // Subquadros da Esteira: apenas membros do próprio subquadro (via departamento) ou admin/gerente/diretor
+    if (label.startsWith(ESTEIRA_SUBQUADRO_PREFIX)) {
+      const subquadroId = label.substring(ESTEIRA_SUBQUADRO_PREFIX.length);
+      const sub = subquadros.find(s => s.id === subquadroId);
+      if (!sub) return false;
+      
+      const isManager = role.includes('ADMIN') || role.includes('GERENTE') || role.includes('DIRETOR') || userProfile?.is_admin;
+      if (isManager) return true;
+
+      const userDept = userProfile?.department?.trim().toLowerCase();
+      return !!userDept && sub.name.trim().toLowerCase() === userDept;
+    }
 
     // Itens padrão (que todos vêem) — configurações pessoais + módulos essenciais
     const alwaysAllowed = [
