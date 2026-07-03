@@ -161,6 +161,75 @@ function PriceChangeContent({ content }: { content: string }) {
   );
 }
 
+/** Renderiza o comunicado de recebimento de material como itens estruturados, agrupados por nota fiscal */
+function MaterialReceivedContent({ content }: { content: string }) {
+  const lines = content.split("\n");
+  const footerLine = lines.find((l) => l.trim().startsWith("Total"));
+
+  type Entry =
+    | { type: "nf"; label: string }
+    | { type: "item"; code: string; name: string; qty: string };
+
+  const entries: Entry[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (/^NF\s+/i.test(line)) {
+      entries.push({ type: "nf", label: line.replace(/:$/, "") });
+    } else if (line.startsWith("•")) {
+      const m = line.match(/^•\s*\[([^\]]+)\]\s*(.+?)\s*—\s*(.+?)\s*un$/);
+      if (m) {
+        entries.push({ type: "item", code: m[1], name: m[2], qty: m[3] });
+      } else {
+        entries.push({ type: "item", code: "", name: line.replace(/^•\s*/, ""), qty: "" });
+      }
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1 mb-1">
+      <div className="max-h-36 overflow-y-auto flex flex-col gap-1 pr-1">
+        {entries.map((e, i) =>
+          e.type === "nf" ? (
+            <div key={i} className="flex items-center gap-2 mt-1 first:mt-0">
+              <span className="text-[9px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest shrink-0">
+                {e.label}
+              </span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+          ) : (
+            <div
+              key={i}
+              className="flex items-center gap-2 py-1 px-2 rounded-lg bg-secondary/40 hover:bg-secondary/70 transition-colors"
+            >
+              {e.code && (
+                <span className="font-black text-muted-foreground shrink-0 text-[9px] bg-secondary border border-border px-1.5 py-0.5 rounded-md leading-none">
+                  {e.code}
+                </span>
+              )}
+              <span
+                className="flex-1 font-semibold text-foreground text-[11px] truncate"
+                title={e.name}
+              >
+                {e.name}
+              </span>
+              {e.qty && (
+                <span className="shrink-0 font-black text-[10px] px-1.5 py-0.5 rounded-md text-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/15">
+                  {e.qty} un
+                </span>
+              )}
+            </div>
+          ),
+        )}
+      </div>
+      {footerLine && (
+        <p className="text-[10px] text-muted-foreground/50 font-medium mt-0.5">
+          {footerLine}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function CommentBubble({
   comment,
   currentUserId,
@@ -856,6 +925,9 @@ export function CommunicationCard({
           {data.title.includes("ALTERACOES DE PRECO") ? (
             /* Comunicado de alteração de preço: renderização estruturada por produto */
             <PriceChangeContent content={data.content} />
+          ) : data.content.startsWith("Chegou material do fornecedor") ? (
+            /* Comunicado de recebimento de material: itens agrupados por nota fiscal */
+            <MaterialReceivedContent content={data.content} />
           ) : (
             /* Comunicados normais: expandir/recolher ao clicar */
             <div

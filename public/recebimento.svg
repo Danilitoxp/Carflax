@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600" role="img" aria-label="Recebimento de material">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#111a2e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="600" height="600" fill="url(#bg)"/>
+
+  <!-- seta de entrada -->
+  <g stroke="url(#accent)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M300 120 V245"/>
+    <path d="M250 205 L300 255 L350 205"/>
+  </g>
+
+  <!-- caixa (pacote) -->
+  <g fill="none" stroke="url(#accent)" stroke-width="20" stroke-linejoin="round">
+    <path d="M300 300 L450 375 L450 470 L300 545 L150 470 L150 375 Z"/>
+    <path d="M150 375 L300 450 L450 375" />
+    <path d="M300 450 L300 545" />
+    <path d="M225 337 L375 412" stroke-opacity="0.55"/>
+  </g>
+</svg>

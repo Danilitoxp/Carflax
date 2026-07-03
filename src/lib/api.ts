@@ -90,6 +90,12 @@ export interface MetaMes {
   META: number | string;
 }
 
+/** Dispara no backend a geração/atualização dos comunicados de recebimento de material do dia. */
+export const apiGerarComunicadoRecebimentos = () =>
+  get<{ criados: number; atualizados: number; fornecedores: number }>(
+    "/api/recebimentos/gerar-comunicado",
+  );
+
 /** Metas do mês por vendedor (CADMET), inclusive de quem ainda não faturou. */
 export const apiDashboardMetas = (data?: string) =>
   get<MetaMes[]>("/api/dashboard/geral/metas", {

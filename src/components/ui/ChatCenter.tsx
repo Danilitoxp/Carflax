@@ -134,7 +134,6 @@ export function ChatCenter({
     return text.replace(/[-=_]{3,}/g, "").trim();
   };
 
-  console.log("[CRM] ChatCenter:", { isOpen, openChatDocs, openChatsData });
   if (!isOpen && openChatDocs.length === 0) return null;
 
   return (

@@ -15,7 +15,7 @@ import {
   UpcomingEventsCard,
   EmployeeOfMonthCard,
 } from "@/components/dashboard/Geral/RightPanelComponents";
-import { type VendedorResumo, type CrmItem } from "@/lib/api";
+import { type VendedorResumo, type CrmItem, apiGerarComunicadoRecebimentos } from "@/lib/api";
 import { type CrmConversa } from "@/lib/crm-service";
 import { GeralView } from "@/components/dashboard/Geral/GeralView";
 import { LayoutGrid } from "lucide-react";
@@ -460,7 +460,7 @@ function DashboardContent({
 
       const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string;
       if (!vapidKey) {
-        console.warn("[Push] VITE_VAPID_PUBLIC_KEY não encontrada no .env. Notificações desativadas.");
+        // Sem chave VAPID configurada: notificações push ficam desativadas (silencioso).
         return;
       }
 
@@ -516,8 +516,24 @@ function DashboardContent({
 
   useEffect(() => {
     const role = userProfile?.role?.toUpperCase() || "";
-    if (role === "ADMIN" || role.includes("GERENTE")) {
+    const isAdminGerente = role === "ADMIN" || role.includes("GERENTE");
+    if (isAdminGerente) {
       runAnnouncementAutomation();
+    }
+    // Comunicado de recebimento de material: dispara também quando um líder/gestor
+    // abre a página (além do agendador de 10 min). Throttle de ~10 min para não
+    // bater no ERP a cada refresh. A rotina no servidor é idempotente (dedup/atualiza).
+    if (isAdminGerente || userProfile?.is_leader === true) {
+      try {
+        const KEY = "carflax-recebimento-last";
+        const last = Number(localStorage.getItem(KEY) || 0);
+        if (Date.now() - last > 10 * 60 * 1000) {
+          localStorage.setItem(KEY, String(Date.now()));
+          apiGerarComunicadoRecebimentos().catch(() => {});
+        }
+      } catch {
+        apiGerarComunicadoRecebimentos().catch(() => {});
+      }
     }
   }, [userProfile]);
 
@@ -929,7 +945,6 @@ function DashboardContent({
         },
       )
       .subscribe((status) => {
-        console.log("[CRM] Realtime status:", status);
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           console.warn("[CRM] Realtime desconectado, tentando reconectar...");
           setTimeout(() => {
