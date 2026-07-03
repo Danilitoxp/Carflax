@@ -534,8 +534,8 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
 
         const response = await apiDashboardGeral(isManager ? undefined : codVendedor, dataStr);
 
-        if (response && response.length > 0) {
-          if (isManager) {
+        if (isManager) {
+          if (response && response.length > 0) {
             setAllVendedores(response);
 
             if (!externalData) {
@@ -548,10 +548,33 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                 setSelectedCod(response[0].COD_VENDEDOR);
               }
             }
-          } else {
-            const myData = response.find(r => r.COD_VENDEDOR === codVendedor) || response[0];
+          }
+        } else {
+          // Vendedor comum: usa a própria linha do ERP. Se ainda não faturou no mês
+          // (ex.: recém-admitido), o ERP não devolve linha — então monta com a META
+          // real (CADMET) e zera o restante, para o painel não aparecer todo zerado.
+          const myData = (response || []).find(r => r.COD_VENDEDOR === codVendedor);
+          if (myData) {
             setData(myData);
             setSelectedCod(myData.COD_VENDEDOR);
+          } else {
+            const metasMes = await apiDashboardMetas(dataStr).catch(
+              () => [] as { COD_VENDEDOR: string; META: number | string }[],
+            );
+            const metaFound = (metasMes || []).find(
+              mt => String(mt.COD_VENDEDOR).trim() === String(codVendedor).trim(),
+            );
+            const metaVal = metaFound ? parseFloat(String(metaFound.META)) || 0 : 0;
+            const selfPlaceholder: VendedorResumo = {
+              COD_VENDEDOR: codVendedor,
+              NOME_VENDEDOR: userProfile?.name || "",
+              META: metaVal, FATURADO: 0, EM_ABERTO: 0, TOTAL: 0, FALTANTE: metaVal,
+              CUSTO: 0, MARGEM_REAL: 0, MARGEM_REAL_PERC: 0,
+              QTD_VENDAS: 0, TICKET_MEDIO: 0, QTD_ORCAMENTOS: 0, ORC_FECHADOS: 0,
+              PRAZO_MEDIO_DIAS: 0, TOTAL_VENDIDO_HOJE: 0,
+            };
+            setData(selfPlaceholder);
+            setSelectedCod(codVendedor);
           }
         }
 
