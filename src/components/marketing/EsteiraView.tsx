@@ -367,7 +367,11 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
           .in("owner_id", memberIds)
           .order("order_index", { ascending: true });
         if (error) throw error;
-        setCards(data || []);
+        // Só entram no quadro de equipe os cards cujo CRIADOR também é do subquadro.
+        // Assim, uma delegação feita por alguém de fora (ex.: quadro pessoal de outra
+        // área) não vaza pra cá só porque o responsável faz parte da equipe.
+        const memberSet = new Set(memberIds);
+        setCards((data || []).filter((c) => !c.created_by || memberSet.has(c.created_by)));
         return;
       }
 
@@ -411,7 +415,13 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
   // membro do subquadro; no modo pessoal, se eu for o responsável ou o criador.
   const belongsToCurrentView = (ownerId: string | null, createdBy: string | null) => {
     if (isSubquadroView) {
-      return !!ownerId && subquadroMembers.some((m) => m.id === ownerId);
+      // Dono E criador precisam ser do subquadro — delegação vinda de fora fica só
+      // nos quadros pessoais, não vaza para o quadro de equipe.
+      return (
+        !!ownerId &&
+        subquadroMembers.some((m) => m.id === ownerId) &&
+        (!createdBy || subquadroMembers.some((m) => m.id === createdBy))
+      );
     }
     return ownerId === boardOwnerId || createdBy === boardOwnerId;
   };
