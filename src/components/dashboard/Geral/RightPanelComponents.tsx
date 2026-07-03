@@ -393,6 +393,8 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   const filteredData = periodTab === '7dias' ? vendasDiarias.slice(-7) : vendasDiarias;
 
   useEffect(() => {
+    let cancelled = false;
+
     if (externalData) {
       setData(externalData);
       setInternalLoading(false);
@@ -476,6 +478,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             if (subSetErp.length === 0) {
               // sem subordinados com dados no ERP — mostra os próprios dados
               const myData = response.find(r => r.COD_VENDEDOR === codVendedor) || response[0];
+              if (cancelled) return;
               setAllVendedores([myData]);
               setData(myData);
               setSelectedCod(myData.COD_VENDEDOR);
@@ -524,6 +527,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                 PRAZO_MEDIO_DIAS: totalFATURADO > 0 ? prazoPonderado / totalFATURADO : 0,
               };
               // Inclui o "Meu Time" (linha MEDIA) + os vendedores individuais no seletor
+              if (cancelled) return;
               setAllVendedores([teamTotal, ...subSet]);
               setData(teamTotal);
               setSelectedCod("MEDIA");
@@ -536,6 +540,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
 
         if (isManager) {
           if (response && response.length > 0) {
+            if (cancelled) return;
             setAllVendedores(response);
 
             if (!externalData) {
@@ -555,6 +560,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
           // real (CADMET) e zera o restante, para o painel não aparecer todo zerado.
           const myData = (response || []).find(r => r.COD_VENDEDOR === codVendedor);
           if (myData) {
+            if (cancelled) return;
             setData(myData);
             setSelectedCod(myData.COD_VENDEDOR);
           } else {
@@ -573,6 +579,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
               QTD_VENDAS: 0, TICKET_MEDIO: 0, QTD_ORCAMENTOS: 0, ORC_FECHADOS: 0,
               PRAZO_MEDIO_DIAS: 0, TOTAL_VENDIDO_HOJE: 0,
             };
+            if (cancelled) return;
             setData(selfPlaceholder);
             setSelectedCod(codVendedor);
           }
@@ -581,12 +588,27 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
       } catch (error) {
         console.error("Erro ao carregar métricas:", error);
       } finally {
-        setInternalLoading(false);
+        if (!cancelled) setInternalLoading(false);
       }
     }
 
     fetchData();
-  }, [userProfile, externalData]);
+
+    return () => {
+      cancelled = true;
+    };
+    // Depende só dos campos primitivos usados do userProfile (não do objeto inteiro),
+    // para o efeito não re-executar — piscando o painel — a cada nova referência do prop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    userProfile?.id,
+    userProfile?.role,
+    userProfile?.is_leader,
+    userProfile?.operator_code,
+    userProfile?.operatorCode,
+    userProfile?.name,
+    externalData,
+  ]);
 
   useEffect(() => {
     setActiveQuote(prev => getRandomQuote(prev));
