@@ -531,6 +531,7 @@ const notifSections = [
     items: [
       { key: "updates", label: "Atualizações de Segurança" },
       { key: "maintenance", label: "Manutenção do Servidor" },
+      { key: "stalePedidos", label: "Pedido parado (Balcão 2 / Entrega)" },
     ],
   },
   {
@@ -559,7 +560,7 @@ const notifSections = [
 ];
 
 function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null }) {
-  const [state, setState] = useState<StateMap>(buildDefault);
+  const [state, setState] = useState<StateMap>(loadNotifState);
   const [responsibles, setResponsibles] = useState<LossResponsible[]>([]);
   const [loadingResp, setLoadingResp] = useState(true);
   const [savingResp, setSavingResp] = useState(false);
@@ -612,6 +613,18 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
   function toggle(section: string, item: string) {
     setState((prev) => ({ ...prev, [section]: { ...prev[section], [item]: !prev[section][item] } }));
   }
+
+  // Persiste as preferências de notificação (usadas, ex., pelo alerta de pedidos parados).
+  useEffect(() => {
+    try { localStorage.setItem("carflax_notif_prefs", JSON.stringify(state)); } catch { /* ignore */ }
+  }, [state]);
+
+  // Ao habilitar "Pedido parado", pede permissão de notificação do navegador.
+  useEffect(() => {
+    if (state.alertas?.stalePedidos && typeof Notification !== "undefined" && Notification.permission === "default") {
+      Promise.resolve(Notification.requestPermission()).catch(() => {});
+    }
+  }, [state.alertas?.stalePedidos]);
 
   useEffect(() => {
     async function fetchResponsibles() {
@@ -846,9 +859,27 @@ function buildDefault(): StateMap {
   const s: StateMap = {};
   for (const sec of notifSections) {
     s[sec.key] = {};
-    for (const item of sec.items) s[sec.key][item.key] = true;
+    // "Pedido parado" começa desligado (é um alerta operacional que a pessoa habilita).
+    for (const item of sec.items) s[sec.key][item.key] = item.key !== "stalePedidos";
   }
   return s;
+}
+
+/** Lê as preferências salvas por cima dos defaults (apenas chaves conhecidas). */
+function loadNotifState(): StateMap {
+  const def = buildDefault();
+  try {
+    const raw = localStorage.getItem("carflax_notif_prefs");
+    if (!raw) return def;
+    const saved = JSON.parse(raw);
+    for (const sec of notifSections) {
+      for (const item of sec.items) {
+        const v = saved?.[sec.key]?.[item.key];
+        if (typeof v === "boolean") def[sec.key][item.key] = v;
+      }
+    }
+  } catch { /* usa defaults */ }
+  return def;
 }
 
 /* ─────────────────────────────────────────────

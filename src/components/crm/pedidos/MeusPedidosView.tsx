@@ -16,6 +16,7 @@ import {
   Boxes,
   X,
   Loader2,
+  Store,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -137,6 +138,18 @@ function getTipoInfo(tipo: string, tipoMov?: string, localRet?: string) {
   return { label: "OUTROS", color: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" };
 }
 
+/** Label do tipo (mesma regra do badge do card): BALCÃO 1/2, ENTREGA, etc. */
+function tipoLabel(tipo: string, tipoMov?: string, localRet?: string) {
+  return getTipoInfo(tipo, tipoMov, localRet).label;
+}
+
+/** Opções de filtro por tipo de pedido (multi-seleção). */
+const TIPO_FILTERS: { label: string; short: string }[] = [
+  { label: "BALCÃO 1", short: "Balcão 1" },
+  { label: "BALCÃO 2", short: "Balcão 2" },
+  { label: "ENTREGA", short: "Entrega" },
+];
+
 function getStatusInfo(status: string) {
   const s = (status || "").toLowerCase();
   if (s.includes("faturamento"))      return { color: "bg-sky-500/15 text-sky-400 border-sky-500/30" };
@@ -172,6 +185,20 @@ export function MeusPedidosView({ userProfile }: Props) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
+  const [activeTipos, setActiveTipos] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("meuspedidos_tipos");
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("meuspedidos_tipos", JSON.stringify(activeTipos)); } catch { /* ignore */ }
+  }, [activeTipos]);
+
+  const toggleTipo = (label: string) =>
+    setActiveTipos((prev) => (prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]));
   const [usersCache, setUsersCache] = useState<Map<string, { name: string; avatar: string }>>(new Map());
   const [namesToCodesCache, setNamesToCodesCache] = useState<Map<string, string>>(new Map());
   const [itemsModalTarget, setItemsModalTarget] = useState<ItemsModalTarget | null>(null);
@@ -329,15 +356,29 @@ export function MeusPedidosView({ userProfile }: Props) {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
-  /* ── Contagens ──────────────────────────────────────────── */
-  const countAguardando = orders.filter((o) => !o.isSeparating).length;
-  const countSeparando  = orders.filter((o) => o.isSeparating).length;
-  const countSeparado   = separatedOrders.length + faturamentoOrders.length;
-  const countTotal      = orders.length + countSeparado;
+  /* ── Bases filtradas por tipo (Balcão 1/2, Entrega) — alimentam contagens e listas ── */
+  const ordersByTipo = useMemo(
+    () => (activeTipos.length ? orders.filter((o) => activeTipos.includes(tipoLabel("", o.TIPO_MOVIMENTACAO, o.LOCAL_RETIRADA))) : orders),
+    [orders, activeTipos],
+  );
+  const separatedByTipo = useMemo(
+    () => (activeTipos.length ? separatedOrders.filter((o) => activeTipos.includes(tipoLabel(o.TIPO, o.TIPO_MOVIMENTACAO, o.LOCAL_RETIRADA))) : separatedOrders),
+    [separatedOrders, activeTipos],
+  );
+  const faturamentoByTipo = useMemo(
+    () => (activeTipos.length ? faturamentoOrders.filter((o) => activeTipos.includes(tipoLabel("", o.TIPO_MOVIMENTACAO, o.LOCAL_RETIRADA))) : faturamentoOrders),
+    [faturamentoOrders, activeTipos],
+  );
+
+  /* ── Contagens (respeitam o filtro de tipo) ─────────────── */
+  const countAguardando = ordersByTipo.filter((o) => !o.isSeparating).length;
+  const countSeparando  = ordersByTipo.filter((o) => o.isSeparating).length;
+  const countSeparado   = separatedByTipo.length + faturamentoByTipo.length;
+  const countTotal      = ordersByTipo.length + countSeparado;
 
   /* ── Filtro de pedidos em andamento ─────────────────────── */
   const filteredOrders = useMemo(() => {
-    let list = orders;
+    let list = ordersByTipo;
     if (filterTab === "aguardando") list = list.filter((o) => !o.isSeparating);
     if (filterTab === "separando")  list = list.filter((o) => o.isSeparating);
 
@@ -358,32 +399,34 @@ export function MeusPedidosView({ userProfile }: Props) {
       const dateB = `${b.FGO_DTAENT || ""} ${b.FGO_HORENT || ""}`;
       return dateB.localeCompare(dateA);
     });
-  }, [orders, filterTab, search]);
+  }, [ordersByTipo, filterTab, search]);
 
   /* ── Filtro de já separados (conferência + faturamento) ─── */
   const filteredSeparated = useMemo(() => {
-    if (!search.trim()) return separatedOrders;
+    let list = separatedByTipo;
+    if (!search.trim()) return list;
     const q = search.toLowerCase();
-    return separatedOrders.filter(
+    return list.filter(
       (o) =>
         (o.CLIENTE || "").toLowerCase().includes(q) ||
         String(Number(o.PEDIDO)).includes(q) ||
         (o.NOME_VENDEDOR || "").toLowerCase().includes(q) ||
         (o.SEPARADOR || "").toLowerCase().includes(q)
     );
-  }, [separatedOrders, search]);
+  }, [separatedByTipo, search]);
 
   const filteredFaturamento = useMemo(() => {
-    if (!search.trim()) return faturamentoOrders;
+    let list = faturamentoByTipo;
+    if (!search.trim()) return list;
     const q = search.toLowerCase();
-    return faturamentoOrders.filter(
+    return list.filter(
       (o) =>
         (o.NOME_CLIENTE || "").toLowerCase().includes(q) ||
         String(Number(o.FGO_NUMDOC)).includes(q) ||
         (o.NOME_VENDEDOR || "").toLowerCase().includes(q) ||
         (o.NOME_SEPARADOR || "").toLowerCase().includes(q)
     );
-  }, [faturamentoOrders, search]);
+  }, [faturamentoByTipo, search]);
 
   const tabs: { key: FilterTab; label: string; icon: React.ElementType; count?: number; accent?: string }[] = [
     { key: "all",       label: "Todos",        icon: List,          count: countTotal },
@@ -460,6 +503,28 @@ export function MeusPedidosView({ userProfile }: Props) {
               placeholder="Buscar por cliente, pedido ou vendedor..."
               className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
             />
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {TIPO_FILTERS.map((f) => {
+              const active = activeTipos.includes(f.label);
+              return (
+                <button
+                  key={f.label}
+                  onClick={() => toggleTipo(f.label)}
+                  aria-pressed={active}
+                  title={active ? `Removendo filtro ${f.short}` : `Filtrar ${f.short}`}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-all",
+                    active
+                      ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                      : "text-muted-foreground border-border hover:text-foreground hover:bg-muted"
+                  )}
+                >
+                  <Store className="w-3.5 h-3.5" />
+                  {f.short}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

@@ -36,6 +36,7 @@ import { EsteiraView } from "@/components/marketing/EsteiraView";
 import { ESTEIRA_SUBQUADRO_PREFIX, canAccessSection } from "@/lib/menu-config";
 import { useNotification } from "@/hooks/useNotification";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
+import { usePedidosParadosAlert } from "@/hooks/usePedidosParadosAlert";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { SorteioRealtimeModal } from "@/components/ui/SorteioRealtimeModal";
 import { RankingCopaView } from "@/components/crm/campanhas/RankingCopaView";
@@ -74,6 +75,7 @@ function DashboardContent({
   onLogout,
 }: DashboardContentProps) {
   const { showNotification } = useNotification();
+  usePedidosParadosAlert(showNotification, userProfile);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
