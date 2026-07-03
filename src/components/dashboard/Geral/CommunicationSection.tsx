@@ -359,7 +359,8 @@ export function CommunicationCard({
     userProfile?.is_leader ||
     userProfile?.role === "admin";
   const isLiked = currentUserId ? data.likedBy.includes(currentUserId) : false;
-  const [likes, setLikes] = useState(data.likes);
+  // Fonte única de verdade: o tamanho do array liked_by (evita divergência com o campo numérico likes)
+  const [likes, setLikes] = useState(data.likedBy?.length ?? data.likes ?? 0);
   const [interaction, setInteraction] = useState<"like" | null>(
     isLiked ? "like" : null,
   );
@@ -450,7 +451,7 @@ export function CommunicationCard({
 
   const [lastDataId, setLastDataId] = useState(data.id);
   if (data.id !== lastDataId) {
-    setLikes(data.likes);
+    setLikes(data.likedBy?.length ?? data.likes ?? 0);
     setInteraction(
       currentUserId && data.likedBy.includes(currentUserId) ? "like" : null,
     );
@@ -640,12 +641,19 @@ export function CommunicationCard({
     patch: { likes: number; liked_by: string[]; reactions: Record<string, string[]> },
     prevComments: ComunicadoComment[],
   ) => {
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("comunicado_comentarios")
       .update(patch)
-      .eq("id", Number(commentId));
+      .eq("id", commentId)
+      .select("id");
     if (error) {
       console.error("Erro ao salvar reação/like:", error);
+      setComments(prevComments);
+      return;
+    }
+    // Nenhuma linha atualizada = id não bateu ou RLS bloqueou: reverte para não mostrar algo que não foi salvo
+    if (!updated || updated.length === 0) {
+      console.error("Reação/like não persistida (0 linhas atualizadas)", commentId);
       setComments(prevComments);
     }
   };
@@ -767,9 +775,11 @@ export function CommunicationCard({
       } else {
         newLikedBy = newLikedBy.filter((id: string) => id !== currentUserId);
       }
+      // Contagem sempre derivada do array para manter likes e liked_by consistentes
+      setLikes(newLikedBy.length);
       await supabase
         .from("comunicados")
-        .update({ likes: newLikesCount, liked_by: newLikedBy })
+        .update({ likes: newLikedBy.length, liked_by: newLikedBy })
         .eq("id", data.dbId);
     } catch (error) {
       console.error("Erro ao sincronizar curtida:", error);

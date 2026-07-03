@@ -313,13 +313,16 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
   }, [userProfile?.id, boardOwnerId, isSubquadroView]);
 
   useEffect(() => {
-    if (selectedCard) {
-      const owner = usersList.find((u) => u.id === selectedCard.owner_id);
-      setResponsibleSearch(toTitleCase(owner?.name));
-    } else {
+    if (!isCardModalOpen || !selectedCard) {
       setResponsibleSearch("");
+      return;
     }
-  }, [selectedCard, usersList]);
+    const owner = usersList.find((u) => u.id === selectedCard.owner_id);
+    setResponsibleSearch(owner ? toTitleCase(owner.name) : "");
+    // Sincroniza o nome apenas ao abrir o modal / carregar usuários — não a cada
+    // tecla digitada, senão o texto do usuário seria apagado a cada caractere.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCardModalOpen, usersList]);
 
   const fetchUsers = useCallback(async () => {
     try {

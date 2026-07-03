@@ -85,6 +85,17 @@ export const apiDashboardGeral = (vendedor?: string, data?: string) =>
     ...(data ? { data } : {})
   });
 
+export interface MetaMes {
+  COD_VENDEDOR: string;
+  META: number | string;
+}
+
+/** Metas do mês por vendedor (CADMET), inclusive de quem ainda não faturou. */
+export const apiDashboardMetas = (data?: string) =>
+  get<MetaMes[]>("/api/dashboard/geral/metas", {
+    ...(data ? { data } : {})
+  });
+
 export interface VendaDiaria {
   DIA: string;
   TOTAL_VENDIDO: number;

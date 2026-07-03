@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect, useCallback, useRef } from "react";
 import html2canvas from "html2canvas-pro";
 import { uploadImage } from "@/lib/uploadImage";
-import { apiDashboardGeral, type VendedorResumo, apiEntregasConcluidas, apiCampanhaMetas, apiVendasDiarias, type VendaDiaria } from "@/lib/api";
+import { apiDashboardGeral, type VendedorResumo, apiEntregasConcluidas, apiCampanhaMetas, apiVendasDiarias, type VendaDiaria, apiDashboardMetas } from "@/lib/api";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { calculateMonthlyWinner } from "@/lib/highlights_automation";
 import { supabase } from "@/lib/supabase";
@@ -419,21 +419,61 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
           // Busca os vendedores sob responsabilidade deste supervisor
           const { data: subordinados } = await supabase
             .from("usuarios")
-            .select("operator_code")
+            .select("operator_code, name")
             .eq("responsavel_id", userProfile.id)
             .not("operator_code", "is", null);
 
-          const codsSubordinados = (subordinados || []).map((u: { operator_code: string }) => u.operator_code).filter(Boolean);
+          // Membros do time = subordinados + o próprio supervisor (ele também vende
+          // e tem meta, então deve aparecer no seletor e compor o total "Meu Time").
+          const teamMembers: { operator_code: string; name: string }[] = [
+            ...(subordinados || []).map((u: { operator_code: string; name: string }) => ({
+              operator_code: u.operator_code,
+              name: u.name,
+            })),
+          ];
+          if (codVendedor && !teamMembers.some(m => m.operator_code === codVendedor)) {
+            teamMembers.push({ operator_code: codVendedor, name: userProfile?.name || "" });
+          }
+
+          const codsSubordinados = teamMembers.map(m => m.operator_code).filter(Boolean);
           setTeamCodes(codsSubordinados);
 
-          // Busca todos os dados do dashboard e filtra
-          const response = await apiDashboardGeral(undefined, dataStr);
+          // Busca dados do dashboard + metas do mês (estas incluem quem ainda não faturou)
+          const [response, metasMes] = await Promise.all([
+            apiDashboardGeral(undefined, dataStr),
+            apiDashboardMetas(dataStr).catch(() => [] as { COD_VENDEDOR: string; META: number | string }[]),
+          ]);
+          const metaMap = new Map<string, number>(
+            (metasMes || []).map(mt => [String(mt.COD_VENDEDOR).trim(), parseFloat(String(mt.META)) || 0]),
+          );
 
           if (response && response.length > 0) {
-            const subSet = response.filter(r => codsSubordinados.includes(r.COD_VENDEDOR));
+            const subSetErp = response.filter(r => codsSubordinados.includes(r.COD_VENDEDOR));
+
+            // Membros atribuídos que ainda não têm linha no ERP (ex.: vendedor
+            // recém-admitido, sem faturamento no mês) entram com a META real (via
+            // CADMET) e o restante zerado, para ficarem selecionáveis e já mostrarem
+            // meta/faltante mesmo antes de faturar. Equilíbrio, diário e dias restantes
+            // são calculados pelo próprio card a partir desses dois campos.
+            const erpCods = new Set(subSetErp.map(r => r.COD_VENDEDOR));
+            const placeholders: VendedorResumo[] = teamMembers
+              .filter(m => m.operator_code && !erpCods.has(m.operator_code))
+              .map(m => {
+                const metaVal = metaMap.get(String(m.operator_code).trim()) || 0;
+                return {
+                  COD_VENDEDOR: m.operator_code,
+                  NOME_VENDEDOR: m.name,
+                  META: metaVal, FATURADO: 0, EM_ABERTO: 0, TOTAL: 0, FALTANTE: metaVal,
+                  CUSTO: 0, MARGEM_REAL: 0, MARGEM_REAL_PERC: 0,
+                  QTD_VENDAS: 0, TICKET_MEDIO: 0, QTD_ORCAMENTOS: 0, ORC_FECHADOS: 0,
+                  PRAZO_MEDIO_DIAS: 0, TOTAL_VENDIDO_HOJE: 0,
+                };
+              });
+
+            const subSet = [...subSetErp, ...placeholders];
 
             const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
-            if (subSet.length === 0) {
+            if (subSetErp.length === 0) {
               // sem subordinados com dados no ERP — mostra os próprios dados
               const myData = response.find(r => r.COD_VENDEDOR === codVendedor) || response[0];
               setAllVendedores([myData]);
@@ -776,7 +816,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                           selectedCod === v.COD_VENDEDOR ? "text-blue-600 bg-blue-50/50 dark:bg-blue-900/20" : "text-slate-600 dark:text-slate-300"
                         )}
                       >
-                        <span className="truncate uppercase pr-2">{v.NOME_VENDEDOR}</span>
+                        <span className="truncate uppercase pr-2">{(v.NOME_VENDEDOR || "").trim().split(/\s+/).slice(0, 2).join(" ")}</span>
                         {selectedCod === v.COD_VENDEDOR && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
                       </button>
                     ))}
