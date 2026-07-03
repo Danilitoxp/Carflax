@@ -264,6 +264,8 @@ export function mapCrmItem(p: Partial<CrmItem> & {
 
 export interface CrmOrcamento {
   ORCAMENTO: string;
+  /** Documento gerado quando o orçamento foi faturado/convertido (FGO_NUMFAT). Elo de migração entre empresas. */
+  DOC_GERADO?: string | null;
   PEDIDO: string;
   NOTA_FISCAL?: string | number;
   DATA_ORCAMENTO: string;

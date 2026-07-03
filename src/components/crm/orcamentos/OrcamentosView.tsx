@@ -54,6 +54,7 @@ export interface Orcamento {
   lossReason?: string;
   lembreteData?: string;
   empresa?: string;
+  docGerado?: string;
   items: CrmItem[];
   sellerCode?: string;
   phone?: string;
@@ -126,6 +127,7 @@ function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
       markupValue: avgMarkup,
       lossReason: r.MOTIVO_CANCELAMENTO !== "SEM MOTIVO" ? r.MOTIVO_CANCELAMENTO : undefined,
       empresa: r.EMPRESA,
+      docGerado: r.DOC_GERADO ?? undefined,
       items: products,
       sellerCode: r.COD_VENDEDOR,
       phone: r.TELEFONE_CLIENTE ? formatPhone(r.TELEFONE_CLIENTE.trim()) : ''
@@ -405,6 +407,22 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         }
       }
       orcamentos = Array.from(byDoc.values());
+
+      // Deduplicar orçamentos "migrados" entre empresas usando o vínculo real do ERP:
+      // um orçamento faturado guarda em docGerado (FGO_NUMFAT) o número do pedido/venda
+      // que gerou. Se esse número aparece como outro documento na lista, o orçamento de
+      // origem (em aberto) deve sumir — mantemos o resultante (a venda).
+      const normDoc = (s?: string) =>
+        String(s || "").split("-")[0].replace(/\D/g, "").padStart(12, "0");
+      const idsPresentes = new Set(orcamentos.map((o) => normDoc(o.id)));
+      orcamentos = orcamentos.filter((o) => {
+        if (o.status === "VENDA" || o.status === "PERDIDO") return true; // nunca esconde definitivo
+        if (!o.docGerado) return true;
+        const gerado = normDoc(o.docGerado);
+        if (gerado === normDoc(o.id)) return true; // aponta pra si mesmo: ignora
+        // Se o documento gerado está na lista (a venda resultante), esconde a origem
+        return !idsPresentes.has(gerado);
+      });
 
       // Atualizar mapa de sellerCode (ref, sem causar re-render)
       const map = new Map<string, string>();
