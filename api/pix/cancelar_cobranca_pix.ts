@@ -12,7 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     {
       method: "DELETE",
       headers: { accept: "application/json", authorization: PIX_AUTH },
-    }
+    },
   );
 
   const data = await upstream.text();
