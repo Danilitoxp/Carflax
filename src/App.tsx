@@ -1144,22 +1144,25 @@ function DashboardContent({
     "Pós-Venda",
     "Relatórios Mkt",
   ].includes(activeItem);
-  // Papéis de gestão de vendas também veem o painel de métricas (com seletor de
-  // times/vendedores), não o card de "destaque" do funcionário comum.
+  // Só o COMERCIAL vê o painel de métricas; os demais veem "Funcionário do Mês".
+  // Gerente de outra área (ex.: logística) NÃO vê métricas.
   const roleUpper = userProfile?.role?.toUpperCase() || "";
-  const isGestaoVendas =
-    roleUpper === "ADMIN" ||
-    roleUpper.includes("DIRETOR") ||
-    roleUpper.includes("GERENTE") ||
-    roleUpper.includes("SUPERVISOR") ||
-    userProfile?.is_leader === true;
+  const deptUpper = userProfile?.department?.toUpperCase() || "";
+  const isComercialDept = deptUpper === "COMERCIAL" || deptUpper === "VENDAS";
+  const isVendedorRole =
+    userProfile?.role?.toLowerCase().includes("vendedor") ||
+    userProfile?.role?.toLowerCase().includes("venda");
+  const isDiretoria = roleUpper.includes("DIRETOR"); // DIRETOR e DIRETORA
+  const isGerenteVendas =
+    roleUpper.includes("GERENTE") &&
+    (isComercialDept || roleUpper.includes("VENDA") || roleUpper.includes("COMERCIAL"));
 
   const isComercial =
-    userProfile?.department === "Comercial" ||
-    userProfile?.department === "Vendas" ||
-    userProfile?.role?.toLowerCase().includes("vendedor") ||
-    userProfile?.role?.toLowerCase().includes("venda") ||
-    isGestaoVendas ||
+    isComercialDept ||
+    isVendedorRole ||
+    isDiretoria ||
+    isGerenteVendas ||
+    roleUpper === "ADMIN" ||
     isVendedor;
 
   const showRightPanel = activeItem === "Geral"; // Mostrar para todos no dashboard principal

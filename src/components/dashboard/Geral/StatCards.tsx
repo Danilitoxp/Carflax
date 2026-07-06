@@ -20,7 +20,12 @@ export function StatCards({ userProfile, loading: externalLoading }: { userProfi
         const yyyy = now.getFullYear();
         const mesano = `${mm}${yyyy}`;
         const role = userProfile?.role?.toUpperCase() || "";
-        const isManager = role.includes("GERENTE") || role === "ADMIN" || role.includes("DIRETOR");
+        const dept = userProfile?.department?.toUpperCase() || "";
+        const isComercialDept = dept === "COMERCIAL" || dept === "VENDAS";
+        const isGerenteVendas =
+          role.includes("GERENTE") && (isComercialDept || role.includes("VENDA") || role.includes("COMERCIAL"));
+        // Visão geral (loja) só para Gerente de Vendas, Diretoria e Admin.
+        const isManager = role === "ADMIN" || role.includes("DIRETOR") || isGerenteVendas;
         const codVendedor = userProfile?.operator_code || userProfile?.operatorCode;
         
         // Se for gerente, buscamos todos (para pegar a MEDIA), senão buscamos o específico

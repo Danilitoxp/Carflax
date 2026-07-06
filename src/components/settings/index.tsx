@@ -27,7 +27,7 @@ import {
   Loader2,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 
 interface UserProfile {
@@ -554,6 +554,8 @@ const notifSections = [
     color: "amber",
     items: [
       { key: "broadcast", label: "Novos Comunicados no Geral" },
+      { key: "priceChange", label: "Alterações de Preço" },
+      { key: "productArrival", label: "Produtos que Chegaram" },
       { key: "events", label: "Eventos do Calendário" },
     ],
   },
@@ -614,10 +616,46 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
     setState((prev) => ({ ...prev, [section]: { ...prev[section], [item]: !prev[section][item] } }));
   }
 
-  // Persiste as preferências de notificação (usadas, ex., pelo alerta de pedidos parados).
+  const userId = userProfile?.id;
+  const hydratedRef = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Hidrata as preferências salvas por usuário no banco (sobrepõe o cache local).
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("notification_prefs")
+        .eq("id", userId)
+        .maybeSingle();
+      if (!cancelled) {
+        if (!error && data?.notification_prefs) {
+          setState((prev) => mergeKnownPrefs(prev, data.notification_prefs));
+        }
+        hydratedRef.current = true; // libera o salvamento a partir daqui
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  // Cache local instantâneo + persistência por usuário no banco (debounced).
   useEffect(() => {
     try { localStorage.setItem("carflax_notif_prefs", JSON.stringify(state)); } catch { /* ignore */ }
-  }, [state]);
+    if (!userId || !hydratedRef.current) return; // não salva antes de hidratar do banco
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      supabase
+        .from("usuarios")
+        .update({ notification_prefs: state })
+        .eq("id", userId)
+        .then(({ error }) => {
+          if (error) console.error("[Notif] Erro ao salvar preferências:", error);
+        });
+    }, 600);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [state, userId]);
 
   // Ao habilitar "Pedido parado", pede permissão de notificação do navegador.
   useEffect(() => {
@@ -865,19 +903,26 @@ function buildDefault(): StateMap {
   return s;
 }
 
+/** Mescla preferências salvas sobre uma base, considerando só chaves conhecidas. */
+function mergeKnownPrefs(base: StateMap, saved: unknown): StateMap {
+  const out: StateMap = {};
+  for (const sec of notifSections) {
+    out[sec.key] = { ...base[sec.key] };
+    for (const item of sec.items) {
+      const v = (saved as StateMap | null | undefined)?.[sec.key]?.[item.key];
+      if (typeof v === "boolean") out[sec.key][item.key] = v;
+    }
+  }
+  return out;
+}
+
 /** Lê as preferências salvas por cima dos defaults (apenas chaves conhecidas). */
 function loadNotifState(): StateMap {
   const def = buildDefault();
   try {
     const raw = localStorage.getItem("carflax_notif_prefs");
     if (!raw) return def;
-    const saved = JSON.parse(raw);
-    for (const sec of notifSections) {
-      for (const item of sec.items) {
-        const v = saved?.[sec.key]?.[item.key];
-        if (typeof v === "boolean") def[sec.key][item.key] = v;
-      }
-    }
+    return mergeKnownPrefs(def, JSON.parse(raw));
   } catch { /* usa defaults */ }
   return def;
 }

@@ -10,7 +10,7 @@ import {
   Smile,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { uploadImage } from "@/lib/uploadImage";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,21 @@ export interface UserProfile {
 }
 
 /** Renderiza o conteúdo de comunicados de alteração de preço como linhas estruturadas */
+// Classifica o comunicado para respeitar as preferências de notificação do
+// usuário (Configurações > Notificações > Comunicação Interna). Só oculta
+// quando o toggle correspondente está explicitamente desligado.
+function isCommVisibleForPrefs(
+  post: { title?: string; content?: string },
+  equipePrefs: Record<string, boolean> | undefined,
+): boolean {
+  if (!equipePrefs) return true;
+  const title = (post.title || "").toUpperCase();
+  const content = post.content || "";
+  if (title.includes("ALTERACOES DE PRECO")) return equipePrefs.priceChange !== false;
+  if (content.startsWith("Chegou material do fornecedor")) return equipePrefs.productArrival !== false;
+  return equipePrefs.broadcast !== false; // comunicados gerais
+}
+
 function PriceChangeContent({ content }: { content: string }) {
   const lines = content.split("\n");
   const productLines = lines.filter((l) => l.startsWith("\u2022"));
@@ -1365,11 +1380,23 @@ export function CommunicationSection({
     }));
   };
 
+  // Preferências de notificação do usuário (o que ele quer ver no feed).
+  const equipePrefs = useMemo<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem("carflax_notif_prefs");
+      return raw ? (JSON.parse(raw)?.equipe ?? {}) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
   const filtered = (
     activeCategory === "Todos"
       ? comms
       : comms.filter((c) => c.category === activeCategory)
-  ).filter((c) => !hiddenPosts.includes(String(c.dbId)));
+  )
+    .filter((c) => !hiddenPosts.includes(String(c.dbId)))
+    .filter((c) => isCommVisibleForPrefs(c, equipePrefs));
 
   return (
     <div className="flex flex-col relative">

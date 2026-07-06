@@ -39,6 +39,7 @@ interface UserProfileLite {
   name?: string;
   avatar?: string;
   role?: string;
+  department?: string;
   phone?: string;
   whatsapp?: string;
   is_leader?: boolean;
@@ -453,8 +454,13 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     }
 
     const role = userProfile?.role?.toUpperCase() || "";
-    const isManager = role.includes("GERENTE") || role === "ADMIN";
-    const isDirector = !isManager && role.includes("DIRETOR");
+    const dept = userProfile?.department?.toUpperCase() || "";
+    const isComercialDept = dept === "COMERCIAL" || dept === "VENDAS";
+    // Visão GERAL (loja inteira) só para Gerente de Vendas, Admin e Diretoria.
+    const isDirector = role.includes("DIRETOR"); // DIRETOR e DIRETORA → geral + times
+    const isGerenteVendas =
+      role.includes("GERENTE") && (isComercialDept || role.includes("VENDA") || role.includes("COMERCIAL"));
+    const isManager = role === "ADMIN" || isGerenteVendas;
     const isSupervisor = !isManager && !isDirector && (role.includes("SUPERVISOR") || userProfile?.is_leader === true);
 
     if (externalData && !isManager && !isSupervisor && !isDirector) return;
