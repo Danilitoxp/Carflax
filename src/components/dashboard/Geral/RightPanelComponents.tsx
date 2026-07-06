@@ -43,6 +43,58 @@ interface UserProfileLite {
   whatsapp?: string;
   is_leader?: boolean;
 }
+
+// Usuário vindo do Supabase para montar a hierarquia (Diretor → Supervisores → Vendedores)
+interface OrgUser {
+  id: string;
+  operator_code?: string | null;
+  name?: string | null;
+  role?: string | null;
+  responsavel_id?: string | null;
+  is_leader?: boolean | null;
+}
+
+// Soma as métricas de um conjunto de vendedores em uma única linha agregada.
+// Usado para o total "Meu Time" (supervisor) e para os subtotais por time na
+// visão do Diretor. Recalcula todos os campos exibidos — não pode herdar da
+// linha da loja inteira, senão margem/prazo/hoje viriam com o total da loja.
+function buildTeamTotal(
+  rows: VendedorResumo[],
+  base: VendedorResumo | undefined,
+  cod: string,
+  nome: string,
+): VendedorResumo {
+  const sum = (key: keyof VendedorResumo) =>
+    rows.reduce((acc, r) => acc + (parseFloat(String(r[key])) || 0), 0);
+  const totalMETA = sum("META");
+  const totalFATURADO = sum("FATURADO");
+  const totalQtdVendas = sum("QTD_VENDAS");
+  const totalMargemReal = sum("MARGEM_REAL");
+  const prazoPonderado = rows.reduce(
+    (acc, r) => acc + (parseFloat(String(r.PRAZO_MEDIO_DIAS)) || 0) * (parseFloat(String(r.FATURADO)) || 0),
+    0,
+  );
+  return {
+    ...(base || rows[0]),
+    COD_VENDEDOR: cod,
+    NOME_VENDEDOR: nome,
+    META: totalMETA,
+    FATURADO: totalFATURADO,
+    EM_ABERTO: sum("EM_ABERTO"),
+    TOTAL: sum("TOTAL"),
+    FALTANTE: totalMETA - totalFATURADO,
+    TOTAL_VENDIDO_HOJE: sum("TOTAL_VENDIDO_HOJE"),
+    QTD_VENDAS: totalQtdVendas,
+    QTD_ORCAMENTOS: sum("QTD_ORCAMENTOS"),
+    ORC_FECHADOS: sum("ORC_FECHADOS"),
+    CUSTO: sum("CUSTO"),
+    MARGEM_REAL: totalMargemReal,
+    MARGEM_REAL_PERC: totalFATURADO > 0 ? (totalMargemReal / totalFATURADO) * 100 : 0,
+    TICKET_MEDIO: totalQtdVendas > 0 ? totalFATURADO / totalQtdVendas : 0,
+    PRAZO_MEDIO_DIAS: totalFATURADO > 0 ? prazoPonderado / totalFATURADO : 0,
+  };
+}
+
 const MOTIVATIONAL_QUOTES = [
   { text: "O sucesso é a soma de pequenos esforços repetidos dia após dia.", author: "Robert Collier", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Robert%20Collier" },
   { text: "Seja a sua própria motivação. Venda soluções, entregue valor!", author: "Zig Ziglar", avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Zig%20Ziglar" },
@@ -379,7 +431,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
       const mm = String(now.getMonth() + 1).padStart(2, '0');
       const dd = String(now.getDate()).padStart(2, '0');
       const dataStr = `${yyyy}-${mm}-${dd}`;
-      const cod = selectedCod === "MEDIA" || selectedCod === "TOTAL" ? undefined : selectedCod;
+      const cod = selectedCod === "MEDIA" || selectedCod === "TOTAL" || selectedCod.startsWith("TEAM:") ? undefined : selectedCod;
       const result = await apiVendasDiarias(cod, dataStr);
       setVendasDiarias(result);
     } catch (err) {
@@ -402,9 +454,10 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
 
     const role = userProfile?.role?.toUpperCase() || "";
     const isManager = role.includes("GERENTE") || role === "ADMIN";
-    const isSupervisor = !isManager && (role.includes("SUPERVISOR") || userProfile?.is_leader === true);
+    const isDirector = !isManager && role.includes("DIRETOR");
+    const isSupervisor = !isManager && !isDirector && (role.includes("SUPERVISOR") || userProfile?.is_leader === true);
 
-    if (externalData && !isManager && !isSupervisor) return;
+    if (externalData && !isManager && !isSupervisor && !isDirector) return;
 
     async function fetchData() {
       try {
@@ -416,6 +469,60 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
         const dataStr = `${yyyy}-${mm}-${dd}`;
 
         const codVendedor = userProfile?.operator_code || userProfile?.operatorCode || "049";
+
+        if (isDirector) {
+          // Diretor(a): vê o Total Geral (empresa), os subtotais por time de cada
+          // supervisor e todos os vendedores individualmente.
+          const [response, orgRes] = await Promise.all([
+            apiDashboardGeral(undefined, dataStr),
+            supabase.from("usuarios").select("id, operator_code, name, role, responsavel_id, is_leader"),
+          ]);
+          const usuarios = (orgRes.data || []) as OrgUser[];
+
+          if (response && response.length > 0) {
+            const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
+            const individuais = response.filter(r => r.COD_VENDEDOR !== "MEDIA");
+            const erpByCod = new Map(individuais.map(r => [String(r.COD_VENDEDOR).trim(), r]));
+
+            // Agrupa subordinados por responsável (supervisor)
+            const membrosPorResponsavel = new Map<string, OrgUser[]>();
+            for (const u of usuarios) {
+              if (!u.responsavel_id) continue;
+              if (!membrosPorResponsavel.has(u.responsavel_id)) membrosPorResponsavel.set(u.responsavel_id, []);
+              membrosPorResponsavel.get(u.responsavel_id)!.push(u);
+            }
+
+            // Cada supervisor = usuário que é responsável por ≥1 pessoa.
+            const teamTotals: VendedorResumo[] = [];
+            for (const sup of usuarios) {
+              const membros = membrosPorResponsavel.get(sup.id);
+              if (!membros || membros.length === 0) continue;
+              const cods = new Set<string>();
+              if (sup.operator_code) cods.add(String(sup.operator_code).trim());
+              membros.forEach(m => { if (m.operator_code) cods.add(String(m.operator_code).trim()); });
+              const rows = [...cods].map(c => erpByCod.get(c)).filter(Boolean) as VendedorResumo[];
+              if (rows.length === 0) continue;
+              const primeiroNome = (sup.name || "Time").trim().split(/\s+/)[0];
+              teamTotals.push(buildTeamTotal(rows, mediaRow, `TEAM:${sup.id}`, `Time ${primeiroNome}`));
+            }
+            teamTotals.sort(
+              (a, b) => (parseFloat(String(b.FATURADO)) || 0) - (parseFloat(String(a.FATURADO)) || 0),
+            );
+
+            if (cancelled) return;
+            setAllVendedores([...(mediaRow ? [mediaRow] : []), ...teamTotals, ...individuais]);
+            if (!externalData) {
+              if (mediaRow) {
+                setData(mediaRow);
+                setSelectedCod("MEDIA");
+              } else {
+                setData(response[0]);
+                setSelectedCod(response[0].COD_VENDEDOR);
+              }
+            }
+          }
+          return;
+        }
 
         if (isSupervisor && userProfile?.id) {
           // Busca os vendedores sob responsabilidade deste supervisor
@@ -845,10 +952,16 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                     {selectedCod === "MEDIA" && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
                   </button>
 
-                  {allVendedores
-                    .filter(v => v.COD_VENDEDOR !== "MEDIA")
-                    .sort((a, b) => (a.NOME_VENDEDOR || "").localeCompare(b.NOME_VENDEDOR || ""))
-                    .map((v) => (
+                  {(() => {
+                    const rest = allVendedores.filter(v => v.COD_VENDEDOR !== "MEDIA");
+                    const times = rest
+                      .filter(v => v.COD_VENDEDOR.startsWith("TEAM:"))
+                      .sort((a, b) => (parseFloat(String(b.FATURADO)) || 0) - (parseFloat(String(a.FATURADO)) || 0));
+                    const vendedores = rest
+                      .filter(v => !v.COD_VENDEDOR.startsWith("TEAM:"))
+                      .sort((a, b) => (a.NOME_VENDEDOR || "").localeCompare(b.NOME_VENDEDOR || ""));
+
+                    const renderBtn = (v: VendedorResumo) => (
                       <button
                         key={v.COD_VENDEDOR}
                         onClick={() => {
@@ -864,7 +977,21 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                         <span className="truncate uppercase pr-2">{(v.NOME_VENDEDOR || "").trim().split(/\s+/).slice(0, 2).join(" ")}</span>
                         {selectedCod === v.COD_VENDEDOR && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
                       </button>
-                    ))}
+                    );
+
+                    const label = (t: string) => (
+                      <div className="px-4 pt-2 pb-1 text-[9px] font-black text-muted-foreground uppercase tracking-widest">{t}</div>
+                    );
+
+                    return (
+                      <>
+                        {times.length > 0 && label("Times")}
+                        {times.map(renderBtn)}
+                        {times.length > 0 && vendedores.length > 0 && label("Vendedores")}
+                        {vendedores.map(renderBtn)}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </>

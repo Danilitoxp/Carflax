@@ -1144,11 +1144,22 @@ function DashboardContent({
     "Pós-Venda",
     "Relatórios Mkt",
   ].includes(activeItem);
+  // Papéis de gestão de vendas também veem o painel de métricas (com seletor de
+  // times/vendedores), não o card de "destaque" do funcionário comum.
+  const roleUpper = userProfile?.role?.toUpperCase() || "";
+  const isGestaoVendas =
+    roleUpper === "ADMIN" ||
+    roleUpper.includes("DIRETOR") ||
+    roleUpper.includes("GERENTE") ||
+    roleUpper.includes("SUPERVISOR") ||
+    userProfile?.is_leader === true;
+
   const isComercial =
     userProfile?.department === "Comercial" ||
     userProfile?.department === "Vendas" ||
     userProfile?.role?.toLowerCase().includes("vendedor") ||
     userProfile?.role?.toLowerCase().includes("venda") ||
+    isGestaoVendas ||
     isVendedor;
 
   const showRightPanel = activeItem === "Geral"; // Mostrar para todos no dashboard principal

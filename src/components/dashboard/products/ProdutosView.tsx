@@ -5,7 +5,7 @@ import {
   Tag,
   ChevronUp,
   ChevronDown,
-  Printer
+  FileSpreadsheet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
@@ -131,222 +131,115 @@ export function ProdutosView() {
     }
   };
 
-  const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      alert("Por favor, permita pop-ups para imprimir o inventário.");
+  const handleExportExcel = async () => {
+    const items = filteredProducts;
+    if (items.length === 0) {
+      alert("Nenhum produto para exportar com os filtros atuais.");
       return;
     }
 
-    // Filter products dynamically in the print action to ensure we use the absolute latest state
-    const searchLower = searchTerm.trim().toLowerCase();
-    const words = searchLower.split(/\s+/).filter(Boolean);
+    const XLSX = (await import("xlsx-js-style")).default;
 
-    const itemsToPrint = products.filter(p => {
-      const matchesSearch = words.length === 0 || 
-        words.every(word => p.desc.toLowerCase().includes(word)) || 
-        p.cod.toLowerCase().includes(searchLower);
+    const HEADERS = ["Código", "Descrição", "Marca", "Estoque", "Total Vendido", "Preço de Venda"];
+    const NUM_COLS = 6;
 
-      const matchesBrand = filterBrand === "Todas as Marcas" || p.brand === filterBrand;
-      const matchesStock = filterStock === "TODOS" ||
-        (filterStock === "COM ESTOQUE" && p.stock > 0) ||
-        (filterStock === "SEM ESTOQUE" && p.stock <= 0);
+    const activeFilters =
+      [
+        filterBrand !== "Todas as Marcas" ? `Marca: ${filterBrand}` : "",
+        filterStock !== "TODOS" ? `Estoque: ${filterStock}` : "",
+        searchTerm ? `Busca: "${searchTerm}"` : "",
+      ]
+        .filter(Boolean)
+        .join("  |  ") || "Nenhum";
 
-      return matchesSearch && matchesBrand && matchesStock;
-    });
+    // Monta a matriz de valores (título, meta, cabeçalho, dados)
+    const aoa: (string | number)[][] = [
+      ["RELATÓRIO DE PRODUTOS — CARFLAX"],
+      [`Gerado em ${new Date().toLocaleString("pt-BR")}   ·   Filtros: ${activeFilters}   ·   Total: ${items.length}`],
+      [],
+      HEADERS,
+      ...items.map((p) => [
+        p.cod,
+        p.desc,
+        p.brand,
+        Number(p.stock.toFixed(3)),
+        Number(p.sales.toFixed(3)),
+        Number(p.debit.toFixed(2)),
+      ]),
+    ];
 
-    // Sort itemsToPrint if needed
-    if (sortConfig !== null) {
-      itemsToPrint.sort((a, b) => {
-        const key = sortConfig.key;
-        const dir = sortConfig.direction;
-        
-        if (key === 'cod') {
-          return dir === 'asc' ? Number(a.cod) - Number(b.cod) : Number(b.cod) - Number(a.cod);
-        }
-        
-        const valA = a[key];
-        const valB = b[key];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-        if (typeof valA === 'number' && typeof valB === 'number') {
-          return dir === 'asc' ? valA - valB : valB - valA;
-        }
+    // ── Estilos ──────────────────────────────────────────────────────────────
+    const BORDER = { style: "thin", color: { rgb: "E2E8F0" } };
+    const borderAll = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER };
 
-        const strA = String(valA).toLowerCase();
-        const strB = String(valB).toLowerCase();
-        if (strA < strB) return dir === 'asc' ? -1 : 1;
-        if (strA > strB) return dir === 'asc' ? 1 : -1;
-        return 0;
-      });
+    // Cor de destaque por coluna (cabeçalho) + cor suave para as células
+    const COL_HEAD = ["1E293B", "1E293B", "7C3AED", "2563EB", "D97706", "059669"];
+    const COL_TINT = ["FFFFFF", "FFFFFF", "F5F3FF", "EFF6FF", "FFFBEB", "ECFDF5"];
+
+    const titleCell = ws["A1"];
+    if (titleCell) {
+      titleCell.s = {
+        font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "0F172A" } },
+        alignment: { horizontal: "center", vertical: "center" },
+      };
+    }
+    const metaCell = ws["A2"];
+    if (metaCell) {
+      metaCell.s = {
+        font: { italic: true, sz: 10, color: { rgb: "475569" } },
+        alignment: { horizontal: "center", vertical: "center" },
+      };
     }
 
-    const rowsHtml = itemsToPrint.map(p => `
-      <tr style="page-break-inside: avoid; break-inside: avoid;">
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-family: monospace; font-size: 11px; font-weight: bold; color: #1e293b;">${p.cod}</td>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: 500; color: #0f172a; text-transform: uppercase;">${p.desc}</td>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: bold; text-align: right; color: #334155;">${p.stock.toFixed(3)}</td>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; border-left: 1px solid #e2e8f0; width: 140px; background-color: #fafafa;"></td>
-      </tr>
-    `).join("");
+    const HEADER_ROW = 3; // 0-based (linha 4)
+    for (let c = 0; c < NUM_COLS; c++) {
+      const ref = XLSX.utils.encode_cell({ r: HEADER_ROW, c });
+      if (!ws[ref]) continue;
+      ws[ref].s = {
+        font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: COL_HEAD[c] } },
+        alignment: { horizontal: c === 1 ? "left" : "center", vertical: "center" },
+        border: borderAll,
+      };
+    }
 
-    const activeFilters = [
-      filterBrand !== "Todas as Marcas" ? `Marca: ${filterBrand}` : "",
-      filterStock !== "TODOS" ? `Estoque: ${filterStock}` : "",
-      searchTerm ? `Busca: "${searchTerm}"` : ""
-    ].filter(Boolean).join(" | ") || "Nenhum";
+    for (let i = 0; i < items.length; i++) {
+      const r = HEADER_ROW + 1 + i;
+      const zebra = i % 2 === 1;
+      for (let c = 0; c < NUM_COLS; c++) {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        if (!ws[ref]) continue;
+        const isNum = c >= 3;
+        ws[ref].s = {
+          font: { sz: 10, color: { rgb: "0F172A" }, bold: c === 0 },
+          fill: { fgColor: { rgb: zebra ? "F8FAFC" : COL_TINT[c] } },
+          alignment: {
+            horizontal: c === 0 ? "center" : c === 1 || c === 2 ? "left" : "right",
+            vertical: "center",
+          },
+          border: borderAll,
+        };
+        if (c === 5) ws[ref].z = '"R$" #,##0.00';
+        else if (isNum) ws[ref].z = "#,##0.000";
+      }
+    }
 
-    const pageHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Inventário - Carflax HUB</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              color: #1e293b;
-              margin: 30px;
-              line-height: 1.5;
-            }
-            header {
-              border-bottom: 2px solid #0f172a;
-              padding-bottom: 12px;
-              margin-bottom: 20px;
-            }
-            .header-top {
-              display: flex;
-              justify-content: space-between;
-              align-items: baseline;
-            }
-            h1 {
-              font-size: 20px;
-              font-weight: 800;
-              margin: 0;
-              color: #0f172a;
-              letter-spacing: -0.5px;
-            }
-            .brand-subtitle {
-              font-size: 10px;
-              font-weight: 700;
-              color: #2563eb;
-              text-transform: uppercase;
-              letter-spacing: 1.5px;
-              margin-bottom: 4px;
-            }
-            .meta-grid {
-              display: grid;
-              grid-template-columns: repeat(3, 1fr);
-              gap: 16px;
-              margin-top: 12px;
-              font-size: 11px;
-              background-color: #f8fafc;
-              padding: 10px 14px;
-              border-radius: 6px;
-              border: 1px solid #e2e8f0;
-            }
-            .meta-item strong {
-              color: #475569;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 10px;
-            }
-            th {
-              background-color: #f1f5f9;
-              color: #475569;
-              padding: 8px;
-              font-size: 10px;
-              font-weight: 800;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              border-bottom: 2px solid #cbd5e1;
-              border-top: 1px solid #e2e8f0;
-            }
-            .signature-section {
-              margin-top: 40px;
-              display: flex;
-              justify-content: space-between;
-              font-size: 11px;
-              color: #475569;
-              page-break-inside: avoid;
-              break-inside: avoid;
-            }
-            .signature-box {
-              width: 45%;
-              border-top: 1px solid #cbd5e1;
-              text-align: center;
-              padding-top: 8px;
-              margin-top: 30px;
-            }
-            @media print {
-              body {
-                margin: 0;
-                color: #000;
-              }
-              .meta-grid {
-                background-color: transparent !important;
-                border-color: #cbd5e1;
-              }
-              th {
-                background-color: #f1f5f9 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-              td {
-                border-bottom-color: #cbd5e1 !important;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <header>
-            <div class="brand-subtitle">Carflax HUB</div>
-            <div class="header-top">
-              <h1>Folha de Inventário de Produtos</h1>
-              <div style="font-size: 10px; color: #64748b; text-align: right;">
-                Página 1 de 1
-              </div>
-            </div>
-            <div class="meta-grid">
-              <div class="meta-item"><strong>Filtros ativos:</strong> ${activeFilters}</div>
-              <div class="meta-item"><strong>Gerado em:</strong> ${new Date().toLocaleString("pt-BR")}</div>
-              <div class="meta-item" style="text-align: right;"><strong>Total de Itens:</strong> ${itemsToPrint.length}</div>
-            </div>
-          </header>
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 15%; text-align: left;">Código</th>
-                <th style="width: 50%; text-align: left;">Descrição do Item</th>
-                <th style="width: 15%; text-align: right;">Saldo Atual</th>
-                <th style="width: 20%; text-align: center; border-left: 1px solid #cbd5e1;">Qtd. Contada</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
+    ws["!cols"] = [{ wch: 12 }, { wch: 54 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 16 }];
+    ws["!rows"] = [{ hpt: 26 }, { hpt: 18 }, { hpt: 6 }, { hpt: 22 }];
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: NUM_COLS - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: NUM_COLS - 1 } },
+    ];
+    ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: HEADER_ROW, c: 0 }, e: { r: HEADER_ROW + items.length, c: NUM_COLS - 1 } }) };
+    // Congela o cabeçalho ao rolar
+    ws["!freeze"] = { xSplit: 0, ySplit: HEADER_ROW + 1 };
 
-          <div class="signature-section">
-            <div class="signature-box">
-              Assinatura do Responsável pela Contagem
-            </div>
-            <div class="signature-box">
-              Visto / Conferência de Lançamento
-            </div>
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(pageHtml);
-    printWindow.document.close();
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Produtos");
+    XLSX.writeFile(wb, `Produtos_Carflax_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   return (
@@ -403,11 +296,11 @@ export function ProdutosView() {
           </div>
 
           <button
-            onClick={handlePrint}
-            title="Imprimir Folha de Inventário"
+            onClick={handleExportExcel}
+            title="Exportar produtos para Excel"
             className="flex items-center justify-center p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all shadow-sm group shrink-0"
           >
-            <Printer className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
+            <FileSpreadsheet className="w-4 h-4 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
           </button>
         </div>
       </div>

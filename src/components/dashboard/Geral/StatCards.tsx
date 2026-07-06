@@ -20,7 +20,7 @@ export function StatCards({ userProfile, loading: externalLoading }: { userProfi
         const yyyy = now.getFullYear();
         const mesano = `${mm}${yyyy}`;
         const role = userProfile?.role?.toUpperCase() || "";
-        const isManager = role.includes("GERENTE") || role === "ADMIN";
+        const isManager = role.includes("GERENTE") || role === "ADMIN" || role.includes("DIRETOR");
         const codVendedor = userProfile?.operator_code || userProfile?.operatorCode;
         
         // Se for gerente, buscamos todos (para pegar a MEDIA), senão buscamos o específico
