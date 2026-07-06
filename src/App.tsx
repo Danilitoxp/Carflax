@@ -1128,7 +1128,7 @@ function DashboardContent({
     "Meus Pedidos",
     "Comercial",
     "Produtos",
-    "Clientes",
+    "Análise FRV",
     "Campanhas",
     "Ligações",
     "Alugueis",

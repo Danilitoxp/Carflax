@@ -508,12 +508,40 @@ export interface AmancoRankingResponse {
 export const apiAmancoRanking = () =>
   get<AmancoRankingResponse>("/api/crm/campanhas/amanco-ranking");
 
-export const apiClientesFrv = async (dataInicio?: string, dataFim?: string, vendedor?: string) => {
-  const params = new URLSearchParams();
-  if (dataInicio) params.append("dataInicio", dataInicio);
-  if (dataFim) params.append("dataFim", dataFim);
-  if (vendedor) params.append("vendedor", vendedor);
+// ── Análise FRV (Inteligência Comercial da Carteira) ─────────────────────────
+export interface FrvSeriePonto {
+  mes: string; // 'YYYY-MM'
+  valor: number;
+  custo: number;
+  pedidos: number;
+}
 
-  const queryString = params.toString();
-  return get(`/api/crm/clientes-frv${queryString ? `?${queryString}` : ""}`);
-};
+export interface FrvCliente {
+  cliente_id: string;
+  nome_cliente: string;
+  cod_vendedor: string;
+  nome_vendedor: string;
+  empresa: string;
+  primeira_compra: string | null;
+  ultima_compra: string | null;
+  recencia_dias: number;
+  frequencia: number;
+  valor_total: number;
+  custo_total: number;
+  margem_total: number;
+  margem_pct: number;
+  ticket_medio: number;
+  intervalo_medio_dias: number | null;
+  serie: FrvSeriePonto[];
+}
+
+export interface FrvResponse {
+  gerado_em: string;
+  janela_meses: number;
+  janela_inicio: string;
+  vendedores: { cod: string; nome: string }[];
+  empresas: string[];
+  clientes: FrvCliente[];
+}
+
+export const apiAnaliseFrv = () => get<FrvResponse>("/api/crm/clientes-frv");

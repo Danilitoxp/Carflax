@@ -4,7 +4,7 @@ import {
   ChevronUp, ChevronDown, ChevronsUpDown, Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiClientesFrv } from "@/lib/api";
+import { apiAnaliseFrv } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
@@ -95,17 +95,18 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
       ? filterVendedor !== "Todos" ? filterVendedor : undefined
       : operatorCode || undefined;
 
-    apiClientesFrv(undefined, undefined, vendedor)
-      .then((data) =>
-        setClientes(
-          ((data as ClienteFRV[]) || []).map(c => ({
+    apiAnaliseFrv()
+      .then((resp) => {
+        const lista = (resp?.clientes || [])
+          .filter((c) => !vendedor || c.cod_vendedor === vendedor)
+          .map((c) => ({
             ...c,
             recencia_dias: Number(c.recencia_dias),
             frequencia: Number(c.frequencia),
             valor_total: parseFloat(String(c.valor_total)),
-          }))
-        )
-      )
+          })) as ClienteFRV[];
+        setClientes(lista);
+      })
       .finally(() => setLoading(false));
   }, [gerente, operatorCode, filterVendedor]);
 

@@ -44,7 +44,7 @@ export function CrmSection({ activeTab, userProfile }: CrmSectionProps) {
             <ProdutosView />
           ) : activeTab === "Meus Pedidos" ? (
             <MeusPedidosView userProfile={userProfile} />
-          ) : activeTab === "Clientes" ? (
+          ) : activeTab === "Análise FRV" ? (
             <ClientesFRVView />
           ) : activeTab === "Campanhas" ? (
             <div className="h-full overflow-y-auto scrollbar-hide">
