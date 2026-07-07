@@ -61,6 +61,11 @@ export interface Orcamento {
   enderecoObra?: string;
   fechamentoPrevisto?: string;
   entregaPrevista?: string;
+  /** Status que veio do ERP/Citel (fonte: MOTIVO_CANCELAMENTO, PEDIDO, NOTA_FISCAL) */
+  citelStatus?: string;
+  /** Status + motivo que o vendedor registrou manualmente no CRM (Supabase) */
+  crmStatusVendedor?: string;
+  crmMotivoVendedor?: string;
 }
 
 
@@ -147,17 +152,30 @@ function isSupervisor(role?: string) {
   return role.toLowerCase().includes("supervisor");
 }
 
+
+
 interface RowProps {
   item: Orcamento;
   isAdmin?: boolean;
+  showDualColumns?: boolean;
   onOpenItems: (o: Orcamento) => void;
   onOpenStatus: (o: Orcamento) => void;
   onOpenChat: (o: Orcamento) => void;
 }
 
-const OrcamentoRow = memo(({ item, isAdmin, onOpenItems, onOpenStatus, onOpenChat }: RowProps) => {
+const OrcamentoRow = memo(({ item, isAdmin, showDualColumns, onOpenItems, onOpenStatus, onOpenChat }: RowProps) => {
+  const hasDivergence = showDualColumns && item.crmStatusVendedor === "PERDIDO" && (
+    item.citelStatus !== "PERDIDO" ||
+    (item.citelStatus === "PERDIDO" &&
+      (item.crmMotivoVendedor ?? "").trim().toUpperCase() !== (item.lossReason ?? "").trim().toUpperCase())
+  );
   return (
-    <tr className="hover:bg-secondary/50 transition-colors group">
+    <tr className={cn(
+      "transition-colors group relative",
+      hasDivergence
+        ? "bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-500/60"
+        : "hover:bg-secondary/50"
+    )}>
       <td className="px-6 py-4">
         <div className="flex flex-col gap-0.5">
           <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
@@ -192,49 +210,101 @@ const OrcamentoRow = memo(({ item, isAdmin, onOpenItems, onOpenStatus, onOpenCha
           <span className="text-[11px] font-black text-foreground">{item.markup}</span>
         </div>
       </td>
-      <td className="px-6 py-4">
-        <div className="flex flex-col items-center gap-1">
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              const blocked = item.status === "VENDA" || (item.status === "PERDIDO" && !isAdmin);
-              if (!blocked) onOpenStatus(item);
-            }}
-            className={cn(
-              "inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black tracking-tighter transition-all border",
-              item.status === "VENDA" || (item.status === "PERDIDO" && !isAdmin) ? "cursor-default opacity-80" : "cursor-pointer hover:brightness-110 active:scale-95 shadow-sm",
-              item.status === "VENDA" ? "bg-emerald-600/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-600/20" :
-              item.status === "EMITIDO" ? "bg-slate-500/10 dark:bg-slate-400/10 text-slate-600 dark:text-slate-400 border-slate-500/20" :
-              item.status === "ENVIADO" ? "bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-600/20" :
-              item.status === "NEGOCIAÇÃO" ? "bg-amber-600/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-600/20" :
-              item.status === "LIB. CRÉDITO" ? "bg-orange-600/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-600/20" :
-              item.status === "AGUARD. PEDIDO" ? "bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-600/20" :
-              item.status === "PERDIDO" ? "bg-rose-600/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-600/20" :
-              "bg-secondary text-muted-foreground border-border"
+
+      {/* Coluna STATUS — oculta quando as colunas duplas estão ativas */}
+      {!showDualColumns && (
+        <td className="px-6 py-4">
+          <div className="flex flex-col items-center gap-1">
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                const blocked = item.status === "VENDA" || (item.status === "PERDIDO" && !isAdmin);
+                if (!blocked) onOpenStatus(item);
+              }}
+              className={cn(
+                "inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black tracking-tighter transition-all border",
+                item.status === "VENDA" || (item.status === "PERDIDO" && !isAdmin) ? "cursor-default opacity-80" : "cursor-pointer hover:brightness-110 active:scale-95 shadow-sm",
+                item.status === "VENDA" ? "bg-emerald-600/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-600/20" :
+                item.status === "EMITIDO" ? "bg-slate-500/10 dark:bg-slate-400/10 text-slate-600 dark:text-slate-400 border-slate-500/20" :
+                item.status === "ENVIADO" ? "bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-600/20" :
+                item.status === "NEGOCIAÇÃO" ? "bg-amber-600/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-600/20" :
+                item.status === "LIB. CRÉDITO" ? "bg-orange-600/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-600/20" :
+                item.status === "AGUARD. PEDIDO" ? "bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-600/20" :
+                item.status === "PERDIDO" ? "bg-rose-600/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-600/20" :
+                "bg-secondary text-muted-foreground border-border"
+              )}
+            >
+              {item.status}
+            </div>
+            {item.status === "PERDIDO" && (
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{item.lossReason || "Não Informado"}</span>
             )}
-          >
-            {item.status}
+            {(item.status === "ENVIADO" || item.status === "NEGOCIAÇÃO") && item.lembreteData && (() => {
+              const raw = item.lembreteData!;
+              const display = /^\d{2}\/\d{2}\/\d{4}$/.test(raw)
+                ? raw
+                : /^\d{4}-\d{2}-\d{2}/.test(raw)
+                ? raw.slice(8, 10) + "/" + raw.slice(5, 7) + "/" + raw.slice(0, 4)
+                : (() => { const d = new Date(raw); return isNaN(d.getTime()) ? raw : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }); })();
+              const color = item.status === "NEGOCIAÇÃO" ? "text-amber-400" : "text-blue-400";
+              return (
+                <div className={`flex items-center gap-0.5 text-[8px] font-bold ${color}`}>
+                  <Calendar className="w-2.5 h-2.5" />
+                  <span>{display}</span>
+                </div>
+              );
+            })()}
           </div>
-          {item.status === "PERDIDO" && (
-            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{item.lossReason || "Não Informado"}</span>
-          )}
-          {(item.status === "ENVIADO" || item.status === "NEGOCIAÇÃO") && item.lembreteData && (() => {
-            const raw = item.lembreteData!;
-            const display = /^\d{2}\/\d{2}\/\d{4}$/.test(raw)
-              ? raw
-              : /^\d{4}-\d{2}-\d{2}/.test(raw)
-              ? raw.slice(8, 10) + "/" + raw.slice(5, 7) + "/" + raw.slice(0, 4)
-              : (() => { const d = new Date(raw); return isNaN(d.getTime()) ? raw : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }); })();
-            const color = item.status === "NEGOCIAÇÃO" ? "text-amber-400" : "text-blue-400";
-            return (
-              <div className={`flex items-center gap-0.5 text-[8px] font-bold ${color}`}>
-                <Calendar className="w-2.5 h-2.5" />
-                <span>{display}</span>
-              </div>
-            );
-          })()}
-        </div>
-      </td>
+        </td>
+      )}
+
+
+      {/* Colunas duplas: Status Vendedor + Status Citel — apenas para admin em modo Perdido */}
+      {showDualColumns && (
+        <>
+          {/* Status Vendedor (CRM/Supabase) */}
+          <td className="px-6 py-4">
+            <div className="flex flex-col items-center gap-0.5">
+              {item.crmStatusVendedor ? (
+                <>
+                  <span className={cn(
+                    "inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-black tracking-tighter border",
+                    item.crmStatusVendedor === "PERDIDO"
+                      ? "bg-rose-600/10 dark:bg-rose-500/20 text-rose-500 dark:text-rose-400 border-rose-600/20"
+                      : "bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20"
+                  )}>
+                    {item.crmStatusVendedor}
+                  </span>
+                  {item.crmMotivoVendedor && (
+                    <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-tight text-center">{item.crmMotivoVendedor}</span>
+                  )}
+                </>
+              ) : (
+                <span className="text-[8px] font-bold text-slate-500 italic">não declarado</span>
+              )}
+            </div>
+          </td>
+
+          {/* Status Citel (ERP) */}
+          <td className="px-6 py-4">
+            <div className="flex flex-col items-center gap-0.5">
+              <span className={cn(
+                "inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-black tracking-tighter border",
+                item.citelStatus === "PERDIDO"
+                  ? "bg-rose-600/10 dark:bg-rose-500/20 text-rose-500 dark:text-rose-400 border-rose-600/20"
+                  : "bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20"
+              )}>
+                {item.citelStatus || "—"}
+              </span>
+              {item.citelStatus === "PERDIDO" && item.lossReason && (
+                <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-tight text-center">{item.lossReason}</span>
+              )}
+
+            </div>
+          </td>
+        </>
+      )}
+
       <td className="px-6 py-4 text-right">
         <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
           <button
@@ -256,6 +326,10 @@ const OrcamentoRow = memo(({ item, isAdmin, onOpenItems, onOpenStatus, onOpenCha
     </tr>
   );
 });
+
+
+
+
 
 export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const { showNotification } = useNotification();
@@ -292,6 +366,59 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     })();
     return () => { cancelled = true; };
   }, [userProfile]);
+
+  const [teamOptions, setTeamOptions] = useState<{ label: string; value: string; codes: Set<string> }[]>([]);
+
+  useEffect(() => {
+    if (!userProfile || !isGerente(userProfile.role)) return;
+    let cancelled = false;
+    (async () => {
+      const { data: usuarios } = await supabase
+        .from("usuarios")
+        .select("id, operator_code, name, role, responsavel_id, is_leader");
+      if (cancelled || !usuarios) return;
+
+      const membrosPorResponsavel = new Map<string, typeof usuarios>();
+      for (const u of usuarios) {
+        if (!u.responsavel_id) continue;
+        if (!membrosPorResponsavel.has(u.responsavel_id)) membrosPorResponsavel.set(u.responsavel_id, []);
+        membrosPorResponsavel.get(u.responsavel_id)!.push(u);
+      }
+
+      const activeSellerCodes = new Set(
+        orçamentosData
+          .map((item) => String(item.sellerCode || "").trim().replace(/^0+/, ""))
+          .filter(Boolean)
+      );
+
+      const teams: { label: string; value: string; codes: Set<string> }[] = [];
+      for (const sup of usuarios) {
+        const membros = membrosPorResponsavel.get(sup.id);
+        if (!membros || membros.length === 0) continue;
+        const codes = new Set<string>();
+        if (sup.operator_code) codes.add(String(sup.operator_code).trim().replace(/^0+/, ""));
+        membros.forEach(m => {
+          if (m.operator_code) codes.add(String(m.operator_code).trim().replace(/^0+/, ""));
+        });
+
+        // Só exibe o time se pelo menos um membro do time estiver ativo/presente nos orçamentos carregados
+        const hasActiveMembers = Array.from(codes).some(code => activeSellerCodes.has(code));
+        if (!hasActiveMembers) continue;
+
+        if (codes.size > 0) {
+          const primeiroNome = (sup.name || "Time").trim().split(/\s+/)[0];
+          teams.push({
+            label: `Time ${primeiroNome}`,
+            value: `TEAM:${sup.id}`,
+            codes,
+          });
+        }
+      }
+      setTeamOptions(teams);
+    })();
+    return () => { cancelled = true; };
+  }, [userProfile, orçamentosData]);
+
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "id", direction: "desc" });
   const [filterStatus, setFilterStatus] = useState("Todos os Status");
@@ -462,6 +589,11 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
       const merged = orcamentos.map((o) => {
         const crm = statusMap.get(o.id.trim());
+        // citelStatus = status que o ERP/Citel indica (antes de qualquer overlay)
+        const citelStatus: string = o.status;
+        // crmStatusVendedor = status que o vendedor declarou manualmente no CRM
+        const crmStatusVendedor: string | undefined = crm ? crm.status_crm.toUpperCase() : undefined;
+        const crmMotivoVendedor: string | undefined = crm?.motivo_perda ?? undefined;
 
         // Prioridade ABSOLUTA para o ERP se for VENDA ou PERDIDO
         if (o.status === "VENDA" || o.status === "PERDIDO") {
@@ -475,9 +607,12 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
               motivo_perda: o.lossReason ?? crm.motivo_perda ?? null,
             });
           }
-          if (!crm) return o;
+          if (!crm) return { ...o, citelStatus, crmStatusVendedor, crmMotivoVendedor };
           return {
             ...o,
+            citelStatus,
+            crmStatusVendedor,
+            crmMotivoVendedor,
             lossReason: o.lossReason ?? crm.motivo_perda ?? undefined,
             lembreteData: crm.lembrete_data ?? undefined,
             enderecoObra: crm.endereco_obra ?? undefined,
@@ -486,13 +621,16 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           };
         }
 
-        if (!crm) return o;
+        if (!crm) return { ...o, citelStatus, crmStatusVendedor, crmMotivoVendedor };
 
         // Para orçamentos em aberto (EMITIDO), o CRM manual tem precedência,
         // exceto PERDIDO que só pode vir da API
         const crmStatus = crm.status_crm.toUpperCase();
         return {
           ...o,
+          citelStatus,
+          crmStatusVendedor,
+          crmMotivoVendedor,
           status: crmStatus,
           lossReason: o.lossReason ?? crm.motivo_perda ?? undefined,
           lembreteData: crm.lembrete_data ?? crm.fechamento_previsto ?? undefined,
@@ -501,6 +639,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
           entregaPrevista: crm.entrega_prevista ?? undefined,
         };
       });
+
 
       if (docsToSync.length > 0) {
         Promise.all(
@@ -559,12 +698,19 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       const myCode = String(userProfile.operator_code || userProfile.operatorCode || "").trim();
       if (myCode) params.vendedor = myCode;
     } else if (filterSeller !== "Todos os Vendedores") {
-      const code = sellerCodeRef.current.get(filterSeller);
-      if (code) params.vendedor = code;
+      if (filterSeller.startsWith("TEAM:")) {
+        const team = teamOptions.find(t => t.value === filterSeller);
+        if (team) {
+          params.vendedor = Array.from(team.codes).join(",");
+        }
+      } else {
+        const code = sellerCodeRef.current.get(filterSeller);
+        if (code) params.vendedor = code;
+      }
     }
 
     apiCrmFaturamento(params).then(setFaturamento).catch(() => {});
-  }, [filterSeller, startDate, endDate, userProfile, subordinateCodes]);
+  }, [filterSeller, startDate, endDate, userProfile, subordinateCodes, teamOptions]);
 
   // ── Ouve evento do FollowUpReminder para aplicar o filtro automaticamente ──
   useEffect(() => {
@@ -826,9 +972,31 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   };
 
   const uniqueSellers = useMemo(() => {
-    const sellers = new Set(orçamentosData.map((item) => item.seller));
-    return ["Todos os Vendedores", ...Array.from(sellers)];
-  }, [orçamentosData]);
+    const sellers = Array.from(new Set(orçamentosData.map((item) => item.seller))).sort();
+    
+    if (userProfile && isGerente(userProfile.role)) {
+      const options: (string | { label: string; value: string; isHeader?: boolean })[] = [
+        { label: "Todos os Vendedores", value: "Todos os Vendedores" }
+      ];
+      
+      if (teamOptions.length > 0) {
+        options.push({ label: "Times de Vendas", value: "HEADER_TEAMS", isHeader: true });
+        teamOptions.forEach(t => {
+          options.push({ label: t.label, value: t.value });
+        });
+      }
+      
+      if (sellers.length > 0) {
+        options.push({ label: "Vendedores", value: "HEADER_SELLERS", isHeader: true });
+        sellers.forEach(s => {
+          options.push({ label: s, value: s });
+        });
+      }
+      return options;
+    }
+    
+    return ["Todos os Vendedores", ...sellers];
+  }, [orçamentosData, teamOptions, userProfile]);
 
   const lossReasons = [
     "Todos os Motivos",
@@ -887,8 +1055,19 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       }
     }
 
-    if (filterSeller !== "Todos os Vendedores")
-      result = result.filter((item) => item.seller === filterSeller);
+    if (filterSeller !== "Todos os Vendedores") {
+      if (filterSeller.startsWith("TEAM:")) {
+        const team = teamOptions.find((t) => t.value === filterSeller);
+        if (team) {
+          result = result.filter((item) => {
+            const code = String(item.sellerCode || "").trim().replace(/^0+/, "");
+            return team.codes.has(code);
+          });
+        }
+      } else {
+        result = result.filter((item) => item.seller === filterSeller);
+      }
+    }
 
     if (filterReason !== "Todos os Motivos")
       result = result.filter((item) => item.lossReason?.toUpperCase().trim() === filterReason.toUpperCase().trim());
@@ -1275,7 +1454,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     { id: "date", label: "Data/Hora" },
                     { id: "total", label: "Total" },
                     { id: "markup", label: "Markup" },
-                    { id: "status", label: "Status" },
+                    ...((isGerente(userProfile?.role) || isSupervisor(userProfile?.role)) && filterStatus === "Perdido" ? [] : [{ id: "status", label: "Status" }]),
                   ].map((col) => (
                     <th
                       key={col.id}
@@ -1288,6 +1467,19 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       </div>
                     </th>
                   ))}
+                  {/* Colunas extras de declínio — apenas para admins filtrando por Perdido */}
+                  {(isGerente(userProfile?.role) || isSupervisor(userProfile?.role)) && filterStatus === "Perdido" && (
+                    <>
+                      <th className="px-6 py-3 text-[9px] font-black uppercase tracking-[0.1em] text-center text-blue-400">
+                        Status Vendedor
+                        <div className="text-[7px] font-medium text-slate-500 normal-case tracking-normal mt-0.5">declarado no CRM</div>
+                      </th>
+                      <th className="px-6 py-3 text-[9px] font-black uppercase tracking-[0.1em] text-center text-amber-400">
+                        Status Citel
+                        <div className="text-[7px] font-medium text-slate-500 normal-case tracking-normal mt-0.5">ERP / sistema Citel</div>
+                      </th>
+                    </>
+                  )}
                   <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.1em] text-right">Ações</th>
                 </tr>
               </thead>
@@ -1301,13 +1493,18 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       <td className="px-6 py-4"><div className="h-3 w-20 bg-secondary dark:bg-slate-800/50 rounded" /></td>
                       <td className="px-6 py-4"><div className="h-3 w-24 bg-emerald-500/10 dark:bg-emerald-500/10 rounded" /></td>
                       <td className="px-6 py-4"><div className="h-3 w-12 bg-secondary dark:bg-slate-800/50 rounded" /></td>
-                      <td className="px-6 py-4"><div className="flex justify-center"><div className="h-5 w-16 bg-secondary dark:bg-slate-800 rounded-full" /></div></td>
+                      {(isGerente(userProfile?.role) || isSupervisor(userProfile?.role)) && filterStatus === "Perdido" && (
+                        <>
+                          <td className="px-6 py-4"><div className="flex justify-center"><div className="h-5 w-16 bg-blue-500/10 rounded-full" /></div></td>
+                          <td className="px-6 py-4"><div className="flex justify-center"><div className="h-5 w-16 bg-amber-500/10 rounded-full" /></div></td>
+                        </>
+                      )}
                       <td className="px-6 py-4"><div className="flex justify-end gap-2"><div className="h-6 w-6 bg-secondary dark:bg-slate-800/50 rounded" /><div className="h-6 w-6 bg-secondary dark:bg-slate-800/50 rounded" /></div></td>
                     </tr>
                   ))
                 ) : filteredAndSortedItems.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-[11px] text-slate-400 font-bold">
+                    <td colSpan={(isGerente(userProfile?.role) || isSupervisor(userProfile?.role)) && filterStatus === "Perdido" ? 10 : 8} className="px-6 py-12 text-center text-[11px] text-slate-400 font-bold">
                       Nenhum orçamento encontrado para o período selecionado.
                     </td>
                   </tr>
@@ -1317,6 +1514,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                       key={item.id}
                       item={item}
                       isAdmin={isGerente(userProfile?.role) || isSupervisor(userProfile?.role)}
+                      showDualColumns={(isGerente(userProfile?.role) || isSupervisor(userProfile?.role)) && filterStatus === "Perdido"}
                       onOpenItems={async (o) => {
                         setSelectedItem(o);
                         setIsItemsModalOpen(true);

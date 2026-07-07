@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 interface DropdownOption {
   label: string;
   value: string;
+  isHeader?: boolean;
 }
 
 interface TinyDropdownProps {
@@ -125,7 +126,19 @@ export function TinyDropdown({
             {options.map((option) => {
               const optLabel = typeof option === 'string' ? option : option.label;
               const optValue = typeof option === 'string' ? option : option.value;
+              const isHeader = typeof option === 'string' ? false : !!(option as DropdownOption).isHeader;
               const isSelected = value === optValue;
+
+              if (isHeader) {
+                return (
+                  <div
+                    key={optLabel}
+                    className="px-4 pt-2 pb-1 text-[9px] font-black text-muted-foreground uppercase tracking-widest border-b border-border/20 mb-1 first:mt-0 mt-2"
+                  >
+                    {optLabel}
+                  </div>
+                );
+              }
 
               return (
                 <button
