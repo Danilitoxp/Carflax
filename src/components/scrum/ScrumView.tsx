@@ -1,10 +1,8 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Kanban,
   Plus,
   X,
-  ChevronLeft,
-  ChevronRight,
   AlertTriangle,
   Trash2,
   Building2,
@@ -56,7 +54,6 @@ const PRIOS: Record<ScrumPrioridade, { label: string; color: string }> = {
 
 const PRIO_ORDER: Record<ScrumPrioridade, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
 
-const STATUS_INDEX: Record<ScrumStatus, number> = { aberto: 0, analise: 1, andamento: 2, resolvido: 3 };
 
 const emptyForm = (setor = ""): Partial<ScrumOcorrencia> => ({
   titulo: "",
@@ -70,6 +67,8 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
   const [ocorrencias, setOcorrencias] = useState<ScrumOcorrencia[]>([]);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
+  const [dragOverCol, setDragOverCol] = useState<ScrumStatus | null>(null);
+  const draggingId = useRef<string | null>(null);
 
   const [filterSetor, setFilterSetor] = useState("todos");
   const [filterPrio, setFilterPrio] = useState("todos");
@@ -88,11 +87,12 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
   const canCreate =
     canManage || !!userProfile?.is_leader || role.includes("GERENTE") || role.includes("SUPERVISOR");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // silent=true → atualiza dados sem mostrar skeleton (evita flash nas operações internas)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const data = await listOcorrencias();
     setOcorrencias(data);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -107,11 +107,11 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
       .then(({ data }) => setUsers((data || []) as { id: string; name: string }[]));
   }, []);
 
-  // Realtime: mantém o quadro ao vivo durante a reunião
+  // Realtime: mantém o quadro ao vivo durante a reunião (silent para não piscar)
   useEffect(() => {
     const ch = supabase
       .channel("scrum_ocorrencias_rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "scrum_ocorrencias" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "scrum_ocorrencias" }, () => load(true))
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -193,7 +193,7 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
         });
       }
       setIsModalOpen(false);
-      await load();
+      await load(true);
     } catch {
       /* erro já logado no serviço */
     } finally {
@@ -201,22 +201,28 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
     }
   };
 
-  const moveStatus = async (o: ScrumOcorrencia, dir: -1 | 1) => {
-    const idx = STATUS_INDEX[o.status] + dir;
-    if (idx < 0 || idx > 3) return;
-    const novo = COLUNAS[idx].key;
-    await updateOcorrencia(o.id, {
-      status: novo,
-      resolved_at: novo === "resolvido" ? o.resolved_at || new Date().toISOString() : null,
-    });
-    await load();
+  const handleDrop = async (targetStatus: ScrumStatus) => {
+    const id = draggingId.current;
+    if (!id) return;
+    const o = ocorrencias.find((x) => x.id === id);
+    if (!o || o.status === targetStatus) return;
+
+    // Update otimista: move o card no estado local imediatamente (sem skeleton)
+    const resolvedAt = targetStatus === "resolvido" ? o.resolved_at || new Date().toISOString() : null;
+    setOcorrencias((prev) =>
+      prev.map((x) => x.id === id ? { ...x, status: targetStatus, resolved_at: resolvedAt } : x),
+    );
+
+    // Persiste em background; o realtime sincroniza os outros clientes
+    await updateOcorrencia(id, { status: targetStatus, resolved_at: resolvedAt });
   };
 
   const handleDelete = async (o: ScrumOcorrencia) => {
     if (!confirm(`Excluir a ocorrência "${o.titulo}"?`)) return;
-    await deleteOcorrencia(o.id);
+    // Remove do estado local imediatamente
+    setOcorrencias((prev) => prev.filter((x) => x.id !== o.id));
     setIsModalOpen(false);
-    await load();
+    await deleteOcorrencia(o.id);
   };
 
   const abertas = ocorrencias.filter((o) => o.status !== "resolvido").length;
@@ -273,7 +279,7 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
             variant="amber"
           />
           <button
-            onClick={load}
+            onClick={() => load()}
             title="Atualizar"
             className="h-10 w-10 flex items-center justify-center bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all shrink-0"
           >
@@ -294,8 +300,22 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
       <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 overflow-y-auto xl:overflow-hidden">
         {COLUNAS.map((col) => {
           const items = porColuna(col.key);
+          const isOver = dragOverCol === col.key;
           return (
-            <div key={col.key} className="flex flex-col min-h-0 bg-secondary/20 border border-border/60 rounded-2xl overflow-hidden">
+            <div
+              key={col.key}
+              className={cn(
+                "flex flex-col min-h-0 border rounded-2xl overflow-hidden transition-all duration-150",
+                isOver
+                  ? "border-primary/60 bg-primary/5 shadow-lg shadow-primary/10"
+                  : "bg-secondary/20 border-border/60",
+              )}
+              onDragOver={(e) => { e.preventDefault(); setDragOverCol(col.key); }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverCol(null);
+              }}
+              onDrop={(e) => { e.preventDefault(); setDragOverCol(null); handleDrop(col.key); }}
+            >
               <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between shrink-0 bg-card/40">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: col.color }} />
@@ -311,7 +331,12 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
                 {loading ? (
                   [1, 2].map((i) => <div key={i} className="h-28 rounded-xl bg-card/60 animate-pulse" />)
                 ) : items.length === 0 ? (
-                  <div className="py-8 text-center text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Nenhuma ocorrência</div>
+                  <div className={cn(
+                    "py-8 text-center text-[9px] font-bold uppercase tracking-widest transition-colors",
+                    isOver ? "text-primary" : "text-muted-foreground",
+                  )}>
+                    {isOver ? "Soltar aqui" : "Nenhuma ocorrência"}
+                  </div>
                 ) : (
                   items.map((o) => (
                     <ScrumCard
@@ -319,7 +344,8 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
                       o={o}
                       canManage={canManage}
                       onOpen={() => openEdit(o)}
-                      onMove={(dir) => moveStatus(o, dir)}
+                      onDragStart={() => { draggingId.current = o.id; }}
+                      onDragEnd={() => { draggingId.current = null; setDragOverCol(null); }}
                     />
                   ))
                 )}
@@ -354,16 +380,28 @@ function ScrumCard({
   o,
   canManage,
   onOpen,
-  onMove,
+  onDragStart,
+  onDragEnd,
 }: {
   o: ScrumOcorrencia;
   canManage: boolean;
   onOpen: () => void;
-  onMove: (dir: -1 | 1) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 }) {
+  const [isDragging, setIsDragging] = useState(false);
   const prio = PRIOS[o.prioridade];
   return (
-    <div className="bg-card border border-border rounded-xl p-3 shadow-sm hover:border-primary/40 hover:shadow-md transition-all group">
+    <div
+      draggable={canManage}
+      onDragStart={() => { setIsDragging(true); onDragStart(); }}
+      onDragEnd={() => { setIsDragging(false); onDragEnd(); }}
+      className={cn(
+        "bg-card border border-border rounded-xl p-3 shadow-sm hover:border-primary/40 hover:shadow-md transition-all group",
+        canManage && "cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-40 scale-95",
+      )}
+    >
       <div className="flex items-start justify-between gap-2 cursor-pointer" onClick={onOpen}>
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: prio.color }} title={`Prioridade ${prio.label}`} />
@@ -390,26 +428,6 @@ function ScrumCard({
             <p className="text-[8px] font-black text-primary uppercase tracking-widest truncate mt-0.5">→ {o.responsavel_nome}</p>
           )}
         </div>
-        {canManage && (
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={(e) => { e.stopPropagation(); onMove(-1); }}
-              disabled={o.status === "aberto"}
-              className="p-1 rounded-md hover:bg-secondary disabled:opacity-20 transition-all"
-              title="Mover para trás"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onMove(1); }}
-              disabled={o.status === "resolvido"}
-              className="p-1 rounded-md hover:bg-secondary disabled:opacity-20 transition-all"
-              title="Avançar"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
