@@ -441,7 +441,7 @@ export function MeusPedidosView({ userProfile }: Props) {
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* Header */}
-      <div className="px-6 pt-5 pb-4 border-b border-border/50 space-y-4">
+      <div className="px-3 sm:px-6 pt-5 pb-4 border-b border-border/50 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -530,7 +530,7 @@ export function MeusPedidosView({ userProfile }: Props) {
       </div>
 
       {/* Grid */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide p-6">
+      <div className="flex-1 overflow-y-auto scrollbar-hide p-3 sm:p-6">
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (

@@ -804,12 +804,13 @@ export function ChatModal({
   if (!isOpen || isMinimized) return null;
 
   return (
-    <div className="pointer-events-none">
+    <div className="pointer-events-none w-full h-full sm:w-auto sm:h-auto">
       <div className={cn(
-          "bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 animate-in slide-in-from-bottom-4 overflow-hidden",
-          isMaximized ? "w-[900px] h-[85vh]" : "w-[340px] h-[480px]"
+          "bg-card/95 backdrop-blur-xl border border-border shadow-2xl flex flex-col pointer-events-auto transition-all duration-300 animate-in slide-in-from-bottom-4 overflow-hidden",
+          "w-full h-[100dvh] fixed inset-0 sm:relative sm:inset-auto rounded-none sm:rounded-2xl",
+          isMaximized ? "sm:w-[900px] sm:h-[85vh]" : "sm:w-[340px] sm:h-[480px]"
         )}>
-        <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/30 rounded-t-2xl shrink-0 transition-all">
+        <div className="p-4 pt-[calc(1rem+env(safe-area-inset-top))] sm:pt-4 border-b border-border flex items-center justify-between bg-secondary/30 rounded-t-none sm:rounded-t-2xl shrink-0 transition-all">
           <div className="flex items-center gap-3">
             <div className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black overflow-hidden border border-blue-500/30",

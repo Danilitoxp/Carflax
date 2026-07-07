@@ -6,7 +6,7 @@ export function HeroBanner({ loading }: { loading?: boolean }) {
   
   if (loading) {
     return (
-      <div className="relative overflow-hidden rounded-2xl w-full bg-card border border-border h-[280px] flex items-center justify-center animate-pulse">
+      <div className="relative overflow-hidden rounded-2xl w-full bg-card border border-border h-[200px] sm:h-[280px] flex items-center justify-center animate-pulse">
         <div className="space-y-4 text-center">
           <div className="h-10 w-64 bg-secondary rounded-xl mx-auto" />
           <div className="h-4 w-96 bg-secondary/50 rounded-lg mx-auto" />
@@ -16,7 +16,7 @@ export function HeroBanner({ loading }: { loading?: boolean }) {
   }
 
   return (
-    <div className="relative overflow-hidden rounded-3xl w-full bg-card border border-border h-[280px] flex flex-col items-center justify-center group">
+    <div className="relative overflow-hidden rounded-3xl w-full bg-card border border-border h-[200px] sm:h-[280px] flex flex-col items-center justify-center group">
       {/* Background/Ambient gradient & Mesh Grid */}
       <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-transparent pointer-events-none" />
       <div 

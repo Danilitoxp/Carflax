@@ -24,6 +24,7 @@ import { SugestaoModal } from "@/components/sugestao";
 import { OrcamentoIAModal } from "@/components/ui/OrcamentoIAModal";
 import { SugestoesAdminView } from "@/components/admin/SugestoesAdminView";
 import { ScrumView } from "@/components/scrum/ScrumView";
+import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 import { ColetorView } from "@/components/coletor/ColetorView";
 import { EntregasView } from "@/components/entregas";
 import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
@@ -1208,7 +1209,10 @@ function DashboardContent({
         )}
       >
         {/* Mobile Header */}
-        <div className="lg:hidden flex items-center justify-between p-4 border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-30">
+        <div
+          className="lg:hidden flex items-center justify-between p-4 border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-30"
+          style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
+        >
           <button
             onClick={() => setIsMobileMenuOpen(true)}
             className="p-2 hover:bg-secondary rounded-xl text-primary transition-colors"
@@ -1776,6 +1780,7 @@ function App() {
         ) : (
           <LoginView onLogin={() => {}} />
         )}
+        <PwaInstallPrompt />
       </NotificationProvider>
     </ThemeProvider>
   );

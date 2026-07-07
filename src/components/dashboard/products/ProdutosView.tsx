@@ -17,6 +17,7 @@ interface Product {
   desc: string;
   stock: number;
   sales: number;
+  media: number;
   debit: number;
   credit: number;
   brand: string;
@@ -54,6 +55,7 @@ export function ProdutosView() {
               desc: p.DESCRICAO,
               stock: typeof p.TOTAL_DISPONIVEL === 'string' ? parseFloat(p.TOTAL_DISPONIVEL) : Number(p.TOTAL_DISPONIVEL || 0),
               sales: typeof p.TOTAL_VENDIDO === 'string' ? parseFloat(p.TOTAL_VENDIDO) : Number(p.TOTAL_VENDIDO || 0),
+              media: typeof p.MEDIA === 'string' ? parseFloat(p.MEDIA) : Number(p.MEDIA || 0),
               debit: precoVenda,
               credit: precoVenda * 1.0466,
               brand: p.MARCA || "GERAL",
@@ -243,7 +245,7 @@ export function ProdutosView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col gap-4 pt-4 pb-6 px-6 overflow-hidden h-full max-h-screen bg-background">
+    <div className="flex-1 flex flex-col gap-4 pt-4 pb-6 px-3 sm:px-6 overflow-hidden h-full max-h-screen bg-background">
       {/* TINY TOOLBAR */}
       <div className="flex flex-col gap-3 shrink-0">
         
@@ -307,11 +309,11 @@ export function ProdutosView() {
 
       {/* PRODUCTS TABLE CONTAINER */}
       <div className="flex-1 bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col relative">
-        <div 
-          className="flex-1 overflow-y-auto scrollbar-hide"
+        <div
+          className="flex-1 overflow-auto scrollbar-hide"
           onScroll={handleScroll}
         >
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[640px]">
             <thead className="sticky top-0 z-10 bg-secondary/50 backdrop-blur-md border-b border-border">
               <tr>
                 {[
@@ -319,13 +321,14 @@ export function ProdutosView() {
                   { id: "desc", label: "DESCRIÇÃO", align: "left" },
                   { id: "brand", label: "MARCA", align: "center" },
                   { id: "stock", label: "ESTOQUE", align: "right" },
+                  { id: "media", label: "MÉDIA 3M", align: "right" },
                   { id: "debit", label: "DÉBITO", align: "right" },
                 ].map((col) => (
                   <th
                     key={col.id}
                     onClick={() => requestSort(col.id as keyof Product)}
                     className={cn(
-                       "py-2.5 px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors",
+                       "py-2.5 px-3 sm:px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors",
                        col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
                     )}
                   >
@@ -358,16 +361,16 @@ export function ProdutosView() {
                 <>
                   {visibleProducts.map((p: Product, i) => (
                     <tr key={i} className="hover:bg-secondary/20 transition-colors group">
-                      <td className="py-3 px-6 text-[10px] font-bold text-muted-foreground">{p.cod}</td>
-                      <td className="py-3 px-6">
+                      <td className="py-3 px-3 sm:px-6 text-[10px] font-bold text-muted-foreground">{p.cod}</td>
+                      <td className="py-3 px-3 sm:px-6">
                         <span className="text-[11px] font-black text-foreground uppercase tracking-tight line-clamp-1">{p.desc}</span>
                       </td>
-                      <td className="py-3 px-6 text-center">
+                      <td className="py-3 px-3 sm:px-6 text-center">
                         <span className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 uppercase tracking-tight">
                           {p.brand}
                         </span>
                       </td>
-                      <td className="py-3 px-6 text-right">
+                      <td className="py-3 px-3 sm:px-6 text-right">
                         <span className={cn(
                           "text-[11px] font-black tracking-tighter",
                           p.stock > 10 ? "text-foreground" : p.stock > 0 ? "text-amber-500" : "text-rose-500"
@@ -375,7 +378,12 @@ export function ProdutosView() {
                           {p.stock.toFixed(3)}
                         </span>
                       </td>
-                      <td className="py-3 px-6 text-right">
+                      <td className="py-3 px-3 sm:px-6 text-right">
+                        <span className="text-[11px] font-black text-blue-600 dark:text-blue-400 tracking-tighter tabular-nums">
+                          {p.media.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 sm:px-6 text-right">
                         <span className="text-[11px] font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">
                           R$ {p.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
@@ -385,7 +393,7 @@ export function ProdutosView() {
                   
                   {visibleCount < filteredProducts.length && (
                     <tr>
-                      <td colSpan={5} className="py-6">
+                      <td colSpan={6} className="py-6">
                         <div className="flex justify-center w-full">
                           <TinyLoader size="sm" />
                         </div>

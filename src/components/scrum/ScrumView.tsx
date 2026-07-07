@@ -229,7 +229,7 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
   const criticas = ocorrencias.filter((o) => o.prioridade === "critica" && o.status !== "resolvido").length;
 
   return (
-    <div className="h-full flex flex-col bg-background p-5 gap-4 overflow-hidden">
+    <div className="h-full flex flex-col bg-background p-3 sm:p-5 gap-3 sm:gap-4 overflow-hidden">
       {/* Header */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3 flex-wrap">
@@ -297,7 +297,7 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
       </div>
 
       {/* Board */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 overflow-y-auto xl:overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-row md:grid md:grid-cols-2 xl:grid-cols-4 gap-4 overflow-x-auto md:overflow-x-visible xl:overflow-hidden pb-3">
         {COLUNAS.map((col) => {
           const items = porColuna(col.key);
           const isOver = dragOverCol === col.key;
@@ -305,7 +305,7 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
             <div
               key={col.key}
               className={cn(
-                "flex flex-col min-h-0 border rounded-2xl overflow-hidden transition-all duration-150",
+                "flex flex-col min-h-0 border rounded-2xl overflow-hidden transition-all duration-150 shrink-0 w-[280px] sm:w-[320px] md:w-auto md:shrink",
                 isOver
                   ? "border-primary/60 bg-primary/5 shadow-lg shadow-primary/10"
                   : "bg-secondary/20 border-border/60",

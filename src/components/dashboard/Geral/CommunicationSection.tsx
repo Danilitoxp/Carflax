@@ -1548,8 +1548,8 @@ export function CommunicationSection({
         </div>
       )}
 
-      <div className="pb-3 border-b border-border mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-1">
+      <div className="pb-3 border-b border-border mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1 flex-wrap">
           {loading
             ? Array.from({ length: 5 }).map((_, i) => (
                 <div

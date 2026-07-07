@@ -226,7 +226,7 @@ export function RelatoriosView({
 
   if (loading) {
     return (
-      <div className="h-full flex flex-col p-6 space-y-6 bg-background overflow-hidden">
+      <div className="h-full flex flex-col p-3 sm:p-6 space-y-6 bg-background overflow-hidden">
         {/* Skeleton Action Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="h-10 w-full md:w-64 bg-card/50 rounded-xl animate-pulse border border-border" />

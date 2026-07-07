@@ -1051,7 +1051,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const maxReasonCount = Math.max(...reasonEntries.map((e) => e.count), 1);
 
   return (
-    <div className="h-full flex flex-col pt-4 px-6 pb-2 overflow-y-auto scrollbar-hide bg-background">
+    <div className="h-full flex flex-col pt-4 px-3 sm:px-6 pb-2 overflow-y-auto scrollbar-hide bg-background">
       {/* Header & Filters */}
       <div className="flex flex-col lg:flex-row gap-4 items-center justify-between shrink-0 mb-4 px-1">
         <div className="flex flex-col sm:flex-row gap-2 items-center w-full lg:w-auto flex-1 flex-wrap">

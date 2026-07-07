@@ -409,7 +409,7 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
   const isMesAtual = mesSelecionado.mes === mesAtual && mesSelecionado.ano === anoAtual;
 
   return (
-    <div className="h-full flex flex-col pt-4 px-6 pb-2 overflow-hidden bg-background">
+    <div className="h-full flex flex-col pt-4 px-3 sm:px-6 pb-2 overflow-hidden bg-background">
       <style>{`
         @keyframes border-trace {
           0%, 100% { clip-path: inset(0 0 98% 0); }

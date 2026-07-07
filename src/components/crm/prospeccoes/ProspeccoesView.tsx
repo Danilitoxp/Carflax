@@ -176,7 +176,7 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
     <div className="h-full flex flex-col overflow-hidden bg-[#F8FAFC] dark:bg-background">
 
       {/* Header */}
-      <div className="px-6 pt-5 pb-4 border-b border-border/60 bg-white dark:bg-card shrink-0">
+      <div className="px-3 sm:px-6 pt-5 pb-4 border-b border-border/60 bg-white dark:bg-card shrink-0">
 
         {/* Title row */}
         <div className="flex items-center justify-between mb-3">
@@ -277,8 +277,8 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide">
-        <table className="w-full border-collapse">
+      <div className="flex-1 overflow-auto scrollbar-hide">
+        <table className="w-full border-collapse min-w-[720px]">
           <thead className="sticky top-0 z-10 bg-secondary/80 backdrop-blur-sm border-b border-border/60">
             <tr>
               <th className="px-6 py-3 text-left text-[9px] font-black uppercase tracking-widest text-muted-foreground w-[32%]">

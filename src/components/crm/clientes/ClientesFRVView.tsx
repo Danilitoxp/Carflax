@@ -410,9 +410,9 @@ export function ClientesFRVView() {
   const modoSufixo = modo === "mes" ? "vs mês ant." : modo === "3m" ? "vs trim. ant." : "vs ano ant.";
 
   return (
-    <div className="h-full flex flex-col bg-background p-5 gap-4 overflow-hidden relative">
-      {/* ── Header (fileira única: título + abas + filtros) ── */}
-      <div className="flex items-center gap-3 shrink-0 min-w-0">
+    <div className="h-full flex flex-col bg-background p-3 sm:p-5 gap-4 overflow-hidden relative">
+      {/* ── Header: título + abas + filtros (quebra em linhas no mobile) ── */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0 flex-wrap">
         <h1 className="text-lg font-black text-foreground uppercase tracking-tighter flex items-center gap-2 shrink-0">
           <div className="p-1.5 bg-primary/10 rounded-lg">
             <BarChart4 className="w-5 h-5 text-primary" />
@@ -438,11 +438,11 @@ export function ClientesFRVView() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-          <TinyDropdown icon={UserSquare2} value={filtroVendedor} options={vendedorOptions} onChange={setFiltroVendedor} className="flex-1 min-w-0 max-w-[190px]" variant="blue" />
-          <TinyDropdown icon={Building2} value={filtroEmpresa} options={empresaOptions} onChange={setFiltroEmpresa} className="flex-1 min-w-0 max-w-[170px]" variant="slate" />
-          <TinyDropdown icon={Layers} value={filtroSegmento} options={segmentoOptions} onChange={setFiltroSegmento} className="flex-1 min-w-0 max-w-[180px]" variant="emerald" />
-          <TinyDropdown icon={CalendarClock} value={modo} options={MODO_OPTIONS} onChange={(v) => setModo(v as ComparacaoModo)} className="flex-1 min-w-0 max-w-[190px]" variant="amber" />
+        <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto lg:flex-1 min-w-0 lg:justify-end">
+          <TinyDropdown icon={UserSquare2} value={filtroVendedor} options={vendedorOptions} onChange={setFiltroVendedor} className="flex-1 min-w-[140px] max-w-[190px]" variant="blue" />
+          <TinyDropdown icon={Building2} value={filtroEmpresa} options={empresaOptions} onChange={setFiltroEmpresa} className="flex-1 min-w-[130px] max-w-[170px]" variant="slate" />
+          <TinyDropdown icon={Layers} value={filtroSegmento} options={segmentoOptions} onChange={setFiltroSegmento} className="flex-1 min-w-[140px] max-w-[180px]" variant="emerald" />
+          <TinyDropdown icon={CalendarClock} value={modo} options={MODO_OPTIONS} onChange={(v) => setModo(v as ComparacaoModo)} className="flex-1 min-w-[140px] max-w-[190px]" variant="amber" />
         </div>
       </div>
 

@@ -376,6 +376,7 @@ export interface ProductInfo {
   TOTAL_VENDIDO?: number | string;
   VALOR_CREDITO?: number | string;
   VALOR_DEBITO?: string;
+  MEDIA?: number | string;
 }
 
 export const apiDashboardProdutos = (codigo?: string) =>

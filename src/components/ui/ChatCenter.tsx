@@ -138,14 +138,14 @@ export function ChatCenter({
 
   return (
     <>
-      {/* Chat modals — stack from right, shift when list panel is open */}
+      {/* Chat modals — stack from right, shift when list panel is open (full screen on mobile) */}
       {openChatsData.length > 0 && (
         <div
-          className="fixed z-[9999] bottom-6 flex items-end gap-4 pointer-events-none transition-all duration-300"
+          className="fixed z-[9999] max-sm:!inset-0 sm:bottom-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-end gap-4 pointer-events-none transition-all duration-300 w-full sm:w-auto"
           style={{ right: isOpen ? "calc(350px + 24px + 16px)" : "24px" }}
         >
           {openChatsData.map((chat) => (
-            <div key={chat.doc} className="pointer-events-auto">
+            <div key={chat.doc} className="pointer-events-auto w-full h-full sm:w-auto sm:h-auto">
               <ChatModal
                 isOpen={true}
                 onClose={() => {
@@ -169,12 +169,12 @@ export function ChatCenter({
         </div>
       )}
 
-      {/* Chat list panel — separate from modals */}
+      {/* Chat list panel — separate from modals (full screen on mobile) */}
       {isOpen && (
-        <div className="fixed z-[9999] bottom-6 right-6 bg-card/95 backdrop-blur-xl border border-border shadow-2xl flex flex-col pointer-events-auto w-[350px] h-[520px] rounded-2xl overflow-hidden">
+        <div className="fixed z-[9999] max-sm:!inset-0 sm:bottom-6 sm:right-6 bg-card/95 backdrop-blur-xl border border-border shadow-2xl flex flex-col pointer-events-auto w-full h-[100dvh] sm:w-[350px] sm:h-[520px] rounded-none sm:rounded-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:animate-none">
 
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border/40 shrink-0">
+        {/* Header with notch padding on mobile */}
+        <div className="flex items-center justify-between p-4 pt-[calc(1.2rem+env(safe-area-inset-top))] sm:pt-4 border-b border-border/40 shrink-0">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-4.5 h-4.5 text-blue-500" />
             <span className="text-[11px] font-black text-foreground uppercase tracking-widest">Conversas</span>
