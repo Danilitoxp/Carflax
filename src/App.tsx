@@ -210,6 +210,24 @@ function DashboardContent({
     openChatDocsRef.current = openChatDocs;
   }, [openChatDocs]);
 
+  // Ids dos líderes (supervisores/gerentes/diretores). Usado para abrir o chat do
+  // destinatário em tempo real quando um líder envia uma mensagem, mesmo que ele
+  // não seja o responsável_id exato daquele vendedor.
+  const leaderIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("usuarios")
+        .select("id")
+        .eq("is_leader", true);
+      if (!cancelled && data) {
+        leaderIdsRef.current = new Set(data.map((u) => String(u.id)));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const handleToggleChatDoc = useCallback((doc: string) => {
     setOpenChatDocs((prev) => {
       if (prev.includes(doc)) return prev.filter((d) => d !== doc);
@@ -892,9 +910,14 @@ function DashboardContent({
             const forcarChat =
               isForMe && !!myResponsavelId && newMsg.enviado_por === myResponsavelId;
 
-            // Abre o chat quando é forçado (responsável) ou quando não há nenhum aberto.
-            // openChatDoc é idempotente, então não corre risco de abrir+fechar.
-            if (isForMe && (forcarChat || openChatDocsRef.current.length === 0)) {
+            // Remetente é um líder (supervisor/gerente/diretor)? Então abre o chat
+            // do destinatário em tempo real (sem bloquear), mesmo que ele não seja
+            // o responsável_id exato deste vendedor.
+            const senderIsLeader = !!newMsg.enviado_por && leaderIdsRef.current.has(String(newMsg.enviado_por));
+
+            // Abre o chat quando é forçado (responsável), quando o remetente é líder
+            // ou quando não há nenhum aberto. openChatDoc é idempotente.
+            if (isForMe && (forcarChat || senderIsLeader || openChatDocsRef.current.length === 0)) {
               openChatDoc(newMsg.documento);
             }
             if (forcarChat) {

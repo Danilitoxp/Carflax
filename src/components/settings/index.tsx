@@ -619,10 +619,13 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
   const userId = userProfile?.id;
   const hydratedRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Só mostra os toggles depois de carregar as preferências salvas, para não
+  // "piscar" o valor padrão (ativo) antes de aplicar o que o usuário desativou.
+  const [prefsReady, setPrefsReady] = useState(false);
 
   // Hidrata as preferências salvas por usuário no banco (sobrepõe o cache local).
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) { setPrefsReady(true); return; }
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
@@ -635,6 +638,7 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
           setState((prev) => mergeKnownPrefs(prev, data.notification_prefs));
         }
         hydratedRef.current = true; // libera o salvamento a partir daqui
+        setPrefsReady(true);
       }
     })();
     return () => { cancelled = true; };
@@ -721,7 +725,11 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
               {items.map((item) => (
                 <div key={item.key} className="flex items-center justify-between group">
                   <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{item.label}</span>
-                  <Toggle checked={state[key][item.key]} onChange={() => toggle(key, item.key)} />
+                  {prefsReady ? (
+                    <Toggle checked={state[key][item.key]} onChange={() => toggle(key, item.key)} />
+                  ) : (
+                    <div className="h-5 w-10 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse shrink-0" />
+                  )}
                 </div>
               ))}
             </div>
