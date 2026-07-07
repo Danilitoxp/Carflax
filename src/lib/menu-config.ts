@@ -66,6 +66,7 @@ export const NAV_SECTIONS: NavSection[] = [
     permGroup: "LOGÍSTICA",
     subItems: [{ label: "Romaneios" }],
   },
+  { label: "Scrum", permGroup: "GESTÃO & ADMIN", leaderOnly: true },
   { label: "Usuários", permGroup: "GESTÃO & ADMIN", leaderOnly: true },
   { label: "DB Admin", permGroup: "GESTÃO & ADMIN", leaderOnly: true },
   { label: "Sugestões", permGroup: "ESSENCIAL" },
@@ -163,7 +164,7 @@ const VENDAS_SECTIONS = [
 ];
 
 // Módulos de Gestão & Admin liberados automaticamente para líderes
-const LEADER_SECTIONS = ["Usuários", "DB Admin"];
+const LEADER_SECTIONS = ["Scrum", "Usuários", "DB Admin"];
 
 export function canAccessSection(profile: AccessProfile | null | undefined, item: string): boolean {
   if (!item) return false;

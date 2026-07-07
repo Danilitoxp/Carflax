@@ -76,6 +76,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "Painel Coletor": LayoutGrid,
   Entregas: Truck,
   Romaneios: FileText,
+  Scrum: Kanban,
   Usuários: Users,
   "DB Admin": Database,
   Sugestões: Lightbulb,
@@ -287,7 +288,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     if (isVendasDept && comercialItems.includes(label)) return true;
 
     // Líderes têm acesso automático aos módulos de Gestão & Admin, sem precisar de toggle manual
-    const leaderOnlyItems = ["Usuários", "DB Admin"];
+    const leaderOnlyItems = ["Scrum", "Usuários", "DB Admin"];
     if (userProfile?.is_leader && leaderOnlyItems.includes(label)) return true;
 
     // Permissões manuais (Database) — vale para todos os roles

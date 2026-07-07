@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { SugestaoModal } from "@/components/sugestao";
 import { OrcamentoIAModal } from "@/components/ui/OrcamentoIAModal";
 import { SugestoesAdminView } from "@/components/admin/SugestoesAdminView";
+import { ScrumView } from "@/components/scrum/ScrumView";
 import { ColetorView } from "@/components/coletor/ColetorView";
 import { EntregasView } from "@/components/entregas";
 import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
@@ -65,6 +66,7 @@ interface DashboardContentProps {
   userProfile: UserProfile | null;
   vendedorMetrics: VendedorResumo | null;
   perdidoMap: Map<string, number>;
+  geralLoading: boolean;
   onLogout: () => void;
 }
 
@@ -72,6 +74,7 @@ function DashboardContent({
   userProfile,
   vendedorMetrics,
   perdidoMap,
+  geralLoading,
   onLogout,
 }: DashboardContentProps) {
   const { showNotification } = useNotification();
@@ -85,7 +88,6 @@ function DashboardContent({
   });
   const [isSugestaoModalOpen, setIsSugestaoModalOpen] = useState(false);
   const [isOrcamentoIAOpen, setIsOrcamentoIAOpen] = useState(false);
-  const [geralLoading, setGeralLoading] = useState(true);
   const [activeSorteio, setActiveSorteio] = useState<{
     mes: number;
     ano: number;
@@ -133,22 +135,6 @@ function DashboardContent({
     window.addEventListener("carflax-change-tab", handleTabChange);
     return () => window.removeEventListener("carflax-change-tab", handleTabChange);
   }, []);
-
-  useEffect(() => {
-    // Timer de segurança: Nunca deixa o loading infinito (máximo 3s)
-    const safetyTimer = setTimeout(() => setGeralLoading(false), 3000);
-
-    if (geralLoading) {
-      // Se já temos o perfil, podemos carregar a estrutura básica em 500ms
-      const timer = setTimeout(() => setGeralLoading(false), 500);
-      return () => {
-        clearTimeout(timer);
-        clearTimeout(safetyTimer);
-      };
-    }
-
-    return () => clearTimeout(safetyTimer);
-  }, [geralLoading]);
 
   // Defesa em profundidade: se o localStorage restaurar uma seção que o usuário
   // não pode mais acessar (ex: permissão revogada), volta para Geral silenciosamente
@@ -1283,6 +1269,8 @@ function DashboardContent({
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <SugestoesAdminView />
             </div>
+          ) : activeItem === "Scrum" ? (
+            <ScrumView userProfile={userProfile || undefined} />
           ) : activeItem === "DB Admin" ? (
             <SqlRunnerView />
           ) : activeItem === "Geral" ? (
@@ -1424,6 +1412,15 @@ function App() {
   const [session, setSession] = useState<Session | null>(null); // From Supabase Auth
   const sessionRef = useRef<Session | null>(null); // Ref para evitar re-execução do useEffect
   const [loading, setLoading] = useState(true);
+  // Carga inicial do dashboard: emenda no MESMO LoadingScreen do boot (login/refresh),
+  // então a animação do lápis não reseta ao trocar de fase (auth → dashboard).
+  const [geralLoading, setGeralLoading] = useState(true);
+  useEffect(() => {
+    if (loading || !session) return; // só conta depois que a autenticação termina
+    const timer = setTimeout(() => setGeralLoading(false), 500);
+    const safety = setTimeout(() => setGeralLoading(false), 3000);
+    return () => { clearTimeout(timer); clearTimeout(safety); };
+  }, [loading, session]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [vendedorMetrics, setVendedorMetrics] = useState<VendedorResumo | null>(
     null,
@@ -1735,7 +1732,7 @@ function App() {
     return <TermsOfServiceView />;
   }
 
-  if (loading) return <LoadingScreen />;
+  if (loading || (session && geralLoading)) return <LoadingScreen />;
 
   const isMotoristaRoute =
     window.location.pathname.includes("/motorista") ||
@@ -1773,6 +1770,7 @@ function App() {
             userProfile={profile}
             vendedorMetrics={vendedorMetrics}
             perdidoMap={perdidoMap}
+            geralLoading={geralLoading}
             onLogout={() => supabase.auth.signOut()}
           />
         ) : (

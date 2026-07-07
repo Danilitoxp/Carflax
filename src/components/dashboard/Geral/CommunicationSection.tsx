@@ -1175,8 +1175,10 @@ export function CommunicationSection({
   const canManage =
     userProfile?.is_leader ||
     userProfile?.role === "admin";
-  const loading =
-    externalLoading !== undefined ? externalLoading : internalLoading;
+  // Mostra o skeleton tanto no boot (externalLoading) quanto quando os comunicados
+  // estão sendo (re)carregados — ex.: ao voltar para a seção Geral, que remonta a
+  // seção e refaz o fetch.
+  const loading = !!externalLoading || internalLoading;
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | string | null>(null);
