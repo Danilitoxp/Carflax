@@ -37,6 +37,8 @@ export interface MarketingMessage {
   vendedor_id?: string;
   created_at?: string;
   editado?: boolean;
+  quoted_text?: string;
+  quoted_sender?: "me" | "contact";
 }
 
 export interface MarketingVenda {
@@ -212,7 +214,7 @@ export const marketingService = {
   async getMessagesByJid(remoteJid: string, limit = 50, sinceDate?: string, beforeDate?: string, vendedorId?: string) {
     let query = supabase
       .from("marketing_whatsapp")
-      .select("message_id, remote_jid, sender, texto, tipo, status, timestamp, media_url, reacao, vendedor_id, editado")
+      .select("message_id, remote_jid, sender, texto, tipo, status, timestamp, media_url, reacao, vendedor_id, editado, quoted_text, quoted_sender")
       .eq("remote_jid", remoteJid);
 
     if (vendedorId) {

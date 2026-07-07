@@ -27,7 +27,8 @@ import {
   Video,
   Smile,
   Printer,
-  FolderDown
+  FolderDown,
+  CornerUpLeft
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { supabase } from "@/lib/supabase";
@@ -538,8 +539,9 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
   const [showClientDrawer, setShowClientDrawer] = useState(false);
   const [drawerClientName, setDrawerClientName] = useState("");
   
-  // Atribuição de atendente
+  // Atribuição de atendente e resposta a mensagens
   const [operators, setOperators] = useState<{ id: string; name: string; avatar?: string }[]>([]);
+  const [replyingMessage, setReplyingMessage] = useState<Message | null>(null);
 
   // ERP Autcom Required Fields
   const [drawerClientNumeroDocumento, setDrawerClientNumeroDocumento] = useState("");
@@ -1100,6 +1102,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         tipo: tipoMsg,
         status: (message.status === "READ" || String(message.status) === "3") ? "read" : (message.status === "DELIVERY_ACK" || String(message.status) === "2") ? "delivered" : "sent",
         ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {}),
+        quoted_text: quotedText,
+        quoted_sender: quotedSender,
       }).then(() => {
         if (text) {
           detectAndSaveOrigin(remoteJid, text);
@@ -1607,6 +1611,19 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
       const timestamp = new Date().toISOString();
       const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+      const quoted = replyingMessage ? {
+        key: {
+          id: replyingMessage.id,
+          fromMe: replyingMessage.sender === "me"
+        },
+        message: {
+          conversation: replyingMessage.text
+        }
+      } : undefined;
+
+      const quotedText = replyingMessage?.text;
+      const quotedSender = replyingMessage?.sender;
+
       const newMsg: Message = {
         id: msgId,
         text: textToSend,
@@ -1614,10 +1631,12 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         rawTimestamp: timestamp,
         sender: "me",
         status: "sent",
-        tipo: "text"
+        tipo: "text",
+        ...(quotedText ? { quotedText, quotedSender } : {})
       };
 
       setMessages(prev => [...prev, newMsg]);
+      setReplyingMessage(null);
 
       // Atualiza o lastMessage no chat da sidebar e atribui o vendedor_id localmente
       setChats(prev => prev.map(c =>
@@ -1625,7 +1644,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
       ));
       setSelectedChat(prev => prev ? { ...prev, vendedor_id: vendedorId } : null);
 
-      const sendResp = await evolutionApi.sendText(selectedChat.id, textToSend);
+      const sendResp = await evolutionApi.sendText(selectedChat.id, textToSend, quoted);
       const realId = sendResp?.key?.id;
       if (realId) {
         setMessages(prev => prev.map(m => m.id === msgId ? { ...m, id: realId } : m));
@@ -1647,7 +1666,9 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         timestamp,
         status: "sent",
         tipo: "text",
-        vendedor_id: vendedorId
+        vendedor_id: vendedorId,
+        quoted_text: quotedText,
+        quoted_sender: quotedSender
       });
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
@@ -1676,6 +1697,19 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
       const timestamp = new Date().toISOString();
       const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+      const quoted = replyingMessage ? {
+        key: {
+          id: replyingMessage.id,
+          fromMe: replyingMessage.sender === "me"
+        },
+        message: {
+          conversation: replyingMessage.text
+        }
+      } : undefined;
+
+      const quotedText = replyingMessage?.text;
+      const quotedSender = replyingMessage?.sender;
+
       const newMsg: Message = {
         id: msgId,
         text: caption || file.name,
@@ -1686,8 +1720,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         mediaUrl: base64Full,
         fileName: file.name,
         rawTimestamp: timestamp,
+        ...(quotedText ? { quotedText, quotedSender } : {})
       };
       setMessages(prev => [...prev, newMsg]);
+      setReplyingMessage(null);
 
       try {
         const ext = file.name.split('.').pop() || 'bin';
@@ -1698,7 +1734,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
           setMessages(prev => prev.map(m => m.id === msgId ? { ...m, mediaUrl: publicUrl } : m));
         }
 
-        const docResp = await evolutionApi.sendDocument(selectedChat.id, base64, file.type, file.name, caption);
+        const docResp = await evolutionApi.sendDocument(selectedChat.id, base64, file.type, file.name, caption, quoted);
         const realDocId = docResp?.key?.id;
         if (realDocId) {
           setMessages(prev => prev.map(m => m.id === msgId ? { ...m, id: realDocId } : m));
@@ -1728,6 +1764,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
           tipo: "document",
           media_url: publicUrl || undefined,
           vendedor_id: vendedorId,
+          quoted_text: quotedText,
+          quoted_sender: quotedSender,
         });
       } catch (error) {
         console.error("Erro ao enviar documento:", error);
@@ -1999,6 +2037,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
 
   const handleSelectChat = useCallback(async (chat: Chat) => {
     setSelectedChat(chat);
+    setReplyingMessage(null);
     setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unreadCount: 0 } : c));
     // Persiste no banco que o usuário leu as mensagens
     if ((chat.unreadCount || 0) > 0) {
@@ -2026,6 +2065,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         mediaUrl: m.media_url,
         reacao: m.reacao,
         editado: m.editado || false,
+        quotedText: m.quoted_text,
+        quotedSender: m.quoted_sender,
       }));
 
       setMessages(msgs);
@@ -2076,6 +2117,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         tipo: m.tipo,
         mediaUrl: m.media_url,
         reacao: m.reacao,
+        quotedText: m.quoted_text,
+        quotedSender: m.quoted_sender,
       }));
 
       // Preserva a posição do scroll ao inserir mensagens no topo
@@ -3168,13 +3211,14 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                         </div>
                       )}
                       <div className={cn("flex flex-col", msg.sender === "me" ? "items-end" : "items-start")}>
-                        <div className={cn(
-                          "max-w-[75%] rounded-2xl shadow-sm relative flex flex-col group transition-all", 
-                          isSticker
-                            ? "bg-transparent shadow-none border-none"
-                            : msg.sender === "me" ? "bg-primary text-white rounded-tr-none" : "bg-card border border-border text-foreground rounded-tl-none",
-                          isDocumentMsg ? "p-0 overflow-hidden" : isVisualMedia ? "p-1" : "px-4 py-2"
-                        )}>
+                        <div className="flex items-center gap-2 group/msg-row max-w-[85%]" style={{ flexDirection: msg.sender === "me" ? "row-reverse" : "row" }}>
+                          <div className={cn(
+                            "rounded-2xl shadow-sm relative flex flex-col group transition-all shrink-0 max-w-full", 
+                            isSticker
+                              ? "bg-transparent shadow-none border-none"
+                              : msg.sender === "me" ? "bg-primary text-white rounded-tr-none" : "bg-card border border-border text-foreground rounded-tl-none",
+                            isDocumentMsg ? "p-0 overflow-hidden" : isVisualMedia ? "p-1" : "px-4 py-2"
+                          )}>
                         
                         {/* Mídia: Imagem ou Figurinha */}
                         {(msg.tipo === "image" || msg.tipo === "sticker") && msg.mediaUrl && (
@@ -3414,7 +3458,17 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                             )}
                           </div>
                         )}
-                      </div>
+                          </div>
+                          {!isSticker && (
+                            <button
+                              onClick={() => setReplyingMessage(msg)}
+                              className="opacity-0 group-hover/msg-row:opacity-100 p-1.5 hover:bg-secondary rounded-lg transition-all duration-200 text-muted-foreground hover:text-foreground shrink-0 animate-in zoom-in duration-200"
+                              title="Responder esta mensagem"
+                            >
+                              <CornerUpLeft className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       
                       {/* Reação */}
                       {msg.reacao && (
@@ -3739,6 +3793,26 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* Replying Message Preview */}
+                {replyingMessage && (
+                  <div className="max-w-5xl mx-auto mb-3 p-3 bg-secondary/80 border border-border/80 rounded-xl flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
+                    <div className="flex-1 min-w-0 border-l-2 border-primary pl-3" style={{ borderLeftWidth: 3 }}>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-primary block mb-0.5">
+                        Respondendo a: {replyingMessage.sender === "me" ? "Você" : "Cliente"}
+                      </span>
+                      <p className="text-xs text-muted-foreground truncate leading-tight">
+                        {replyingMessage.text}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setReplyingMessage(null)}
+                      className="p-1.5 hover:bg-rose-500/10 text-rose-500 rounded-lg transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
 

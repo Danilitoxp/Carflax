@@ -94,16 +94,17 @@ export const evolutionApi = {
   },
 
   /**
-   * Envia uma mensagem de texto
+   * Envia uma mensagem de texto (com suporte opcional a citação/resposta)
    */
-  async sendText(remoteJid: string, text: string): Promise<EvoSendResponse> {
+  async sendText(remoteJid: string, text: string, quoted?: { key: { id: string; fromMe: boolean }; message: { conversation: string } }): Promise<EvoSendResponse> {
     return fetchEvo<EvoSendResponse>(`/message/sendText/${EVO_CONFIG.instance}`, {
       method: 'POST',
       body: JSON.stringify({
         number: remoteJid,
         text: text,
         delay: 1200,
-        linkPreview: true
+        linkPreview: true,
+        ...(quoted ? { quoted } : {})
       }),
     });
   },
@@ -217,7 +218,7 @@ export const evolutionApi = {
   /**
    * Envia um documento (PDF, DOCX, etc.) em base64
    */
-  async sendDocument(remoteJid: string, base64: string, mimetype: string, filename: string, caption?: string): Promise<EvoSendResponse> {
+  async sendDocument(remoteJid: string, base64: string, mimetype: string, filename: string, caption?: string, quoted?: { key: { id: string; fromMe: boolean }; message: { conversation: string } }): Promise<EvoSendResponse> {
     return fetchEvo<EvoSendResponse>(`/message/sendMedia/${EVO_CONFIG.instance}`, {
       method: 'POST',
       body: JSON.stringify({
@@ -227,6 +228,7 @@ export const evolutionApi = {
         mimetype: mimetype,
         fileName: filename,
         caption: caption || '',
+        ...(quoted ? { quoted } : {})
       }),
     });
   },
