@@ -142,8 +142,8 @@ export function ProdutosView() {
 
     const XLSX = (await import("xlsx-js-style")).default;
 
-    const HEADERS = ["Código", "Descrição", "Marca", "Estoque", "Total Vendido", "Preço de Venda"];
-    const NUM_COLS = 6;
+    const HEADERS = ["Código", "Descrição", "Marca", "Estoque", "Média (3m)", "Total Vendido", "Preço de Venda"];
+    const NUM_COLS = 7;
 
     const activeFilters =
       [
@@ -165,6 +165,7 @@ export function ProdutosView() {
         p.desc,
         p.brand,
         Number(p.stock.toFixed(3)),
+        Number(p.media.toFixed(2)),
         Number(p.sales.toFixed(3)),
         Number(p.debit.toFixed(2)),
       ]),
@@ -177,8 +178,8 @@ export function ProdutosView() {
     const borderAll = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER };
 
     // Cor de destaque por coluna (cabeçalho) + cor suave para as células
-    const COL_HEAD = ["1E293B", "1E293B", "7C3AED", "2563EB", "D97706", "059669"];
-    const COL_TINT = ["FFFFFF", "FFFFFF", "F5F3FF", "EFF6FF", "FFFBEB", "ECFDF5"];
+    const COL_HEAD = ["1E293B", "1E293B", "7C3AED", "2563EB", "1D4ED8", "D97706", "059669"];
+    const COL_TINT = ["FFFFFF", "FFFFFF", "F5F3FF", "EFF6FF", "EFF6FF", "FFFBEB", "ECFDF5"];
 
     const titleCell = ws["A1"];
     if (titleCell) {
@@ -224,12 +225,13 @@ export function ProdutosView() {
           },
           border: borderAll,
         };
-        if (c === 5) ws[ref].z = '"R$" #,##0.00';
+        if (c === 6) ws[ref].z = '"R$" #,##0.00';
+        else if (c === 4) ws[ref].z = "#,##0.00";
         else if (isNum) ws[ref].z = "#,##0.000";
       }
     }
 
-    ws["!cols"] = [{ wch: 12 }, { wch: 54 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 16 }];
+    ws["!cols"] = [{ wch: 12 }, { wch: 54 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 }];
     ws["!rows"] = [{ hpt: 26 }, { hpt: 18 }, { hpt: 6 }, { hpt: 22 }];
     ws["!merges"] = [
       { s: { r: 0, c: 0 }, e: { r: 0, c: NUM_COLS - 1 } },
@@ -350,11 +352,12 @@ export function ProdutosView() {
               {loading ? (
                 Array.from({ length: 15 }).map((_, i) => (
                   <tr key={`skeleton-${i}`} className="animate-pulse">
-                    <td className="py-4 px-6"><div className="h-2 w-10 bg-secondary rounded" /></td>
-                    <td className="py-4 px-6"><div className="h-2 w-full max-w-[250px] bg-secondary rounded" /></td>
-                    <td className="py-4 px-6"><div className="h-5 w-16 bg-secondary/50 rounded-lg mx-auto" /></td>
-                    <td className="py-4 px-6 text-right"><div className="h-2 w-12 bg-secondary rounded ml-auto" /></td>
-                    <td className="py-4 px-6 text-right"><div className="h-2 w-16 bg-secondary/50 rounded ml-auto" /></td>
+                    <td className="py-4 px-3 sm:px-6"><div className="h-2 w-10 bg-secondary rounded" /></td>
+                    <td className="py-4 px-3 sm:px-6"><div className="h-2 w-full max-w-[250px] bg-secondary rounded" /></td>
+                    <td className="py-4 px-3 sm:px-6"><div className="h-5 w-16 bg-secondary/50 rounded-lg mx-auto" /></td>
+                    <td className="py-4 px-3 sm:px-6 text-right"><div className="h-2 w-12 bg-secondary rounded ml-auto" /></td>
+                    <td className="py-4 px-3 sm:px-6 text-right"><div className="h-2 w-12 bg-secondary rounded ml-auto" /></td>
+                    <td className="py-4 px-3 sm:px-6 text-right"><div className="h-2 w-16 bg-secondary/50 rounded ml-auto" /></td>
                   </tr>
                 ))
               ) : (
