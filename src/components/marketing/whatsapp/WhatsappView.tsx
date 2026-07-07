@@ -224,6 +224,7 @@ interface Chat {
   arquivado?: boolean;
   fixado?: boolean;
   leadInfo?: LeadMetadata;
+  vendedor_id?: string;
 }
 
 interface EvoChatResponse {
@@ -537,6 +538,9 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
   const [showClientDrawer, setShowClientDrawer] = useState(false);
   const [drawerClientName, setDrawerClientName] = useState("");
   
+  // Atribuição de atendente
+  const [operators, setOperators] = useState<{ id: string; name: string; avatar?: string }[]>([]);
+
   // ERP Autcom Required Fields
   const [drawerClientNumeroDocumento, setDrawerClientNumeroDocumento] = useState("");
   const [drawerClientTipoDocumento, setDrawerClientTipoDocumento] = useState<number>(2); // 1 = CNPJ, 2 = CPF
@@ -609,6 +613,51 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
+  }, []);
+
+  // Carrega operadores (usuários)
+  useEffect(() => {
+    const loadOperators = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("usuarios")
+          .select("id, name, avatar")
+          .order("name");
+        if (!error && data) {
+          setOperators(data);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar operadores:", err);
+      }
+    };
+    loadOperators();
+  }, []);
+
+  // Realtime: escuta alterações de atendente/vendedor_id nos clientes em tempo real
+  useEffect(() => {
+    const channel = supabase
+      .channel('whatsapp-clientes-changes')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'marketing_clientes' },
+        (payload) => {
+          const updated = payload.new as { remote_jid: string; vendedor_id?: string | null };
+          if (updated.remote_jid) {
+            setChats(prev => prev.map(c => {
+              if (c.id !== updated.remote_jid) return c;
+              return { ...c, vendedor_id: updated.vendedor_id || undefined };
+            }));
+            setSelectedChat(prev => {
+              if (prev && prev.id === updated.remote_jid) {
+                return { ...prev, vendedor_id: updated.vendedor_id || undefined };
+              }
+              return prev;
+            });
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const sendBrowserNotification = (title: string, body: string, icon?: string) => {
@@ -695,6 +744,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
           avatar: item.foto_url || "",
           arquivado: item.arquivado,
           fixado: item.fixado || false,
+          vendedor_id: item.vendedor_id || undefined,
           leadInfo: {
             status: item.status || "Novo Lead",
             temperature: (item.temperatura as Temperature) || "Frio",
@@ -770,6 +820,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
       avatar: item.foto_url || "",
       arquivado: item.arquivado,
       fixado: item.fixado || false,
+      vendedor_id: item.vendedor_id || undefined,
       leadInfo: {
         status: item.status || "Novo Lead",
         temperature: (item.temperatura as Temperature) || "Frio",
@@ -1568,10 +1619,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
 
       setMessages(prev => [...prev, newMsg]);
 
-      // Atualiza o lastMessage no chat da sidebar
+      // Atualiza o lastMessage no chat da sidebar e atribui o vendedor_id localmente
       setChats(prev => prev.map(c =>
-        c.id === selectedChat.id ? { ...c, lastMessage: textToSend, lastMessageSender: "me", lastMessageType: "text", lastMessageStatus: "sent", time: "Agora" } : c
+        c.id === selectedChat.id ? { ...c, lastMessage: textToSend, lastMessageSender: "me", lastMessageType: "text", lastMessageStatus: "sent", time: "Agora", vendedor_id: vendedorId } : c
       ));
+      setSelectedChat(prev => prev ? { ...prev, vendedor_id: vendedorId } : null);
 
       const sendResp = await evolutionApi.sendText(selectedChat.id, textToSend);
       const realId = sendResp?.key?.id;
@@ -1583,7 +1635,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         remote_jid: selectedChat.id,
         ultima_mensagem: textToSend,
         ultima_conversa_em: timestamp,
-        status: "Em Contato"
+        status: "Em Contato",
+        vendedor_id: vendedorId
       });
 
       await marketingService.saveMessage({
@@ -1651,11 +1704,18 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
           setMessages(prev => prev.map(m => m.id === msgId ? { ...m, id: realDocId } : m));
         }
 
+        // Atualiza a sidebar e atribui o vendedor_id localmente
+        setChats(prev => prev.map(c =>
+          c.id === selectedChat.id ? { ...c, lastMessage: `📎 ${file.name}`, lastMessageSender: "me", lastMessageType: "document", lastMessageStatus: "sent", time: "Agora", vendedor_id: vendedorId } : c
+        ));
+        setSelectedChat(prev => prev ? { ...prev, vendedor_id: vendedorId } : null);
+
         await marketingService.upsertCliente({
           remote_jid: selectedChat.id,
           ultima_mensagem: `📎 ${file.name}`,
           ultima_conversa_em: timestamp,
-          status: "Em Contato"
+          status: "Em Contato",
+          vendedor_id: vendedorId
         });
 
         await marketingService.saveMessage({
@@ -2784,6 +2844,34 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                       )} />
                     </span>
                     {chat.fixado && <Pin className="w-3 h-3 text-primary rotate-45 shrink-0" />}
+                    {chat.vendedor_id && (
+                      <span
+                        className={cn(
+                          "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tight shrink-0 border flex items-center gap-1",
+                          chat.vendedor_id === vendedorId
+                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                            : "bg-slate-500/10 text-slate-500 border-slate-500/10"
+                        )}
+                        title={`Atendido por: ${operators.find(o => o.id === chat.vendedor_id)?.name || "Outro Atendente"}`}
+                      >
+                        <div className="w-3.5 h-3.5 rounded-full overflow-hidden border border-border/40 flex items-center justify-center shrink-0 bg-secondary">
+                          {(() => {
+                            const op = operators.find(o => o.id === chat.vendedor_id);
+                            return op?.avatar ? (
+                              <img src={op.avatar} className="w-full h-full object-cover" />
+                            ) : (
+                              <User className="w-2 h-2 text-muted-foreground" />
+                            );
+                          })()}
+                        </div>
+                        <span>
+                          {chat.vendedor_id === vendedorId
+                            ? "Você"
+                            : (operators.find(o => o.id === chat.vendedor_id)?.name?.split(" ")[0] || "Atendido")
+                          }
+                        </span>
+                      </span>
+                    )}
                   </div>
                   
                   <p className={cn(
@@ -2892,6 +2980,30 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
               </div>
               
               <div className="flex items-center gap-2">
+                {/* Atendente (vendedor_id) Estático */}
+                {selectedChat.vendedor_id ? (
+                  <div className="h-9 px-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full overflow-hidden border border-emerald-500/30 flex items-center justify-center shrink-0">
+                      {(() => {
+                        const op = operators.find(o => o.id === selectedChat.vendedor_id);
+                        return op?.avatar ? (
+                          <img src={op.avatar} className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-3 h-3 text-muted-foreground" />
+                        );
+                      })()}
+                    </div>
+                    <span className="text-[10px] font-black uppercase">
+                      Atendido por: {operators.find(o => o.id === selectedChat.vendedor_id)?.name?.split(" ")[0] || "Atendente"}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="h-9 px-3 rounded-xl border border-dashed border-border/80 bg-secondary/30 flex items-center justify-center gap-2 text-muted-foreground">
+                    <User className="w-4 h-4 shrink-0" />
+                    <span className="text-[10px] font-black uppercase">Aguardando Atendimento</span>
+                  </div>
+                )}
+
                 <div className="relative">
                   <button
                     ref={tempBtnRef}
