@@ -344,7 +344,7 @@ function DashboardContent({
           if ("Notification" in window && Notification.permission === "granted") {
             new Notification(`Entrega Concluída! ✅`, {
               body: `A NF #${newData.nf} para ${newData.client} foi finalizada pelo motorista.`,
-              icon: "/favicon.svg",
+              icon: "/favicon.png",
               tag: `entrega-${newData.nf}`
             });
           }
@@ -415,7 +415,7 @@ function DashboardContent({
         if (Notification.permission === "granted") {
           const notif = new Notification(`💬 ${senderName}`, {
             body: text,
-            icon: "/favicon.svg",
+            icon: "/favicon.png",
             tag: `wpp-global-${String(key.remoteJid)}`,
           });
           notif.onclick = () => {
@@ -917,7 +917,7 @@ function DashboardContent({
                 try {
                   const notif = new Notification(displayTitle, {
                     body: newMsg.obs || "Nova mensagem recebida",
-                    icon: "/favicon.svg",
+                    icon: "/favicon.png",
                     tag: `carflax-chat-${newMsg.documento}`,
                     silent: false,
                   });

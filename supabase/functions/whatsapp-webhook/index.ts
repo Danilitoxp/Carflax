@@ -107,7 +107,7 @@ Deno.serve(async (req: Request) => {
       const notification = JSON.stringify({
         title: `💬 ${senderName}`,
         body: notifText,
-        icon: '/favicon.svg',
+        icon: '/favicon.png',
         tag: `wpp-${remoteJid}`,
         section: 'Marketing',
       });

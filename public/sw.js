@@ -1,7 +1,7 @@
 // Service Worker — Carflax Hub (PWA: cache + Web Push)
 
 const CACHE = 'carflax-hub-v1';
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg'];
+const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.png'];
 
 // Caminhos dinâmicos (dados ao vivo) que NUNCA devem ser cacheados.
 const NO_CACHE = [
@@ -85,8 +85,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || '💬 Nova mensagem', {
       body: data.body || '',
-      icon: data.icon || '/favicon.svg',
-      badge: '/favicon.svg',
+      icon: data.icon || '/favicon.png',
+      badge: '/favicon.png',
       tag: data.tag || 'carflax-push',
       renotify: true,
       data: { section: data.section || 'Marketing', documento: data.documento },

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo, startTransition, Fragment } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, startTransition, Fragment, type ReactElement } from "react";
 import { 
   Search, 
   Paperclip, 
@@ -321,7 +321,7 @@ function inferMsgType(text?: string): string | undefined {
 // clicáveis, preservando o restante do texto. O <p> pai mantém o whitespace.
 const URL_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
 
-function Linkify({ text }: { text: string }): JSX.Element {
+function Linkify({ text }: { text: string }): ReactElement {
   const parts = text.split(URL_REGEX);
   return (
     <>
@@ -381,7 +381,7 @@ async function fetchLinkPreview(url: string): Promise<LinkPreview | null> {
   return promise;
 }
 
-function LinkPreviewCard({ preview }: { preview: LinkPreview }): JSX.Element | null {
+function LinkPreviewCard({ preview }: { preview: LinkPreview }): ReactElement | null {
   if (!preview || !(preview.title || preview.description || preview.image)) return null;
   const href = preview.url?.startsWith("http") ? preview.url : `https://${preview.url}`;
   let host = preview.url || "";
@@ -412,7 +412,7 @@ function MessageLinkPreview({ msg, enabled, onResolved }: {
   msg: Message;
   enabled: boolean;
   onResolved?: (preview: LinkPreview) => void;
-}): JSX.Element | null {
+}): ReactElement | null {
   const [preview, setPreview] = useState<LinkPreview | null>(msg.linkPreview ?? null);
 
   useEffect(() => {
@@ -800,8 +800,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification(title, {
         body,
-        icon: icon || "/favicon.svg",
-        badge: "/favicon.svg"
+        icon: icon || "/favicon.png",
+        badge: "/favicon.png"
       });
     }
   };
