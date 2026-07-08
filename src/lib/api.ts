@@ -399,6 +399,17 @@ export const apiAdminSQL = (query: string, signal?: AbortSignal) =>
 export const apiAdminSchema = () => get<{ success: boolean, dbName: string, tables: { name: string, type: string }[] }>("/api/admin/sql/schema");
 export const apiHealth = () => get<{ status: string }>("/api/health");
 
+export interface LinkPreviewResponse {
+  url: string;
+  title: string | null;
+  description: string | null;
+  image: string | null;
+}
+
+// Busca metadados Open Graph de um link (via backend, contornando CORS).
+export const apiGetLinkPreview = (url: string) =>
+  get<LinkPreviewResponse>("/api/whatsapp/link-preview", { url });
+
 // ── Secullum Ponto Web (Integração Externa) ──────────────────────────────────
 // Swagger: https://pontowebintegracaoexterna.secullum.com.br/docs/index.html
 

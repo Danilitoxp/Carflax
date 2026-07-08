@@ -39,6 +39,13 @@ export interface MarketingMessage {
   editado?: boolean;
   quoted_text?: string;
   quoted_sender?: "me" | "contact";
+  // Preview de link (Open Graph) capturado do payload do WhatsApp em mensagens recebidas
+  link_preview?: {
+    url: string;
+    title?: string | null;
+    description?: string | null;
+    image?: string | null;
+  } | null;
 }
 
 export interface MarketingVenda {
@@ -214,7 +221,7 @@ export const marketingService = {
   async getMessagesByJid(remoteJid: string, limit = 50, sinceDate?: string, beforeDate?: string, vendedorId?: string) {
     let query = supabase
       .from("marketing_whatsapp")
-      .select("message_id, remote_jid, sender, texto, tipo, status, timestamp, media_url, reacao, vendedor_id, editado, quoted_text, quoted_sender")
+      .select("message_id, remote_jid, sender, texto, tipo, status, timestamp, media_url, reacao, vendedor_id, editado, quoted_text, quoted_sender, link_preview")
       .eq("remote_jid", remoteJid);
 
     if (vendedorId) {
@@ -423,6 +430,13 @@ export const marketingService = {
     await supabase
       .from("marketing_whatsapp")
       .update({ media_url: mediaUrl })
+      .eq("message_id", messageId);
+  },
+
+  async updateMessageLinkPreview(messageId: string, linkPreview: MarketingMessage["link_preview"]) {
+    await supabase
+      .from("marketing_whatsapp")
+      .update({ link_preview: linkPreview })
       .eq("message_id", messageId);
   },
 

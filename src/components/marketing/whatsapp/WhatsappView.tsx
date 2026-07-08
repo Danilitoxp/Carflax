@@ -34,7 +34,7 @@ import { evolutionApi } from "@/lib/evolution-v2";
 import { supabase } from "@/lib/supabase";
 import { marketingService } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
-import { apiDashboardProdutos, apiRegisterCliente } from "@/lib/api";
+import { apiDashboardProdutos, apiRegisterCliente, apiGetLinkPreview } from "@/lib/api";
 import { transcribeAudio, classifyTemperature } from "@/lib/gemini-service";
 import { Package } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
@@ -75,6 +75,13 @@ function getBrandInitials(brand: string): string {
   return brand.trim().split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase() || '??';
 }
 
+interface LinkPreview {
+  url: string;
+  title?: string | null;
+  description?: string | null;
+  image?: string | null; // base64 (sem prefixo) ou data URL completo
+}
+
 interface Message {
   id: string;
   text: string;
@@ -91,6 +98,7 @@ interface Message {
   quotedText?: string;
   quotedSender?: "me" | "contact";
   editado?: boolean;
+  linkPreview?: LinkPreview | null;
 }
 
 type Temperature = "Quente" | "Morno" | "Frio";
@@ -256,7 +264,16 @@ interface EvoMessageResponse {
   message?: {
     base64?: string;
     conversation?: string;
-    extendedTextMessage?: { text?: string; contextInfo?: EvoContextInfo };
+    extendedTextMessage?: {
+      text?: string;
+      contextInfo?: EvoContextInfo;
+      // Campos de preview de link (Open Graph) que o WhatsApp/Baileys já envia no payload
+      matchedText?: string;
+      canonicalUrl?: string;
+      title?: string;
+      description?: string;
+      jpegThumbnail?: string; // miniatura em base64 (sem prefixo data:)
+    };
     imageMessage?: { caption?: string; mimetype?: string; contextInfo?: EvoContextInfo };
     videoMessage?: { caption?: string; mimetype?: string; contextInfo?: EvoContextInfo };
     audioMessage?: { ptt?: boolean; mimetype?: string; contextInfo?: EvoContextInfo };
@@ -298,6 +315,123 @@ function inferMsgType(text?: string): string | undefined {
   if (text.includes("📎") || text === "Documento") return "document";
   if (text.includes("🖼️") || text === "Figurinha") return "sticker";
   return "text";
+}
+
+// Detecta URLs (http/https ou "www.") no texto e as renderiza como links azuis
+// clicáveis, preservando o restante do texto. O <p> pai mantém o whitespace.
+const URL_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+
+function Linkify({ text }: { text: string }): JSX.Element {
+  const parts = text.split(URL_REGEX);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (!part) return null;
+        const isUrl = /^(https?:\/\/|www\.)/i.test(part);
+        if (isUrl) {
+          const href = part.startsWith("http") ? part : `https://${part}`;
+          return (
+            <a
+              key={i}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-sky-400 underline underline-offset-2 break-all hover:text-sky-300"
+            >
+              {part}
+            </a>
+          );
+        }
+        return <Fragment key={i}>{part}</Fragment>;
+      })}
+    </>
+  );
+}
+
+// Cache de previews buscados no backend (por URL), com dedupe de requisições concorrentes.
+const linkPreviewCache = new Map<string, LinkPreview | null>();
+const linkPreviewInflight = new Map<string, Promise<LinkPreview | null>>();
+
+function firstUrlInText(text?: string): string | null {
+  if (!text) return null;
+  const m = text.match(/(https?:\/\/[^\s]+|www\.[^\s]+)/i);
+  if (!m) return null;
+  return m[1].startsWith("http") ? m[1] : `https://${m[1]}`;
+}
+
+async function fetchLinkPreview(url: string): Promise<LinkPreview | null> {
+  if (linkPreviewCache.has(url)) return linkPreviewCache.get(url) ?? null;
+  let promise = linkPreviewInflight.get(url);
+  if (!promise) {
+    promise = apiGetLinkPreview(url)
+      .then((res) => {
+        // Só consideramos preview "válido" quando tem imagem ou descrição — título
+        // sozinho normalmente é página genérica/anti-bot e não vale o card.
+        const preview: LinkPreview | null = res && (res.image || res.description)
+          ? { url: res.url || url, title: res.title, description: res.description, image: res.image }
+          : null;
+        linkPreviewCache.set(url, preview);
+        return preview;
+      })
+      .catch(() => { linkPreviewCache.set(url, null); return null; })
+      .finally(() => { linkPreviewInflight.delete(url); });
+    linkPreviewInflight.set(url, promise);
+  }
+  return promise;
+}
+
+function LinkPreviewCard({ preview }: { preview: LinkPreview }): JSX.Element | null {
+  if (!preview || !(preview.title || preview.description || preview.image)) return null;
+  const href = preview.url?.startsWith("http") ? preview.url : `https://${preview.url}`;
+  let host = preview.url || "";
+  try { host = new URL(href).hostname.replace(/^www\./, ""); } catch { /* mantém url crua */ }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="block mb-1.5 overflow-hidden rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+    >
+      {preview.image && (
+        <img src={preview.image} alt="" loading="lazy" className="w-full max-h-52 object-cover" />
+      )}
+      <div className="px-2.5 py-2">
+        {preview.title && <p className="text-xs font-bold line-clamp-2 leading-snug">{preview.title}</p>}
+        {preview.description && <p className="text-[11px] opacity-70 line-clamp-2 leading-snug mt-0.5">{preview.description}</p>}
+        {host && <p className="text-[10px] text-sky-400 truncate mt-1">{host}</p>}
+      </div>
+    </a>
+  );
+}
+
+// Renderiza o card de preview do link. Usa o preview que veio no payload; se não
+// houver e a mensagem for recebida, busca os dados Open Graph via backend.
+function MessageLinkPreview({ msg, enabled, onResolved }: {
+  msg: Message;
+  enabled: boolean;
+  onResolved?: (preview: LinkPreview) => void;
+}): JSX.Element | null {
+  const [preview, setPreview] = useState<LinkPreview | null>(msg.linkPreview ?? null);
+
+  useEffect(() => {
+    if (msg.linkPreview) { setPreview(msg.linkPreview); return; }
+    if (!enabled) return;
+    const url = firstUrlInText(msg.text);
+    if (!url) return;
+    let cancelled = false;
+    fetchLinkPreview(url).then((p) => {
+      if (cancelled || !p) return;
+      setPreview(p);
+      onResolved?.(p);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [msg.id, msg.linkPreview, enabled]);
+
+  if (!preview) return null;
+  return <LinkPreviewCard preview={preview} />;
 }
 
 function getFileExt(filename?: string): string {
@@ -1053,6 +1187,17 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         (isDocument ? (messageContent.documentMessage?.fileName || "Documento") : null) ||
         (isAudio ? "🎵 Áudio" : isSticker ? "🖼️ Figurinha" : "📎 Mídia");
 
+      // Preview de link (Open Graph) que o WhatsApp já manda junto no payload da mensagem recebida
+      const extText = messageContent?.extendedTextMessage;
+      const linkPreview: LinkPreview | null = extText && (extText.jpegThumbnail || extText.description)
+        ? {
+            url: extText.canonicalUrl || extText.matchedText || "",
+            title: extText.title || null,
+            description: extText.description || null,
+            image: extText.jpegThumbnail ? `data:image/jpeg;base64,${extText.jpegThumbnail}` : null,
+          }
+        : null;
+
       // Extrair citação (reply/quote)
       const ctxInfo = messageContent?.extendedTextMessage?.contextInfo
         || messageContent?.imageMessage?.contextInfo
@@ -1104,6 +1249,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         ...(message.key?.fromMe ? { vendedor_id: vendedorId } : {}),
         quoted_text: quotedText,
         quoted_sender: quotedSender,
+        ...(linkPreview ? { link_preview: linkPreview } : {}),
       }).then(() => {
         if (text) {
           detectAndSaveOrigin(remoteJid, text);
@@ -1254,7 +1400,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
               status: "sent",
               tipo: tipoMsg,
               mediaUrl: mediaUrl,
-              ...(quotedText ? { quotedText, quotedSender } : {})
+              ...(quotedText ? { quotedText, quotedSender } : {}),
+              ...(linkPreview ? { linkPreview } : {})
             };
             return [...prevMsgs, newMsg];
           });
@@ -2067,6 +2214,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         editado: m.editado || false,
         quotedText: m.quoted_text,
         quotedSender: m.quoted_sender,
+        linkPreview: m.link_preview ?? null,
       }));
 
       setMessages(msgs);
@@ -2119,6 +2267,7 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
         reacao: m.reacao,
         quotedText: m.quoted_text,
         quotedSender: m.quoted_sender,
+        linkPreview: m.link_preview ?? null,
       }));
 
       // Preserva a posição do scroll ao inserir mensagens no topo
@@ -3422,12 +3571,24 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                           </div>
                         )}
 
+                        {/* Preview de link: usa o do payload ou busca via backend (só recebidas) */}
+                        {!isDocumentMsg && (
+                          <MessageLinkPreview
+                            msg={msg}
+                            enabled={msg.sender === "contact"}
+                            onResolved={(preview) => {
+                              setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, linkPreview: preview } : m));
+                              marketingService.updateMessageLinkPreview(msg.id, preview);
+                            }}
+                          />
+                        )}
+
                         {/* Texto ou Fallback de Erro */}
                         {msg.text && !isDocumentMsg && (
                           (!msg.mediaUrl && ["Mídia", "🎵 Áudio", "📎 Mídia", "🖼️ Figurinha"].includes(msg.text))
                             ? <p className={cn("text-sm font-medium whitespace-pre-wrap text-red-400", isVisualMedia ? "px-2 pt-2" : "")}>{msg.text} (Indisponível)</p>
                             : (!["Mídia", "🎵 Áudio", "📎 Mídia", "📷 Imagem", "📹 Vídeo", "🖼️ Figurinha"].includes(msg.text))
-                              ? <p className={cn("text-sm font-medium whitespace-pre-wrap", isVisualMedia ? "px-2 pt-1 pb-1" : "")}>{msg.text}</p>
+                              ? <p className={cn("text-sm font-medium whitespace-pre-wrap", isVisualMedia ? "px-2 pt-1 pb-1" : "")}><Linkify text={msg.text} /></p>
                               : null
                         )}
                         
