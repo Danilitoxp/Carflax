@@ -337,6 +337,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   const [loading, setLoading] = useState(false);
   const [faturamento, setFaturamento] = useState<FaturamentoResumo | null>(null);
   const sellerCodeRef = useRef<Map<string, string>>(new Map());
+  // Trava contra reentrada: evita que cliques repetidos no botão de status
+  // disparem múltiplos envios (ex.: notificações de WhatsApp duplicadas).
+  const isUpdatingStatusRef = useRef(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const visibleCount = 50;
 
   // Códigos de vendedor que um supervisor pode enxergar (subordinados + ele mesmo).
@@ -726,7 +730,12 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
   // ── Status update ────────────────────────────────────────────────────────
   const handleUpdateStatus = async (newStatus: string, extra?: Partial<CrmStatus>) => {
     if (!selectedItem) return;
-    
+    // Bloqueia execuções concorrentes (duplo/triplo clique) que gerariam
+    // notificações e gravações duplicadas.
+    if (isUpdatingStatusRef.current) return;
+    isUpdatingStatusRef.current = true;
+    setIsUpdatingStatus(true);
+
     // 1. Preparar Payload Completo
     const payload: CrmStatus = {
       documento: selectedItem.id,
@@ -849,6 +858,20 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         const motivoUpper = extra.motivo_perda.toUpperCase().trim();
 
         try {
+          // Idempotência: se este orçamento JÁ teve o alerta de perda enviado,
+          // não dispara de novo (evita duplicidade em remarcações/recargas/sessões).
+          const { data: notifStatus } = await supabase
+            .from("crm_status")
+            .select("perda_notificada_em")
+            .eq("documento", selectedItem.id)
+            .eq("empresa", selectedItem.empresa ?? "001")
+            .maybeSingle();
+
+          if (notifStatus?.perda_notificada_em) {
+            console.log(`[CRM] Alerta de perda do orçamento ${selectedItem.id} já enviado em ${notifStatus.perda_notificada_em}. Ignorando reenvio.`);
+            throw new Error("__ALREADY_NOTIFIED__");
+          }
+
           // Busca a lista de responsáveis configurada
           const { data: configData } = await supabase
             .from("crm_config")
@@ -865,16 +888,23 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
             }
             const responsiblesList: LossResponsible[] = JSON.parse(configData.value);
 
-            // Filtra e deduplica por telefone para evitar envio em duplicidade
+            // Normaliza o telefone para o mesmo formato usado no envio (com DDI 55),
+            // garantindo que a deduplicação bata com o destinatário real.
+            const normalizePhone = (phone: string) => {
+              const cleaned = (phone || "").replace(/\D/g, "");
+              if (!cleaned) return "";
+              return cleaned.length >= 10 && !cleaned.startsWith("55") ? "55" + cleaned : cleaned;
+            };
+
+            // Filtra e deduplica pelo telefone JÁ normalizado para evitar envio em duplicidade
             const seenPhones = new Set<string>();
             const matchingResponsibles = responsiblesList.filter(r => {
-              if (!r.telefone) return false;
-              const formattedPhone = r.telefone.replace(/\D/g, "");
-              if (!formattedPhone) return false;
+              const normalizedPhone = normalizePhone(r.telefone);
+              if (!normalizedPhone) return false;
 
               const isMatch = r.motivo === "Todos os Motivos" || r.motivo.toUpperCase().trim() === motivoUpper;
-              if (isMatch && !seenPhones.has(formattedPhone)) {
-                seenPhones.add(formattedPhone);
+              if (isMatch && !seenPhones.has(normalizedPhone)) {
+                seenPhones.add(normalizedPhone);
                 return true;
               }
               return false;
@@ -882,13 +912,8 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
 
             if (matchingResponsibles.length > 0) {
               const toWhatsappJid = (phone: string) => {
-                const cleaned = phone.replace(/\D/g, "");
-                if (!cleaned) return "";
-                let formatted = cleaned;
-                if (formatted.length >= 10 && !formatted.startsWith("55")) {
-                  formatted = "55" + formatted;
-                }
-                return `${formatted}@s.whatsapp.net`;
+                const normalized = normalizePhone(phone);
+                return normalized ? `${normalized}@s.whatsapp.net` : "";
               };
 
               const lostItemsList = (lostItemsIds.length > 0 && selectedItem.items)
@@ -924,10 +949,21 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                   }
                 })
               );
+
+              // Marca o orçamento como notificado para bloquear reenvios futuros.
+              await supabase
+                .from("crm_status")
+                .update({ perda_notificada_em: new Date().toISOString() })
+                .eq("documento", selectedItem.id)
+                .eq("empresa", selectedItem.empresa ?? "001");
             }
           }
         } catch (wppErr) {
-          console.error("Erro ao processar envio de WhatsApp para responsáveis:", wppErr);
+          // Sentinela de idempotência: não é erro real, apenas indica que o
+          // orçamento já havia sido notificado antes.
+          if (!(wppErr instanceof Error && wppErr.message === "__ALREADY_NOTIFIED__")) {
+            console.error("Erro ao processar envio de WhatsApp para responsáveis:", wppErr);
+          }
         }
       }
 
@@ -956,6 +992,9 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     } catch (err) {
       console.error("Erro ao atualizar status:", err);
       showNotification("error", "Erro ao Salvar", "Não foi possível salvar a alteração. Tente novamente.");
+    } finally {
+      isUpdatingStatusRef.current = false;
+      setIsUpdatingStatus(false);
     }
   };
 
@@ -1936,10 +1975,10 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
                     )}
                     <button
                       onClick={() => handleUpdateStatus("PERDIDO", { motivo_perda: statusMotivoPerdido })}
-                      disabled={!statusMotivoPerdido || ((statusMotivoPerdido === "Falta de Estoque" || statusMotivoPerdido === "Furo de Estoque") && lostItemsIds.length === 0)}
+                      disabled={isUpdatingStatus || !statusMotivoPerdido || ((statusMotivoPerdido === "Falta de Estoque" || statusMotivoPerdido === "Furo de Estoque") && lostItemsIds.length === 0)}
                       className="w-full h-14 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-500/20 active:scale-[0.98] transition-all"
                     >
-                      Confirmar Perda
+                      {isUpdatingStatus ? "Confirmando..." : "Confirmar Perda"}
                     </button>
                   </div>
                 </div>

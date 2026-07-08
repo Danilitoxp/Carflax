@@ -66,6 +66,9 @@ export interface CrmStatus {
   updated_at?: string;
   itens_estoque?: string[] | null;
   itens_preco?: string[] | null;
+  // Timestamp de quando o alerta de "PERDA DE ORÇAMENTO" foi enviado por WhatsApp.
+  // Usado como trava de idempotência para não reenviar o mesmo orçamento.
+  perda_notificada_em?: string | null;
 }
 
 export interface CrmConversa {
