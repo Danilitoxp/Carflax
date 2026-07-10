@@ -750,6 +750,7 @@ interface UserProfile {
   name: string;
   email?: string;
   role: string;
+  avatar?: string;
   operator_code?: string;
   operatorCode?: string;
 }
@@ -1791,10 +1792,10 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
     };
   }, [fetchAvatar, vendedorId]);
 
-  // Realtime: escuta edições de mensagens salvas pelo webhook no Supabase
+  // Realtime: escuta inserções e edições de mensagens salvas no Supabase (inclui notas internas)
   useEffect(() => {
     const channel = supabase
-      .channel('whatsapp-msg-edits')
+      .channel('whatsapp-msg-changes')
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'marketing_whatsapp' },
@@ -1809,6 +1810,51 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
                 ...(updated.editado !== undefined ? { editado: updated.editado } : {}),
               };
             }));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'marketing_whatsapp' },
+        (payload) => {
+          interface SupabaseMessageInsert {
+            message_id: string;
+            remote_jid: string;
+            texto?: string;
+            tipo?: string;
+            sender: "me" | "contact";
+            status?: string;
+            timestamp: string;
+            media_url?: string;
+            reacao?: string;
+            editado?: boolean;
+            quoted_text?: string;
+            quoted_sender?: "me" | "contact";
+            link_preview?: LinkPreview | null;
+            vendedor_id?: string;
+          }
+          const m = payload.new as SupabaseMessageInsert;
+          if (m && selectedChatRef.current && m.remote_jid === selectedChatRef.current.id) {
+            const newMsg: Message = {
+              id: m.message_id,
+              text: m.texto || "",
+              time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              rawTimestamp: m.timestamp,
+              sender: m.sender,
+              status: (m.status as "sent" | "delivered" | "read") || "sent",
+              tipo: m.tipo,
+              mediaUrl: m.media_url,
+              reacao: m.reacao,
+              editado: m.editado || false,
+              quotedText: m.quoted_text,
+              quotedSender: m.quoted_sender,
+              linkPreview: m.link_preview ?? null,
+              vendedorId: m.vendedor_id,
+            };
+            setMessages(prev => {
+              if (prev.some(msg => msg.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
           }
         }
       )
@@ -2584,6 +2630,7 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
     const rawTimestamp = new Date().toISOString();
     const noteMsgId = "note_" + Date.now();
     
+    const activeVendedorId = userProfile?.id || vendedorId;
     const noteMsg: Message = {
       id: noteMsgId,
       text: noteText,
@@ -2592,7 +2639,7 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
       sender: "me",
       status: "read",
       tipo: "internal_note",
-      vendedorId: vendedorId,
+      vendedorId: activeVendedorId,
     };
     
     // Atualiza o estado da UI instantaneamente
@@ -2608,7 +2655,7 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
         sender: "me",
         status: "read",
         timestamp: rawTimestamp,
-        vendedor_id: vendedorId,
+        vendedor_id: activeVendedorId,
       });
     } catch (err) {
       console.error("Erro ao salvar nota interna:", err);
@@ -3275,9 +3322,10 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
 
                     if (msg.tipo === "internal_note") {
                       const op = operators.find(o => o.id === msg.vendedorId);
-                      const senderName = op ? op.name : (msg.vendedorId === userProfile?.id ? (userProfile?.name || "Atendente") : "Atendente");
+                      const isMe = !msg.vendedorId || msg.vendedorId === userProfile?.id || msg.vendedorId === vendedorId || msg.sender === "me";
+                      const senderName = op ? op.name : (isMe ? (userProfile?.name || "Atendente") : "Atendente");
                       const senderFirstName = senderName.split(" ")[0];
-                      const senderAvatar = op?.avatar || (msg.vendedorId === userProfile?.id ? myAvatar : undefined);
+                      const senderAvatar = op?.avatar || (isMe ? userProfile?.avatar : undefined);
                       const senderInitial = senderName.charAt(0).toUpperCase();
 
                       return (
@@ -3292,7 +3340,7 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
                           <div className="flex justify-center my-3 px-4 animate-in fade-in slide-in-from-bottom-1 duration-200 select-none">
                             <div className="max-w-[85%] bg-amber-500/10 border border-amber-500/20 rounded-2xl px-5 py-2.5 text-center shadow-sm backdrop-blur-sm flex flex-col items-center gap-1.5">
                               <div className="flex items-center gap-1.5">
-                                <div className="w-4.5 h-4.5 rounded-full overflow-hidden shrink-0 border border-amber-500/30">
+                                <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 border border-amber-500/30">
                                   {senderAvatar ? (
                                     <img src={senderAvatar} className="w-full h-full object-cover" />
                                   ) : (
