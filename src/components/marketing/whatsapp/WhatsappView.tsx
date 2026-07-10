@@ -801,6 +801,9 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
   const [hasMoreChats, setHasMoreChats] = useState(false);
   const [loadingMoreChats, setLoadingMoreChats] = useState(false);
   const chatOffsetRef = useRef(0);
+  // Lock síncrono do "carregar mais": evita disparos concorrentes do scroll (o estado
+  // loadingMoreChats só atualiza no próximo render, tarde demais para o guard).
+  const loadingMoreChatsRef = useRef(false);
   const productsLoadedRef = useRef(false);
 
   const chatListRef = useRef<HTMLDivElement>(null);
@@ -1071,25 +1074,41 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
   }, []);
 
   const loadMoreChats = useCallback(async () => {
-    if (loadingMoreChats || !hasMoreChats) return;
+    // Guard síncrono via ref: bloqueia os múltiplos disparos que o evento de scroll
+    // gera antes do estado atualizar (o que causava fetches concorrentes na mesma página).
+    if (loadingMoreChatsRef.current || !hasMoreChats) return;
+    loadingMoreChatsRef.current = true;
     setLoadingMoreChats(true);
     try {
-      const more = await marketingService.getActiveClientes('all', CHATS_PAGE, chatOffsetRef.current);
-      if (more.length === 0) { setHasMoreChats(false); return; }
-      chatOffsetRef.current += more.length;
-      setHasMoreChats(more.length === CHATS_PAGE);
-      const mapped = more.map(mapClienteToChat);
-      setChats(prev => {
-        const existingIds = new Set(prev.map(c => c.id));
-        const newChats = mapped.filter(c => !existingIds.has(c.id));
-        return sortChats([...prev, ...newChats]);
-      });
+      // Buscamos 'all' (ativos + arquivados) mas só exibimos o modo atual. Se uma página
+      // vier inteira do outro modo, nada aparece e o scroll "trava". Então continuamos
+      // buscando páginas até adicionar ao menos 1 conversa visível ou acabarem os dados.
+      let addedVisible = 0;
+      let keepGoing = true;
+      while (keepGoing && addedVisible === 0) {
+        const more = await marketingService.getActiveClientes('all', CHATS_PAGE, chatOffsetRef.current);
+        chatOffsetRef.current += more.length;
+        keepGoing = more.length === CHATS_PAGE;
+        setHasMoreChats(keepGoing);
+        if (more.length === 0) break;
+
+        const mapped = more.map(mapClienteToChat);
+        const isVisible = (c: Chat) => (viewModeRef.current === "archived" ? c.arquivado : !c.arquivado);
+        // Contagem síncrona (fora do updater do setChats, que roda de forma assíncrona).
+        addedVisible += mapped.filter(isVisible).length;
+        setChats(prev => {
+          const existingIds = new Set(prev.map(c => c.id));
+          const newChats = mapped.filter(c => !existingIds.has(c.id));
+          return sortChats([...prev, ...newChats]);
+        });
+      }
     } catch (err) {
       console.error("Erro ao carregar mais chats:", err);
     } finally {
+      loadingMoreChatsRef.current = false;
       setLoadingMoreChats(false);
     }
-  }, [loadingMoreChats, hasMoreChats, mapClienteToChat]);
+  }, [hasMoreChats, mapClienteToChat]);
 
   useEffect(() => {
     const container = chatListRef.current;
