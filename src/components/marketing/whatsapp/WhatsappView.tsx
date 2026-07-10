@@ -766,6 +766,8 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [customArchiveReason, setCustomArchiveReason] = useState("");
   const [isEnteringCustomReason, setIsEnteringCustomReason] = useState(false);
+  const [materialInput, setMaterialInput] = useState("");
+  const [isEnteringMaterial, setIsEnteringMaterial] = useState(false);
   const [showTempDropdown, setShowTempDropdown] = useState(false);
   const [showClientDrawer, setShowClientDrawer] = useState(false);
   const [drawerClientName, setDrawerClientName] = useState("");
@@ -844,6 +846,8 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
     if (!showArchiveModal) {
       setCustomArchiveReason("");
       setIsEnteringCustomReason(false);
+      setMaterialInput("");
+      setIsEnteringMaterial(false);
       // Fechou o modal (sem confirmar ou já confirmado): descarta a trava do alvo.
       archiveTargetRef.current = null;
     }
@@ -2973,7 +2977,7 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
           <div className="bg-card border border-border rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all duration-300">
             <div className="p-6 border-b border-border/50 flex items-center justify-between">
               <h3 className="font-black text-sm uppercase tracking-tighter">
-                {isEnteringCustomReason ? "Escreva o Motivo" : "Motivo do Arquivamento"}
+                {isEnteringMaterial ? "Qual Material?" : isEnteringCustomReason ? "Escreva o Motivo" : "Motivo do Arquivamento"}
               </h3>
               <button 
                 onClick={() => setShowArchiveModal(false)}
@@ -2983,21 +2987,54 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
               </button>
             </div>
 
-            {!isEnteringCustomReason ? (
+            {isEnteringMaterial ? (
+              <div className="space-y-4">
+                <div className="p-6 space-y-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
+                    Qual material o cliente procurava?
+                  </label>
+                  <input
+                    value={materialInput}
+                    onChange={(e) => setMaterialInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && materialInput.trim()) handleArchiveChat(`Não vendemos o material: ${materialInput.trim()}`); }}
+                    placeholder="Ex: Cabo flexível 2.5mm, disjuntor DR..."
+                    className="w-full bg-secondary/50 border border-border/80 rounded-2xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-rose-500/50 focus:ring-2 focus:ring-rose-500/20 transition-all"
+                    autoFocus
+                  />
+                </div>
+                <div className="p-6 border-t border-border/50 flex items-center justify-between gap-2 bg-secondary/10">
+                  <button
+                    onClick={() => setIsEnteringMaterial(false)}
+                    className="px-4 py-2 text-xs font-bold text-muted-foreground hover:bg-secondary rounded-xl transition-all"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    disabled={!materialInput.trim()}
+                    onClick={() => { if (materialInput.trim()) handleArchiveChat(`Não vendemos o material: ${materialInput.trim()}`); }}
+                    className="px-5 py-2 text-xs font-black uppercase bg-rose-500 hover:bg-rose-600 text-white rounded-xl transition-all shadow-md hover:shadow-rose-500/20 active:scale-95 disabled:opacity-55 disabled:cursor-not-allowed disabled:active:scale-100"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            ) : !isEnteringCustomReason ? (
               <div className="p-6 space-y-1.5 max-h-[420px] overflow-y-auto">
                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">
                   Selecione o motivo da perda ou encerramento:
                 </p>
                 {ARCHIVE_REASONS.map(r => (
-                  <button 
-                    key={r.text} 
+                  <button
+                    key={r.text}
                     onClick={() => {
                       if (r.text === "Outros") {
                         setIsEnteringCustomReason(true);
+                      } else if (r.text === "Não vendemos o material") {
+                        setIsEnteringMaterial(true);
                       } else {
                         handleArchiveChat(r.text);
                       }
-                    }} 
+                    }}
                     className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-secondary/50 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground border border-transparent hover:border-border/30 transition-all duration-200 active:scale-[0.99] group"
                   >
                     <span className="flex items-center gap-2">

@@ -269,7 +269,7 @@ export function ReportsView() {
                   <Percent className="w-4 h-4 text-primary" /> Taxas de Conversão
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <ConversionCard title="Por Quantidade" formula="Vendas ÷ Leads" percent={totals.convByCount} detail={`${totals.salesCount} de ${totals.leads} leads`} color="blue" />
+                  <ConversionCard title="Por Quantidade" formula="Orçamentos ÷ Leads" percent={totals.leads > 0 ? (totals.quotesCount / totals.leads) * 100 : 0} detail={`${totals.quotesCount} de ${totals.leads} leads viraram orçamento`} color="blue" />
                   <ConversionCard title="Por Orçamento" formula="Vendas ÷ Orçamentos enviados" percent={totals.convByQuote} detail={`${totals.salesCount} de ${totals.quotesCount} orçamentos`} color="indigo" />
                   <ConversionCard title="Por Valor" formula="R$ vendido ÷ R$ orçado" percent={totals.convByValue} detail={`${formatCurrency(totals.salesValue)} de ${formatCurrency(totals.quotesValue)}`} color="emerald" />
                 </div>
