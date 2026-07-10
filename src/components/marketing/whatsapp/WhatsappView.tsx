@@ -4204,7 +4204,10 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
                       } else if (trimmed === "/bom") {
                         const hr = new Date().getHours();
                         const greeting = hr < 12 ? "Bom dia" : "Boa tarde";
-                        val = `${greeting}, tudo bem? \nPrazer, sou a Ingryd Consultora Comercial da Carflax. \n\nComo posso te ajudar?`;
+                        const attendantName = (userProfile?.name || "Consultora Comercial").split(" ")[0];
+                        val = `${greeting}, tudo bem? \nPrazer, sou ${attendantName} da Carflax. \n\nComo posso te ajudar?`;
+                      } else if (trimmed === "/nao") {
+                        val = "Infelizmente, não trabalhamos com esse material. Somos especialistas em materiais hidráulicos e elétricos. Se precisar de algum produto dessas linhas, será um prazer ajudar!";
                       }
                       setInputText(val);
                     }} 
