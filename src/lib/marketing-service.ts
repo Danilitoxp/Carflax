@@ -17,10 +17,83 @@ export interface MarketingCliente {
   mensagens_nao_lidas?: number;
   valor_venda?: number;
   data_venda?: string;
+  valor_orcamento?: number;
+  data_orcamento?: string;
   origem?: string;
   campanha?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface SellerReport {
+  id: string;
+  name: string;
+  avatar?: string | null;
+  leads: number;
+  quotesCount: number;
+  quotesValue: number;
+  salesCount: number;
+  salesValue: number;
+  /** vendas / leads (%) */
+  convRate: number;
+  /** tempo médio de 1ª resposta em minutos, ou null se sem dados */
+  avgResponseMinutes: number | null;
+}
+
+export interface OriginReport {
+  origin: string;
+  leads: number;
+  salesCount: number;
+  salesValue: number;
+}
+
+export interface CampaignReport {
+  campaign: string;
+  leads: number;
+  salesCount: number;
+  salesValue: number;
+}
+
+export interface TemperatureReport {
+  temperature: string;
+  leads: number;
+}
+
+export interface DailyPoint {
+  /** yyyy-mm-dd */
+  date: string;
+  leads: number;
+  sales: number;
+  salesValue: number;
+}
+
+export interface ReportsAnalytics {
+  totals: {
+    leads: number;
+    quotesCount: number;
+    quotesValue: number;
+    salesCount: number;
+    salesValue: number;
+    avgTicket: number;
+    /** vendas / leads (%) */
+    convByCount: number;
+    /** R$ vendido / R$ orçado (%) */
+    convByValue: number;
+    /** vendas / orçamentos enviados (%) */
+    convByQuote: number;
+    avgResponseMinutes: number | null;
+  };
+  /** Mesmo intervalo imediatamente anterior, para deltas. */
+  previous: {
+    leads: number;
+    salesCount: number;
+    salesValue: number;
+  };
+  bySeller: SellerReport[];
+  byOrigin: OriginReport[];
+  byCampaign: CampaignReport[];
+  byTemperature: TemperatureReport[];
+  dailySeries: DailyPoint[];
 }
 
 export interface MarketingMessage {
@@ -428,6 +501,31 @@ export const marketingService = {
       .eq("remote_jid", remoteJid);
   },
 
+  // Marca no lead que houve orçamento e guarda o valor total (à vista/PIX),
+  // espelhando registerSale/valor_venda.
+  async registerOrcamento(remoteJid: string, value: number) {
+    const { error } = await supabase
+      .from("marketing_clientes")
+      .update({
+        valor_orcamento: value,
+        data_orcamento: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("remote_jid", remoteJid);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao registrar orçamento:", error.message);
+      throw error;
+    }
+  },
+
+  async deleteOrcamento(remoteJid: string) {
+    await supabase
+      .from("marketing_clientes")
+      .update({ valor_orcamento: null, data_orcamento: null, updated_at: new Date().toISOString() })
+      .eq("remote_jid", remoteJid);
+  },
+
   async getSalesByJid(remoteJid: string): Promise<MarketingVenda[]> {
     const { data } = await supabase
       .from("marketing_vendas")
@@ -680,6 +778,278 @@ export const marketingService = {
     });
 
     return hourlyCounts;
+  },
+
+  /**
+   * Analytics completo para a página de Relatórios: totais, conversões (por
+   * quantidade, por valor e por orçamento), desempenho por vendedor (incluindo
+   * tempo médio de 1ª resposta) e leads por origem. Todos os números vêm do banco.
+   */
+  async getReportsAnalytics(startDate: Date, endDate?: Date): Promise<ReportsAnalytics> {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = endDate ? new Date(endDate) : new Date(startDate);
+    end.setHours(23, 59, 59, 999);
+    const startIso = start.toISOString();
+    const endIso = end.toISOString();
+
+    const [
+      { data: leadsRaw },
+      { data: quotesRaw },
+      { data: salesRaw },
+      { data: msgsRaw },
+      { data: usersRaw },
+    ] = await Promise.all([
+      supabase
+        .from("marketing_clientes")
+        .select("remote_jid, vendedor_id, origem, campanha, temperatura, status, created_at")
+        .gte("created_at", startIso)
+        .lte("created_at", endIso),
+      supabase
+        .from("marketing_clientes")
+        .select("remote_jid, vendedor_id, valor_orcamento, data_orcamento")
+        .not("valor_orcamento", "is", null)
+        .gte("data_orcamento", startIso)
+        .lte("data_orcamento", endIso),
+      supabase
+        .from("marketing_vendas")
+        .select("remote_jid, valor, created_at")
+        .gte("created_at", startIso)
+        .lte("created_at", endIso),
+      supabase
+        .from("marketing_whatsapp")
+        .select("remote_jid, sender, timestamp, vendedor_id")
+        .gte("timestamp", startIso)
+        .lte("timestamp", endIso)
+        .order("timestamp", { ascending: true }),
+      supabase.from("usuarios").select("id, name, avatar"),
+    ]);
+
+    const leads = leadsRaw || [];
+    const quotes = quotesRaw || [];
+    const sales = salesRaw || [];
+    const msgs = msgsRaw || [];
+
+    const userNames = new Map<string, string>();
+    const userAvatars = new Map<string, string | null>();
+    (usersRaw || []).forEach((u) => { userNames.set(u.id, u.name); userAvatars.set(u.id, u.avatar); });
+
+    // Mapa remote_jid -> dados do lead (vendedor/origem/campanha) para atribuir vendas.
+    const leadByJid = new Map<string, { vendedor_id?: string | null; origem?: string | null; campanha?: string | null }>();
+    leads.forEach((l) => leadByJid.set(l.remote_jid, { vendedor_id: l.vendedor_id, origem: l.origem, campanha: l.campanha }));
+    // Vendas podem ser de leads criados fora do período: completa o mapa.
+    const missingSaleJids = [...new Set(sales.map((s) => s.remote_jid).filter((j) => !leadByJid.has(j)))];
+    if (missingSaleJids.length > 0) {
+      const { data: extra } = await supabase
+        .from("marketing_clientes")
+        .select("remote_jid, vendedor_id, origem, campanha")
+        .in("remote_jid", missingSaleJids);
+      (extra || []).forEach((l) => leadByJid.set(l.remote_jid, { vendedor_id: l.vendedor_id, origem: l.origem, campanha: l.campanha }));
+    }
+
+    // --- Tempo de 1ª resposta por conversa, atribuído a quem respondeu ---
+    const byJidMsgs: Record<string, { sender: string; timestamp: string; vendedor_id?: string | null }[]> = {};
+    for (const m of msgs) {
+      if (!m.remote_jid || !m.sender || !m.timestamp) continue;
+      (byJidMsgs[m.remote_jid] ||= []).push(m);
+    }
+    // Acumula soma/contagem de minutos por vendedor + global.
+    const respBySeller: Record<string, { sum: number; count: number }> = {};
+    let respGlobalSum = 0;
+    let respGlobalCount = 0;
+    for (const list of Object.values(byJidMsgs)) {
+      const firstContactIdx = list.findIndex((m) => m.sender === "contact");
+      if (firstContactIdx === -1) continue;
+      const contactTime = new Date(list[firstContactIdx].timestamp).getTime();
+      const response = list.slice(firstContactIdx + 1).find((m) => m.sender === "me");
+      if (!response) continue;
+      const diff = (new Date(response.timestamp).getTime() - contactTime) / 60000;
+      if (diff < 0 || diff > 1440) continue;
+      respGlobalSum += diff;
+      respGlobalCount += 1;
+      const sid = response.vendedor_id || "sem_vendedor";
+      (respBySeller[sid] ||= { sum: 0, count: 0 });
+      respBySeller[sid].sum += diff;
+      respBySeller[sid].count += 1;
+    }
+
+    // --- Agregação por vendedor ---
+    interface SellerAcc {
+      leads: number; quotesCount: number; quotesValue: number; salesCount: number; salesValue: number;
+    }
+    const sellerAcc = new Map<string, SellerAcc>();
+    const ensureSeller = (id: string): SellerAcc => {
+      let acc = sellerAcc.get(id);
+      if (!acc) { acc = { leads: 0, quotesCount: 0, quotesValue: 0, salesCount: 0, salesValue: 0 }; sellerAcc.set(id, acc); }
+      return acc;
+    };
+
+    leads.forEach((l) => { ensureSeller(l.vendedor_id || "sem_vendedor").leads += 1; });
+    quotes.forEach((q) => {
+      const acc = ensureSeller(q.vendedor_id || "sem_vendedor");
+      acc.quotesCount += 1;
+      acc.quotesValue += Number(q.valor_orcamento) || 0;
+    });
+    sales.forEach((s) => {
+      const sid = leadByJid.get(s.remote_jid)?.vendedor_id || "sem_vendedor";
+      const acc = ensureSeller(sid);
+      acc.salesCount += 1;
+      acc.salesValue += Number(s.valor) || 0;
+    });
+
+    // Leads/orçamentos/vendas sem atendente são atribuídos à Ingryd (foi quem atendeu).
+    const ingrydId = [...userNames.entries()].find(([, n]) => n.trim().toLowerCase().includes("ingryd"))?.[0];
+    if (ingrydId && sellerAcc.has("sem_vendedor")) {
+      const orphan = sellerAcc.get("sem_vendedor")!;
+      const target = ensureSeller(ingrydId);
+      target.leads += orphan.leads;
+      target.quotesCount += orphan.quotesCount;
+      target.quotesValue += orphan.quotesValue;
+      target.salesCount += orphan.salesCount;
+      target.salesValue += orphan.salesValue;
+      sellerAcc.delete("sem_vendedor");
+      const orphanResp = respBySeller["sem_vendedor"];
+      if (orphanResp) {
+        respBySeller[ingrydId] ||= { sum: 0, count: 0 };
+        respBySeller[ingrydId].sum += orphanResp.sum;
+        respBySeller[ingrydId].count += orphanResp.count;
+        delete respBySeller["sem_vendedor"];
+      }
+    }
+
+    const bySeller: SellerReport[] = [...sellerAcc.entries()].map(([id, acc]) => {
+      const resp = respBySeller[id];
+      return {
+        id,
+        name: id === "sem_vendedor" ? "Sem atendente" : (userNames.get(id) || "Desconhecido"),
+        avatar: userAvatars.get(id) || null,
+        leads: acc.leads,
+        quotesCount: acc.quotesCount,
+        quotesValue: acc.quotesValue,
+        salesCount: acc.salesCount,
+        salesValue: acc.salesValue,
+        convRate: acc.leads > 0 ? (acc.salesCount / acc.leads) * 100 : 0,
+        avgResponseMinutes: resp && resp.count > 0 ? resp.sum / resp.count : null,
+      };
+    }).sort((a, b) => b.salesValue - a.salesValue || b.leads - a.leads);
+
+    // --- Leads por origem (com vendas atribuídas) ---
+    const originAcc = new Map<string, { leads: number; salesCount: number; salesValue: number }>();
+    const normOrigin = (o?: string | null) => (o && o.trim() ? o.trim() : "Não informado");
+    leads.forEach((l) => {
+      const key = normOrigin(l.origem);
+      const acc = originAcc.get(key) || { leads: 0, salesCount: 0, salesValue: 0 };
+      acc.leads += 1;
+      originAcc.set(key, acc);
+    });
+    sales.forEach((s) => {
+      const key = normOrigin(leadByJid.get(s.remote_jid)?.origem);
+      const acc = originAcc.get(key) || { leads: 0, salesCount: 0, salesValue: 0 };
+      acc.salesCount += 1;
+      acc.salesValue += Number(s.valor) || 0;
+      originAcc.set(key, acc);
+    });
+    const byOrigin: OriginReport[] = [...originAcc.entries()]
+      .map(([origin, v]) => ({ origin, ...v }))
+      .sort((a, b) => b.leads - a.leads);
+
+    // --- Leads por campanha (com vendas atribuídas) ---
+    const campaignAcc = new Map<string, { leads: number; salesCount: number; salesValue: number }>();
+    const normCampaign = (c?: string | null) => (c && c.trim() ? c.trim() : "Sem campanha");
+    leads.forEach((l) => {
+      const key = normCampaign(l.campanha);
+      const acc = campaignAcc.get(key) || { leads: 0, salesCount: 0, salesValue: 0 };
+      acc.leads += 1;
+      campaignAcc.set(key, acc);
+    });
+    sales.forEach((s) => {
+      const key = normCampaign(leadByJid.get(s.remote_jid)?.campanha);
+      const acc = campaignAcc.get(key) || { leads: 0, salesCount: 0, salesValue: 0 };
+      acc.salesCount += 1;
+      acc.salesValue += Number(s.valor) || 0;
+      campaignAcc.set(key, acc);
+    });
+    const byCampaign: CampaignReport[] = [...campaignAcc.entries()]
+      .map(([campaign, v]) => ({ campaign, ...v }))
+      .sort((a, b) => b.leads - a.leads);
+
+    // --- Leads por temperatura (qualidade) ---
+    const tempOrder = ["Quente", "Morno", "Frio"];
+    const tempAcc = new Map<string, number>();
+    leads.forEach((l) => {
+      const key = tempOrder.includes(l.temperatura || "") ? (l.temperatura as string) : "Frio";
+      tempAcc.set(key, (tempAcc.get(key) || 0) + 1);
+    });
+    const byTemperature: TemperatureReport[] = tempOrder.map((t) => ({ temperature: t, leads: tempAcc.get(t) || 0 }));
+
+    // --- Série diária (leads x vendas por dia no intervalo) ---
+    const dayKey = (iso: string) => new Date(iso).toISOString().slice(0, 10);
+    const dayMap = new Map<string, { leads: number; sales: number; salesValue: number }>();
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      dayMap.set(d.toISOString().slice(0, 10), { leads: 0, sales: 0, salesValue: 0 });
+    }
+    leads.forEach((l) => {
+      const k = dayKey(l.created_at);
+      const e = dayMap.get(k); if (e) e.leads += 1;
+    });
+    sales.forEach((s) => {
+      const k = dayKey(s.created_at);
+      const e = dayMap.get(k); if (e) { e.sales += 1; e.salesValue += Number(s.valor) || 0; }
+    });
+    const dailySeries: DailyPoint[] = [...dayMap.entries()].map(([date, v]) => ({ date, ...v }));
+
+    // --- Comparativo com período anterior (mesma duração imediatamente antes) ---
+    const rangeMs = end.getTime() - start.getTime();
+    const prevEnd = new Date(start.getTime() - 1);
+    const prevStart = new Date(start.getTime() - 1 - rangeMs);
+    const [{ count: prevLeads }, { data: prevSales }] = await Promise.all([
+      supabase
+        .from("marketing_clientes")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", prevStart.toISOString())
+        .lte("created_at", prevEnd.toISOString()),
+      supabase
+        .from("marketing_vendas")
+        .select("valor")
+        .gte("created_at", prevStart.toISOString())
+        .lte("created_at", prevEnd.toISOString()),
+    ]);
+    const prevSalesValue = (prevSales || []).reduce((acc, s) => acc + (Number(s.valor) || 0), 0);
+
+    // --- Totais e conversões ---
+    const leadsCount = leads.length;
+    const quotesCount = quotes.length;
+    const quotesValue = quotes.reduce((acc, q) => acc + (Number(q.valor_orcamento) || 0), 0);
+    const salesCount = sales.length;
+    const salesValue = sales.reduce((acc, s) => acc + (Number(s.valor) || 0), 0);
+
+    return {
+      totals: {
+        leads: leadsCount,
+        quotesCount,
+        quotesValue,
+        salesCount,
+        salesValue,
+        avgTicket: salesCount > 0 ? salesValue / salesCount : 0,
+        // Conversão por quantidade: vendas / leads
+        convByCount: leadsCount > 0 ? (salesCount / leadsCount) * 100 : 0,
+        // Conversão por valor: R$ vendido / R$ orçado
+        convByValue: quotesValue > 0 ? (salesValue / quotesValue) * 100 : 0,
+        // Conversão por orçamento: vendas / orçamentos enviados
+        convByQuote: quotesCount > 0 ? (salesCount / quotesCount) * 100 : 0,
+        avgResponseMinutes: respGlobalCount > 0 ? respGlobalSum / respGlobalCount : null,
+      },
+      previous: {
+        leads: prevLeads || 0,
+        salesCount: (prevSales || []).length,
+        salesValue: prevSalesValue,
+      },
+      bySeller,
+      byOrigin,
+      byCampaign,
+      byTemperature,
+      dailySeries,
+    };
   },
 
   async exportLeadsXlsx(startDate: Date, endDate?: Date) {

@@ -191,23 +191,23 @@ export function LeadsView() {
           </div>
         ) : (
           <div className="space-y-2">
-            {/* Cabeçalho da Lista */}
-            <div className="grid grid-cols-[2fr_1.2fr_1fr_1.5fr_1.2fr_1.1fr] gap-4 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <div className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_1.2fr_1.1fr] gap-4 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               <span>Lead / Contato</span>
               <span>Telefone</span>
               <span>Origem</span>
-              <span>Campanha</span>
+              <span>Valor Venda</span>
+              <span>Orçamento</span>
               <span>Temperatura</span>
               <span className="text-right">Ações</span>
             </div>
-
             {filtered.map(lead => {
               const displayNome = lead.nome || lead.push_name || lead.remote_jid.split('@')[0];
               const phone = lead.remote_jid.split('@')[0];
               const temp = lead.temperatura || "Frio";
               const tempCfg = TEMP_CONFIG[temp as keyof typeof TEMP_CONFIG] || TEMP_CONFIG.Frio;
+
               return (
-                <div key={lead.remote_jid} className="grid grid-cols-[2fr_1.2fr_1fr_1.5fr_1.2fr_1.1fr] gap-4 items-center bg-card border border-border/50 rounded-2xl p-3 hover:border-primary/30 hover:bg-primary/[0.02] transition-all group">
+                <div key={lead.remote_jid} className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_1.2fr_1.1fr] gap-4 items-center bg-card border border-border/50 rounded-2xl p-3 hover:border-primary/30 hover:bg-primary/[0.02] transition-all group">
                   {/* Lead / Contato */}
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-xl bg-secondary overflow-hidden border border-border/50 shrink-0">
@@ -238,9 +238,24 @@ export function LeadsView() {
                     {lead.origem || <span className="opacity-40 italic font-semibold">WhatsApp</span>}
                   </div>
 
-                  {/* Campanha */}
-                  <div className="text-xs font-semibold text-muted-foreground truncate" title={lead.campanha || ""}>
-                    {lead.campanha || <span className="opacity-30 italic font-semibold">Sem Campanha</span>}
+                  {/* Valor Venda */}
+                  <div className={cn(
+                    "text-xs font-bold",
+                    lead.valor_venda && lead.valor_venda > 0 
+                      ? "text-emerald-600 dark:text-emerald-400" 
+                      : "text-muted-foreground/50 font-semibold"
+                  )}>
+                    {(lead.valor_venda ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </div>
+
+                  {/* Orçamento */}
+                  <div className={cn(
+                    "text-xs font-bold",
+                    lead.valor_orcamento && lead.valor_orcamento > 0 
+                      ? "text-blue-600 dark:text-blue-400" 
+                      : "text-muted-foreground/50 font-semibold"
+                  )}>
+                    {(lead.valor_orcamento ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </div>
 
                   {/* Temperatura */}

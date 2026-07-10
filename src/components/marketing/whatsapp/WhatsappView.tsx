@@ -110,6 +110,7 @@ interface LeadMetadata {
   temperature?: Temperature;
   budgetId?: string;
   saleValue?: string;
+  quoteValue?: string;
   city?: string;
   followUpDate?: string;
   numeroDocumento?: string;
@@ -992,6 +993,9 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
             campaign: item.campanha || "Geral",
             saleValue: (item.valor_venda ?? 0) > 0
               ? item.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              : undefined,
+            quoteValue: (item.valor_orcamento ?? 0) > 0
+              ? item.valor_orcamento!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
               : undefined
           }
         };
@@ -1068,6 +1072,9 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
         campaign: item.campanha || "Geral",
         saleValue: (item.valor_venda ?? 0) > 0
           ? item.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : undefined,
+        quoteValue: (item.valor_orcamento ?? 0) > 0
+          ? item.valor_orcamento!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
           : undefined
       }
     };
@@ -1521,6 +1528,9 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
                 campaign: dbCliente?.campanha || "Geral",
                 saleValue: (dbCliente?.valor_venda ?? 0) > 0
                   ? dbCliente!.valor_venda!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : undefined,
+                quoteValue: (dbCliente?.valor_orcamento ?? 0) > 0
+                  ? dbCliente!.valor_orcamento!.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                   : undefined
               }
             };
@@ -2298,6 +2308,19 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
     setInputText(prev => prev + text);
     setShowProductSelector(false);
     setCartProducts([]);
+
+    // Marca no lead que houve orçamento e guarda o valor total à vista (PIX),
+    // espelhando o registro de venda. Usa o ref travado para não errar de conversa.
+    const quoteTarget = selectedChatRef.current;
+    if (quoteTarget && totalDebito > 0) {
+      const formatted = totalDebito.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const updatedLeadInfo = { ...(quoteTarget.leadInfo || {}), quoteValue: formatted };
+      setSelectedChat(prev => prev && prev.id === quoteTarget.id ? { ...prev, leadInfo: updatedLeadInfo } : prev);
+      setChats(prev => prev.map(c => c.id === quoteTarget.id ? { ...c, leadInfo: { ...(c.leadInfo || {}), quoteValue: formatted } } : c));
+      marketingService.registerOrcamento(quoteTarget.id, totalDebito).catch(err =>
+        console.error("Erro ao registrar orçamento:", err)
+      );
+    }
   };
 
   const handleTranscribe = async (msg: Message) => {
@@ -3333,6 +3356,15 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
                     </div>
                   )}
                 </div>
+                {selectedChat.leadInfo?.quoteValue && (
+                  <div
+                    className="flex items-center justify-center gap-1.5 h-9 px-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-500"
+                    title={`Orçamento enviado — R$ ${selectedChat.leadInfo.quoteValue} (à vista)`}
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-black">R$ {selectedChat.leadInfo.quoteValue}</span>
+                  </div>
+                )}
                 {selectedChat.leadInfo?.saleValue && (
                   <button
                     onClick={() => { setSaleValue(selectedChat.leadInfo!.saleValue!); setShowSaleModal(true); }}
