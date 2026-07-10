@@ -115,6 +115,25 @@ export async function getConversas(documento: string): Promise<CrmConversa[]> {
   return data ?? [];
 }
 
+// Fecha (esconde) conversas no banco marcando fechada=true — persiste entre
+// dispositivos/sessões, sem apagar o histórico. Uma nova mensagem reabre a conversa.
+export async function fecharConversas(documentos: string[]): Promise<void> {
+  const docs = [...new Set(documentos.filter(Boolean))];
+  if (docs.length === 0) return;
+  const CHUNK = 200; // evita URL longa demais no filtro .in()
+  for (let i = 0; i < docs.length; i += CHUNK) {
+    const batch = docs.slice(i, i + CHUNK);
+    const { error } = await supabase
+      .from("crm_conversas")
+      .update({ fechada: true })
+      .in("documento", batch);
+    if (error) {
+      console.error("[CRM] erro ao fechar conversas:", error.message);
+      throw error;
+    }
+  }
+}
+
 export async function addConversa(conversa: Omit<CrmConversa, "id">): Promise<void> {
   const { error } = await supabase
     .from("crm_conversas")

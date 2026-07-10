@@ -33,6 +33,7 @@ interface ChatCenterProps {
   onToggleChatDoc: (doc: string) => void;
   onCloseChatDoc: (doc: string) => void;
   onUpdateChat?: (doc: string, data: Partial<ActiveChat>) => void;
+  onClearAll?: () => void;
   forcedChatDoc?: string | null;
   onForcedChatResolved?: () => void;
   isOpen?: boolean;
@@ -49,6 +50,7 @@ export function ChatCenter({
   onToggleChatDoc,
   onCloseChatDoc,
   onUpdateChat,
+  onClearAll,
   forcedChatDoc,
   onForcedChatResolved,
   isOpen = false,
@@ -56,6 +58,7 @@ export function ChatCenter({
 }: ChatCenterProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [confirmClear, setConfirmClear] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   const totalUnread = useMemo(() => {
@@ -370,14 +373,37 @@ export function ChatCenter({
 
         {/* Footer */}
         <div className="p-3 border-t border-border bg-secondary/10 flex justify-center shrink-0">
-          <button
-            onClick={() => {
-              activeChats.forEach(c => onCloseChat(c.doc));
-            }}
-            className="text-[9px] font-black text-muted-foreground hover:text-rose-500 uppercase tracking-widest transition-colors"
-          >
-            Limpar Todas as Conversas
-          </button>
+          {confirmClear ? (
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">
+                Apagar {activeChats.length} conversa{activeChats.length !== 1 ? "s" : ""}?
+              </span>
+              <button
+                onClick={() => {
+                  setConfirmClear(false);
+                  if (onClearAll) onClearAll();
+                  else activeChats.forEach(c => onCloseChat(c.doc));
+                }}
+                className="text-[9px] font-black text-white bg-rose-500 hover:bg-rose-600 px-2.5 py-1 rounded-lg uppercase tracking-widest transition-colors"
+              >
+                Confirmar
+              </button>
+              <button
+                onClick={() => setConfirmClear(false)}
+                className="text-[9px] font-black text-muted-foreground hover:text-foreground uppercase tracking-widest transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmClear(true)}
+              disabled={activeChats.length === 0}
+              className="text-[9px] font-black text-muted-foreground hover:text-rose-500 uppercase tracking-widest transition-colors disabled:opacity-40"
+            >
+              Limpar Todas as Conversas
+            </button>
+          )}
         </div>
       </div>
       )}

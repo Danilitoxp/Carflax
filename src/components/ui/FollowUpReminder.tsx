@@ -50,7 +50,10 @@ export function FollowUpReminder({ userProfile, onNavigateToFollowUps }: Props) 
         .select("documento, lembrete_data, status_crm, vendedor, vendedor_codigo")
         .eq("status_crm", "ENVIADO")
         .lt("lembrete_data", todayStr)
-        .not("lembrete_data", "is", null);
+        .not("lembrete_data", "is", null)
+        // Exclui datas vazias: string "" passa no filtro "< hoje" (é lexicograficamente
+        // menor) e no "not null", entrando na lista sem data de retorno de verdade.
+        .neq("lembrete_data", "");
 
       const role = userProfile.role?.toUpperCase() || "";
       const isSalesManager = role === "ADMIN" || role.includes("DIRETOR") || role.includes("GERENTE COMERCIAL") || role.includes("GERENTE DE VENDAS");

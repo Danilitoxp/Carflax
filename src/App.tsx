@@ -739,6 +739,8 @@ function DashboardContent({
           for (const [doc, msgs] of Object.entries(byDoc)) {
             if (existingDocs.has(doc)) continue;
             if (dismissedChatDocsRef.current.has(doc)) continue;
+            // Conversa fechada no banco (via "Limpar Todas") só reaparece com mensagem nova.
+            if (msgs.every((m) => m.fechada)) continue;
 
             const lastMsg = msgs[0];
             const unreadCount = msgs.filter(
@@ -1387,6 +1389,26 @@ function DashboardContent({
         openChatDocs={openChatDocs}
         onToggleChatDoc={handleToggleChatDoc}
         onCloseChatDoc={handleCloseChatDoc}
+        onClearAll={async () => {
+          const docs = activeChats
+            .map((c) => c.doc)
+            .filter((d) => d !== forcedChatDoc);
+          // Some da lista na hora
+          setActiveChats((prev) => prev.filter((c) => c.doc === forcedChatDoc));
+          setOpenChatDocs((prev) => prev.filter((d) => d === forcedChatDoc));
+          setDismissedChatDocs((prev) => {
+            const next = new Set(prev);
+            docs.forEach((d) => next.add(d));
+            return next;
+          });
+          // Fecha no banco (persiste entre dispositivos/sessões)
+          try {
+            const { fecharConversas } = await import("@/lib/crm-service");
+            await fecharConversas(docs);
+          } catch (err) {
+            console.error("[ChatCenter] Falha ao fechar conversas no banco:", err);
+          }
+        }}
         onUpdateChat={(doc, data) => {
           setActiveChats((prev) =>
             prev.map((c) => (c.doc === doc ? { ...c, ...data } : c)),

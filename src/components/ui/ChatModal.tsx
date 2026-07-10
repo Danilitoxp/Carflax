@@ -1,5 +1,19 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { X, Send, Loader2, Package, ShoppingBag, Maximize2, Minimize2 } from "lucide-react";
+import {
+  X,
+  Send,
+  Loader2,
+  Package,
+  ShoppingBag,
+  Maximize2,
+  Minimize2,
+  RefreshCw,
+  Building2,
+  User2,
+  MessageSquare,
+  Phone,
+  AlertCircle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getConversas, addConversa, getResponsavelIdForVendedor, type CrmConversa } from "@/lib/crm-service";
 import { supabase } from "@/lib/supabase";
@@ -10,6 +24,18 @@ interface UserProfile {
   name: string;
   role: string;
   avatar?: string;
+}
+
+interface ParsedStatusUpdate {
+  orcamento: string;
+  cliente: string;
+  vendedor: string;
+  status: string;
+  contato: string;
+  canal: string;
+  motivo: string;
+  observacao: string | null;
+  itens: string | null;
 }
 
 interface ChatModalProps {
@@ -680,6 +706,166 @@ export function ChatModal({
     return false;
   };
 
+  const parseStatusUpdate = (text: string): ParsedStatusUpdate | null => {
+    if (!text.includes("ATUALIZAÇÃO DE STATUS") && !text.includes("ORÇAMENTO:")) return null;
+
+    const orcamento = text.match(/📑\s*\*?ORÇAMENTO:\*?\s*#?([^\n]+)/i)?.[1]?.trim();
+    const cliente = text.match(/🏢\s*\*?CLIENTE:\*?\s*(.*?)(?:\n|$)/i)?.[1]?.trim();
+    const vendedor = text.match(/👤\s*\*?VENDEDOR:\*?\s*(.*?)(?:\n|$)/i)?.[1]?.trim();
+    const status = text.match(/📢\s*\*?STATUS:\*?\s*(.*?)(?:\n|$)/i)?.[1]?.trim();
+    const contato = text.match(/📞\s*\*?CONTATO:\*?\s*(.*?)(?:\n|$)/i)?.[1]?.trim();
+    const canal = text.match(/📱\s*\*?CANAL:\*?\s*(.*?)(?:\n|$)/i)?.[1]?.trim();
+    const motivo = text.match(/📉\s*\*?MOTIVO:\*?\s*(.*?)(?:\n|$)/i)?.[1]?.trim();
+
+    const observacaoMatch = text.match(/💬\s*\*?OBSERVAÇÃO:\*?\s*\n?([\s\S]*?)(?:\n━|$)/i);
+    const observacao = observacaoMatch ? observacaoMatch[1].trim() : null;
+
+    const itensMatch = text.match(/📦\s*\*?ITENS AFETADOS:\*?\s*\n?([\s\S]*?)(?:\n💬|\n━|$)/i);
+    const itens = itensMatch ? itensMatch[1].trim() : null;
+
+    if (!orcamento && !cliente && !status) return null;
+
+    const cleanVal = (val?: string) => val ? val.replace(/\*/g, "").trim() : "";
+
+    return {
+      orcamento: cleanVal(orcamento),
+      cliente: cleanVal(cliente),
+      vendedor: cleanVal(vendedor),
+      status: cleanVal(status),
+      contato: cleanVal(contato),
+      canal: cleanVal(canal),
+      motivo: cleanVal(motivo),
+      observacao,
+      itens
+    };
+  };
+
+  const renderStatusUpdateCard = (parsed: ParsedStatusUpdate, msg: CrmConversa) => {
+    const statusUpper = (parsed.status || "").toUpperCase();
+    let badgeColor = "bg-blue-500/10 text-blue-500 border-blue-500/20";
+    let dotColor = "bg-blue-500 shadow-blue-500/50";
+    
+    if (statusUpper.includes("NEGOCIA")) {
+      badgeColor = "bg-amber-500/10 text-amber-500 border-amber-500/20";
+      dotColor = "bg-amber-500 shadow-amber-500/50";
+    } else if (statusUpper.includes("CREDITO") || statusUpper.includes("CRÉDITO")) {
+      badgeColor = "bg-orange-500/10 text-orange-500 border-orange-500/20";
+      dotColor = "bg-orange-500 shadow-orange-500/50";
+    } else if (statusUpper.includes("AGUARD")) {
+      badgeColor = "bg-purple-500/10 text-purple-500 border-purple-500/20";
+      dotColor = "bg-purple-500 shadow-purple-500/50";
+    } else if (statusUpper.includes("PERDIDO")) {
+      badgeColor = "bg-rose-500/10 text-rose-500 border-rose-500/20";
+      dotColor = "bg-rose-500 shadow-rose-500/50";
+    }
+
+    const isWhatsApp = (parsed.canal || "").toLowerCase().includes("whatsapp");
+
+    return (
+      <div className="w-full max-w-[420px] bg-card border border-border/80 rounded-2xl shadow-xl overflow-hidden backdrop-blur-sm flex flex-col">
+        {/* Header bar */}
+        <div className="bg-secondary/40 border-b border-border/30 px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="w-3.5 h-3.5 text-blue-500" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+              Status do Orçamento
+            </span>
+          </div>
+          <span className="text-[9px] font-black text-muted-foreground uppercase tracking-wider bg-secondary/80 px-2 py-0.5 rounded border border-border/60">
+            #{parsed.orcamento}
+          </span>
+        </div>
+
+        {/* Content body */}
+        <div className="p-4 space-y-3.5 text-left">
+          {/* Cliente and Seller Info */}
+          <div className="space-y-2">
+            {parsed.cliente && (
+              <div className="flex items-start gap-2.5">
+                <Building2 className="w-4 h-4 text-muted-foreground/60 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground block leading-none mb-0.5">Cliente</span>
+                  <span className="font-bold text-foreground text-xs leading-snug block">{parsed.cliente}</span>
+                </div>
+              </div>
+            )}
+            
+            {parsed.vendedor && (
+              <div className="flex items-start gap-2.5">
+                <User2 className="w-4 h-4 text-muted-foreground/60 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground block leading-none mb-0.5">Vendedor</span>
+                  <span className="font-bold text-foreground text-xs leading-snug block">{parsed.vendedor}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Status and Channel details */}
+          <div className="pt-3 border-t border-border/30 grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground block mb-1">Status</span>
+              <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase border shadow-sm", badgeColor)}>
+                <span className={cn("w-1.5 h-1.5 rounded-full shadow", dotColor)} />
+                {parsed.status ? parsed.status.replace(/[^\w\sÀ-ÿ]/gi, '').trim() : ""}
+              </span>
+            </div>
+            
+            {parsed.canal && (
+              <div>
+                <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground block mb-1">Contato</span>
+                <span className="flex items-center gap-1 text-xs font-bold text-foreground leading-snug mt-1">
+                  {isWhatsApp ? (
+                    <MessageSquare className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  ) : (
+                    <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  )}
+                  <span className="break-words leading-tight">{parsed.canal} {parsed.contato ? `(${parsed.contato})` : ""}</span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Lost Quote / Motivo */}
+          {parsed.motivo && (
+            <div className="p-3 bg-rose-500/5 border border-rose-500/10 rounded-xl flex gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <span className="text-[8px] font-black uppercase tracking-wider text-rose-500 block leading-none mb-0.5">Motivo do Encerramento</span>
+                <p className="font-bold text-[11px] text-rose-600 dark:text-rose-400 uppercase leading-snug">{parsed.motivo}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Itens Afetados */}
+          {parsed.itens && (
+            <div className="p-3 bg-secondary/30 border border-border rounded-xl">
+              <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground block mb-1.5">Itens Perdidos/Afetados</span>
+              <div className="text-[11px] font-bold text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                {parsed.itens}
+              </div>
+            </div>
+          )}
+
+          {/* Observação / Comentário */}
+          {parsed.observacao && (
+            <div className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl relative overflow-hidden">
+              <span className="text-[8px] font-black uppercase tracking-wider text-amber-500 block mb-1">Observação do Atendimento</span>
+              <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300 font-semibold italic">
+                "{parsed.observacao}"
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer timestamp */}
+        <div className="bg-secondary/25 px-4 py-2 border-t border-border/30 flex items-center justify-end text-[8px] text-muted-foreground font-bold">
+          {formatTime(msg.timestamp)}
+        </div>
+      </div>
+    );
+  };
+
   const renderFormattedText = (text: string) => {
     const lines = text.split('\n');
     const result: React.ReactNode[] = [];
@@ -957,30 +1143,43 @@ export function ChatModal({
                         </span>
                       </div>
                     )}
-                    <div className={cn("flex flex-col space-y-1", isMe(msg) ? "items-end" : "items-start")}>
-                      {!isMe(msg) && (
-                        <span className="text-[10px] font-black text-muted-foreground uppercase ml-1 tracking-widest">
-                          {(() => {
-                            if (msg.enviado_por_nome?.toUpperCase() === "SISTEMA") {
-                              const match = msg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
-                              return match ? match[1].replace(/\*/g, "").trim() : "Sistema";
-                            }
-                            return msg.enviado_por_nome;
-                          })()}
-                        </span>
-                      )}
-                      <div className={cn(
-                        "rounded-2xl max-w-full shadow-xl leading-relaxed transition-all", 
-                        isMaximized ? "p-4 text-[15px] font-bold" : "p-3.5 text-[13px] font-semibold",
-                        isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40"
-                      )}>
-                        {renderFormattedText(msg.obs)}
-                      </div>
-                      <div className={cn("flex items-center gap-2", isMe(msg) ? "mr-1" : "ml-1")}>
-                        <span className="text-[9px] font-black text-muted-foreground uppercase opacity-50">{formatTime(msg.timestamp)}</span>
-                        {isMe(msg) && <span className={cn("text-[9px] font-black uppercase", msg.lida ? "text-emerald-500" : "text-muted-foreground")}>{msg.lida ? "✓ Lida" : "✓✓"}</span>}
-                      </div>
-                    </div>
+                    {(() => {
+                      const parsedStatus = parseStatusUpdate(msg.obs);
+                      if (parsedStatus) {
+                        return (
+                          <div className="flex justify-center my-3 w-full animate-in fade-in slide-in-from-bottom-1 duration-200">
+                            {renderStatusUpdateCard(parsedStatus, msg)}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className={cn("flex flex-col space-y-1", isMe(msg) ? "items-end" : "items-start")}>
+                          {!isMe(msg) && (
+                            <span className="text-[10px] font-black text-muted-foreground uppercase ml-1 tracking-widest">
+                              {(() => {
+                                if (msg.enviado_por_nome?.toUpperCase() === "SISTEMA") {
+                                  const match = msg.obs.match(/Vendedor:.*?\*?\s*(.*?)(?:\n|$)/i);
+                                  return match ? match[1].replace(/\*/g, "").trim() : "Sistema";
+                                }
+                                return msg.enviado_por_nome;
+                              })()}
+                            </span>
+                          )}
+                          <div className={cn(
+                            "rounded-2xl max-w-full shadow-xl leading-relaxed transition-all", 
+                            isMaximized ? "p-4 text-[15px] font-bold" : "p-3.5 text-[13px] font-semibold",
+                            isMe(msg) ? "bg-blue-600 text-white rounded-tr-none" : "bg-secondary/80 text-foreground/90 rounded-tl-none border border-border/40"
+                          )}>
+                            {renderFormattedText(msg.obs)}
+                          </div>
+                          <div className={cn("flex items-center gap-2", isMe(msg) ? "mr-1" : "ml-1")}>
+                            <span className="text-[9px] font-black text-muted-foreground uppercase opacity-50">{formatTime(msg.timestamp)}</span>
+                            {isMe(msg) && <span className={cn("text-[9px] font-black uppercase", msg.lida ? "text-emerald-500" : "text-muted-foreground")}>{msg.lida ? "✓ Lida" : "✓✓"}</span>}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
