@@ -307,6 +307,120 @@ const getTempColor = (temp?: string) => {
 
 const avatarCache = new Map<string, string>();
 
+const AVATAR_COLORS = [
+  "bg-pink-500 text-white",
+  "bg-purple-500 text-white",
+  "bg-indigo-500 text-white",
+  "bg-blue-500 text-white",
+  "bg-cyan-500 text-white",
+  "bg-teal-500 text-white",
+  "bg-emerald-500 text-white",
+  "bg-green-500 text-white",
+  "bg-amber-500 text-white",
+  "bg-orange-500 text-white",
+  "bg-rose-500 text-white",
+];
+
+function getAvatarColor(name: string): string {
+  if (!name) return "bg-slate-500 text-white";
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index];
+}
+
+function getContactInitial(name: string): string {
+  if (!name) return "?";
+  const cleanName = name.trim();
+  // Encontra a primeira letra ou número do nome
+  const match = cleanName.match(/[a-zA-Z0-9\u00C0-\u00FF]/);
+  if (match) {
+    return match[0].toUpperCase();
+  }
+  return cleanName.charAt(0).toUpperCase() || "?";
+}
+
+interface ContactAvatarProps {
+  avatar?: string;
+  name: string;
+  size?: "sm" | "md" | "lg" | "custom";
+  customSizeClass?: string;
+  onClick?: (e: React.MouseEvent) => void;
+  className?: string;
+}
+
+function ContactAvatar({ 
+  avatar, 
+  name, 
+  size = "md", 
+  customSizeClass = "", 
+  onClick, 
+  className 
+}: ContactAvatarProps) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const [prevAvatar, setPrevAvatar] = useState(avatar);
+
+  if (avatar !== prevAvatar) {
+    setPrevAvatar(avatar);
+    setImgFailed(false);
+  }
+  const initials = getContactInitial(name);
+  const colorClass = getAvatarColor(name);
+
+  let sizeClasses = "";
+  let textClasses = "";
+  
+  if (size === "sm") {
+    // Chat Header size (w-10 h-10)
+    sizeClasses = "w-10 h-10 border border-border";
+    textClasses = "text-[15px] font-bold font-inter";
+  } else if (size === "md") {
+    // Audio player size (w-[42px] h-[42px])
+    sizeClasses = "w-[42px] h-[42px]";
+    textClasses = "text-[16px] font-bold font-inter";
+  } else if (size === "lg") {
+    // Sidebar list size (w-12 h-12)
+    sizeClasses = "w-12 h-12 border border-border/50";
+    textClasses = "text-[18px] font-bold font-inter";
+  } else if (size === "custom") {
+    sizeClasses = customSizeClass;
+    textClasses = "text-base font-bold font-inter";
+  }
+
+  const hasPhoto = avatar && avatar.trim() !== "" && !imgFailed;
+
+  return (
+    <div 
+      onClick={onClick}
+      className={cn(
+        "rounded-full flex items-center justify-center overflow-hidden relative shrink-0 select-none",
+        sizeClasses,
+        !hasPhoto ? colorClass : "bg-secondary",
+        onClick ? "cursor-pointer" : "",
+        className
+      )}
+    >
+      {hasPhoto ? (
+        <img 
+          src={avatar} 
+          alt={name}
+          className={cn(
+            "w-full h-full object-cover",
+            onClick ? "hover:scale-110 transition-transform" : ""
+          )} 
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <span className={cn("text-white uppercase tracking-tight", textClasses)}>
+          {initials}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function inferMsgType(text?: string): string | undefined {
   if (!text) return undefined;
   if (text.includes("🎵") || text === "Áudio") return "audio";
@@ -497,12 +611,14 @@ function CustomAudioPlayer({
   src, 
   isMe, 
   avatar, 
+  name,
   msgTime, 
   msgStatus 
 }: { 
   src: string, 
   isMe: boolean, 
   avatar?: string,
+  name: string,
   msgTime?: string,
   msgStatus?: string
 }) {
@@ -563,32 +679,12 @@ function CustomAudioPlayer({
       
       {/* Avatar com Microfone */}
       <div className="relative shrink-0 ml-1">
-        <div className="w-[42px] h-[42px] rounded-full overflow-hidden bg-black/10 flex items-center justify-center relative">
-          {avatar ? (
-            <>
-              <img 
-                src={avatar} 
-                alt="Avatar" 
-                className="w-full h-full object-cover" 
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                  const sibling = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                  if (sibling) sibling.style.display = 'flex';
-                }}
-              />
-              <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-black/10">
-                <User className="w-6 h-6 opacity-50 text-muted-foreground" />
-              </div>
-            </>
-          ) : (
-            <User className="w-6 h-6 opacity-50" />
-          )}
-        </div>
+        <ContactAvatar name={name} avatar={avatar} size="md" />
         <div className={cn(
           "absolute -bottom-0.5 -right-0.5 rounded-full p-[2px] border-2",
           isMe ? "border-primary bg-primary" : "border-card bg-card"
         )}>
-           <Mic className={cn("w-[10px] h-[10px]", isMe ? "text-green-300" : "text-green-500")} fill="currentColor" />
+          <Mic className={cn("w-[10px] h-[10px]", isMe ? "text-green-300" : "text-green-500")} fill="currentColor" />
         </div>
       </div>
 
@@ -656,7 +752,7 @@ interface UserProfile {
   operatorCode?: string;
 }
 
-export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?: UserProfile | null }) {
+export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string; userProfile?: UserProfile | null }) {
   const { showNotification } = useNotification();
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -3021,33 +3117,17 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
               )}
 
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border/50 relative">
-                  {chat.avatar ? (
-                    <>
-                      <img 
-                        src={chat.avatar} 
-                        className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                          const sibling = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                          if (sibling) sibling.style.display = 'flex';
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedImage(chat.avatar!);
-                        }}
-                      />
-                      <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-secondary">
-                        <User className="w-6 h-6 text-muted-foreground" />
-                      </div>
-                    </>
-                  ) : (
-                    <User className="w-6 h-6" />
-                  )}
-                </div>
+                <ContactAvatar 
+                  name={chat.name} 
+                  avatar={chat.avatar} 
+                  size="lg" 
+                  onClick={chat.avatar ? (e) => {
+                    e.stopPropagation();
+                    setSelectedImage(chat.avatar!);
+                  } : undefined}
+                />
                 {getOriginBadge(chat.leadInfo?.source)}
               </div>
-              
               <div className="flex-1 min-w-0 flex justify-between gap-2">
                 <div className="flex-1 min-w-0 flex flex-col justify-start pt-1">
                   <div className="flex items-center gap-1.5 mb-0.5">
@@ -3157,28 +3237,14 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
           <>
             <div className="p-4 flex items-center justify-between border-b border-border bg-card/20 backdrop-blur-md z-40 relative">
               <div className="flex items-center gap-3">
+
                 <div className="relative shrink-0">
-                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border relative">
-                     {selectedChat.avatar ? (
-                       <>
-                         <img 
-                          src={selectedChat.avatar} 
-                          className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                            const sibling = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                            if (sibling) sibling.style.display = 'flex';
-                          }}
-                          onClick={() => setSelectedImage(selectedChat.avatar!)}
-                        />
-                        <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-secondary">
-                          <User className="w-5 h-5 text-muted-foreground" />
-                        </div>
-                       </>
-                     ) : (
-                       <User className="w-5 h-5" />
-                     )}
-                  </div>
+                  <ContactAvatar 
+                    name={selectedChat.name} 
+                    avatar={selectedChat.avatar} 
+                    size="sm" 
+                    onClick={selectedChat.avatar ? () => setSelectedImage(selectedChat.avatar!) : undefined}
+                  />
                   {getOriginBadge(selectedChat.leadInfo?.source)}
                 </div>
                 <div>
@@ -3454,10 +3520,10 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                               src={msg.mediaUrl} 
                               isMe={msg.sender === "me"} 
                               avatar={msg.sender === "me" ? myAvatar : selectedChat?.avatar} 
+                              name={msg.sender === "me" ? (userProfile?.name || "Eu") : (selectedChat?.name || "Contato")}
                               msgTime={msg.time}
                               msgStatus={msg.status}
                             />
-                            
                             <div className="mt-1 flex flex-col gap-2">
                                 {msg.transcription && (
                                   <div className={cn(
