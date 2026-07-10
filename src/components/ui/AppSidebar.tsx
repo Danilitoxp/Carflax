@@ -474,10 +474,18 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-slate-800/50 dark:hover:text-slate-200",
                               )}
                             >
-                              <div className={cn(
-                                "w-1 h-1 rounded-full",
-                                activeItem === (sub.value || sub.label) ? "bg-primary" : "bg-muted-foreground/30"
-                              )} />
+                              {(sub.value || sub.label) === "Whatsapp Evolution" ? (
+                                <img 
+                                  src="https://meta-q.cdn.bubble.io/f1735656025985x589899456761148800/evolution-logo.png" 
+                                  alt="Evolution Logo" 
+                                  className="w-3.5 h-3.5 object-contain shrink-0" 
+                                />
+                              ) : (
+                                <div className={cn(
+                                  "w-1 h-1 rounded-full shrink-0",
+                                  activeItem === (sub.value || sub.label) ? "bg-primary" : "bg-muted-foreground/30"
+                                )} />
+                              )}
                               <span>{sub.label}</span>
                             </div>
                           ))}
