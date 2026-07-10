@@ -503,12 +503,12 @@ export const marketingService = {
 
   // Marca no lead que houve orçamento e guarda o valor total (à vista/PIX),
   // espelhando registerSale/valor_venda.
-  async registerOrcamento(remoteJid: string, value: number) {
+  async registerOrcamento(remoteJid: string, value: number, when?: string) {
     const { error } = await supabase
       .from("marketing_clientes")
       .update({
         valor_orcamento: value,
-        data_orcamento: new Date().toISOString(),
+        data_orcamento: when || new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq("remote_jid", remoteJid);
