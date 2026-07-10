@@ -5,7 +5,6 @@ import {
   Send, 
   CheckCheck, 
   User,
-  UserPlus,
   Check,
   Megaphone,
   Flame,
@@ -28,13 +27,14 @@ import {
   Smile,
   Printer,
   FolderDown,
-  CornerUpLeft
+  CornerUpLeft,
+  Eye
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { supabase } from "@/lib/supabase";
 import { marketingService } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
-import { apiDashboardProdutos, apiRegisterCliente, apiGetLinkPreview } from "@/lib/api";
+import { apiDashboardProdutos, apiGetLinkPreview } from "@/lib/api";
 import { transcribeAudio, classifyTemperature } from "@/lib/gemini-service";
 import { Package } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
@@ -99,6 +99,7 @@ interface Message {
   quotedSender?: "me" | "contact";
   editado?: boolean;
   linkPreview?: LinkPreview | null;
+  vendedorId?: string;
 }
 
 type Temperature = "Quente" | "Morno" | "Frio";
@@ -769,26 +770,17 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
   const [materialInput, setMaterialInput] = useState("");
   const [isEnteringMaterial, setIsEnteringMaterial] = useState(false);
   const [showTempDropdown, setShowTempDropdown] = useState(false);
-  const [showClientDrawer, setShowClientDrawer] = useState(false);
-  const [drawerClientName, setDrawerClientName] = useState("");
+  const [isNoteMode, setIsNoteMode] = useState(false);
   
   // Atribuição de atendente e resposta a mensagens
   const [operators, setOperators] = useState<{ id: string; name: string; avatar?: string }[]>([]);
   const [replyingMessage, setReplyingMessage] = useState<Message | null>(null);
 
   // ERP Autcom Required Fields
-  const [drawerClientNumeroDocumento, setDrawerClientNumeroDocumento] = useState("");
-  const [drawerClientTipoDocumento, setDrawerClientTipoDocumento] = useState<number>(2); // 1 = CNPJ, 2 = CPF
-  const [drawerClientCep, setDrawerClientCep] = useState("");
-  const [drawerClientEndereco, setDrawerClientEndereco] = useState("");
-  const [drawerClientNumero, setDrawerClientNumero] = useState("");
-  const [drawerClientBairro, setDrawerClientBairro] = useState("");
-  const [drawerClientCodigoAtividade, setDrawerClientCodigoAtividade] = useState("001");
-  const [drawerClientCodigoVendedor, setDrawerClientCodigoVendedor] = useState("991");
-  const [drawerClientEmailNfe, setDrawerClientEmailNfe] = useState("");
 
-  const [savingClient, setSavingClient] = useState(false);
-  
+
+
+
   const [saleValue, setSaleValue] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -2386,6 +2378,7 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
         quotedText: m.quoted_text,
         quotedSender: m.quoted_sender,
         linkPreview: m.link_preview ?? null,
+        vendedorId: m.vendedor_id,
       }));
 
       setMessages(msgs);
@@ -2439,6 +2432,7 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
         quotedText: m.quoted_text,
         quotedSender: m.quoted_sender,
         linkPreview: m.link_preview ?? null,
+        vendedorId: m.vendedor_id,
       }));
 
       // Preserva a posição do scroll ao inserir mensagens no topo
@@ -2582,278 +2576,49 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
       console.error("Erro ao registrar venda:", error);
     }
   };
-
-  const handleCepChange = async (val: string) => {
-    setDrawerClientCep(val);
-    const clean = val.replace(/\D/g, "");
-    if (clean.length === 8) {
-      try {
-        const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!data.erro) {
-            setDrawerClientEndereco(data.logradouro || "");
-            setDrawerClientBairro(data.bairro || "");
-          }
-        }
-      } catch (err) {
-        console.error("Erro ao buscar CEP:", err);
-      }
-    }
-  };
-
-  const handleSaveClientData = async () => {
-    if (!selectedChat || !drawerClientName.trim()) return;
+  const handleSendInternalNote = async () => {
+    if (!inputText.trim() || !selectedChat) return;
+    const noteText = inputText.trim();
+    setInputText("");
     
-    const cepClean = drawerClientCep.replace(/\D/g, "");
-    const docClean = drawerClientNumeroDocumento.replace(/\D/g, "");
+    const rawTimestamp = new Date().toISOString();
+    const noteMsgId = "note_" + Date.now();
     
-    // Todos os campos (exceto email) são obrigatórios para o ERP
-    const hasErpFields = !!(
-      drawerClientName.trim() &&
-      docClean &&
-      cepClean &&
-      drawerClientEndereco.trim() &&
-      drawerClientNumero.trim() &&
-      drawerClientBairro.trim() &&
-      drawerClientCodigoAtividade.trim() &&
-      drawerClientCodigoVendedor.trim()
-    );
-
-    if (!hasErpFields) {
-      showNotification("error", "Erro", "Por favor, preencha todos os campos obrigatórios (*).");
-      return;
-    }
-
-    setSavingClient(true);
+    const noteMsg: Message = {
+      id: noteMsgId,
+      text: noteText,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      rawTimestamp,
+      sender: "me",
+      status: "read",
+      tipo: "internal_note",
+      vendedorId: vendedorId,
+    };
+    
+    // Atualiza o estado da UI instantaneamente
+    setMessages(prev => [...prev, noteMsg]);
+    
+    // Salva permanentemente no Supabase usando a tabela de mensagens do marketing_whatsapp
     try {
-      const erpPayload = {
-        nome: drawerClientName.trim(),
-        numeroDocumento: docClean,
-        tipoDocumento: drawerClientTipoDocumento,
-        cep: cepClean,
-        endereco: drawerClientEndereco.trim(),
-        numero: drawerClientNumero.trim(),
-        bairro: drawerClientBairro.trim(),
-        codigoAtividade: drawerClientCodigoAtividade.trim(),
-        codigoVendedor: drawerClientCodigoVendedor.trim(),
-        emailNfe: drawerClientEmailNfe.trim() || "nfe@nfe.com.br",
-        telefoneCelular: selectedChat.id.split("@")[0]
-      };
-      
-      await apiRegisterCliente(erpPayload);
-      
-      showNotification("success", "Sucesso", "Cliente cadastrado com sucesso na Citel ERP!");
-      setShowClientDrawer(false);
-    } catch (err: unknown) {
-      console.error("[Autcom ERP Integration] Erro:", err);
-      const msg = err instanceof Error ? err.message : "Erro de resposta da API do ERP";
-      showNotification("error", "Erro ao cadastrar", msg);
-    } finally {
-      setSavingClient(false);
+      await marketingService.saveMessage({
+        message_id: noteMsgId,
+        remote_jid: selectedChat.id,
+        texto: noteText,
+        tipo: "internal_note",
+        sender: "me",
+        status: "read",
+        timestamp: rawTimestamp,
+        vendedor_id: vendedorId,
+      });
+    } catch (err) {
+      console.error("Erro ao salvar nota interna:", err);
     }
   };
+
 
   return (
     <div className="flex h-full bg-background overflow-hidden border border-border/50 rounded-2xl shadow-2xl m-4 relative">
       {/* Modals */}
-      {showClientDrawer && (
-        <>
-          <div 
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[90] animate-in fade-in duration-200" 
-            onClick={() => setShowClientDrawer(false)}
-          />
-          <div className="absolute inset-y-0 right-0 w-[420px] bg-card border-l border-border/80 shadow-2xl z-[95] flex flex-col transform transition-transform duration-300 animate-in slide-in-from-right-5">
-            <div className="p-5 border-b border-border/50 flex items-center justify-between bg-secondary/10">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                  <UserPlus className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-black text-xs uppercase tracking-tighter text-foreground">Ficha Cadastral ERP</h3>
-                  <p className="text-[9px] text-muted-foreground font-semibold">Preencha os dados de faturamento Autcom</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowClientDrawer(false)}
-                className="p-1 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
-              {/* Dados Requeridos pela API do ERP */}
-              <div className="space-y-3">
-                <h4 className="text-[9px] font-black text-primary uppercase tracking-widest border-b border-border/30 pb-1">Dados Cadastrais ERP (Autcom)</h4>
-                
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
-                    Razão Social / Nome Completo <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={drawerClientName}
-                    onChange={(e) => setDrawerClientName(e.target.value)}
-                    placeholder="Nome ou Razão Social"
-                    required
-                    className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1 col-span-1">
-                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
-                      Tipo Doc. <span className="text-rose-500">*</span>
-                    </label>
-                    <select
-                      value={drawerClientTipoDocumento}
-                      onChange={(e) => setDrawerClientTipoDocumento(Number(e.target.value))}
-                      className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors cursor-pointer"
-                    >
-                      <option value={2}>CPF</option>
-                      <option value={1}>CNPJ</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1 col-span-2">
-                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
-                      CPF / CNPJ <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={drawerClientNumeroDocumento}
-                      onChange={(e) => setDrawerClientNumeroDocumento(e.target.value)}
-                      placeholder={drawerClientTipoDocumento === 1 ? "00.000.000/0000-00" : "000.000.000-00"}
-                      required
-                      className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1 col-span-1">
-                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
-                      CEP <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={drawerClientCep}
-                      onChange={(e) => handleCepChange(e.target.value)}
-                      placeholder="00000-000"
-                      required
-                      className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
-                    />
-                  </div>
-                  <div className="space-y-1 col-span-2">
-                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
-                      Endereço / Logradouro <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={drawerClientEndereco}
-                      onChange={(e) => setDrawerClientEndereco(e.target.value)}
-                      placeholder="Av / Rua"
-                      required
-                      className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1 col-span-1">
-                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
-                      Número <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={drawerClientNumero}
-                      onChange={(e) => setDrawerClientNumero(e.target.value)}
-                      placeholder="Ex: 123"
-                      required
-                      className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
-                    />
-                  </div>
-                  <div className="space-y-1 col-span-2">
-                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
-                      Bairro <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={drawerClientBairro}
-                      onChange={(e) => setDrawerClientBairro(e.target.value)}
-                      placeholder="Nome do Bairro"
-                      required
-                      className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
-                    Cód. Atividade <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={drawerClientCodigoAtividade}
-                    onChange={(e) => setDrawerClientCodigoAtividade(e.target.value)}
-                    className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors cursor-pointer"
-                  >
-                    <option value="001">001 - CPF</option>
-                    <option value="002">002 - INDUSTRIA</option>
-                    <option value="003">003 - REVENDA</option>
-                    <option value="004">004 - INSTALADOR</option>
-                    <option value="005">005 - A DEFINIR</option>
-                    <option value="006">006 - COMÉRCIO</option>
-                    <option value="007">007 - CONSTRUTORA</option>
-                    <option value="008">008 - IGREJA</option>
-                    <option value="009">009 - POSTO DE COMBUSTIVEL</option>
-                    <option value="010">010 - CONDOMINIO</option>
-                    <option value="011">011 - HOSPITAL</option>
-                    <option value="012">012 - SHOPPING</option>
-                    <option value="013">013 - LOGÍSTICA</option>
-                    <option value="014">014 - TRANSPORTADORA</option>
-                    <option value="015">015 - SERVIÇO PRESTADO</option>
-                    <option value="016">016 - E-COMMERCE</option>
-                    <option value="017">017 - ELETRICISTA</option>
-                    <option value="018">018 - ENCANADOR</option>
-                    <option value="019">019 - ENGENHEIRO</option>
-                    <option value="020">020 - ARQUITETO</option>
-                    <option value="999">999 - ALTERAR URGENTE</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
-                    E-mail NFe
-                  </label>
-                  <input
-                    type="email"
-                    value={drawerClientEmailNfe}
-                    onChange={(e) => setDrawerClientEmailNfe(e.target.value)}
-                    placeholder="email@dominio.com"
-                    className="w-full bg-secondary/50 border border-border rounded-xl px-3.5 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-colors"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5 border-t border-border/50 flex gap-2.5 bg-secondary/5">
-              <button
-                onClick={() => setShowClientDrawer(false)}
-                className="flex-1 py-2.5 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs rounded-xl border border-border transition-all"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveClientData}
-                disabled={savingClient || !drawerClientName.trim()}
-                className="flex-1 py-2.5 bg-primary text-primary-foreground font-black text-xs rounded-xl hover:opacity-90 transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {savingClient ? "Salvando..." : "Salvar"}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
 
       {showFollowUpModal && (
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -3430,30 +3195,6 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
                     <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-500 rounded-full animate-pulse" />
                   )}
                 </button>
-                <button
-                  onClick={() => {
-                    setDrawerClientName(selectedChat.name || "");
-                    
-                    // ERP Autcom (sem gravação no Supabase, envia direto ao ERP)
-                    setDrawerClientNumeroDocumento("");
-                    setDrawerClientTipoDocumento(2);
-                    setDrawerClientCep("");
-                    setDrawerClientEndereco("");
-                    setDrawerClientNumero("");
-                    setDrawerClientBairro("");
-                    setDrawerClientCodigoAtividade("001");
-                    
-                    setDrawerClientCodigoVendedor("991");
-                    
-                    setDrawerClientEmailNfe("");
-                    
-                    setShowClientDrawer(true);
-                  }}
-                  className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground hover:text-primary transition-all relative"
-                  title="Dados do Cliente"
-                >
-                  <UserPlus className="w-4 h-4" />
-                </button>
                 <button onClick={()=>setShowSaleModal(true)} className={cn("p-2.5 hover:bg-secondary rounded-xl transition-colors", selectedChat.leadInfo?.saleValue ? "text-emerald-500" : "text-muted-foreground")}><DollarSign className="w-4 h-4"/></button>
                 
                 {viewMode === "active" ? (
@@ -3519,8 +3260,7 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
                         onClick={loadMoreMessages}
                         className="text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors py-1"
                       >
-                        Carregar mensagens anteriores
-                      </button>
+</button>
                     </div>
                   )}
                   {messages.map((msg, idx) => {
@@ -3532,6 +3272,46 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
                     const previousMsg = messages[idx - 1];
                     const previousDateFormatted = previousMsg ? getFormattedMessageDate(previousMsg.rawTimestamp) : "";
                     const showDateDivider = currentDateFormatted && currentDateFormatted !== previousDateFormatted;
+
+                    if (msg.tipo === "internal_note") {
+                      const op = operators.find(o => o.id === msg.vendedorId);
+                      const senderName = op ? op.name : (msg.vendedorId === userProfile?.id ? (userProfile?.name || "Atendente") : "Atendente");
+                      const senderFirstName = senderName.split(" ")[0];
+                      const senderAvatar = op?.avatar || (msg.vendedorId === userProfile?.id ? myAvatar : undefined);
+                      const senderInitial = senderName.charAt(0).toUpperCase();
+
+                      return (
+                        <Fragment key={msg.id}>
+                          {showDateDivider && (
+                            <div className="flex justify-center my-4 select-none">
+                              <span className="bg-secondary/80 text-[10px] font-black uppercase tracking-widest text-muted-foreground px-3 py-1 rounded-lg border border-border/50 shadow-sm backdrop-blur-sm">
+                                {currentDateFormatted}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-center my-3 px-4 animate-in fade-in slide-in-from-bottom-1 duration-200 select-none">
+                            <div className="max-w-[85%] bg-amber-500/10 border border-amber-500/20 rounded-2xl px-5 py-2.5 text-center shadow-sm backdrop-blur-sm flex flex-col items-center gap-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-4.5 h-4.5 rounded-full overflow-hidden shrink-0 border border-amber-500/30">
+                                  {senderAvatar ? (
+                                    <img src={senderAvatar} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full bg-amber-500 flex items-center justify-center text-white text-[8px] font-black">
+                                      {senderInitial}
+                                    </div>
+                                  )}
+                                </div>
+                                <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1">
+                                  <Eye className="w-3 h-3 text-amber-500" /> Nota Interna · {senderFirstName}
+                                </span>
+                              </div>
+                              <p className="text-xs text-amber-700 dark:text-amber-300 font-semibold leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                              <span className="text-[8px] text-amber-500/50">{msg.time}</span>
+                            </div>
+                          </div>
+                        </Fragment>
+                      );
+                    }
 
                     return (
                     <Fragment key={msg.id}>
@@ -4192,36 +3972,71 @@ export function WhatsappView({ vendedorId, userProfile }: { vendedorId?: string;
                   >
                     <Paperclip className="w-5 h-5"/>
                   </button>
+                  <button
+                    onClick={() => { setIsNoteMode(p => !p); setInputText(""); }}
+                    className={cn(
+                      "p-2.5 rounded-xl transition-all",
+                      isNoteMode ? "bg-amber-500/15 text-amber-500 border border-amber-500/30" : "hover:bg-secondary text-muted-foreground"
+                    )}
+                    title="Anotação interna (visível apenas para atendentes)"
+                  >
+                    <Eye className="w-5 h-5"/>
+                  </button>
 
                   <input 
                     type="text" 
                     value={inputText} 
                     onChange={(e) => {
                       let val = e.target.value;
-                      const trimmed = val.trim().toLowerCase();
-                      if (trimmed === "/info") {
-                        val = "- Para quando precisa do material?\n- Endereço da Obra (com CEP)\n- Dados para cadastro\n- Metodo do pagamento\n\nObs: em caso de Pessoa Fisica, irei precisar do nome completo, CPF, endereço com o CEP. \nJá em Pessoa Juridica encaminhar a ficha cadastral, por gentileza.";
-                      } else if (trimmed === "/bom") {
-                        const hr = new Date().getHours();
-                        const greeting = hr < 12 ? "Bom dia" : "Boa tarde";
-                        const attendantName = (userProfile?.name || "Consultora Comercial").split(" ")[0];
-                        val = `${greeting}, tudo bem? \nPrazer, sou ${attendantName} da Carflax. \n\nComo posso te ajudar?`;
-                      } else if (trimmed === "/nao") {
-                        val = "Infelizmente, não trabalhamos com esse material. Somos especialistas em materiais hidráulicos e elétricos. Se precisar de algum produto dessas linhas, será um prazer ajudar!";
+                      if (!isNoteMode) {
+                        const trimmed = val.trim().toLowerCase();
+                        if (trimmed === "/info") {
+                          val = "- Para quando precisa do material?\n- Endereço da Obra (com CEP)\n- Dados para cadastro\n- Metodo do pagamento\n\nObs: em caso de Pessoa Fisica, irei precisar do nome completo, CPF, endereço com o CEP. \nJá em Pessoa Juridica encaminhar a ficha cadastral, por gentileza.";
+                        } else if (trimmed === "/bom") {
+                          const hr = new Date().getHours();
+                          const greeting = hr < 12 ? "Bom dia" : "Boa tarde";
+                          const attendantName = (userProfile?.name || "Consultora Comercial").split(" ")[0];
+                          val = `${greeting}, tudo bem? \nPrazer, sou ${attendantName} da Carflax. \n\nComo posso te ajudar?`;
+                        } else if (trimmed === "/nao") {
+                          val = "Infelizmente, não trabalhamos com esse material. Somos especialistas em materiais hidráulicos e elétricos. Se precisar de algum produto dessas linhas, será um prazer ajudar!";
+                        }
                       }
                       setInputText(val);
                     }} 
-                    onKeyDown={(e)=>e.key === "Enter" && (pendingFile ? confirmSendFile() : handleSendMessage())} 
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        if (isNoteMode) {
+                          handleSendInternalNote();
+                        } else {
+                          if (pendingFile) { confirmSendFile(); } else { handleSendMessage(); }
+                        }
+                      }
+                    }}
                     onPaste={handlePaste}
-                    placeholder={pendingFile ? "Adicione uma legenda..." : "Responda agora..."} 
-                    className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-all" 
+                    placeholder={isNoteMode ? "✏️ Anotação interna (não enviada ao cliente)..." : pendingFile ? "Adicione uma legenda..." : "Responda agora..."} 
+                    className={cn(
+                      "flex-1 border rounded-xl px-4 py-2.5 text-sm outline-none transition-all",
+                      isNoteMode 
+                        ? "bg-amber-500/5 border-amber-500/30 focus:border-amber-500/60 text-amber-700 dark:text-amber-300 placeholder:text-amber-500/50"
+                        : "bg-background border-border focus:border-primary/50"
+                    )}
                   />
                   <button 
-                    onClick={pendingFile ? confirmSendFile : handleSendMessage} 
-                    className="w-11 h-11 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all"
+                    onClick={() => {
+                      if (isNoteMode) {
+                        handleSendInternalNote();
+                      } else {
+                        if (pendingFile) { confirmSendFile(); } else { handleSendMessage(); }
+                      }
+                    }}
+                    className={cn(
+                      "w-11 h-11 rounded-xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all",
+                      isNoteMode ? "bg-amber-500 text-white shadow-amber-500/20" : "bg-primary text-white"
+                    )}
                   >
-                    <Send className={cn("w-5 h-5", pendingFile && "animate-pulse")} />
+                    {isNoteMode ? <Eye className="w-5 h-5"/> : <Send className={cn("w-5 h-5", pendingFile && "animate-pulse")} />}
                   </button>
+
                 </div>
               </div>
             </div>
