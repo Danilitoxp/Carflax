@@ -4046,11 +4046,11 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                       let val = e.target.value;
                       const trimmed = val.trim().toLowerCase();
                       if (trimmed === "/info") {
-                        val = "Só preciso de algumas informações \n\n* para quando precisa do matéria?\n* endereço da obra?\n* dados para cadastro";
+                        val = "- Para quando precisa do material?\n- Endereço da Obra (com CEP)\n- Dados para cadastro\n- Metodo do pagamento\n\nObs: em caso de Pessoa Fisica, irei precisar do nome completo, CPF, endereço com o CEP. \nJá em Pessoa Juridica encaminhar a ficha cadastral, por gentileza.";
                       } else if (trimmed === "/bom") {
                         const hr = new Date().getHours();
                         const greeting = hr < 12 ? "Bom dia" : "Boa tarde";
-                        val = `${greeting}, como posso te ajudar?`;
+                        val = `${greeting}, tudo bem? \nPrazer, sou a Ingryd Consultora Comercial da Carflax. \n\nComo posso te ajudar?`;
                       }
                       setInputText(val);
                     }} 
