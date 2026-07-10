@@ -712,6 +712,9 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedChatRef = useRef<Chat | null>(null);
+  // Trava a conversa-alvo de uma ação (arquivar) pelo ID, para que a reordenação
+  // da lista por novas mensagens não faça a ação cair na conversa errada.
+  const archiveTargetRef = useRef<Chat | null>(null);
   const viewModeRef = useRef<"active" | "archived">("active");
   const lastPhoneJid = useRef<string | null>(null);
   const lidToJidMap = useRef<Map<string, string>>(new Map());
@@ -741,6 +744,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
     if (!showArchiveModal) {
       setCustomArchiveReason("");
       setIsEnteringCustomReason(false);
+      // Fechou o modal (sem confirmar ou já confirmado): descarta a trava do alvo.
+      archiveTargetRef.current = null;
     }
   }, [showArchiveModal]);
 
@@ -1025,16 +1030,40 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
     );
   };
 
+  const handleMarkUnread = (chat: Chat) => {
+    // Trava o alvo pelo ID: mesmo que a lista reordene por novas mensagens, a marcação
+    // atinge a conversa clicada, e nunca a que estiver aberta no momento.
+    const targetId = chat.id;
+    const newCount = chat.unreadCount > 0 ? chat.unreadCount : 1;
+    setContextMenu(null);
+
+    // Atualiza a UI imediatamente
+    setChats(prev => prev.map(c => c.id === targetId ? { ...c, unreadCount: newCount } : c));
+    // Se a conversa marcada estiver aberta, fecha para não "re-ler" na hora
+    if (selectedChatRef.current?.id === targetId) setSelectedChat(null);
+
+    // Persiste em segundo plano
+    marketingService.markAsUnread(targetId, newCount).catch(err =>
+      console.error("Erro ao marcar como não lido:", err)
+    );
+  };
+
   const handleArchiveChat = async (reason?: string) => {
-    const chatToArchive = contextMenu?.chat || selectedChat;
+    // Usa a referência travada no momento em que a ação foi iniciada (abertura do
+    // modal / clique no menu). Só cai para contextMenu/selectedChat se não houver
+    // trava, evitando arquivar a conversa errada quando a lista reordena.
+    const chatToArchive = archiveTargetRef.current || contextMenu?.chat || selectedChat;
     if (!chatToArchive) return;
 
-    setChats(prev => prev.map(c => c.id === chatToArchive.id ? { ...c, arquivado: true } : c));
-    if (selectedChat?.id === chatToArchive.id) setSelectedChat(null);
+    const targetId = chatToArchive.id;
+    archiveTargetRef.current = null;
+
+    setChats(prev => prev.map(c => c.id === targetId ? { ...c, arquivado: true } : c));
+    if (selectedChatRef.current?.id === targetId) setSelectedChat(null);
     setShowArchiveModal(false);
     setContextMenu(null);
 
-    marketingService.toggleArchived(chatToArchive.id, true, reason).catch(err =>
+    marketingService.toggleArchived(targetId, true, reason).catch(err =>
       console.error("Erro ao arquivar chat:", err)
     );
   };
@@ -3274,8 +3303,8 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
                 <button onClick={()=>setShowSaleModal(true)} className={cn("p-2.5 hover:bg-secondary rounded-xl transition-colors", selectedChat.leadInfo?.saleValue ? "text-emerald-500" : "text-muted-foreground")}><DollarSign className="w-4 h-4"/></button>
                 
                 {viewMode === "active" ? (
-                  <button 
-                    onClick={() => setShowArchiveModal(true)} 
+                  <button
+                    onClick={() => { archiveTargetRef.current = selectedChat; setShowArchiveModal(true); }}
                     className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground hover:text-rose-500 transition-colors"
                     title="Arquivar Conversa"
                   >
@@ -4066,10 +4095,20 @@ export function WhatsappView({ vendedorId }: { vendedorId?: string; userProfile?
               <><Pin className="w-4 h-4 text-primary" /> Fixar Conversa</>
             )}
           </button>
-          
-          <button 
+
+          <button
+            onClick={() => handleMarkUnread(contextMenu.chat)}
+            className="w-full px-4 py-2 text-left text-xs font-bold hover:bg-secondary flex items-center gap-3 transition-colors"
+          >
+            <Bell className="w-4 h-4 text-emerald-500" /> Marcar como não lido
+          </button>
+
+          <button
             onClick={() => {
               if (viewMode === "active") {
+                // Trava a conversa clicada antes de limpar o menu, pois o modal
+                // pede o motivo de forma assíncrona e o contextMenu vira null.
+                archiveTargetRef.current = contextMenu.chat;
                 setContextMenu(null);
                 setShowArchiveModal(true);
               } else {

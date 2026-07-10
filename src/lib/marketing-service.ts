@@ -265,6 +265,17 @@ export const marketingService = {
     }
   },
 
+  async markAsUnread(remoteJid: string, count = 1) {
+    const { error } = await supabase
+      .from("marketing_clientes")
+      .update({ mensagens_nao_lidas: count, updated_at: new Date().toISOString() })
+      .eq("remote_jid", remoteJid);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao marcar como não lido:", error.message);
+    }
+  },
+
   async updateMessageStatus(messageId: string, status: string) {
     // Usa upsert via message_id para evitar CORS com PATCH em alguns ambientes
     const { data: existing } = await supabase
