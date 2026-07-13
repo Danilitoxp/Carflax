@@ -1149,7 +1149,7 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
     }
 
     return result;
-  }, [orçamentosData, searchTerm, filterStatus, filterSeller, filterReason, startDate, endDate, sortConfig]);
+  }, [orçamentosData, searchTerm, filterStatus, filterSeller, filterReason, startDate, endDate, sortConfig, teamOptions]);
 
   // ── Insights (calculados dos dados reais) ───────────────────────────────
   const visibleProducts = useMemo(() => {
@@ -1166,10 +1166,19 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
       acc[o.status] = (acc[o.status] || 0) + o.totalValue;
       return acc;
     }, {});
-    // Usar dados reais de faturamento (VW_FATURAMENTO) quando disponíveis
-    const vendas = faturamento ? Number(faturamento.QTD_VENDAS) || 0 : (statusCounts["VENDA"] || 0);
-    const vendasValor = faturamento ? Number(faturamento.TOTAL_VENDIDO) || 0 : (statusValues["VENDA"] || 0);
-    if (faturamento) {
+    // Usar dados reais de faturamento (VW_FATURAMENTO) quando disponíveis E não-zero.
+    // Se a API retornar 0 mas já temos orçamentos com VENDA na lista filtrada,
+    // usamos os dados locais como fallback (ex.: supervisores com filtro de time).
+    const localVendas = statusCounts["VENDA"] || 0;
+    const localVendasValor = statusValues["VENDA"] || 0;
+    const fatQtd = faturamento ? Number(faturamento.QTD_VENDAS) || 0 : 0;
+    const fatValor = faturamento ? Number(faturamento.TOTAL_VENDIDO) || 0 : 0;
+    // Usa faturamento somente quando ele traz dados reais (QTD > 0 ou VALOR > 0).
+    // Caso contrário, cai para os valores da lista filtrada.
+    const useFaturamento = faturamento != null && (fatQtd > 0 || fatValor > 0);
+    const vendas = useFaturamento ? fatQtd : localVendas;
+    const vendasValor = useFaturamento ? fatValor : localVendasValor;
+    if (useFaturamento) {
       statusCounts["VENDA"] = vendas;
       statusValues["VENDA"] = vendasValor;
     }
