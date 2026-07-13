@@ -113,7 +113,7 @@ export function RetiradaView({ userProfile }: { userProfile?: { name: string } }
   }, [erpPedidos, supabaseRetiradas]);
 
   // Ações
-  const handleAvisarGerente = async (pedido: RetiradaPedido) => {
+  const handleAvisarEstoque = async (pedido: RetiradaPedido) => {
     const operator = userProfile?.name || "Operador";
     const data: Omit<RetiradaState, "id"> = {
       pedido: pedido.pedido,
@@ -132,7 +132,7 @@ export function RetiradaView({ userProfile }: { userProfile?: { name: string } }
 
       if (error) throw error;
     } catch (err) {
-      console.error("Erro ao avisar gerente:", err);
+      console.error("Erro ao avisar estoque:", err);
     }
   };
 
@@ -485,11 +485,11 @@ export function RetiradaView({ userProfile }: { userProfile?: { name: string } }
                     <div className="pt-2">
                       {isWaiting && (
                         <button
-                          onClick={() => handleAvisarGerente(pedido)}
+                          onClick={() => handleAvisarEstoque(pedido)}
                           className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-md shadow-amber-500/15 flex items-center justify-center space-x-1.5 transition-all hover:shadow-lg"
                         >
                           <PlayCircle className="w-4 h-4" />
-                          <span>Avisar Gerente (Chegou)</span>
+                          <span>Avisar Estoque (Chegou)</span>
                         </button>
                       )}
 
