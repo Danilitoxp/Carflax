@@ -58,9 +58,12 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: "Coletor",
-    permGroup: "LOGÍSTICA",
-    subItems: [{ label: "Painel Coletor" }],
+    label: "Estoque",
+    permGroup: "ESTOQUE",
+    subItems: [
+      { label: "Separação" },
+      { label: "Conferência" },
+    ],
   },
   {
     label: "Entregas",
@@ -89,7 +92,7 @@ function buildPermissionGroups() {
   const map = new Map<string, string[]>();
 
   // Define group order
-  const ORDER = ["COMERCIAL", "MARKETING", "LOGÍSTICA", "GESTÃO & ADMIN"];
+  const ORDER = ["COMERCIAL", "MARKETING", "ESTOQUE", "LOGÍSTICA", "GESTÃO & ADMIN"];
   ORDER.forEach(g => map.set(g, []));
 
   NAV_SECTIONS.forEach(section => {
@@ -147,7 +150,7 @@ const PUBLIC_SECTIONS = [
   "Dashboard", "Geral", "Produtos",
   "Calendário", "Eventos", "Férias",
   "Esteira", "Minha Esteira", "Sugestões",
-  "Organograma", "Coletor", "Painel Coletor",
+  "Organograma", "Estoque", "Separação", "Conferência",
   "Relatórios", "Relatórios Mkt",
 ];
 

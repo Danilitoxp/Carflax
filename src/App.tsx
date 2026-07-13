@@ -26,6 +26,7 @@ import { SugestoesAdminView } from "@/components/admin/SugestoesAdminView";
 import { ScrumView } from "@/components/scrum/ScrumView";
 import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 import { ColetorView } from "@/components/coletor/ColetorView";
+import { SeparacaoView, ConferenciaView } from "@/components/estoque/ExpedicaoView";
 import { EntregasView } from "@/components/entregas";
 import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
 import { UsersView } from "@/components/users/UsersView";
@@ -1268,6 +1269,10 @@ function DashboardContent({
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <ColetorView />
             </div>
+          ) : activeItem === "Separação" ? (
+            <SeparacaoView />
+          ) : activeItem === "Conferência" ? (
+            <ConferenciaView />
           ) : activeItem === "Usuários" ? (
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <UsersView />

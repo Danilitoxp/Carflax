@@ -30,6 +30,9 @@ import {
   Kanban,
   MessageSquare,
   Wallet,
+  Warehouse,
+  PackageCheck,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -74,8 +77,11 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Leads: Users,
   Cronograma: Calendar,
   Esteira: Kanban,
+  Estoque: Warehouse,
   Coletor: Smartphone,
-  "Painel Coletor": LayoutGrid,
+  "Painel Coletor": Smartphone,
+  "Separação": PackageCheck,
+  "Conferência": ClipboardCheck,
   Entregas: Truck,
   Romaneios: FileText,
   Scrum: Kanban,

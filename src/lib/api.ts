@@ -646,3 +646,50 @@ export interface HistoricoClienteResponse {
 
 export const apiHistoricoCliente = (clienteId: string) =>
   get<HistoricoClienteResponse>(`/api/crm/historico-cliente?cliente=${encodeURIComponent(clienteId)}`);
+
+// ── Expedição: Separação e Conferência ───────────────────────────────────────
+export interface ExpedicaoItem {
+  pedido: string;
+  empresa: string;
+  cod_cliente: string;
+  cliente: string;
+  operador: string;
+  qtd_sku: number;
+  hora_inicio: string | null;
+  hora_fim: string | null;
+  tempo_seg: number | null;
+}
+
+export interface ExpedicaoOperador {
+  operador: string;
+  qtd: number;
+  media_seg: number;
+}
+
+export interface ExpedicaoEvolucao {
+  dia: string;
+  qtd: number;
+  media_seg: number;
+}
+
+export interface ExpedicaoLocal {
+  local: string;
+  qtd: number;
+  media_seg: number;
+}
+
+export interface ExpedicaoResponse {
+  gerado_em: string;
+  etapa: "separacao" | "conferencia";
+  media_hoje_seg: number;
+  total_hoje: number;
+  media_mes_seg: number;
+  total_mes: number;
+  por_operador: ExpedicaoOperador[];
+  por_local: ExpedicaoLocal[];
+  evolucao: ExpedicaoEvolucao[];
+  lista: ExpedicaoItem[];
+}
+
+export const apiSeparacao = () => get<ExpedicaoResponse>("/api/estoque/separacao");
+export const apiConferencia = () => get<ExpedicaoResponse>("/api/estoque/conferencia");
