@@ -26,6 +26,7 @@ import {
   Trophy,
   CircleSlash,
   GitCommitVertical,
+  CheckCircle2,
 } from "lucide-react";
 import {
   ResponsiveContainer,
