@@ -21,6 +21,7 @@ import { apiCarteira, type CarteiraResponse, type CarteiraCliente } from "@/lib/
 import { Skeleton } from "@/components/ui/Skeleton";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 import { fmtBRL, fmtData } from "../clientes/frv-utils";
+import { supabase } from "@/lib/supabase";
 
 // ── Config ───────────────────────────────────────────────────────────────────
 const NOW = new Date();
@@ -221,6 +222,7 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
     dir: "desc",
   });
   const [cliPage, setCliPage] = useState(1);
+  const [avatarsMap, setAvatarsMap] = useState<Record<string, string>>({});
 
   // Admin/gestor vê todos os vendedores + filtro; vendedor comum vê só a própria carteira
   const isAdmin =
@@ -248,6 +250,30 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Carrega fotos/avatars de perfil de todos os vendedores do banco de dados (Supabase)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("operator_code, avatar")
+        .not("avatar", "is", null);
+      if (error) {
+        console.error("[CarteiraView] Erro ao carregar avatars dos vendedores:", error);
+      }
+      if (cancelled || !data) return;
+      const map: Record<string, string> = {};
+      data.forEach((u) => {
+        const code = normCod(u.operator_code);
+        if (code && u.avatar) {
+          map[code] = u.avatar;
+        }
+      });
+      setAvatarsMap(map);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Agrupa clientes por vendedor
   const carteiras = useMemo<Carteira[]>(() => {
@@ -499,6 +525,13 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
                 <ArrowLeft className="w-4 h-4" />
               </button>
             )}
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden shrink-0 border border-primary/10">
+              {avatarsMap[normCod(carteiraSel.cod)] ? (
+                <img src={avatarsMap[normCod(carteiraSel.cod)]} alt={carteiraSel.nome} className="w-full h-full object-cover" />
+              ) : (
+                <UserSquare2 className="w-5 h-5 text-primary" />
+              )}
+            </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded uppercase tracking-wider">Cód. {carteiraSel.cod}</span>
@@ -699,8 +732,12 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
                 >
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/10">
-                        <UserSquare2 className="w-4 h-4 text-primary" />
+                      <div className="w-9 h-9 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/10 overflow-hidden">
+                        {avatarsMap[normCod(v.cod)] ? (
+                          <img src={avatarsMap[normCod(v.cod)]} alt={v.nome} className="w-full h-full object-cover" />
+                        ) : (
+                          <UserSquare2 className="w-4 h-4 text-primary" />
+                        )}
                       </div>
                       <div className="min-w-0">
                         <p className="font-black text-foreground leading-tight truncate group-hover:text-primary transition-colors">{v.nome}</p>
