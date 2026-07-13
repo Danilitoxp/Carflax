@@ -35,10 +35,10 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Comercial",
     permGroup: "COMERCIAL",
     subItems: [
+      { label: "Minha Carteira", value: "Carteira" },
       { label: "Orçamentos" },
       { label: "Meus Pedidos" },
       { label: "Análise FRV" },
-      { label: "Carteira" },
       { label: "Prospecções" },
       { label: "Campanhas" },
       { label: "Alugueis" },

@@ -570,6 +570,7 @@ export interface CarteiraCliente {
   pedidos_mes: number;
   valor_mes: number;
   margem_mes: number;
+  telefone_cliente?: string | null;
 }
 
 export interface CarteiraResponse {
