@@ -571,6 +571,10 @@ export interface CarteiraCliente {
   valor_mes: number;
   margem_mes: number;
   telefone_cliente?: string | null;
+  orc_total?: number; // orçamentos do mês
+  orc_fechados?: number; // orçamentos convertidos em pedido
+  orc_valor_total?: number; // R$ orçado
+  orc_valor_fechado?: number; // R$ convertido
 }
 
 export interface CarteiraResponse {

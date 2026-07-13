@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { apiCarteira, apiTransferirCliente, type CarteiraResponse, type CarteiraCliente } from "@/lib/api";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
-import { fmtBRL, fmtData } from "../clientes/frv-utils";
+import { fmtBRL, fmtBRLCompact, fmtData } from "../clientes/frv-utils";
 import { supabase } from "@/lib/supabase";
 
 // ── Config ───────────────────────────────────────────────────────────────────
@@ -62,7 +62,12 @@ interface Carteira {
 }
 
 type VendSortKey = "nome" | "numClientes" | "valorTotal" | "margemTotal" | "pedidos";
-type CliSortKey = "nome_cliente" | "valor_mes" | "margem_mes" | "pedidos_mes" | "recencia_dias";
+type CliSortKey = "nome_cliente" | "valor_mes" | "conversao" | "pedidos_mes" | "recencia_dias";
+
+// Taxa de conversão de orçamentos (fechados/total). -1 quando não há orçamentos,
+// para clientes sem orçamento irem ao fim na ordenação decrescente.
+const taxaConversao = (c: CarteiraCliente) =>
+  c.orc_total && c.orc_total > 0 ? (c.orc_fechados || 0) / c.orc_total : -1;
 
 const getRecenciaDias = (ultimaCompra: string | null) => {
   if (!ultimaCompra) return Infinity;
@@ -406,6 +411,7 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
         const bDays = getRecenciaDias(b.ultima_compra);
         return (aDays - bDays) * mult;
       }
+      if (key === "conversao") return (taxaConversao(a) - taxaConversao(b)) * mult;
       return (((a[key] as number) || 0) - ((b[key] as number) || 0)) * mult;
     });
   }, [carteiraSel, buscaCli, cliSort]);
@@ -468,6 +474,38 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
       <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-black border tracking-wider", color)}>
         {pct.toFixed(1).replace(".", ",")}%
       </span>
+    );
+  };
+
+  // Helper para renderizar a conversão de orçamentos (quantidade + valor)
+  const renderConversao = (c: CarteiraCliente) => {
+    const total = c.orc_total || 0;
+    if (total === 0) {
+      return (
+        <div className="inline-flex flex-col items-end gap-0.5">
+          <span className="font-black text-muted-foreground/50 tabular-nums">0/0</span>
+          <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-wider">sem orçamento</span>
+        </div>
+      );
+    }
+    const fechados = c.orc_fechados || 0;
+    const pct = (fechados / total) * 100;
+    let color = "text-rose-500 bg-rose-500/10 border-rose-500/20";
+    if (pct >= 60) color = "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
+    else if (pct >= 30) color = "text-amber-500 bg-amber-500/10 border-amber-500/20";
+
+    return (
+      <div className="inline-flex flex-col items-end gap-0.5">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="font-black text-foreground tabular-nums">{total}/{fechados}</span>
+          <span className={cn("px-1.5 py-0.5 rounded-md text-[10px] font-black border tracking-wider", color)}>
+            {pct.toFixed(0)}%
+          </span>
+        </span>
+        <span className="text-[9px] font-bold text-muted-foreground tabular-nums">
+          {fmtBRLCompact(c.orc_valor_total || 0)} / {fmtBRLCompact(c.orc_valor_fechado || 0)}
+        </span>
+      </div>
     );
   };
 
@@ -620,10 +658,7 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
                     <SortHeader label="Faturamento" active={cliSort.key === "valor_mes"} direction={cliSort.dir} onClick={() => toggleCliSort("valor_mes")} className="justify-end" />
                   </th>
                   <th className="text-right px-5 py-3.5 hidden md:table-cell">
-                    <SortHeader label="Margem" active={cliSort.key === "margem_mes"} direction={cliSort.dir} onClick={() => toggleCliSort("margem_mes")} className="justify-end" />
-                  </th>
-                  <th className="text-right px-5 py-3.5 hidden sm:table-cell">
-                    <SortHeader label="Pedidos" active={cliSort.key === "pedidos_mes"} direction={cliSort.dir} onClick={() => toggleCliSort("pedidos_mes")} className="justify-end" />
+                    <SortHeader label="Conversão" active={cliSort.key === "conversao"} direction={cliSort.dir} onClick={() => toggleCliSort("conversao")} className="justify-end" />
                   </th>
                   <th className="text-right px-5 py-3.5">
                     <SortHeader label="Recência" active={cliSort.key === "recencia_dias"} direction={cliSort.dir} onClick={() => toggleCliSort("recencia_dias")} className="justify-end" />
@@ -637,7 +672,6 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
               </thead>
               <tbody className="divide-y divide-border/65">
                 {clientesPagina.map((c) => {
-                  const margemClientePct = c.valor_mes > 0 ? (c.margem_mes / c.valor_mes) * 100 : 0;
                   return (
                     <tr key={c.cliente_id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-5 py-4">
@@ -659,12 +693,8 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
                       </td>
                       <td className="px-5 py-4 text-right font-black text-foreground tabular-nums">{fmtBRL(c.valor_mes)}</td>
                       <td className="px-5 py-4 text-right tabular-nums hidden md:table-cell">
-                        <div className="inline-flex flex-col items-end gap-0.5">
-                          <span className="font-bold text-foreground">{fmtBRL(c.margem_mes)}</span>
-                          {renderMarginBadge(margemClientePct)}
-                        </div>
+                        {renderConversao(c)}
                       </td>
-                      <td className="px-5 py-4 text-right tabular-nums hidden sm:table-cell font-bold text-muted-foreground">{c.pedidos_mes}</td>
                       <td className="px-5 py-4 text-right tabular-nums">
                         <div className="inline-flex flex-col items-end gap-1">
                           {renderRecenciaBadge(c.ultima_compra)}
@@ -687,7 +717,7 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
                 })}
                 {clientesSel.length === 0 && (
                   <tr>
-                    <td colSpan={isAdmin ? 7 : 6} className="px-5 py-16 text-center text-xs font-bold text-muted-foreground uppercase tracking-widest bg-muted/5">
+                    <td colSpan={isAdmin ? 6 : 5} className="px-5 py-16 text-center text-xs font-bold text-muted-foreground uppercase tracking-widest bg-muted/5">
                       Nenhum cliente com movimento nesta carteira
                     </td>
                   </tr>
