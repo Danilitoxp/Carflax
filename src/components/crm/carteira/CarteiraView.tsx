@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   Search,
   Users,
@@ -15,9 +16,12 @@ import {
   Building2,
   RefreshCw,
   Eye,
+  ArrowLeftRight,
+  X,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiCarteira, type CarteiraResponse, type CarteiraCliente } from "@/lib/api";
+import { apiCarteira, apiTransferirCliente, type CarteiraResponse, type CarteiraCliente } from "@/lib/api";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 import { fmtBRL, fmtData } from "../clientes/frv-utils";
@@ -224,6 +228,12 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
   const [cliPage, setCliPage] = useState(1);
   const [avatarsMap, setAvatarsMap] = useState<Record<string, string>>({});
 
+  // Transferência de cliente para outro vendedor (admin)
+  const [transferindo, setTransferindo] = useState<CarteiraCliente | null>(null);
+  const [destinoCod, setDestinoCod] = useState("");
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [transferErro, setTransferErro] = useState<string | null>(null);
+
   // Admin/gestor vê todos os vendedores + filtro; vendedor comum vê só a própria carteira
   const isAdmin =
     userProfile?.is_admin === true ||
@@ -416,6 +426,37 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
   const toggleCliSort = (key: CliSortKey) =>
     setCliSort((s) => ({ key, dir: s.key === key && s.dir === "desc" ? "asc" : "desc" }));
 
+  // Vendedores de destino para transferência (exclui o vendedor atual do cliente)
+  const destinoOptions = useMemo(() => {
+    const atual = (transferindo?.cod_vendedor || "").trim();
+    return [...carteiras]
+      .filter((v) => v.cod !== "—" && v.cod !== atual)
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .map((v) => ({ label: `${v.nome} (${v.cod})`, value: v.cod }));
+  }, [carteiras, transferindo]);
+
+  const abrirTransferencia = (c: CarteiraCliente) => {
+    setTransferindo(c);
+    setDestinoCod("");
+    setTransferErro(null);
+  };
+
+  const handleTransferir = async () => {
+    if (!transferindo || !destinoCod || transferLoading) return;
+    setTransferLoading(true);
+    setTransferErro(null);
+    try {
+      await apiTransferirCliente(transferindo.cliente_id, destinoCod);
+      setTransferindo(null);
+      await loadData(); // recarrega para refletir a nova carteira
+    } catch (err) {
+      console.error("Erro ao transferir cliente:", err);
+      setTransferErro("Não foi possível transferir o cliente no ERP. Tente novamente.");
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
   // Helper para renderizar crachá de margem de forma elegante
   const renderMarginBadge = (pct: number) => {
     let color = "text-rose-500 bg-rose-500/10 border-rose-500/20";
@@ -587,6 +628,11 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
                   <th className="text-right px-5 py-3.5">
                     <SortHeader label="Recência" active={cliSort.key === "recencia_dias"} direction={cliSort.dir} onClick={() => toggleCliSort("recencia_dias")} className="justify-end" />
                   </th>
+                  {isAdmin && (
+                    <th className="text-right px-5 py-3.5">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground select-none">Ações</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/65">
@@ -625,12 +671,23 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
                           {c.ultima_compra && <span className="text-[9px] font-bold text-muted-foreground/60">{fmtData(c.ultima_compra)}</span>}
                         </div>
                       </td>
+                      {isAdmin && (
+                        <td className="px-5 py-4 text-right">
+                          <button
+                            onClick={() => abrirTransferencia(c)}
+                            title="Transferir cliente para outro vendedor"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary/40 transition-all"
+                          >
+                            <ArrowLeftRight className="w-3.5 h-3.5" /> Transferir
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
                 {clientesSel.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-16 text-center text-xs font-bold text-muted-foreground uppercase tracking-widest bg-muted/5">
+                    <td colSpan={isAdmin ? 7 : 6} className="px-5 py-16 text-center text-xs font-bold text-muted-foreground uppercase tracking-widest bg-muted/5">
                       Nenhum cliente com movimento nesta carteira
                     </td>
                   </tr>
@@ -640,6 +697,78 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
           </div>
           <Pagination page={cliPageSafe} totalItems={clientesSel.length} perPage={CLI_POR_PAGINA} onPage={setCliPage} />
         </div>
+
+        {transferindo &&
+          createPortal(
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+                onClick={() => !transferLoading && setTransferindo(null)}
+              />
+              <div className="relative w-full max-w-md bg-background border border-border rounded-2xl shadow-2xl p-5 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <ArrowLeftRight className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-foreground leading-tight">Transferir cliente</h3>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Altera o vendedor no ERP</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => !transferLoading && setTransferindo(null)}
+                    className="p-2 hover:bg-secondary rounded-xl transition-colors"
+                  >
+                    <X className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+
+                <div className="rounded-xl border border-border bg-card p-3 mb-3">
+                  <p className="font-black text-foreground leading-tight">{transferindo.nome_cliente}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
+                    Cód. {transferindo.cliente_id} · Atual: {transferindo.nome_vendedor || transferindo.cod_vendedor || "—"}
+                  </p>
+                </div>
+
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Novo vendedor</label>
+                <select
+                  value={destinoCod}
+                  onChange={(e) => setDestinoCod(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">Selecione o vendedor de destino…</option>
+                  {destinoOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+
+                {transferErro && (
+                  <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-2">{transferErro}</p>
+                )}
+
+                <div className="flex items-center gap-2 mt-4">
+                  <button
+                    onClick={handleTransferir}
+                    disabled={!destinoCod || transferLoading}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-[11px] font-black uppercase tracking-widest hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                  >
+                    {transferLoading ? "Transferindo…" : <><Check className="w-4 h-4" /> Confirmar transferência</>}
+                  </button>
+                  <button
+                    onClick={() => setTransferindo(null)}
+                    disabled={transferLoading}
+                    className="rounded-xl border border-border bg-card px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
       </div>
     );
   }

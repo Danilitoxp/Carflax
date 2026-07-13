@@ -581,6 +581,16 @@ export interface CarteiraResponse {
 
 export const apiCarteira = () => get<CarteiraResponse>("/api/crm/carteira");
 
+export interface TransferirClienteResponse {
+  ok: boolean;
+  cliente_id: string;
+  codigo_vendedor: string;
+}
+
+// Transfere um cliente para outro vendedor (PATCH parcial no ERP)
+export const apiTransferirCliente = (clienteId: string, codigoVendedor: string) =>
+  post<TransferirClienteResponse>("/api/crm/carteira/transferir", { clienteId, codigoVendedor });
+
 // ── Mix de Produtos por Cliente (por marca) ──────────────────────────────────
 export type MixMarcaStatus = "perdida" | "nova" | "caindo" | "crescendo" | "estavel";
 

@@ -284,10 +284,11 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const marketingItems = ["Marketing", "Whatsapp Evolution", "Leads", "Cronograma", "Relatórios Mkt"];
     if (isMarketingDept && marketingItems.includes(label)) return true;
 
-    // Permissões específicas do departamento de VENDAS
-    const isVendasDept = userProfile?.department?.toUpperCase() === 'VENDAS';
+    // Permissões específicas do departamento de VENDAS/COMERCIAL
+    const dept = userProfile?.department?.toUpperCase();
+    const isVendasOrComercialDept = dept === 'VENDAS' || dept === 'COMERCIAL';
     const comercialItems = ["Comercial", "Orçamentos", "Meus Pedidos", "Análise FRV", "Carteira", "Prospecções", "Campanhas", "Alugueis", "Relatórios"];
-    if (isVendasDept && comercialItems.includes(label)) return true;
+    if (isVendasOrComercialDept && comercialItems.includes(label)) return true;
 
     // Líderes têm acesso automático aos módulos de Gestão & Admin, sem precisar de toggle manual
     const leaderOnlyItems = ["Scrum", "Usuários", "DB Admin"];

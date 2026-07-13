@@ -186,7 +186,8 @@ export function canAccessSection(profile: AccessProfile | null | undefined, item
 
   if (profile.department?.toUpperCase() === "MARKETING" && MARKETING_SECTIONS.includes(item)) return true;
 
-  if (profile.department?.toUpperCase() === "VENDAS" && VENDAS_SECTIONS.includes(item)) return true;
+  const dept = profile.department?.toUpperCase();
+  if ((dept === "VENDAS" || dept === "COMERCIAL") && VENDAS_SECTIONS.includes(item)) return true;
 
   // Permissões manuais atribuídas no cadastro do usuário
   if (profile.permissions?.includes(item)) return true;
