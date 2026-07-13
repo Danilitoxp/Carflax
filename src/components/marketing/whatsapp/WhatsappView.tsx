@@ -139,6 +139,8 @@ interface LeadMetadata {
   codigoAtividade?: string;
   codigoVendedor?: string;
   emailNfe?: string;
+  formaPagamento?: string;
+  observacao?: string;
 }
 
 const GoogleIcon = () => (
@@ -974,6 +976,10 @@ export function WhatsappView({
   const [isEnteringCustomReason, setIsEnteringCustomReason] = useState(false);
   const [materialInput, setMaterialInput] = useState("");
   const [isEnteringMaterial, setIsEnteringMaterial] = useState(false);
+  const [selectedReason, setSelectedReason] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [archiveObservation, setArchiveObservation] = useState("");
+  const [isConfirmingArchiveDetails, setIsConfirmingArchiveDetails] = useState(false);
   const [showTempDropdown, setShowTempDropdown] = useState(false);
   const [isNoteMode, setIsNoteMode] = useState(false);
 
@@ -1478,7 +1484,19 @@ export function WhatsappView({
       .catch((err) => console.error("Erro ao marcar como não lido:", err));
   };
 
-  const handleArchiveChat = async (reason?: string) => {
+  const handleCloseArchiveModal = () => {
+    setShowArchiveModal(false);
+    setIsEnteringMaterial(false);
+    setIsEnteringCustomReason(false);
+    setIsConfirmingArchiveDetails(false);
+    setMaterialInput("");
+    setCustomArchiveReason("");
+    setSelectedReason("");
+    setPaymentMethod("");
+    setArchiveObservation("");
+  };
+
+  const handleArchiveChat = async (reasonText?: string) => {
     // Usa a referência travada no momento em que a ação foi iniciada (abertura do
     // modal / clique no menu). Só cai para contextMenu/selectedChat se não houver
     // trava, evitando arquivar a conversa errada quando a lista reordena.
@@ -1489,15 +1507,36 @@ export function WhatsappView({
     const targetId = chatToArchive.id;
     archiveTargetRef.current = null;
 
+    const finalReason = reasonText || selectedReason;
+
     setChats((prev) =>
-      prev.map((c) => (c.id === targetId ? { ...c, arquivado: true } : c)),
+      prev.map((c) =>
+        c.id === targetId
+          ? {
+              ...c,
+              arquivado: true,
+              leadInfo: c.leadInfo
+                ? {
+                    ...c.leadInfo,
+                    status: finalReason,
+                    formaPagamento: paymentMethod,
+                    observacao: archiveObservation,
+                  }
+                : {
+                    status: finalReason,
+                    formaPagamento: paymentMethod,
+                    observacao: archiveObservation,
+                  },
+            }
+          : c,
+      ),
     );
     if (selectedChatRef.current?.id === targetId) setSelectedChat(null);
-    setShowArchiveModal(false);
+    handleCloseArchiveModal();
     setContextMenu(null);
 
     marketingService
-      .toggleArchived(targetId, true, reason)
+      .toggleArchived(targetId, true, finalReason, paymentMethod, archiveObservation)
       .catch((err) => console.error("Erro ao arquivar chat:", err));
   };
 
@@ -3667,25 +3706,93 @@ export function WhatsappView({
       )}
 
       {showArchiveModal && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-card border border-border rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all duration-300">
             <div className="p-6 border-b border-border/50 flex items-center justify-between">
               <h3 className="font-black text-sm uppercase tracking-tighter">
-                {isEnteringMaterial
+                {isConfirmingArchiveDetails
+                  ? "Finalizar Atendimento"
+                  : isEnteringMaterial
                   ? "Qual Material?"
                   : isEnteringCustomReason
-                    ? "Escreva o Motivo"
-                    : "Motivo do Arquivamento"}
+                  ? "Escreva o Motivo"
+                  : "Motivo do Arquivamento"}
               </h3>
               <button
-                onClick={() => setShowArchiveModal(false)}
+                onClick={handleCloseArchiveModal}
                 className="p-1 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {isEnteringMaterial ? (
+            {isConfirmingArchiveDetails ? (
+              <div className="space-y-4">
+                <div className="p-6 space-y-4">
+                  {/* Forma de Pagamento */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
+                      Forma de Pagamento
+                    </label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="w-full bg-secondary/50 border border-border/80 rounded-2xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-rose-500/50 focus:ring-2 focus:ring-rose-500/20 transition-all cursor-pointer"
+                    >
+                      <option value="">Selecione a forma de pagamento</option>
+                      <option value="Pix">Pix</option>
+                      <option value="Dinheiro">Dinheiro</option>
+                      <option value="Cartão de Crédito">Cartão de Crédito</option>
+                      <option value="Cartão de Débito">Cartão de Débito</option>
+                      <option value="Boleto">Boleto</option>
+                      <option value="Faturamento">Faturamento (Faturado)</option>
+                      <option value="Outra">Outra</option>
+                      <option value="Nenhuma">Não se aplica / Nenhuma</option>
+                    </select>
+                  </div>
+
+                  {/* Observação */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
+                      Observação / Detalhes
+                    </label>
+                    <textarea
+                      value={archiveObservation}
+                      onChange={(e) => setArchiveObservation(e.target.value)}
+                      placeholder="Adicione observações importantes sobre este atendimento..."
+                      rows={3}
+                      className="w-full bg-secondary/50 border border-border/80 rounded-2xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-rose-500/50 focus:ring-2 focus:ring-rose-500/20 transition-all resize-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-6 border-t border-border/50 flex items-center justify-between gap-2 bg-secondary/10">
+                  <button
+                    onClick={() => {
+                      if (selectedReason.startsWith("Não vendemos o material")) {
+                        setIsConfirmingArchiveDetails(false);
+                        setIsEnteringMaterial(true);
+                      } else if (isEnteringCustomReason) {
+                        setIsConfirmingArchiveDetails(false);
+                        setIsEnteringCustomReason(true);
+                      } else {
+                        setIsConfirmingArchiveDetails(false);
+                        setSelectedReason("");
+                      }
+                    }}
+                    className="px-4 py-2 text-xs font-bold text-muted-foreground hover:bg-secondary rounded-xl transition-all"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    onClick={() => handleArchiveChat()}
+                    className="px-5 py-2 text-xs font-black uppercase bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all shadow-md hover:shadow-emerald-500/20 active:scale-95"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            ) : isEnteringMaterial ? (
               <div className="space-y-4">
                 <div className="p-6 space-y-2">
                   <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
@@ -3695,10 +3802,11 @@ export function WhatsappView({
                     value={materialInput}
                     onChange={(e) => setMaterialInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && materialInput.trim())
-                        handleArchiveChat(
-                          `Não vendemos o material: ${materialInput.trim()}`,
-                        );
+                      if (e.key === "Enter" && materialInput.trim()) {
+                        setSelectedReason(`Não vendemos o material: ${materialInput.trim()}`);
+                        setIsEnteringMaterial(false);
+                        setIsConfirmingArchiveDetails(true);
+                      }
                     }}
                     placeholder="Ex: Cabo flexível 2.5mm, disjuntor DR..."
                     className="w-full bg-secondary/50 border border-border/80 rounded-2xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-rose-500/50 focus:ring-2 focus:ring-rose-500/20 transition-all"
@@ -3715,14 +3823,15 @@ export function WhatsappView({
                   <button
                     disabled={!materialInput.trim()}
                     onClick={() => {
-                      if (materialInput.trim())
-                        handleArchiveChat(
-                          `Não vendemos o material: ${materialInput.trim()}`,
-                        );
+                      if (materialInput.trim()) {
+                        setSelectedReason(`Não vendemos o material: ${materialInput.trim()}`);
+                        setIsEnteringMaterial(false);
+                        setIsConfirmingArchiveDetails(true);
+                      }
                     }}
                     className="px-5 py-2 text-xs font-black uppercase bg-rose-500 hover:bg-rose-600 text-white rounded-xl transition-all shadow-md hover:shadow-rose-500/20 active:scale-95 disabled:opacity-55 disabled:cursor-not-allowed disabled:active:scale-100"
                   >
-                    Confirmar
+                    Avançar
                   </button>
                 </div>
               </div>
@@ -3740,7 +3849,8 @@ export function WhatsappView({
                       } else if (r.text === "Não vendemos o material") {
                         setIsEnteringMaterial(true);
                       } else {
-                        handleArchiveChat(r.text);
+                        setSelectedReason(r.text);
+                        setIsConfirmingArchiveDetails(true);
                       }
                     }}
                     className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-secondary/50 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground border border-transparent hover:border-border/30 transition-all duration-200 active:scale-[0.99] group"
@@ -3784,12 +3894,14 @@ export function WhatsappView({
                     disabled={!customArchiveReason.trim()}
                     onClick={() => {
                       if (customArchiveReason.trim()) {
-                        handleArchiveChat(customArchiveReason.trim());
+                        setSelectedReason(customArchiveReason.trim());
+                        setIsEnteringCustomReason(false);
+                        setIsConfirmingArchiveDetails(true);
                       }
                     }}
                     className="px-5 py-2 text-xs font-black uppercase bg-rose-500 hover:bg-rose-600 text-white rounded-xl transition-all shadow-md hover:shadow-rose-500/20 active:scale-95 disabled:opacity-55 disabled:cursor-not-allowed disabled:active:scale-100"
                   >
-                    Confirmar
+                    Avançar
                   </button>
                 </div>
               </div>

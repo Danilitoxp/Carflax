@@ -21,6 +21,8 @@ export interface MarketingCliente {
   data_orcamento?: string;
   origem?: string;
   campanha?: string;
+  forma_pagamento?: string;
+  observacao?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -390,7 +392,13 @@ export const marketingService = {
     }
   },
 
-  async toggleArchived(remoteJid: string, archived: boolean, motivo?: string) {
+  async toggleArchived(
+    remoteJid: string,
+    archived: boolean,
+    motivo?: string,
+    formaPagamento?: string,
+    observacao?: string
+  ) {
     const updatePayload: Record<string, unknown> = {
       arquivado: archived,
       updated_at: new Date().toISOString()
@@ -399,6 +407,12 @@ export const marketingService = {
     // Salva o motivo no campo 'status' que já existe na tabela
     if (motivo) {
       updatePayload.status = motivo;
+    }
+    if (formaPagamento !== undefined) {
+      updatePayload.forma_pagamento = formaPagamento;
+    }
+    if (observacao !== undefined) {
+      updatePayload.observacao = observacao;
     }
 
     const { error } = await supabase

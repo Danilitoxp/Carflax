@@ -157,10 +157,14 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
   };
 
   const canEditThis = (o: ScrumOcorrencia | null) =>
-    !!o && (canManage || o.autor_id === userProfile?.id);
+    !!o && !!userProfile?.id && (canManage || o.autor_id === userProfile.id);
 
   const handleSave = async () => {
     if (!form.titulo?.trim() || !form.setor?.trim() || !form.descricao?.trim()) return;
+    if (editing && !canEditThis(editing)) {
+      alert("Você não tem permissão para editar esta ocorrência.");
+      return;
+    }
     setSaving(true);
     try {
       if (editing) {
@@ -202,6 +206,7 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
   };
 
   const handleDrop = async (targetStatus: ScrumStatus) => {
+    if (!canManage) return;
     const id = draggingId.current;
     if (!id) return;
     const o = ocorrencias.find((x) => x.id === id);
@@ -343,6 +348,7 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
                       key={o.id}
                       o={o}
                       canManage={canManage}
+                      userId={userProfile?.id}
                       onOpen={() => openEdit(o)}
                       onDragStart={() => { draggingId.current = o.id; }}
                       onDragEnd={() => { draggingId.current = null; setDragOverCol(null); }}
@@ -379,18 +385,21 @@ export function ScrumView({ userProfile }: { userProfile?: UserProfile }) {
 function ScrumCard({
   o,
   canManage,
+  userId,
   onOpen,
   onDragStart,
   onDragEnd,
 }: {
   o: ScrumOcorrencia;
   canManage: boolean;
+  userId?: string;
   onOpen: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const prio = PRIOS[o.prioridade];
+  const canEdit = canManage || (!!userId && o.autor_id === userId);
   return (
     <div
       draggable={canManage}
@@ -407,7 +416,11 @@ function ScrumCard({
           <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: prio.color }} title={`Prioridade ${prio.label}`} />
           <p className="text-[11px] font-black text-foreground uppercase tracking-tight leading-tight truncate group-hover:text-primary transition-colors">{o.titulo}</p>
         </div>
-        <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+        {canEdit ? (
+          <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+        ) : (
+          <Eye className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+        )}
       </div>
 
       <div className="mt-2 flex items-center gap-1.5 flex-wrap">
@@ -470,7 +483,7 @@ function OcorrenciaModal({
         <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-secondary/20 shrink-0">
           <h3 className="text-sm font-black text-foreground uppercase tracking-tight flex items-center gap-2">
             <Kanban className="w-4 h-4 text-primary" />
-            {editing ? "Ocorrência" : "Nova Ocorrência"}
+            {editing ? (readOnly ? "Visualizar Ocorrência" : "Editar Ocorrência") : "Nova Ocorrência"}
           </h3>
           <button onClick={onClose} className="p-2 hover:bg-secondary rounded-xl transition-all">
             <X className="w-5 h-5" />
