@@ -27,6 +27,7 @@ import { ScrumView } from "@/components/scrum/ScrumView";
 import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 import { ColetorView } from "@/components/coletor/ColetorView";
 import { SeparacaoView, ConferenciaView } from "@/components/estoque/ExpedicaoView";
+import { RetiradaView } from "@/components/estoque/RetiradaView";
 import { EntregasView } from "@/components/entregas";
 import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
 import { UsersView } from "@/components/users/UsersView";
@@ -40,6 +41,8 @@ import { ESTEIRA_SUBQUADRO_PREFIX, canAccessSection } from "@/lib/menu-config";
 import { useNotification } from "@/hooks/useNotification";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 import { usePedidosParadosAlert } from "@/hooks/usePedidosParadosAlert";
+import { useRetiradaAlert, startAlertSound, stopAlertSound } from "@/hooks/useRetiradaAlert";
+import { BellRing } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { SorteioRealtimeModal } from "@/components/ui/SorteioRealtimeModal";
 import { RankingCopaView } from "@/components/crm/campanhas/RankingCopaView";
@@ -81,6 +84,14 @@ function DashboardContent({
 }: DashboardContentProps) {
   const { showNotification } = useNotification();
   usePedidosParadosAlert(showNotification, userProfile);
+  
+  const [activeRetiradaAlert, setActiveRetiradaAlert] = useState<{ cliente: string; pedido: string } | null>(null);
+
+  useRetiradaAlert((cliente, pedido) => {
+    setActiveRetiradaAlert({ cliente, pedido });
+    startAlertSound();
+  });
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -1273,6 +1284,8 @@ function DashboardContent({
             <SeparacaoView />
           ) : activeItem === "Conferência" ? (
             <ConferenciaView />
+          ) : activeItem === "Retirada" ? (
+            <RetiradaView userProfile={userProfile || undefined} />
           ) : activeItem === "Usuários" ? (
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <UsersView />
@@ -1435,6 +1448,44 @@ function DashboardContent({
           }, 150);
         }}
       />
+
+      {activeRetiradaAlert && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-rose-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-card border-4 border-rose-500 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all duration-300">
+            <div className="p-8 text-center space-y-6">
+              <div className="w-20 h-20 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-500/30">
+                <BellRing className="w-10 h-10 animate-bounce" />
+              </div>
+              <h2 className="text-3xl font-black text-rose-500 uppercase tracking-tighter">
+                CLIENTE VEIO RETIRAR!
+              </h2>
+              <div className="bg-secondary/50 rounded-2xl p-6 border border-border">
+                <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-1">
+                  Cliente
+                </p>
+                <p className="text-xl font-extrabold text-foreground leading-tight">
+                  {activeRetiradaAlert.cliente}
+                </p>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-4 mb-1">
+                  Pedido
+                </p>
+                <p className="text-sm font-black text-foreground bg-secondary px-3 py-1 rounded-lg inline-block border border-border/80">
+                  #{activeRetiradaAlert.pedido}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveRetiradaAlert(null);
+                  stopAlertSound();
+                }}
+                className="w-full py-4 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-rose-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Entendido / Fechar Alerta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

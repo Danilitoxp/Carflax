@@ -693,3 +693,15 @@ export interface ExpedicaoResponse {
 
 export const apiSeparacao = () => get<ExpedicaoResponse>("/api/estoque/separacao");
 export const apiConferencia = () => get<ExpedicaoResponse>("/api/estoque/conferencia");
+
+export interface RetiradaPedido {
+  pedido: string;
+  empresa: string;
+  cod_cliente: string;
+  cliente: string;
+  qtd_sku: number;
+  data_conferencia?: string;
+  hora_conferencia?: string;
+}
+
+export const apiRetiradaPedidos = () => get<RetiradaPedido[]>("/api/estoque/retirada/pedidos");

@@ -532,6 +532,7 @@ const notifSections = [
       { key: "updates", label: "Atualizações de Segurança" },
       { key: "maintenance", label: "Manutenção do Servidor" },
       { key: "stalePedidos", label: "Pedido parado (Balcão 2 / Entrega)" },
+      { key: "clienteRetira", label: "Cliente veio retirar (Balcão 2)" },
     ],
   },
   {
