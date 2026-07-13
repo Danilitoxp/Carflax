@@ -29,6 +29,7 @@ import {
   Package,
   Kanban,
   MessageSquare,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Orçamentos: FileBadge,
   "Meus Pedidos": Package,
   "Análise FRV": BarChart3,
+  Carteira: Wallet,
   Clientes: Users,
   Prospecções: Crosshair,
   Ligações: PhoneCall,
@@ -284,7 +286,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
 
     // Permissões específicas do departamento de VENDAS
     const isVendasDept = userProfile?.department?.toUpperCase() === 'VENDAS';
-    const comercialItems = ["Comercial", "Orçamentos", "Meus Pedidos", "Análise FRV", "Prospecções", "Campanhas", "Alugueis", "Relatórios"];
+    const comercialItems = ["Comercial", "Orçamentos", "Meus Pedidos", "Análise FRV", "Carteira", "Prospecções", "Campanhas", "Alugueis", "Relatórios"];
     if (isVendasDept && comercialItems.includes(label)) return true;
 
     // Líderes têm acesso automático aos módulos de Gestão & Admin, sem precisar de toggle manual

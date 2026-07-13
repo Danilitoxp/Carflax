@@ -26,8 +26,13 @@ import {
   UserSquare2,
   Layers,
   CalendarClock,
+  CalendarRange,
   Flame,
   MapPin,
+  ClipboardList,
+  HeartPulse,
+  CheckCircle2,
+  Hourglass,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -43,6 +48,8 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { RFMMatrix } from "./RFMMatrix";
+import { RaioXCliente } from "./RaioXCliente";
+import { listarContatos, TIPO_LABEL, RESULTADO_LABEL, type ContatoComercial } from "@/lib/contatos-service";
 import { apiAnaliseFrv, type FrvResponse } from "@/lib/api";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
@@ -52,6 +59,8 @@ import {
   agregarEvolucao,
   gerarAlertas,
   calcularKpis,
+  scoreOportunidade,
+  acaoSugerida,
   fmtBRL,
   fmtBRLCompact,
   fmtPct,
@@ -60,7 +69,16 @@ import {
   SEGMENTOS_ORDEM,
   type ComparacaoModo,
   type ClienteFRVCalc,
+  type AcaoTom,
 } from "./frv-utils";
+
+// Cor do texto da ação sugerida por tom (Agenda)
+const ACAO_TOM_COR: Record<AcaoTom, string> = {
+  critico: "text-rose-600 dark:text-rose-400",
+  atencao: "text-amber-600 dark:text-amber-400",
+  oportunidade: "text-emerald-600 dark:text-emerald-400",
+  neutro: "text-muted-foreground",
+};
 
 // ── Config ───────────────────────────────────────────────────────────────────
 const ITEMS_PER_PAGE = 50;
@@ -71,8 +89,17 @@ const MODO_OPTIONS = [
   { label: "Ano × Ano Anterior", value: "12m" },
 ];
 
+// Período (janela de dados carregada do backend). Padrão enxuto p/ carregar rápido.
+const JANELA_OPTIONS = [
+  { label: "Últimos 6 meses", value: "6" },
+  { label: "Últimos 12 meses", value: "12" },
+  { label: "Últimos 24 meses", value: "24" },
+];
+
 const VIEWS = [
   { key: "visao", label: "Visão Geral", icon: LayoutGrid },
+  { key: "agenda", label: "Agenda", icon: ClipboardList },
+  { key: "recuperacao", label: "Recuperação", icon: HeartPulse },
   { key: "rankings", label: "Rankings", icon: Trophy },
   { key: "acoes", label: "Oport. & Riscos", icon: Target },
   { key: "matriz", label: "Matriz RFV", icon: BarChart4 },
@@ -224,7 +251,17 @@ function RankTable({
 
 type SortKey = keyof ClienteFRVCalc;
 
-export function ClientesFRVView() {
+interface FrvUserProfile {
+  id?: string;
+  name?: string;
+  role?: string;
+  operator_code?: string;
+  operatorCode?: string;
+  is_admin?: boolean;
+  is_leader?: boolean;
+}
+
+export function ClientesFRVView({ userProfile }: { userProfile?: FrvUserProfile }) {
   const [activeView, setActiveView] = useState<ViewKey>("visao");
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -232,6 +269,7 @@ export function ClientesFRVView() {
 
   // Filtros
   const [modo, setModo] = useState<ComparacaoModo>("mes");
+  const [janela, setJanela] = useState(12); // período (meses) — padrão enxuto p/ carregar rápido
   const [filtroVendedor, setFiltroVendedor] = useState("todos");
   const [filtroEmpresa, setFiltroEmpresa] = useState("todos");
   const [filtroSegmento, setFiltroSegmento] = useState("todos");
@@ -244,12 +282,24 @@ export function ClientesFRVView() {
     direction: "desc",
   });
   const [selectedSegment, setSelectedSegment] = useState<{ label: string; clients: ClienteFRVCalc[] } | null>(null);
+  const [raioX, setRaioX] = useState<ClienteFRVCalc | null>(null);
+
+  // Contatos comerciais (base da Performance de Recuperação)
+  const [contatos, setContatos] = useState<ContatoComercial[]>([]);
+  const reloadContatos = useCallback(() => {
+    listarContatos(180)
+      .then(setContatos)
+      .catch((err) => console.error("Erro ao carregar contatos:", err));
+  }, []);
+  useEffect(() => {
+    reloadContatos();
+  }, [reloadContatos]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setErro(null);
     try {
-      const resp = await apiAnaliseFrv();
+      const resp = await apiAnaliseFrv(janela);
       setData(resp);
     } catch (err) {
       console.error("Erro ao carregar Análise FRV:", err);
@@ -257,11 +307,21 @@ export function ClientesFRVView() {
     } finally {
       setTimeout(() => setLoading(false), 250);
     }
-  }, []);
+  }, [janela]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Modo de comparação disponível conforme o período carregado
+  // (Ano × Ano exige 24 meses; Trimestre exige ao menos 6)
+  const modoOptions = useMemo(
+    () => MODO_OPTIONS.filter((o) => (o.value === "12m" ? janela >= 24 : o.value === "3m" ? janela >= 6 : true)),
+    [janela]
+  );
+  useEffect(() => {
+    if (!modoOptions.some((o) => o.value === modo)) setModo("mes");
+  }, [modoOptions, modo]);
 
   // Base calculada (scores/segmentos relativos à carteira inteira)
   const baseCalc = useMemo(() => {
@@ -281,6 +341,43 @@ export function ClientesFRVView() {
   const kpis = useMemo(() => calcularKpis(clientes), [clientes]);
   const evolucao = useMemo(() => agregarEvolucao(clientes, 12), [clientes]);
   const alertas = useMemo(() => gerarAlertas(clientes), [clientes]);
+
+  // Agenda do vendedor: worklist priorizada por score de oportunidade
+  const agenda = useMemo(
+    () =>
+      clientes
+        .map((c) => ({ c, score: scoreOportunidade(c), acao: acaoSugerida(c) }))
+        .filter((x) => x.score >= 25)
+        .sort((a, b) => b.score - a.score),
+    [clientes]
+  );
+
+  // Performance de Recuperação: cruza contatos (Supabase) com a última compra (ERP)
+  const recuperacao = useMemo(() => {
+    const byId = new Map(baseCalc.map((c) => [c.cliente_id, c]));
+    const visiveisIds = new Set(clientes.map((c) => c.cliente_id));
+    const usaFiltro = filtroVendedor !== "todos" || filtroEmpresa !== "todos" || filtroSegmento !== "todos";
+
+    const lista = contatos
+      .filter((ct) => !usaFiltro || visiveisIds.has(ct.cliente_id))
+      .map((ct) => {
+        const cli = byId.get(ct.cliente_id) || null;
+        let status: "recuperado" | "aguardando" | "perdido";
+        if (ct.resultado === "sem_interesse") status = "perdido";
+        else if (cli?.ultima_compra && new Date(cli.ultima_compra).getTime() > new Date(ct.created_at).getTime())
+          status = "recuperado";
+        else status = "aguardando";
+        return { ct, cli, status };
+      });
+
+    const recuperadosIds = new Set(lista.filter((x) => x.status === "recuperado").map((x) => x.ct.cliente_id));
+    const totalContatos = lista.length;
+    const recuperados = recuperadosIds.size;
+    const aguardando = lista.filter((x) => x.status === "aguardando").length;
+    const fatRecuperado = [...recuperadosIds].reduce((s, id) => s + (byId.get(id)?.faturamento_atual || 0), 0);
+    const taxa = totalContatos > 0 ? (recuperados / totalContatos) * 100 : 0;
+    return { lista, totalContatos, recuperados, aguardando, fatRecuperado, taxa };
+  }, [contatos, baseCalc, clientes, filtroVendedor, filtroEmpresa, filtroSegmento]);
 
   // Distribuição por segmento
   const distSegmentos = useMemo(() => {
@@ -439,10 +536,11 @@ export function ClientesFRVView() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto lg:flex-1 min-w-0 lg:justify-end">
+          <TinyDropdown icon={CalendarRange} value={String(janela)} options={JANELA_OPTIONS} onChange={(v) => setJanela(Number(v))} className="flex-1 min-w-[140px] max-w-[180px]" variant="blue" />
           <TinyDropdown icon={UserSquare2} value={filtroVendedor} options={vendedorOptions} onChange={setFiltroVendedor} className="flex-1 min-w-[140px] max-w-[190px]" variant="blue" />
           <TinyDropdown icon={Building2} value={filtroEmpresa} options={empresaOptions} onChange={setFiltroEmpresa} className="flex-1 min-w-[130px] max-w-[170px]" variant="slate" />
           <TinyDropdown icon={Layers} value={filtroSegmento} options={segmentoOptions} onChange={setFiltroSegmento} className="flex-1 min-w-[140px] max-w-[180px]" variant="emerald" />
-          <TinyDropdown icon={CalendarClock} value={modo} options={MODO_OPTIONS} onChange={(v) => setModo(v as ComparacaoModo)} className="flex-1 min-w-[140px] max-w-[190px]" variant="amber" />
+          <TinyDropdown icon={CalendarClock} value={modo} options={modoOptions} onChange={(v) => setModo(v as ComparacaoModo)} className="flex-1 min-w-[140px] max-w-[190px]" variant="amber" />
         </div>
       </div>
 
@@ -605,12 +703,162 @@ export function ClientesFRVView() {
           {/* ══ RANKINGS ══ */}
           {activeView === "rankings" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
-              <RankTable titulo="Maiores em Faturamento" icon={Trophy} accent="text-amber-500" clientes={topFaturamento} metricLabel="24 meses" metric={(c) => fmtBRLCompact(c.valor_total)} />
+              <RankTable titulo="Maiores em Faturamento" icon={Trophy} accent="text-amber-500" clientes={topFaturamento} metricLabel={`${data?.janela_meses ?? janela} meses`} metric={(c) => fmtBRLCompact(c.valor_total)} />
               <RankTable titulo="Maiores em Margem" icon={Percent} accent="text-emerald-500" clientes={topMargem} metricLabel={`margem`} metric={(c) => fmtBRLCompact(c.margem_total)} metricColor={() => "text-emerald-600 dark:text-emerald-400"} />
               <RankTable titulo="Maiores Crescimentos" icon={TrendingUp} accent="text-emerald-500" clientes={topCrescimento} metricLabel={modoSufixo} metric={(c) => fmtPct(c.variacao_pct)} metricColor={() => "text-emerald-600 dark:text-emerald-400"} />
               <RankTable titulo="Maiores Quedas" icon={TrendingDown} accent="text-rose-500" clientes={topQueda} metricLabel={modoSufixo} metric={(c) => fmtPct(c.variacao_pct)} metricColor={() => "text-rose-600 dark:text-rose-400"} />
               <RankTable titulo="Inativos de Maior Valor" icon={UserX} accent="text-slate-500" clientes={topInativos} metricLabel="sem comprar" metric={(c) => `${c.recencia_dias}d`} metricColor={() => "text-rose-600 dark:text-rose-400"} />
               <RankTable titulo="Maior Risco de Abandono" icon={Flame} accent="text-rose-500" clientes={[...clientes].sort((a, b) => b.risco_abandono - a.risco_abandono).slice(0, 10)} metricLabel="risco" metric={(c) => `${c.risco_abandono}/100`} metricColor={() => "text-rose-600 dark:text-rose-400"} />
+            </div>
+          )}
+
+          {/* ══ AGENDA DO VENDEDOR ══ */}
+          {activeView === "agenda" && (
+            <div className="flex flex-col gap-3 h-full">
+              <div className="flex items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-primary" />
+                  <h3 className="text-[11px] font-black text-foreground uppercase tracking-tight">
+                    Quem contatar hoje <span className="text-muted-foreground">({agenda.length})</span>
+                  </h3>
+                </div>
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest hidden sm:block">
+                  Priorizado por score de oportunidade
+                </span>
+              </div>
+
+              <div className="flex-1 bg-card border border-border rounded-2xl overflow-hidden flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto scrollbar-hide divide-y divide-border">
+                  {agenda.map(({ c, score, acao }) => (
+                    <button
+                      key={c.cliente_id}
+                      onClick={() => setRaioX(c)}
+                      className="w-full text-left px-4 py-3.5 hover:bg-secondary/40 transition-colors flex items-center gap-3 group"
+                    >
+                      {/* Score */}
+                      <div
+                        className={cn(
+                          "w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 border",
+                          score >= 70
+                            ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400"
+                            : score >= 45
+                            ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                            : "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
+                        )}
+                      >
+                        <span className="text-lg font-black tabular-nums leading-none">{score}</span>
+                        <span className="text-[7px] font-black uppercase tracking-widest opacity-60">score</span>
+                      </div>
+
+                      {/* Cliente + ação */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-[11px] font-black text-foreground uppercase tracking-tight truncate max-w-[200px] group-hover:text-primary transition-colors">
+                            {c.nome_cliente}
+                          </p>
+                          <SegBadge cliente={c} />
+                        </div>
+                        <p className={cn("text-[10px] font-black uppercase tracking-tight mt-1", ACAO_TOM_COR[acao.tom])}>
+                          {acao.titulo}
+                        </p>
+                        <p className="text-[9px] font-bold text-muted-foreground mt-0.5 leading-relaxed line-clamp-1">{acao.detalhe}</p>
+                      </div>
+
+                      {/* Métricas */}
+                      <div className="text-right shrink-0 hidden sm:block">
+                        <p className="text-[11px] font-black text-foreground tabular-nums">{fmtBRLCompact(c.valor_total)}</p>
+                        <p className="text-[9px] font-bold text-muted-foreground">{c.nome_vendedor || "s/ vend."}</p>
+                        <p className="text-[9px] font-bold text-muted-foreground">{c.recencia_dias}d sem comprar</p>
+                      </div>
+
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+                    </button>
+                  ))}
+                  {agenda.length === 0 && <EmptyMini texto="Nenhum cliente prioritário no filtro atual" />}
+                </div>
+                <div className="p-3 border-t border-border bg-secondary/10 flex justify-between items-center shrink-0">
+                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                    {agenda.length} clientes com oportunidade de recuperação
+                  </span>
+                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest hidden sm:block">
+                    Clique para abrir o Raio-X
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══ PERFORMANCE DE RECUPERAÇÃO ══ */}
+          {activeView === "recuperacao" && (
+            <div className="flex flex-col gap-3 h-full">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
+                <div className="bg-card border border-border rounded-2xl p-4">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Contatos (180d)</p>
+                  <p className="text-2xl font-black text-foreground tabular-nums mt-1">{recuperacao.totalContatos}</p>
+                </div>
+                <div className="bg-card border border-border rounded-2xl p-4">
+                  <p className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Recuperados</p>
+                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums mt-1">{recuperacao.recuperados}</p>
+                </div>
+                <div className="bg-card border border-border rounded-2xl p-4">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Taxa de conversão</p>
+                  <p className="text-2xl font-black text-foreground tabular-nums mt-1">{recuperacao.taxa.toFixed(0)}%</p>
+                </div>
+                <div className="bg-card border border-border rounded-2xl p-4">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Fat. recuperado</p>
+                  <p className="text-2xl font-black text-foreground tabular-nums mt-1">{fmtBRLCompact(recuperacao.fatRecuperado)}</p>
+                </div>
+              </div>
+
+              <div className="flex-1 bg-card border border-border rounded-2xl overflow-hidden flex flex-col min-h-0">
+                <div className="px-5 py-3.5 border-b border-border flex items-center gap-2.5 shrink-0">
+                  <HeartPulse className="w-4 h-4 text-primary" />
+                  <h3 className="text-[11px] font-black text-foreground uppercase tracking-tight">
+                    Contatos registrados <span className="text-muted-foreground">({recuperacao.lista.length})</span>
+                  </h3>
+                </div>
+                <div className="flex-1 overflow-y-auto scrollbar-hide divide-y divide-border">
+                  {recuperacao.lista.map(({ ct, cli, status }) => {
+                    const stCfg =
+                      status === "recuperado"
+                        ? { cor: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20", label: "Recuperado", icon: CheckCircle2 }
+                        : status === "perdido"
+                        ? { cor: "text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20", label: "Sem interesse", icon: X }
+                        : { cor: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20", label: "Aguardando", icon: Hourglass };
+                    const StIcon = stCfg.icon;
+                    return (
+                      <button
+                        key={ct.id}
+                        onClick={() => cli && setRaioX(cli)}
+                        disabled={!cli}
+                        className="w-full text-left px-4 py-3 hover:bg-secondary/40 transition-colors flex items-center gap-3 disabled:cursor-default group"
+                      >
+                        <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border", stCfg.cor)}>
+                          <StIcon className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-black text-foreground uppercase tracking-tight truncate group-hover:text-primary transition-colors">
+                            {ct.cliente_nome || ct.cliente_id}
+                          </p>
+                          <p className="text-[9px] font-bold text-muted-foreground mt-0.5">
+                            {TIPO_LABEL[ct.tipo]} · {RESULTADO_LABEL[ct.resultado]}
+                            {ct.autor_nome ? ` · ${ct.autor_nome}` : ""}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight border", stCfg.cor)}>
+                            {stCfg.label}
+                          </span>
+                          <p className="text-[9px] font-bold text-muted-foreground mt-1 tabular-nums">{fmtData(ct.created_at)}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {recuperacao.lista.length === 0 && (
+                    <EmptyMini texto="Nenhum contato registrado. Abra um cliente e registre um contato." />
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -730,7 +978,7 @@ export function ClientesFRVView() {
                         <Th center onClick={() => requestSort("recencia_dias")}>Recência <SortIcon k="recencia_dias" /></Th>
                         <Th center onClick={() => requestSort("frequencia")}>Freq. <SortIcon k="frequencia" /></Th>
                         <Th right onClick={() => requestSort("ticket_medio")}>Ticket <SortIcon k="ticket_medio" /></Th>
-                        <Th right onClick={() => requestSort("valor_total")}>Fat. 24m <SortIcon k="valor_total" /></Th>
+                        <Th right onClick={() => requestSort("valor_total")}>Fat. {data?.janela_meses ?? janela}m <SortIcon k="valor_total" /></Th>
                         <Th right onClick={() => requestSort("margem_pct")}>Margem <SortIcon k="margem_pct" /></Th>
                         <Th center onClick={() => requestSort("variacao_pct")}>Variação <SortIcon k="variacao_pct" /></Th>
                         <Th center onClick={() => requestSort("risco_abandono")}>Risco <SortIcon k="risco_abandono" /></Th>
@@ -739,7 +987,7 @@ export function ClientesFRVView() {
                     </thead>
                     <tbody className="divide-y divide-border">
                       {paginated.map((c) => (
-                        <tr key={c.cliente_id} className="hover:bg-secondary/30 transition-colors group">
+                        <tr key={c.cliente_id} onClick={() => setRaioX(c)} className="hover:bg-secondary/30 transition-colors group cursor-pointer">
                           <td className="px-4 py-3">
                             <p className="text-[11px] font-black text-foreground uppercase tracking-tight group-hover:text-primary transition-colors truncate max-w-[220px]">{c.nome_cliente}</p>
                             <p className="text-[8px] font-bold text-muted-foreground">{c.cliente_id} · {c.nome_vendedor || "s/ vend."}</p>
@@ -774,6 +1022,14 @@ export function ClientesFRVView() {
           )}
         </div>
       )}
+
+      <RaioXCliente
+        cliente={raioX}
+        janelaMeses={data?.janela_meses ?? 24}
+        onClose={() => setRaioX(null)}
+        userProfile={userProfile}
+        onContatoRegistrado={reloadContatos}
+      />
     </div>
   );
 }

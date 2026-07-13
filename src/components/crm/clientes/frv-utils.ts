@@ -381,6 +381,92 @@ export function gerarAlertas(clientes: ClienteFRVCalc[]): Alerta[] {
   return alertas.sort((a, b) => b.prioridade - a.prioridade);
 }
 
+// ── Score de Oportunidade de Recuperação (0..100) ────────────────────────────
+// Diferente do risco de abandono: mede o quanto vale a pena (e é possível)
+// recuperar/expandir este cliente. Combina importância (valor + margem),
+// histórico de recorrência, urgência (queda de faturamento ou atraso relativo
+// à cadência) e um decaimento para clientes praticamente perdidos há muito tempo.
+export function scoreOportunidade(c: ClienteFRVCalc): number {
+  const clamp = (x: number) => Math.min(1, Math.max(0, x));
+
+  const importancia = (c.v_score + c.m_score) / 10; // 0..1 (valor + margem)
+  const recorrencia = c.f_score / 5; // 0..1
+
+  // Queda de faturamento no período (0..1): -50% ou pior → 1
+  const queda = c.variacao_pct < 0 ? clamp(Math.abs(c.variacao_pct) / 50) : 0;
+
+  // Atraso relativo à cadência (0..1): 4x a cadência → 1
+  let atraso = 0;
+  if (c.intervalo_medio_dias) atraso = clamp((c.recencia_dias / c.intervalo_medio_dias - 1) / 3);
+  else atraso = clamp((c.recencia_dias - 30) / 150);
+
+  const urgencia = Math.max(queda, atraso);
+
+  // Recuperabilidade: cliente abandonado há muito tempo vale menos como oportunidade
+  let recuperavel = 1;
+  if (c.recencia_dias > 540) recuperavel = 0.45;
+  else if (c.recencia_dias > 365) recuperavel = 0.7;
+
+  const raw = (0.4 * importancia + 0.2 * recorrencia + 0.4 * urgencia) * recuperavel;
+  return Math.round(clamp(raw) * 100);
+}
+
+// ── Ação sugerida (pura) ─────────────────────────────────────────────────────
+// Motor de regras compartilhado pela Agenda do Vendedor e pelo Raio-X.
+export type AcaoTom = "critico" | "atencao" | "oportunidade" | "neutro";
+
+export interface AcaoSugerida {
+  titulo: string;
+  detalhe: string;
+  tom: AcaoTom;
+}
+
+export function acaoSugerida(c: ClienteFRVCalc): AcaoSugerida {
+  if (c.status === "inativo" && c.valor_total > 0) {
+    return {
+      titulo: "Agendar visita",
+      detalhe: `Cliente parado há ${c.recencia_dias} dias. Faturava ${fmtBRLCompact(c.valor_total)} — recuperação prioritária.`,
+      tom: "critico",
+    };
+  }
+  if (c.risco_abandono >= 60) {
+    return {
+      titulo: "Ligar hoje",
+      detalhe: `Risco alto de perda (${c.risco_abandono}/100). Faça contato de retenção imediato.`,
+      tom: "critico",
+    };
+  }
+  if (c.faturamento_anterior > 0 && c.variacao_pct <= -35) {
+    return {
+      titulo: "Contato de retenção",
+      detalhe: `Compras caíram ${fmtPct(c.variacao_pct)}. Investigue satisfação e concorrência.`,
+      tom: "atencao",
+    };
+  }
+  if (c.dias_para_proxima !== null && c.dias_para_proxima <= 7 && c.dias_para_proxima >= -3) {
+    return {
+      titulo: "Janela de recompra aberta",
+      detalhe:
+        c.dias_para_proxima >= 0
+          ? `Próxima compra prevista em ${c.dias_para_proxima} dia(s). Antecipe o contato.`
+          : `Recompra prevista há ${Math.abs(c.dias_para_proxima)} dia(s). Faça o follow-up.`,
+      tom: "oportunidade",
+    };
+  }
+  if (c.variacao_pct >= 35 && c.faturamento_atual > 0) {
+    return {
+      titulo: "Ampliar mix",
+      detalhe: `Cliente cresceu ${fmtPct(c.variacao_pct)}. Momento ideal para oferecer produtos complementares.`,
+      tom: "oportunidade",
+    };
+  }
+  return {
+    titulo: "Manter relacionamento",
+    detalhe: "Cliente dentro do padrão de compra. Mantenha a cadência e acompanhe o mix.",
+    tom: "neutro",
+  };
+}
+
 // ── KPIs agregados ───────────────────────────────────────────────────────────
 export interface KpisFRV {
   faturamentoAtual: number;

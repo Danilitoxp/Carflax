@@ -556,4 +556,78 @@ export interface FrvResponse {
   clientes: FrvCliente[];
 }
 
-export const apiAnaliseFrv = () => get<FrvResponse>("/api/crm/clientes-frv");
+export const apiAnaliseFrv = (meses?: number) =>
+  get<FrvResponse>(`/api/crm/clientes-frv${meses ? `?meses=${meses}` : ""}`);
+
+// ── Carteira de Vendedores (mês atual) ───────────────────────────────────────
+export interface CarteiraCliente {
+  cliente_id: string;
+  nome_cliente: string;
+  cod_vendedor: string;
+  nome_vendedor: string;
+  empresa: string;
+  ultima_compra: string | null;
+  pedidos_mes: number;
+  valor_mes: number;
+  margem_mes: number;
+}
+
+export interface CarteiraResponse {
+  gerado_em: string;
+  mes: string; // 'YYYY-MM'
+  clientes: CarteiraCliente[];
+}
+
+export const apiCarteira = () => get<CarteiraResponse>("/api/crm/carteira");
+
+// ── Mix de Produtos por Cliente (por marca) ──────────────────────────────────
+export type MixMarcaStatus = "perdida" | "nova" | "caindo" | "crescendo" | "estavel";
+
+export interface MixMarca {
+  marca: string;
+  valor_atual: number; // últimos 12m
+  valor_anterior: number; // 12m anteriores
+  margem_atual: number;
+  pedidos_atual: number;
+  ultima_compra: string | null;
+  variacao_pct: number;
+  status: MixMarcaStatus;
+}
+
+export interface MixClienteResponse {
+  cliente_id: string;
+  gerado_em: string;
+  janela_corte: string;
+  marcas: MixMarca[];
+}
+
+export const apiMixCliente = (clienteId: string) =>
+  get<MixClienteResponse>(`/api/crm/mix-cliente?cliente=${encodeURIComponent(clienteId)}`);
+
+// ── Histórico / Timeline Comercial do Cliente ────────────────────────────────
+export type HistoricoEventoTipo = "entrada" | "auge" | "queda" | "crescimento" | "marca_perdida" | "parou";
+
+export interface HistoricoAno {
+  ano: number;
+  valor: number;
+  margem: number;
+  pedidos: number;
+  marcas: number;
+}
+
+export interface HistoricoEvento {
+  ano: number;
+  tipo: HistoricoEventoTipo;
+  titulo: string;
+  detalhe: string;
+}
+
+export interface HistoricoClienteResponse {
+  cliente_id: string;
+  gerado_em: string;
+  anos: HistoricoAno[];
+  eventos: HistoricoEvento[];
+}
+
+export const apiHistoricoCliente = (clienteId: string) =>
+  get<HistoricoClienteResponse>(`/api/crm/historico-cliente?cliente=${encodeURIComponent(clienteId)}`);

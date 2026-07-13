@@ -1141,6 +1141,7 @@ function DashboardContent({
     "Comercial",
     "Produtos",
     "Análise FRV",
+    "Carteira",
     "Campanhas",
     "Ligações",
     "Alugueis",

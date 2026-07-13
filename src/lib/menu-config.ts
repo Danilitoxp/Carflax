@@ -38,6 +38,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Orçamentos" },
       { label: "Meus Pedidos" },
       { label: "Análise FRV" },
+      { label: "Carteira" },
       { label: "Prospecções" },
       { label: "Campanhas" },
       { label: "Alugueis" },
@@ -151,7 +152,7 @@ const PUBLIC_SECTIONS = [
 ];
 
 const VENDEDOR_SECTIONS = [
-  "Comercial", "Orçamentos", "Análise FRV", "Ligações", "Campanhas",
+  "Comercial", "Orçamentos", "Análise FRV", "Carteira", "Ligações", "Campanhas",
   "Alugueis", "Logística", "Romaneios", "Entregas",
 ];
 
@@ -160,7 +161,7 @@ const MARKETING_SECTIONS = [
 ];
 
 const VENDAS_SECTIONS = [
-  "Comercial", "Orçamentos", "Meus Pedidos", "Análise FRV", "Prospecções", "Campanhas", "Alugueis", "Relatórios",
+  "Comercial", "Orçamentos", "Meus Pedidos", "Análise FRV", "Carteira", "Prospecções", "Campanhas", "Alugueis", "Relatórios",
 ];
 
 // Módulos de Gestão & Admin liberados automaticamente para líderes
