@@ -24,10 +24,10 @@ export interface MarketingCliente {
   fixado?: boolean;
   motivo_arquivamento?: string;
   mensagens_nao_lidas?: number;
-  valor_venda?: number;
-  data_venda?: string;
-  valor_orcamento?: number;
-  data_orcamento?: string;
+  valor_venda?: number | null;
+  data_venda?: string | null;
+  valor_orcamento?: number | null;
+  data_orcamento?: string | null;
   origem?: string;
   campanha?: string;
   forma_pagamento?: string;
