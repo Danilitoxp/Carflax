@@ -46,6 +46,8 @@ export interface Orcamento {
   client: string;
   date: string;
   time: string;
+  /** Data da baixa/faturamento (venda) vinda do ERP — só existe quando faturado. */
+  saleDate?: string;
   total: string;
   markup: string;
   status: string;
@@ -115,6 +117,12 @@ function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
       : "";
     const hora = String(r.HORA_ORCAMENTO || "00:00:00").slice(0, 5);
 
+    // Data da venda: prefere DATA_VENDA (baixa ou, na falta, data do pedido); cai para DATA_BAIXA.
+    const vendaRaw = r.DATA_VENDA || (r.DATA_BAIXA && r.DATA_BAIXA !== "SEM DATA" ? r.DATA_BAIXA : "");
+    const saleDate = vendaRaw && vendaRaw.length >= 10
+      ? `${vendaRaw.slice(8, 10)}/${vendaRaw.slice(5, 7)}/${vendaRaw.slice(0, 4)}`
+      : undefined;
+
     let defaultStatus = "EMITIDO";
     if (r.MOTIVO_CANCELAMENTO !== "SEM MOTIVO") defaultStatus = "PERDIDO";
     else if (r.PEDIDO === "Sim" || r.NOTA_FISCAL || (r.DATA_BAIXA && r.DATA_BAIXA !== "SEM DATA")) defaultStatus = "VENDA";
@@ -125,6 +133,7 @@ function parseOrcamentos(raw: CrmOrcamento[]): Orcamento[] {
       client: parseName(r.CLIENTE),
       date: dateBR,
       time: hora,
+      saleDate,
       total: total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       markup: `${avgMarkup.toFixed(1)}%`,
       status: defaultStatus,
@@ -238,6 +247,12 @@ const OrcamentoRow = memo(({ item, isAdmin, showDualColumns, onOpenItems, onOpen
             </div>
             {item.status === "PERDIDO" && (
               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{item.lossReason || "Não Informado"}</span>
+            )}
+            {item.status === "VENDA" && item.saleDate && (
+              <div className="flex items-center gap-0.5 text-[8px] font-bold text-emerald-600 dark:text-emerald-400" title="Data da venda (faturamento)">
+                <Calendar className="w-2.5 h-2.5" />
+                <span>{item.saleDate}</span>
+              </div>
             )}
             {(item.status === "ENVIADO" || item.status === "NEGOCIAÇÃO") && item.lembreteData && (() => {
               const raw = item.lembreteData!;

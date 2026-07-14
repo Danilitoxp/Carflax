@@ -998,6 +998,8 @@ export function WhatsappView({
   const [allProducts, setAllProducts] = useState<NormalizedProduct[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [chatSearch, setChatSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<Chat[]>([]);
+  const [searching, setSearching] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [cartProducts, setCartProducts] = useState<NormalizedProduct[]>([]);
   const [avgResponseTime, setAvgResponseTime] = useState<number | null>(null);
@@ -1379,6 +1381,26 @@ export function WhatsappView({
     },
     [],
   );
+
+  // Busca no servidor: encontra qualquer lead por nome ou telefone (com ou sem máscara),
+  // independente de estar arquivado ou ativo. Debounce para não consultar a cada tecla.
+  useEffect(() => {
+    const term = chatSearch.trim();
+    if (!term) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      const results = await marketingService.searchClientes(term);
+      setSearchResults(sortChats(results.map(mapClienteToChat)));
+      setSearching(false);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [chatSearch, mapClienteToChat]);
 
   const loadMoreChats = useCallback(async () => {
     // Guard síncrono via ref: bloqueia os múltiplos disparos que o evento de scroll
@@ -2888,13 +2910,25 @@ export function WhatsappView({
   const filteredChats = useMemo(() => {
     const searchLower = chatSearch.trim().toLowerCase();
     if (!searchLower) return displayedChats;
-    return displayedChats.filter(
+
+    // Durante a busca ignoramos o filtro arquivado/ativo: o resultado do servidor
+    // (searchResults) já traz qualquer lead que casa por nome ou telefone. Combinamos
+    // com os chats já carregados em memória para exibição instantânea, sem duplicar.
+    const digits = searchLower.replace(/\D/g, "");
+    const localMatches = chats.filter(
       (c) =>
         c.name.toLowerCase().includes(searchLower) ||
         c.id.toLowerCase().includes(searchLower) ||
-        c.lastMessage.toLowerCase().includes(searchLower),
+        c.lastMessage.toLowerCase().includes(searchLower) ||
+        (digits.length > 0 && c.id.replace(/\D/g, "").includes(digits)),
     );
-  }, [displayedChats, chatSearch]);
+
+    const byId = new Map<string, Chat>();
+    for (const c of [...localMatches, ...searchResults]) {
+      if (!byId.has(c.id)) byId.set(c.id, c);
+    }
+    return sortChats([...byId.values()]);
+  }, [displayedChats, chats, searchResults, chatSearch]);
 
   const filteredProducts = useMemo(() => {
     const searchLower = productSearch.trim().toLowerCase();
@@ -4210,6 +4244,22 @@ export function WhatsappView({
                 </div>
               </button>
             ))
+          )}
+          {!loading && searching && filteredChats.length === 0 && (
+            <div className="flex flex-col items-center py-12 gap-2 opacity-50">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="text-[10px] font-black uppercase tracking-widest">
+                Buscando...
+              </span>
+            </div>
+          )}
+          {!loading && !searching && chatSearch.trim() && filteredChats.length === 0 && (
+            <div className="flex flex-col items-center py-12 gap-2 opacity-50 text-center px-4">
+              <Search className="w-6 h-6" />
+              <span className="text-[10px] font-black uppercase tracking-widest">
+                Nenhum lead encontrado
+              </span>
+            </div>
           )}
           {loadingMoreChats && (
             <div className="flex items-center justify-center py-4">

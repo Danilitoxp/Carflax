@@ -1,5 +1,14 @@
 import { supabase } from "./supabase";
 
+/**
+ * Escapa um valor para uso dentro de um filtro `.or()`/`.ilike()` do PostgREST.
+ * Sem isso, caracteres reservados como ( ) , da máscara de telefone quebram a query.
+ * O valor deve ser envolvido em aspas duplas na condição (ex: `col.ilike."%valor%"`).
+ */
+function pgSafe(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 export interface MarketingCliente {
   id?: string;
   remote_jid: string;
@@ -236,6 +245,39 @@ export const marketingService = {
   },
 
   /**
+   * Busca clientes por nome ou telefone, independente de estarem arquivados.
+   * O telefone é buscado apenas pelos dígitos (ignora máscara: parênteses, espaços, traços).
+   */
+  async searchClientes(term: string, limit = 50): Promise<MarketingCliente[]> {
+    const trimmed = term.trim();
+    if (!trimmed) return [];
+
+    const digits = trimmed.replace(/\D/g, "");
+    const orConditions = [
+      `nome.ilike."%${pgSafe(trimmed)}%"`,
+      `push_name.ilike."%${pgSafe(trimmed)}%"`,
+      `remote_jid.ilike."%${pgSafe(trimmed)}%"`,
+    ];
+    if (digits) {
+      orConditions.push(`remote_jid.ilike."%${digits}%"`);
+    }
+
+    const { data, error } = await supabase
+      .from("marketing_clientes")
+      .select("*")
+      .like("remote_jid", "%@s.whatsapp.net")
+      .or(orConditions.join(","))
+      .order("ultima_conversa_em", { ascending: false, nullsFirst: false })
+      .limit(limit);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao buscar clientes:", error.message);
+      return [];
+    }
+    return (data || []) as MarketingCliente[];
+  },
+
+  /**
    * Busca todos os clientes/contatos
    */
   async getClientes(includeArchived = false) {
@@ -458,7 +500,20 @@ export const marketingService = {
       .or("status.is.null,and(status.neq.Negociando,status.neq.Convertido)");
 
     if (search) {
-      query = query.or(`nome.ilike.%${search}%,push_name.ilike.%${search}%,remote_jid.ilike.%${search}%`);
+      // O telefone é salvo apenas com dígitos no remote_jid (ex: 5511997493556@...),
+      // então buscamos o número sem a máscara (parênteses, espaços, traços).
+      const digits = search.replace(/\D/g, "");
+      // Aspas obrigatórias: sem elas, caracteres como ( ) , da máscara do telefone
+      // são interpretados como sintaxe do .or() do PostgREST e quebram a query.
+      const orConditions = [
+        `nome.ilike."%${pgSafe(search)}%"`,
+        `push_name.ilike."%${pgSafe(search)}%"`,
+        `remote_jid.ilike."%${pgSafe(search)}%"`,
+      ];
+      if (digits) {
+        orConditions.push(`remote_jid.ilike."%${digits}%"`);
+      }
+      query = query.or(orConditions.join(","));
     }
 
     if (filterTemperature !== "Todas as Temperaturas") {
@@ -667,22 +722,26 @@ export const marketingService = {
       getTempCount('Quente')
     ]);
 
-    // Faturamento no período (da tabela marketing_vendas)
+    // Faturamento no período: soma do valor_venda dos leads, atribuído pela data_venda.
     const { data: salesInPeriod } = await supabase
-      .from('marketing_vendas')
-      .select('valor')
-      .gte('created_at', start.toISOString())
-      .lte('created_at', end.toISOString());
+      .from('marketing_clientes')
+      .select('valor_venda')
+      .gt('valor_venda', 0)
+      .not('data_venda', 'is', null)
+      .gte('data_venda', start.toISOString())
+      .lte('data_venda', end.toISOString());
 
     // Faturamento no mês inteiro
     const { data: salesMonth } = await supabase
-      .from('marketing_vendas')
-      .select('valor')
-      .gte('created_at', firstDayOfMonth)
-      .lte('created_at', lastDayOfMonth);
+      .from('marketing_clientes')
+      .select('valor_venda')
+      .gt('valor_venda', 0)
+      .not('data_venda', 'is', null)
+      .gte('data_venda', firstDayOfMonth)
+      .lte('data_venda', lastDayOfMonth);
 
-    const billingInPeriod = (salesInPeriod || []).reduce((acc, s) => acc + (Number(s.valor) || 0), 0);
-    const billingMonth = (salesMonth || []).reduce((acc, s) => acc + (Number(s.valor) || 0), 0);
+    const billingInPeriod = (salesInPeriod || []).reduce((acc, s) => acc + (Number(s.valor_venda) || 0), 0);
+    const billingMonth = (salesMonth || []).reduce((acc, s) => acc + (Number(s.valor_venda) || 0), 0);
 
     return {
       leadsToday: leadsInPeriod || 0,
@@ -825,11 +884,15 @@ export const marketingService = {
         .not("valor_orcamento", "is", null)
         .gte("data_orcamento", startIso)
         .lte("data_orcamento", endIso),
+      // Vendas: fonte é o valor_venda preenchido no lead (modal de edição), atribuído
+      // pela data_venda. Cada lead com venda conta como uma venda, já com vendedor/origem/campanha.
       supabase
-        .from("marketing_vendas")
-        .select("remote_jid, valor, created_at")
-        .gte("created_at", startIso)
-        .lte("created_at", endIso),
+        .from("marketing_clientes")
+        .select("remote_jid, vendedor_id, origem, campanha, valor_venda, data_venda")
+        .gt("valor_venda", 0)
+        .not("data_venda", "is", null)
+        .gte("data_venda", startIso)
+        .lte("data_venda", endIso),
       supabase
         .from("marketing_whatsapp")
         .select("remote_jid, sender, timestamp, vendedor_id")
@@ -841,25 +904,20 @@ export const marketingService = {
 
     const leads = leadsRaw || [];
     const quotes = quotesRaw || [];
-    const sales = salesRaw || [];
+    // Cada lead com venda vira uma venda, já com vendedor/origem/campanha e a data da venda.
+    const sales = (salesRaw || []).map((s) => ({
+      remote_jid: s.remote_jid,
+      valor: Number(s.valor_venda) || 0,
+      vendedor_id: s.vendedor_id as string | null | undefined,
+      origem: s.origem as string | null | undefined,
+      campanha: s.campanha as string | null | undefined,
+      data_venda: s.data_venda as string,
+    }));
     const msgs = msgsRaw || [];
 
     const userNames = new Map<string, string>();
     const userAvatars = new Map<string, string | null>();
     (usersRaw || []).forEach((u) => { userNames.set(u.id, u.name); userAvatars.set(u.id, u.avatar); });
-
-    // Mapa remote_jid -> dados do lead (vendedor/origem/campanha) para atribuir vendas.
-    const leadByJid = new Map<string, { vendedor_id?: string | null; origem?: string | null; campanha?: string | null }>();
-    leads.forEach((l) => leadByJid.set(l.remote_jid, { vendedor_id: l.vendedor_id, origem: l.origem, campanha: l.campanha }));
-    // Vendas podem ser de leads criados fora do período: completa o mapa.
-    const missingSaleJids = [...new Set(sales.map((s) => s.remote_jid).filter((j) => !leadByJid.has(j)))];
-    if (missingSaleJids.length > 0) {
-      const { data: extra } = await supabase
-        .from("marketing_clientes")
-        .select("remote_jid, vendedor_id, origem, campanha")
-        .in("remote_jid", missingSaleJids);
-      (extra || []).forEach((l) => leadByJid.set(l.remote_jid, { vendedor_id: l.vendedor_id, origem: l.origem, campanha: l.campanha }));
-    }
 
     // --- Tempo de 1ª resposta por conversa, atribuído a quem respondeu ---
     const byJidMsgs: Record<string, { sender: string; timestamp: string; vendedor_id?: string | null }[]> = {};
@@ -905,7 +963,7 @@ export const marketingService = {
       acc.quotesValue += Number(q.valor_orcamento) || 0;
     });
     sales.forEach((s) => {
-      const sid = leadByJid.get(s.remote_jid)?.vendedor_id || "sem_vendedor";
+      const sid = s.vendedor_id || "sem_vendedor";
       const acc = ensureSeller(sid);
       acc.salesCount += 1;
       acc.salesValue += Number(s.valor) || 0;
@@ -957,7 +1015,7 @@ export const marketingService = {
       originAcc.set(key, acc);
     });
     sales.forEach((s) => {
-      const key = normOrigin(leadByJid.get(s.remote_jid)?.origem);
+      const key = normOrigin(s.origem);
       const acc = originAcc.get(key) || { leads: 0, salesCount: 0, salesValue: 0 };
       acc.salesCount += 1;
       acc.salesValue += Number(s.valor) || 0;
@@ -977,7 +1035,7 @@ export const marketingService = {
       campaignAcc.set(key, acc);
     });
     sales.forEach((s) => {
-      const key = normCampaign(leadByJid.get(s.remote_jid)?.campanha);
+      const key = normCampaign(s.campanha);
       const acc = campaignAcc.get(key) || { leads: 0, salesCount: 0, salesValue: 0 };
       acc.salesCount += 1;
       acc.salesValue += Number(s.valor) || 0;
@@ -1007,7 +1065,7 @@ export const marketingService = {
       const e = dayMap.get(k); if (e) e.leads += 1;
     });
     sales.forEach((s) => {
-      const k = dayKey(s.created_at);
+      const k = dayKey(s.data_venda);
       const e = dayMap.get(k); if (e) { e.sales += 1; e.salesValue += Number(s.valor) || 0; }
     });
     const dailySeries: DailyPoint[] = [...dayMap.entries()].map(([date, v]) => ({ date, ...v }));
@@ -1023,12 +1081,14 @@ export const marketingService = {
         .gte("created_at", prevStart.toISOString())
         .lte("created_at", prevEnd.toISOString()),
       supabase
-        .from("marketing_vendas")
-        .select("valor")
-        .gte("created_at", prevStart.toISOString())
-        .lte("created_at", prevEnd.toISOString()),
+        .from("marketing_clientes")
+        .select("valor_venda")
+        .gt("valor_venda", 0)
+        .not("data_venda", "is", null)
+        .gte("data_venda", prevStart.toISOString())
+        .lte("data_venda", prevEnd.toISOString()),
     ]);
-    const prevSalesValue = (prevSales || []).reduce((acc, s) => acc + (Number(s.valor) || 0), 0);
+    const prevSalesValue = (prevSales || []).reduce((acc, s) => acc + (Number(s.valor_venda) || 0), 0);
 
     // --- Totais e conversões ---
     const leadsCount = leads.length;
@@ -1078,17 +1138,20 @@ export const marketingService = {
         .select('*')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString()),
+      // Vendas: valor_venda preenchido no lead, atribuído pela data_venda.
       supabase
-        .from('marketing_vendas')
-        .select('remote_jid, valor, created_at')
-        .gte('created_at', start.toISOString())
-        .lte('created_at', end.toISOString())
+        .from('marketing_clientes')
+        .select('remote_jid, valor_venda, data_venda')
+        .gt('valor_venda', 0)
+        .not('data_venda', 'is', null)
+        .gte('data_venda', start.toISOString())
+        .lte('data_venda', end.toISOString())
     ]);
 
     const vendasByJid: Record<string, { valor: number; created_at: string }[]> = {};
     (vendasNoPeriodo || []).forEach(v => {
       if (!vendasByJid[v.remote_jid]) vendasByJid[v.remote_jid] = [];
-      vendasByJid[v.remote_jid].push({ valor: Number(v.valor) || 0, created_at: v.created_at });
+      vendasByJid[v.remote_jid].push({ valor: Number(v.valor_venda) || 0, created_at: v.data_venda as string });
     });
 
     const jidsComVenda = Object.keys(vendasByJid);

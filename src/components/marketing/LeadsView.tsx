@@ -17,6 +17,17 @@ import type { MarketingCliente } from "@/lib/marketing-service";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 
+// Formata o texto digitado como moeda pt-BR (ex: "195646" -> "1.956,46"),
+// tratando os dígitos como centavos.
+function formatCurrencyInput(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  return (parseInt(digits, 10) / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 const TEMP_CONFIG = {
   Quente: { color: "text-rose-500 bg-rose-500/10 border-rose-500/20", dot: "bg-rose-500" },
   Morno:  { color: "text-amber-500 bg-amber-500/10 border-amber-500/20", dot: "bg-amber-500" },
@@ -41,6 +52,8 @@ export function LeadsView() {
   const [editNome, setEditNome] = useState("");
   const [editOrigem, setEditOrigem] = useState("");
   const [editCampanha, setEditCampanha] = useState("");
+  const [editValorVenda, setEditValorVenda] = useState("");
+  const [editDataVenda, setEditDataVenda] = useState("");
   const [savingLead, setSavingLead] = useState(false);
 
   // Debounce search
@@ -106,6 +119,12 @@ export function LeadsView() {
     setEditNome(lead.nome || lead.push_name || "");
     setEditOrigem(lead.origem || "WhatsApp");
     setEditCampanha(lead.campanha || "");
+    setEditValorVenda(
+      lead.valor_venda != null
+        ? lead.valor_venda.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : ""
+    );
+    setEditDataVenda(lead.data_venda ? lead.data_venda.slice(0, 10) : "");
     setIsEditModalOpen(true);
   };
 
@@ -114,11 +133,17 @@ export function LeadsView() {
     if (!selectedLead) return;
     setSavingLead(true);
     try {
+      const valorParsed = editValorVenda.trim()
+        ? Number(editValorVenda.replace(/\./g, "").replace(",", "."))
+        : null;
+
       const updatedData = {
         ...selectedLead,
         nome: editNome.trim() || undefined,
         origem: editOrigem || undefined,
         campanha: editCampanha.trim() || undefined,
+        valor_venda: valorParsed != null && !Number.isNaN(valorParsed) ? valorParsed : null,
+        data_venda: editDataVenda ? new Date(`${editDataVenda}T00:00:00`).toISOString() : null,
       };
 
       await marketingService.upsertCliente(updatedData);
@@ -423,6 +448,31 @@ export function LeadsView() {
                       onChange={(e) => setEditCampanha(e.target.value)}
                       placeholder="Ex: campanha_corolla_junho"
                     />
+                  </div>
+
+                  {/* Valor e Data da Venda */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Valor da Venda (R$)</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-semibold"
+                        value={editValorVenda}
+                        onChange={(e) => setEditValorVenda(formatCurrencyInput(e.target.value))}
+                        placeholder="Ex: 1500,00"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Data da Venda</label>
+                      <input
+                        type="date"
+                        className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-semibold"
+                        value={editDataVenda}
+                        onChange={(e) => setEditDataVenda(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
 

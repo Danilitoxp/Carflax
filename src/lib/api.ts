@@ -283,6 +283,8 @@ export interface CrmOrcamento {
   VALOR_TOTAL_ORCAMENTO: string;
   MARKUP_DOC?: number | null;
   DATA_BAIXA: string;
+  /** Data da venda: baixa/faturamento ou, na falta, data de entrada do pedido. Pode ser null. */
+  DATA_VENDA?: string | null;
   MOTIVO_CANCELAMENTO: string;
   TELEFONE_CLIENTE?: string;
   PRODUTOS: CrmItem[];
