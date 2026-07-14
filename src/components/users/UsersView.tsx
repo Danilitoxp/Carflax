@@ -362,8 +362,35 @@ export function UsersView() {
     // Busca o email antes de excluir
     const userToDelete = users.find(u => u.id === id);
 
+    // ─── Nullificar / deletar todas as FKs que referenciam este usuário ─────
+    // Mapeado a partir das migrations — evita erro 23503 ao deletar.
+    const cleanupResults = await Promise.allSettled([
+      // esteira_notificacoes: destino é NOT NULL → deletar; actor_id → nulificar
+      supabase.from("esteira_notificacoes").delete().eq("destino", id),
+      supabase.from("esteira_notificacoes").update({ actor_id: null }).eq("actor_id", id),
+      // esteira_subquadros: created_by → nulificar
+      supabase.from("esteira_subquadros").update({ created_by: null }).eq("created_by", id),
+      // marketing_esteira: owner_id e created_by → nulificar
+      supabase.from("marketing_esteira").update({ owner_id: null }).eq("owner_id", id),
+      supabase.from("marketing_esteira").update({ created_by: null }).eq("created_by", id),
+      // marketing_clientes: vendedor_id → nulificar
+      supabase.from("marketing_clientes").update({ vendedor_id: null }).eq("vendedor_id", id),
+      // usuarios: responsavel_id tem ON DELETE SET NULL na migration → automático,
+      // mas forçamos manualmente por segurança
+      supabase.from("usuarios").update({ responsavel_id: null }).eq("responsavel_id", id),
+    ]);
+
+    // Log de qualquer cleanup que falhou (informativo, não bloqueia)
+    cleanupResults.forEach((r, i) => {
+      if (r.status === "rejected") console.warn(`[Users] Cleanup FK[${i}] falhou:`, r.reason);
+    });
+
     const { error } = await supabase.from("usuarios").delete().eq("id", id);
-    if (error) { console.error("[Users] Erro ao excluir:", error); return; }
+    if (error) {
+      console.error("[Users] Erro ao excluir — JSON:", JSON.stringify(error, null, 2));
+      alert(`Não foi possível excluir o usuário.\nTabela bloqueando: ${error.details || error.message}`);
+      return;
+    }
     setUsers(prev => prev.filter(u => u.id !== id));
 
     // Remove também do Auth do Supabase (em segundo plano)
