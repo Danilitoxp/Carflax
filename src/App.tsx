@@ -41,6 +41,7 @@ import { ESTEIRA_SUBQUADRO_PREFIX, canAccessSection } from "@/lib/menu-config";
 import { useNotification } from "@/hooks/useNotification";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 import { usePedidosParadosAlert } from "@/hooks/usePedidosParadosAlert";
+import { useBalcao2PrazoAlert } from "@/hooks/useBalcao2PrazoAlert";
 import { useRetiradaAlert, startAlertSound, stopAlertSound } from "@/hooks/useRetiradaAlert";
 import { BellRing } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
@@ -84,7 +85,8 @@ function DashboardContent({
 }: DashboardContentProps) {
   const { showNotification } = useNotification();
   usePedidosParadosAlert(showNotification, userProfile);
-  
+  useBalcao2PrazoAlert(showNotification, userProfile);
+
   const [activeRetiradaAlert, setActiveRetiradaAlert] = useState<{ cliente: string; pedido: string } | null>(null);
 
   useRetiradaAlert((cliente, pedido) => {

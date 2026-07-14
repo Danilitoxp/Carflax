@@ -19,8 +19,51 @@ import {
   Store,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isBalcao2, parseOrderCreated, b2RemainingMs, formatB2Remaining, B2_AVISO_MS } from "@/lib/balcao2-prazo";
 
 const API_SERVER = "https://marketing-banco-de-dados.velbav.easypanel.host";
+
+/* ─── Contador de prazo Balcão 2 (72h) ───────────────────────── */
+
+function Balcao2Prazo({
+  tipoMov,
+  localRet,
+  dtaent,
+  horent,
+}: {
+  tipoMov?: string;
+  localRet?: string;
+  dtaent?: string;
+  horent?: string;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const i = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(i);
+  }, []);
+
+  if (!isBalcao2(tipoMov, localRet)) return null;
+  const created = parseOrderCreated(dtaent, horent);
+  if (created == null) return null;
+
+  const remaining = b2RemainingMs(created, now);
+  const overdue = remaining <= 0;
+  const critico = remaining <= B2_AVISO_MS; // faltando 1 dia ou menos
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border",
+        "bg-red-500/15 text-red-400 border-red-500/40",
+        (overdue || critico) && "animate-pulse"
+      )}
+      title={overdue ? "Prazo de 72h estourado" : "Prazo de retirada (72h)"}
+    >
+      <Clock className="w-3 h-3" />
+      {overdue ? formatB2Remaining(remaining) : `${formatB2Remaining(remaining)} restantes`}
+    </span>
+  );
+}
 
 /* ─── Tipos ─────────────────────────────────────────────────── */
 
@@ -824,14 +867,22 @@ function SeparatedOrderCard({
             </span>
           </div>
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock className="w-3.5 h-3.5" />
             <span>{formatDate(order.DATA_ENTRADA)} - {order.FGO_HORENT || "--:--"}</span>
           </div>
-          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", tipoInfo.color)}>
-            {tipoInfo.label}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <Balcao2Prazo
+              tipoMov={order.TIPO_MOVIMENTACAO}
+              localRet={order.LOCAL_RETIRADA}
+              dtaent={order.DATA_ENTRADA}
+              horent={order.FGO_HORENT}
+            />
+            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", tipoInfo.color)}>
+              {tipoInfo.label}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -956,14 +1007,22 @@ function FaturamentoOrderCard({ order, onViewItems }: { order: FaturamentoOrder;
             <span className="font-semibold text-foreground truncate">{order.NOME_VENDEDOR}</span>
           </div>
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock className="w-3.5 h-3.5" />
             <span>{formatDate(order.FGO_DTAENT)} - {order.FGO_HORENT || "--:--"}</span>
           </div>
-          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", tipoInfo.color)}>
-            {tipoInfo.label}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <Balcao2Prazo
+              tipoMov={order.TIPO_MOVIMENTACAO}
+              localRet={order.LOCAL_RETIRADA}
+              dtaent={order.FGO_DTAENT}
+              horent={order.FGO_HORENT}
+            />
+            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", tipoInfo.color)}>
+              {tipoInfo.label}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -1177,14 +1236,22 @@ function OrderCard({
             <span className="font-semibold text-foreground truncate">{order.NOME_VENDEDOR}</span>
           </div>
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock className="w-3.5 h-3.5" />
             <span>{formatDate(order.FGO_DTAENT)} - {order.FGO_HORENT || "--:--"}</span>
           </div>
-          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", delivery.color)}>
-            {delivery.label}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <Balcao2Prazo
+              tipoMov={order.TIPO_MOVIMENTACAO}
+              localRet={order.LOCAL_RETIRADA}
+              dtaent={order.FGO_DTAENT}
+              horent={order.FGO_HORENT}
+            />
+            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", delivery.color)}>
+              {delivery.label}
+            </span>
+          </div>
         </div>
       </div>
     </div>
