@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { MessageSquare, X, Search } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatBrTime, BR_TIMEZONE } from "@/lib/utils";
 import { ChatModal } from "./ChatModal";
 import { type CrmItem } from "@/lib/api";
 
@@ -320,8 +320,8 @@ export function ChatCenter({
                       const yesterday = new Date(now);
                       yesterday.setDate(now.getDate() - 1);
                       const isYesterday = d.toDateString() === yesterday.toDateString();
-                      const dateLabel = isToday ? "Hoje" : isYesterday ? "Ontem" : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-                      const timeLabel = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                      const dateLabel = isToday ? "Hoje" : isYesterday ? "Ontem" : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: BR_TIMEZONE });
+                      const timeLabel = formatBrTime(d);
                       return (
                         <span className="text-[8px] font-black text-muted-foreground uppercase opacity-40 shrink-0 text-right leading-tight flex flex-col items-end gap-0.5">
                           <span>{dateLabel}</span>

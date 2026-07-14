@@ -42,7 +42,7 @@ import {
 import { evolutionApi } from "@/lib/evolution-v2";
 import { supabase } from "@/lib/supabase";
 import { marketingService } from "@/lib/marketing-service";
-import { cn } from "@/lib/utils";
+import { cn, formatBrTime, formatBrDate } from "@/lib/utils";
 import { apiDashboardProdutos, apiGetLinkPreview, apiCrmOrcamentos } from "@/lib/api";
 import { transcribeAudio, classifyTemperature } from "@/lib/gemini-service";
 import { Package } from "lucide-react";
@@ -780,7 +780,7 @@ function getFormattedMessageDate(timestampStr?: string) {
   } else if (msgDate.getTime() === yesterday.getTime()) {
     return "Ontem";
   } else {
-    return date.toLocaleDateString("pt-BR");
+    return formatBrDate(date);
   }
 }
 
@@ -1234,10 +1234,7 @@ export function WhatsappView({
           lastMessage: item.ultima_mensagem || "",
           lastMessageType: inferMsgType(item.ultima_mensagem || ""),
           time: item.ultima_conversa_em
-            ? new Date(item.ultima_conversa_em).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
+            ? formatBrTime(new Date(item.ultima_conversa_em))
             : "",
           unreadCount: item.mensagens_nao_lidas || 0,
           avatar: item.foto_url || "",
@@ -1347,10 +1344,7 @@ export function WhatsappView({
         lastMessage: item.ultima_mensagem || "",
         lastMessageType: inferMsgType(item.ultima_mensagem || ""),
         time: item.ultima_conversa_em
-          ? new Date(item.ultima_conversa_em).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
+          ? formatBrTime(new Date(item.ultima_conversa_em))
           : "",
         unreadCount: item.mensagens_nao_lidas || 0,
         avatar: item.foto_url || "",
@@ -1842,10 +1836,7 @@ export function WhatsappView({
         sendBrowserNotification(`Nova mensagem de ${senderName}`, text);
       }
 
-      const time = new Date(timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      const time = formatBrTime(new Date(timestamp));
 
       const msgId = message.key?.id || Date.now().toString();
 
@@ -2452,10 +2443,7 @@ export function WhatsappView({
             const newMsg: Message = {
               id: m.message_id,
               text: m.texto || "",
-              time: new Date(m.timestamp).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
+              time: formatBrTime(new Date(m.timestamp)),
               rawTimestamp: m.timestamp,
               sender: m.sender,
               status: (m.status as "sent" | "delivered" | "read") || "sent",
@@ -2605,10 +2593,7 @@ export function WhatsappView({
     try {
       const msgId = "me_" + Date.now().toString();
       const timestamp = new Date().toISOString();
-      const time = new Date(timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      const time = formatBrTime(new Date(timestamp));
 
       const quoted = replyingMessage
         ? {
@@ -2716,10 +2701,7 @@ export function WhatsappView({
 
       const msgId = "doc_" + Date.now();
       const timestamp = new Date().toISOString();
-      const time = new Date(timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      const time = formatBrTime(new Date(timestamp));
 
       const quoted = replyingMessage
         ? {
@@ -3244,10 +3226,7 @@ export function WhatsappView({
       const msgs: Message[] = dbMessages.map((m) => ({
         id: m.message_id,
         text: m.texto || "",
-        time: new Date(m.timestamp).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        time: formatBrTime(new Date(m.timestamp)),
         rawTimestamp: m.timestamp,
         sender: m.sender,
         status: (m.status as "sent" | "delivered" | "read") || "sent",
@@ -3315,10 +3294,7 @@ export function WhatsappView({
       const mapped: Message[] = older.map((m) => ({
         id: m.message_id,
         text: m.texto || "",
-        time: new Date(m.timestamp).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        time: formatBrTime(new Date(m.timestamp)),
         rawTimestamp: m.timestamp,
         sender: m.sender,
         status: (m.status as "sent" | "delivered" | "read") || "sent",
@@ -3550,10 +3526,7 @@ export function WhatsappView({
     const noteMsg: Message = {
       id: noteMsgId,
       text: noteText,
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      time: formatBrTime(new Date()),
       rawTimestamp,
       sender: "me",
       status: "read",
@@ -4304,12 +4277,7 @@ export function WhatsappView({
                     ) : lastSeenMap.current.has(selectedChat.id) ? (
                       <p className="text-[10px] text-muted-foreground font-medium">
                         visto por último às{" "}
-                        {lastSeenMap.current
-                          .get(selectedChat.id)!
-                          .toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                        {formatBrTime(lastSeenMap.current.get(selectedChat.id)!)}
                       </p>
                     ) : (
                       <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">

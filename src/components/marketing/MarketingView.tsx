@@ -6,6 +6,7 @@ import { LeadsView } from "./LeadsView";
 import { ReportsView } from "./ReportsView";
 import { CronogramaView } from "./CronogramaView";
 import { PosVendaView } from "./PosVendaView";
+import { CriativoView } from "./criativo/CriativoView";
 
 interface UserProfile {
   id?: string;
@@ -36,6 +37,10 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
 
   if (activeTab === "Leads") {
     return <LeadsView />;
+  }
+
+  if (activeTab === "Criativo") {
+    return <CriativoView />;
   }
 
   if (activeTab === "Cronograma") {

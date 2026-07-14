@@ -1166,6 +1166,7 @@ function DashboardContent({
     "Whatsapp Go",
     "Cronograma",
     "Leads",
+    "Criativo",
     "Pós-Venda",
     "Relatórios Mkt",
   ].includes(activeItem);

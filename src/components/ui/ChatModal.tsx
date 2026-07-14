@@ -14,7 +14,7 @@ import {
   Phone,
   AlertCircle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatBrTime } from "@/lib/utils";
 import { getConversas, addConversa, getResponsavelIdForVendedor, type CrmConversa } from "@/lib/crm-service";
 import { supabase } from "@/lib/supabase";
 import { apiCrmOrcamentos, mapCrmItem, type CrmItem } from "@/lib/api";
@@ -653,7 +653,7 @@ export function ChatModal({
   const formatTime = (ts?: string) => {
     if (!ts) return "";
     try {
-      return new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      return formatBrTime(ts);
     } catch {
       return "";
     }

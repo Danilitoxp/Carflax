@@ -52,6 +52,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Whatsapp", value: "Whatsapp Evolution" },
       { label: "Whatsapp Go" },
       { label: "Leads" },
+      { label: "Criativo" },
       { label: "Cronograma" },
       { label: "Pós-Venda" },
       { label: "Relatórios", value: "Relatórios Mkt" },
@@ -161,7 +162,7 @@ const VENDEDOR_SECTIONS = [
 ];
 
 const MARKETING_SECTIONS = [
-  "Marketing", "Whatsapp Evolution", "Whatsapp Go", "Leads", "Cronograma", "Pós-Venda", "Relatórios Mkt",
+  "Marketing", "Whatsapp Evolution", "Whatsapp Go", "Leads", "Criativo", "Cronograma", "Pós-Venda", "Relatórios Mkt",
 ];
 
 const VENDAS_SECTIONS = [

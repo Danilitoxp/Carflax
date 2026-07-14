@@ -457,13 +457,33 @@ export const marketingService = {
       updatePayload.observacao = observacao;
     }
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from("marketing_clientes")
       .update(updatePayload)
       .eq("remote_jid", remoteJid);
 
+    // Resiliência: se as colunas opcionais (forma_pagamento/observacao) não existirem
+    // na tabela, o Postgres rejeita o update inteiro (PGRST204). Refaz sem esses campos
+    // para o arquivamento não quebrar — a forma de pagamento/observação só é salva se as
+    // colunas existirem no banco.
+    const missingColumn = error && (error.code === "PGRST204" || error.code === "42703");
+    if (missingColumn) {
+      delete updatePayload.forma_pagamento;
+      delete updatePayload.observacao;
+      ({ error } = await supabase
+        .from("marketing_clientes")
+        .update(updatePayload)
+        .eq("remote_jid", remoteJid));
+    }
+
     if (error) {
-      console.error("[MarketingService] Erro ao arquivar/desarquivar:", error);
+      console.error(
+        "[MarketingService] Erro ao arquivar/desarquivar:",
+        error.message,
+        "| details:", error.details,
+        "| hint:", error.hint,
+        "| code:", error.code
+      );
       throw error;
     }
   },

@@ -7,6 +7,7 @@ import {
 import { evolutionGoApi } from "../../../lib/evolution-go";
 import type { GoInstance, GoChat, GoMessage } from "../../../lib/evolution-go";
 import { marketingService } from "../../../lib/marketing-service";
+import { formatBrTime, BR_TIMEZONE } from "../../../lib/utils";
 import { supabase } from "../../../lib/supabase";
 
 interface WhatsappGoViewProps {
@@ -22,8 +23,8 @@ function formatTime(ts: number): string {
   const d = new Date(ts > 1e10 ? ts : ts * 1000);
   const now = new Date();
   if (d.toDateString() === now.toDateString())
-    return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    return formatBrTime(d);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: BR_TIMEZONE });
 }
 
 function getInitials(name?: string) {
