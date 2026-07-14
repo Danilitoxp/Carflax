@@ -103,6 +103,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ex@carflax.com"
+                    autoComplete="email"
                     className="w-full bg-secondary/50 dark:bg-white/[0.03] border border-border/50 dark:border-white/10 rounded-2xl pl-14 pr-6 py-4 text-sm font-bold outline-none focus:border-[#0053FC]/50 focus:ring-4 focus:ring-[#0053FC]/5 transition-all placeholder:text-muted-foreground/30 text-foreground"
                     required
                   />
@@ -121,6 +122,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
+                    autoComplete="current-password"
                     className="w-full bg-secondary/50 dark:bg-white/[0.03] border border-border/50 dark:border-white/10 rounded-2xl pl-14 pr-14 py-4 text-sm font-bold outline-none focus:border-[#0053FC]/50 focus:ring-4 focus:ring-[#0053FC]/5 transition-all placeholder:text-muted-foreground/30 text-foreground"
                     required
                   />

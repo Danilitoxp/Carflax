@@ -68,6 +68,19 @@ Deno.serve(async (req: Request) => {
     // Exclui do Auth
     const { error: deleteError } = await supabase.auth.admin.deleteUser(authUser.id);
     if (deleteError) {
+      // 409 Conflict = usuário já foi removido / não existe mais — tratar como sucesso
+      const isAlreadyGone =
+        deleteError.message?.toLowerCase().includes('not found') ||
+        deleteError.message?.toLowerCase().includes('conflict') ||
+        (deleteError as unknown as { status?: number }).status === 409;
+
+      if (isAlreadyGone) {
+        return new Response(
+          JSON.stringify({ ok: true, skipped: true, message: 'Usuário já removido do Auth' }),
+          { status: 200, headers: CORS_HEADERS }
+        );
+      }
+
       return new Response(JSON.stringify({ error: deleteError.message }), {
         status: 400,
         headers: CORS_HEADERS,
