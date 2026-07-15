@@ -64,6 +64,7 @@ export interface UserProfile {
   is_admin?: boolean;
   phone?: string;
   whatsapp?: string;
+  ramal?: string;
   responsavel_id?: string;
   is_leader?: boolean;
 }
@@ -1670,6 +1671,7 @@ function App() {
             // coluna ainda não existir ou estiver vazia.
             phone: data.phone || authUser?.user_metadata?.phone || authUser?.phone || "",
             whatsapp: data.whatsapp || authUser?.user_metadata?.whatsapp || "",
+            ramal: data.ramal || authUser?.user_metadata?.ramal || "",
           };
           setProfile(mergedProfile);
           fetchVendedorMetrics(mergedProfile);

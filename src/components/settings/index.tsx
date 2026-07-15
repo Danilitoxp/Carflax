@@ -46,6 +46,7 @@ interface UserProfile {
   department?: string;
   phone?: string;
   whatsapp?: string;
+  ramal?: string;
   permissions?: string[];
   is_admin?: boolean;
   is_leader?: boolean;
@@ -293,6 +294,7 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
     nome: userProfile?.name || "",
     email: userProfile?.email || "",
     telefone: formatPhone(userProfile?.phone || userProfile?.whatsapp || ""),
+    ramal: userProfile?.ramal || "",
     cargo: userProfile?.role || "",
     avatar: userProfile?.avatar || "",
   }));
@@ -306,6 +308,7 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
       nome: userProfile.name || "",
       email: userProfile.email || "",
       telefone: formatPhone(userProfile.phone || userProfile.whatsapp || ""),
+      ramal: userProfile.ramal || "",
       cargo: userProfile.role || "",
       avatar: userProfile.avatar || "",
     });
@@ -369,21 +372,22 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
       //    Tolerante a falha: se as colunas ainda não existirem, não quebra o save.
       const { error: phoneError } = await supabase
         .from("usuarios")
-        .update({ phone: form.telefone, whatsapp: form.telefone })
+        .update({ phone: form.telefone, whatsapp: form.telefone, ramal: form.ramal })
         .eq("id", userProfile.id);
 
       if (phoneError) {
         console.warn(
-          "[Settings] Não foi possível salvar phone/whatsapp na tabela usuarios (rode a migração de colunas). Usando apenas o Auth.",
+          "[Settings] Não foi possível salvar phone/whatsapp/ramal na tabela usuarios (rode a migração de colunas). Usando apenas o Auth.",
           phoneError.message
         );
       }
 
-      // 3. Manter telefone/whatsapp também no user_metadata do Supabase Auth.
+      // 3. Manter telefone/whatsapp/ramal também no user_metadata do Supabase Auth.
       const { error: authError } = await supabase.auth.updateUser({
         data: {
           phone: form.telefone,
           whatsapp: form.telefone,
+          ramal: form.ramal,
         }
       });
 
@@ -520,11 +524,18 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
               icon={Smartphone} 
               type="tel" 
             />
-            <SettingsInput 
-              label="CARGO / FUNÇÃO" 
-              value={form.cargo} 
-              onChange={(v) => setForm({ ...form, cargo: v })} 
-              icon={Briefcase} 
+            <SettingsInput
+              label="CARGO / FUNÇÃO"
+              value={form.cargo}
+              onChange={(v) => setForm({ ...form, cargo: v })}
+              icon={Briefcase}
+            />
+            <SettingsInput
+              label="RAMAL"
+              value={form.ramal}
+              onChange={(v) => setForm({ ...form, ramal: v.replace(/\D/g, "") })}
+              icon={Phone}
+              placeholder="Ex: 1000"
             />
           </div>
 
@@ -1235,7 +1246,7 @@ function OrcamentosTab() {
 
 // Valores institucionais fixos (iguais para todos), apenas exibidos.
 const SIGNATURE_COMPANY = {
-  phone: "(11) 4521-9777 | R: 1000",
+  phoneBase: "(11) 4521-9777",
   website: "www.carflax.com.br",
   address: "Av. Américo Bruno Nº 75 | Jundiaí - SP",
 };
@@ -1246,6 +1257,7 @@ const SIG_TEMPLATE = {
     '<text class="st10" transform="translate(267.3 60.19)"><tspan class="st9" x="0" y="0">ZECA</tspan><tspan class="st7" x="57.62" y="0"> </tspan><tspan class="st0" x="63.04" y="0">MORTARELLI JR</tspan></text>',
   roleBlock:
     '<text class="st3" transform="translate(267.28 76.5)"><tspan x="0" y="0">Diretor</tspan></text>',
+  phone: "(11) 4521-9777 | R: 1000",
   whatsapp: "(11) 96848-7958",
   email: "joao@carflax.com.br",
 };
@@ -1324,7 +1336,7 @@ async function getEmbeddedFontStyle(): Promise<string> {
 }
 
 /** Gera o SVG personalizado a partir do template e dos dados do usuário. */
-function buildSignatureSvg(template: string, data: { name: string; role: string; email: string; whatsapp: string }) {
+function buildSignatureSvg(template: string, data: { name: string; role: string; email: string; whatsapp: string; ramal: string }) {
   let out = template;
 
   // Nome: primeiro nome em azul (st9) + restante em cinza (st0), fluindo
@@ -1344,6 +1356,11 @@ function buildSignatureSvg(template: string, data: { name: string; role: string;
     `<text class="st3" transform="translate(267.28 76.5)"><tspan x="0" y="0">${xmlEscape(data.role || "Cargo")}</tspan></text>`;
   out = out.replace(SIG_TEMPLATE.roleBlock, roleSvg);
 
+  // Telefone fixo + ramal por usuário. Se não houver ramal, mostra só o fixo.
+  const ramal = data.ramal.trim();
+  const phoneLine = ramal ? `${SIGNATURE_COMPANY.phoneBase} | R: ${ramal}` : SIGNATURE_COMPANY.phoneBase;
+  out = out.replace(SIG_TEMPLATE.phone, xmlEscape(phoneLine));
+
   // WhatsApp e e-mail (strings únicas no arquivo)
   if (data.whatsapp) out = out.replace(SIG_TEMPLATE.whatsapp, xmlEscape(data.whatsapp));
   if (data.email) out = out.replace(SIG_TEMPLATE.email, xmlEscape(data.email));
@@ -1359,6 +1376,7 @@ function SignatureTab({ userProfile }: { userProfile?: UserProfile | null }) {
     role: userProfile?.role || "",
     email: userProfile?.email || "",
     whatsapp: formatPhone(userProfile?.whatsapp || userProfile?.phone || ""),
+    ramal: userProfile?.ramal || "",
   }));
   const [busy, setBusy] = useState<null | "png" | "copy" | "svg">(null);
   const [feedback, setFeedback] = useState("");
@@ -1371,8 +1389,9 @@ function SignatureTab({ userProfile }: { userProfile?: UserProfile | null }) {
       role: userProfile.role || "",
       email: userProfile.email || "",
       whatsapp: formatPhone(userProfile.whatsapp || userProfile.phone || ""),
+      ramal: userProfile.ramal || "",
     });
-  }, [userProfile?.id, userProfile?.name, userProfile?.role, userProfile?.email, userProfile?.phone, userProfile?.whatsapp]);
+  }, [userProfile?.id, userProfile?.name, userProfile?.role, userProfile?.email, userProfile?.phone, userProfile?.whatsapp, userProfile?.ramal]);
 
   // Carrega o SVG template uma vez (arquivo já está em UTF-8).
   useEffect(() => {
@@ -1557,6 +1576,7 @@ function SignatureTab({ userProfile }: { userProfile?: UserProfile | null }) {
               <SettingsInput label="CARGO / FUNÇÃO" value={me.role} onChange={(v) => setMe({ ...me, role: v })} icon={Briefcase} />
               <SettingsInput label="E-MAIL" value={me.email} onChange={(v) => setMe({ ...me, email: v })} icon={Mail} type="email" />
               <SettingsInput label="WHATSAPP" value={me.whatsapp} onChange={(v) => setMe({ ...me, whatsapp: formatPhone(v) })} icon={Smartphone} type="tel" />
+              <SettingsInput label="RAMAL" value={me.ramal} onChange={(v) => setMe({ ...me, ramal: v.replace(/\D/g, "") })} icon={Phone} placeholder="Ex: 1000" />
             </div>
 
             {/* Dados institucionais (fixos) */}
@@ -1567,7 +1587,7 @@ function SignatureTab({ userProfile }: { userProfile?: UserProfile | null }) {
                 <span className="text-[9px] font-bold text-slate-300 dark:text-slate-700 uppercase tracking-widest ml-auto">Fixos</span>
               </div>
               <div className="space-y-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" /> {SIGNATURE_COMPANY.phone}</p>
+                <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" /> {me.ramal ? `${SIGNATURE_COMPANY.phoneBase} | R: ${me.ramal}` : SIGNATURE_COMPANY.phoneBase}</p>
                 <p className="flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" /> {SIGNATURE_COMPANY.website}</p>
                 <p className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" /> {SIGNATURE_COMPANY.address}</p>
               </div>
