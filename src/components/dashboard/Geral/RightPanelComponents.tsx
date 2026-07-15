@@ -226,8 +226,11 @@ const formatNameTitleCase = (name: string) => {
 };
 
 export function SalesMetricsCard({ isCompact, userProfile, data: externalData, loading: externalLoading, perdidoMap = new Map() }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo, loading?: boolean, perdidoMap?: Map<string, number> }) {
-  const [internalLoading, setInternalLoading] = useState(!externalData);
-  const [data, setData] = useState<VendedorResumo | null>(externalData || null);
+  // Diretor tem visão própria (Total geral); não deve semear o painel com a linha
+  // individual vinda do App — senão pisca a linha do diretor antes do efeito ajustar.
+  const isDirectorInit = (userProfile?.role?.toUpperCase() || "").includes("DIRETOR");
+  const [internalLoading, setInternalLoading] = useState(isDirectorInit ? true : !externalData);
+  const [data, setData] = useState<VendedorResumo | null>(isDirectorInit ? null : (externalData || null));
   const [allVendedores, setAllVendedores] = useState<VendedorResumo[]>([]);
   const [selectedCod, setSelectedCod] = useState<string>("TOTAL");
   // Códigos dos vendedores do time (quando supervisor) — usado para agregar o "perdido"
@@ -448,11 +451,6 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   useEffect(() => {
     let cancelled = false;
 
-    if (externalData) {
-      setData(externalData);
-      setInternalLoading(false);
-    }
-
     const role = userProfile?.role?.toUpperCase() || "";
     const dept = userProfile?.department?.toUpperCase() || "";
     const isComercialDept = dept === "COMERCIAL" || dept === "VENDAS";
@@ -463,11 +461,22 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     const isManager = role === "ADMIN" || isGerenteVendas;
     const isSupervisor = !isManager && !isDirector && (role.includes("SUPERVISOR") || userProfile?.is_leader === true);
 
-    if (externalData && !isManager && !isSupervisor && !isDirector) return;
+    // O diretor tem visão própria (Total geral + times + vendedores no seletor).
+    // O App envia como `externalData` a linha individual do próprio diretor —
+    // se aplicássemos isso, o painel abriria no Total e, ao chegar o externalData,
+    // pularia para a linha do diretor. Por isso, ignoramos o externalData p/ diretor.
+    const extData = isDirector ? undefined : externalData;
+
+    if (extData) {
+      setData(extData);
+      setInternalLoading(false);
+    }
+
+    if (extData && !isManager && !isSupervisor && !isDirector) return;
 
     async function fetchData() {
       try {
-        if (!externalData) setInternalLoading(true);
+        if (!extData) setInternalLoading(true);
         const now = new Date();
         const yyyy = now.getFullYear();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -517,7 +526,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
 
             if (cancelled) return;
             setAllVendedores([...(mediaRow ? [mediaRow] : []), ...teamTotals, ...individuais]);
-            if (!externalData) {
+            if (!extData) {
               if (mediaRow) {
                 setData(mediaRow);
                 setSelectedCod("MEDIA");
@@ -656,7 +665,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             if (cancelled) return;
             setAllVendedores(response);
 
-            if (!externalData) {
+            if (!extData) {
               const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
               if (mediaRow) {
                 setData(mediaRow);
