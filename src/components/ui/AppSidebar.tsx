@@ -15,6 +15,7 @@ import {
   Bell,
   ShieldCheck,
   Palette,
+  Signature,
   Lightbulb,
   FileBadge,
   Plane,
@@ -131,6 +132,7 @@ const settingsItems: MenuItem[] = [
       { label: "Notificações", icon: Bell },
       { label: "Segurança", icon: ShieldCheck },
       { label: "Aparência", icon: Palette },
+      { label: "Assinatura", icon: Signature },
       { label: "Banners", icon: Image },
     ]
   },
@@ -278,7 +280,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
 
     // Itens padrão (que todos vêem) — configurações pessoais + módulos essenciais
     const alwaysAllowed = [
-      "Meu Perfil", "Aparência", "Notificações", "Segurança",
+      "Meu Perfil", "Aparência", "Assinatura", "Notificações", "Segurança",
       "Dashboard", "Geral", "Produtos",
       "Calendário", "Eventos", "Férias",
       "Esteira", "Minha Esteira", "Sugestões"

@@ -25,6 +25,13 @@ import {
   Trash2,
   Send,
   Loader2,
+  Download,
+  Copy,
+  Phone,
+  Globe,
+  MapPin,
+  Building2,
+  Signature,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -345,7 +352,7 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
   async function handleSave() {
     if (!userProfile?.id) return;
     try {
-      // 1. Salvar campos de texto no banco de dados
+      // 1. Salvar campos de texto no banco de dados (fonte de verdade do perfil).
       const { error: dbError } = await supabase
         .from("usuarios")
         .update({
@@ -357,7 +364,22 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
 
       if (dbError) throw dbError;
 
-      // 2. Salvar telefone/whatsapp no user_metadata do Supabase Auth
+      // 2. Persistir telefone/whatsapp também na tabela usuarios, para que outros
+      //    módulos (que leem direto do banco) enxerguem o valor atualizado.
+      //    Tolerante a falha: se as colunas ainda não existirem, não quebra o save.
+      const { error: phoneError } = await supabase
+        .from("usuarios")
+        .update({ phone: form.telefone, whatsapp: form.telefone })
+        .eq("id", userProfile.id);
+
+      if (phoneError) {
+        console.warn(
+          "[Settings] Não foi possível salvar phone/whatsapp na tabela usuarios (rode a migração de colunas). Usando apenas o Auth.",
+          phoneError.message
+        );
+      }
+
+      // 3. Manter telefone/whatsapp também no user_metadata do Supabase Auth.
       const { error: authError } = await supabase.auth.updateUser({
         data: {
           phone: form.telefone,
@@ -367,11 +389,30 @@ function ProfileTab({ userProfile }: { userProfile?: UserProfile | null }) {
 
       if (authError) throw authError;
 
+      // 4. Se o e-mail mudou, atualizar também o e-mail de LOGIN (Auth). Isso
+      //    dispara um e-mail de confirmação; o login só troca após o usuário
+      //    confirmar. Comparamos com o e-mail atual do Auth para não reenviar à toa.
+      let emailChanged = false;
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const currentEmail = (authUser?.email || "").trim().toLowerCase();
+      const newEmail = form.email.trim().toLowerCase();
+      if (newEmail && newEmail !== currentEmail) {
+        const { error: emailError } = await supabase.auth.updateUser({ email: form.email.trim() });
+        if (emailError) throw emailError;
+        emailChanged = true;
+      }
+
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
 
       // Disparar evento para atualizar o perfil globalmente sem refresh
       window.dispatchEvent(new CustomEvent("carflax-profile-updated"));
+
+      if (emailChanged) {
+        alert(
+          "Enviamos um link de confirmação para o novo e-mail. Seu e-mail de LOGIN só será alterado depois que você clicar nesse link. Até lá, continue entrando com o e-mail atual."
+        );
+      }
     } catch (err: unknown) {
       console.error("[Settings] Erro ao salvar dados do perfil:", err);
       const error = err as Error;
@@ -1185,6 +1226,411 @@ function OrcamentosTab() {
    COMPONENTE PRINCIPAL (TINY REDESIGN)
 ───────────────────────────────────────────── */
 
+/* ─────────────────────────────────────────────
+   ASSINATURA DE E-MAIL
+   Usa o SVG oficial (public/carflax-assinatura.svg) como
+   template e troca apenas os campos do usuário logado,
+   preservando 100% do design (logo, notebook, ícones).
+───────────────────────────────────────────── */
+
+// Valores institucionais fixos (iguais para todos), apenas exibidos.
+const SIGNATURE_COMPANY = {
+  phone: "(11) 4521-9777 | R: 1000",
+  website: "www.carflax.com.br",
+  address: "Av. Américo Bruno Nº 75 | Jundiaí - SP",
+};
+
+// Strings originais presentes no SVG, usadas como âncora para substituição.
+const SIG_TEMPLATE = {
+  nameBlock:
+    '<text class="st10" transform="translate(267.3 60.19)"><tspan class="st9" x="0" y="0">ZECA</tspan><tspan class="st7" x="57.62" y="0"> </tspan><tspan class="st0" x="63.04" y="0">MORTARELLI JR</tspan></text>',
+  roleBlock:
+    '<text class="st3" transform="translate(267.28 76.5)"><tspan x="0" y="0">Diretor</tspan></text>',
+  whatsapp: "(11) 96848-7958",
+  email: "joao@carflax.com.br",
+};
+
+function xmlEscape(v: string) {
+  return v
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// Força largura/altura (em px) no <svg> raiz, removendo as existentes. Faz o
+// navegador rasterizar o SVG nativamente nessa resolução (nítido) e sem distorcer.
+function withSvgSize(svg: string, w: number, h: number) {
+  return svg.replace(/<svg\b([^>]*?)>/, (_m, attrs: string) => {
+    const cleaned = attrs.replace(/\swidth="[^"]*"/, "").replace(/\sheight="[^"]*"/, "");
+    return `<svg${cleaned} width="${w}" height="${h}">`;
+  });
+}
+
+// Mede a proporção real (largura/altura) do SVG renderizado no DOM — é a mesma
+// que aparece na pré-visualização, evitando "achatar" a imagem no PNG.
+function measureSvgRatio(svg: string): number {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:absolute;left:-99999px;top:0;width:1000px;visibility:hidden;pointer-events:none";
+  probe.innerHTML = svg;
+  document.body.appendChild(probe);
+  try {
+    const el = probe.querySelector("svg");
+    if (el) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) return r.width / r.height;
+      const vb = el.viewBox?.baseVal;
+      if (vb && vb.width > 0 && vb.height > 0) return vb.width / vb.height;
+    }
+  } finally {
+    probe.remove();
+  }
+  return 850.32 / 234.24; // proporção do modelo como fallback
+}
+
+// ArrayBuffer -> base64 (em blocos, para não estourar a call stack).
+function bufToBase64(buf: ArrayBuffer) {
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+// Monta um <style> com a fonte Montserrat embutida em base64, para que o SVG
+// seja 100% autossuficiente ao ser rasterizado (imagem carregada isoladamente
+// não baixa fontes externas). Resultado é cacheado entre chamadas.
+let cachedFontStyle: string | null = null;
+async function getEmbeddedFontStyle(): Promise<string> {
+  if (cachedFontStyle !== null) return cachedFontStyle;
+  try {
+    const cssRes = await fetch("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap");
+    let css = await cssRes.text();
+    const urls = Array.from(new Set([...css.matchAll(/url\((https:\/\/[^)]+\.woff2)\)/g)].map((m) => m[1])));
+    await Promise.all(
+      urls.map(async (u) => {
+        const fontRes = await fetch(u);
+        const b64 = bufToBase64(await fontRes.arrayBuffer());
+        css = css.split(u).join(`data:font/woff2;base64,${b64}`);
+      })
+    );
+    cachedFontStyle = `<style type="text/css"><![CDATA[\n${css}\n]]></style>`;
+  } catch (err) {
+    console.error("[Assinatura] Não foi possível embutir a fonte Montserrat:", err);
+    cachedFontStyle = ""; // segue sem embutir (usa fallback do sistema)
+  }
+  return cachedFontStyle;
+}
+
+/** Gera o SVG personalizado a partir do template e dos dados do usuário. */
+function buildSignatureSvg(template: string, data: { name: string; role: string; email: string; whatsapp: string }) {
+  let out = template;
+
+  // Nome: primeiro nome em azul (st9) + restante em cinza (st0), fluindo
+  // naturalmente (sem x fixo) para funcionar com qualquer comprimento.
+  const parts = data.name.trim().split(/\s+/).filter(Boolean);
+  const first = xmlEscape((parts[0] || "").toUpperCase());
+  const rest = xmlEscape(parts.slice(1).join(" ").toUpperCase());
+  const nameSvg =
+    `<text class="st10" transform="translate(267.3 60.19)">` +
+    `<tspan class="st9" x="0" y="0">${first || "NOME"}</tspan>` +
+    (rest ? `<tspan class="st0" y="0"> ${rest}</tspan>` : "") +
+    `</text>`;
+  out = out.replace(SIG_TEMPLATE.nameBlock, nameSvg);
+
+  // Cargo
+  const roleSvg =
+    `<text class="st3" transform="translate(267.28 76.5)"><tspan x="0" y="0">${xmlEscape(data.role || "Cargo")}</tspan></text>`;
+  out = out.replace(SIG_TEMPLATE.roleBlock, roleSvg);
+
+  // WhatsApp e e-mail (strings únicas no arquivo)
+  if (data.whatsapp) out = out.replace(SIG_TEMPLATE.whatsapp, xmlEscape(data.whatsapp));
+  if (data.email) out = out.replace(SIG_TEMPLATE.email, xmlEscape(data.email));
+
+  return out;
+}
+
+function SignatureTab({ userProfile }: { userProfile?: UserProfile | null }) {
+  const [template, setTemplate] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [me, setMe] = useState(() => ({
+    name: userProfile?.name || "",
+    role: userProfile?.role || "",
+    email: userProfile?.email || "",
+    whatsapp: formatPhone(userProfile?.whatsapp || userProfile?.phone || ""),
+  }));
+  const [busy, setBusy] = useState<null | "png" | "copy" | "svg">(null);
+  const [feedback, setFeedback] = useState("");
+
+  // Reidrata os dados do usuário quando o perfil carrega/atualiza.
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    setMe({
+      name: userProfile.name || "",
+      role: userProfile.role || "",
+      email: userProfile.email || "",
+      whatsapp: formatPhone(userProfile.whatsapp || userProfile.phone || ""),
+    });
+  }, [userProfile?.id, userProfile?.name, userProfile?.role, userProfile?.email, userProfile?.phone, userProfile?.whatsapp]);
+
+  // Carrega o SVG template uma vez (arquivo já está em UTF-8).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${import.meta.env.BASE_URL}carflax-assinatura.svg`);
+        const raw = await res.text();
+        if (!cancelled) setTemplate(raw);
+      } catch (err) {
+        console.error("[Assinatura] Erro ao carregar template SVG:", err);
+        if (!cancelled) setLoadError(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const personalizedSvg = template ? buildSignatureSvg(template, me) : null;
+
+  // Versão responsiva para a pré-visualização (svg ocupa 100% da largura).
+  const previewSvg = personalizedSvg
+    ? personalizedSvg.replace(/<svg\b([^>]*?)>/, (_full, attrs) => {
+        const cleaned = attrs.replace(/\swidth="[^"]*"/, "").replace(/\sheight="[^"]*"/, "");
+        return `<svg${cleaned} style="width:100%;height:auto;display:block">`;
+      })
+    : null;
+
+  async function rasterize(targetWidth = 2400): Promise<HTMLCanvasElement | null> {
+    if (!personalizedSvg) return null;
+    // Proporção real do modelo (mesma da pré-visualização) → sem distorção.
+    const ratio = measureSvgRatio(personalizedSvg);
+    const outW = Math.round(targetWidth);
+    const outH = Math.round(targetWidth / ratio);
+    // SVG autossuficiente: fonte embutida + tamanho forçado em px (nítido).
+    const fontStyle = await getEmbeddedFontStyle();
+    let selfContained = withSvgSize(personalizedSvg, outW, outH);
+    if (fontStyle) selfContained = selfContained.replace(/(<svg\b[^>]*>)/, `$1${fontStyle}`);
+    const blob = new Blob([selfContained], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Falha ao carregar SVG"));
+        img.src = url;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      return canvas;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  const fileBase = me.name.trim().toLowerCase().replace(/\s+/g, "-") || "carflax";
+
+  function flash(msg: string, ms = 3500) {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(""), ms);
+  }
+
+  async function handleDownloadSvg() {
+    if (!personalizedSvg) return;
+    setBusy("svg");
+    try {
+      const fontStyle = await getEmbeddedFontStyle();
+      const selfContained = fontStyle
+        ? personalizedSvg.replace(/(<svg\b[^>]*>)/, `$1${fontStyle}`)
+        : personalizedSvg;
+      const blob = new Blob([selfContained], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.download = `assinatura-${fileBase}.svg`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+      flash("Assinatura .SVG baixada!");
+    } catch (err) {
+      console.error("[Assinatura] Erro ao gerar SVG:", err);
+      flash("Erro ao gerar o SVG.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleDownloadPng() {
+    setBusy("png");
+    try {
+      const canvas = await rasterize(2400);
+      if (!canvas) return;
+      const link = document.createElement("a");
+      link.download = `assinatura-${fileBase}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      flash("Imagem .PNG baixada!");
+    } catch (err) {
+      console.error("[Assinatura] Erro ao gerar PNG:", err);
+      flash("Erro ao gerar a imagem.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleCopyImage() {
+    setBusy("copy");
+    try {
+      const canvas = await rasterize(2400);
+      if (!canvas) return;
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob((b) => res(b), "image/png"));
+      if (!blob) throw new Error("blob nulo");
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      flash("Assinatura copiada! Cole no seu e-mail (Ctrl+V).", 4500);
+    } catch (err) {
+      console.error("[Assinatura] Erro ao copiar:", err);
+      flash("Seu navegador bloqueou a cópia. Use 'Baixar PNG'.", 4500);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="max-w-[1100px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-[#E5E7EB] dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-100 dark:border-blue-500/20">
+            <Signature className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-2">Assinatura de E-mail</h4>
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
+              Seus dados já vêm preenchidos no modelo oficial Carflax. Copie ou baixe e use no seu e-mail.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Pré-visualização (largura total) */}
+      <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-[#E5E7EB] dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
+        <div className="px-6 py-5 border-b border-slate-50 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.02] flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
+            <Mail className="w-4 h-4" />
+          </div>
+          <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">Pré-visualização</h4>
+        </div>
+        <div className="p-4 md:p-6 bg-slate-100/50 dark:bg-slate-950/40">
+          <div className="rounded-xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+            {loadError ? (
+              <div className="p-10 text-center text-[11px] font-bold text-rose-500 uppercase tracking-widest">
+                Não foi possível carregar o modelo da assinatura.
+              </div>
+            ) : previewSvg ? (
+              <div dangerouslySetInnerHTML={{ __html: previewSvg }} />
+            ) : (
+              <div className="p-10 flex items-center justify-center text-slate-400">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Formulário */}
+        <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-[#E5E7EB] dark:border-white/10 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+          <div className="px-6 py-5 border-b border-slate-50 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.02] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
+              <User className="w-4 h-4" />
+            </div>
+            <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">Seus dados</h4>
+          </div>
+          <div className="p-6 md:p-8 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+              <SettingsInput label="NOME COMPLETO" value={me.name} onChange={(v) => setMe({ ...me, name: v })} icon={User} />
+              <SettingsInput label="CARGO / FUNÇÃO" value={me.role} onChange={(v) => setMe({ ...me, role: v })} icon={Briefcase} />
+              <SettingsInput label="E-MAIL" value={me.email} onChange={(v) => setMe({ ...me, email: v })} icon={Mail} type="email" />
+              <SettingsInput label="WHATSAPP" value={me.whatsapp} onChange={(v) => setMe({ ...me, whatsapp: formatPhone(v) })} icon={Smartphone} type="tel" />
+            </div>
+
+            {/* Dados institucionais (fixos) */}
+            <div className="pt-6 border-t border-slate-50 dark:border-white/5">
+              <div className="flex items-center gap-2 mb-4">
+                <Building2 className="w-3.5 h-3.5 text-slate-400 dark:text-slate-600" />
+                <span className="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">Dados institucionais</span>
+                <span className="text-[9px] font-bold text-slate-300 dark:text-slate-700 uppercase tracking-widest ml-auto">Fixos</span>
+              </div>
+              <div className="space-y-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" /> {SIGNATURE_COMPANY.phone}</p>
+                <p className="flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" /> {SIGNATURE_COMPANY.website}</p>
+                <p className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" /> {SIGNATURE_COMPANY.address}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Ações */}
+        <div className="bg-white dark:bg-slate-900/50 dark:backdrop-blur-xl border border-[#E5E7EB] dark:border-white/10 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+          <div className="px-6 py-5 border-b border-slate-50 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.02] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
+              <Download className="w-4 h-4" />
+            </div>
+            <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">Exportar</h4>
+          </div>
+          <div className="p-6 md:p-8 flex-1 flex flex-col justify-center space-y-3">
+            {feedback && (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-xl border border-blue-100 dark:border-blue-500/20">
+                <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300">{feedback}</span>
+              </div>
+            )}
+            <Button
+              onClick={handleCopyImage}
+              disabled={busy !== null || !personalizedSvg}
+              className="w-full h-12 rounded-xl font-black text-[11px] uppercase tracking-widest bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-600/20 active:scale-95 transition-all disabled:opacity-40"
+            >
+              {busy === "copy" ? (
+                <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> COPIANDO...</span>
+              ) : (
+                <span className="flex items-center gap-2"><Copy className="w-4 h-4" /> COPIAR ASSINATURA</span>
+              )}
+            </Button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                onClick={handleDownloadPng}
+                disabled={busy !== null || !personalizedSvg}
+                className="flex-1 h-12 rounded-xl font-black text-[11px] uppercase tracking-widest bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm active:scale-95 transition-all disabled:opacity-40"
+              >
+                {busy === "png" ? (
+                  <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> ...</span>
+                ) : (
+                  <span className="flex items-center gap-2"><Download className="w-4 h-4" /> BAIXAR PNG</span>
+                )}
+              </Button>
+              <Button
+                onClick={handleDownloadSvg}
+                disabled={busy !== null || !personalizedSvg}
+                className="flex-1 h-12 rounded-xl font-black text-[11px] uppercase tracking-widest bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm active:scale-95 transition-all disabled:opacity-40"
+              >
+                <span className="flex items-center gap-2"><FileBadge className="w-4 h-4" /> BAIXAR SVG</span>
+              </Button>
+            </div>
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-600 text-center leading-relaxed pt-1">
+              Dica: no Gmail vá em Configurações → Assinatura, clique em inserir imagem e cole. O SVG mantém qualidade vetorial.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsSection({ externalTab, userProfile }: SettingsSectionProps) {
   const tabMap: Record<string, string> = {
     "Meu Perfil": "profile",
@@ -1193,6 +1639,7 @@ export function SettingsSection({ externalTab, userProfile }: SettingsSectionPro
     "Segurança": "security",
     "Aparência": "appearance",
     "Banners": "banners",
+    "Assinatura": "signature",
     "Configurações": "profile",
   };
 
@@ -1214,6 +1661,7 @@ export function SettingsSection({ externalTab, userProfile }: SettingsSectionPro
           {activeTab === "security" && <SecurityTab />}
           {activeTab === "appearance" && <AppearanceTab />}
           {activeTab === "banners" && <BannersTab userProfile={userProfile} />}
+          {activeTab === "signature" && <SignatureTab userProfile={userProfile} />}
         </div>
       </div>
     </div>

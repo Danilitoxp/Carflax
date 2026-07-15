@@ -1147,6 +1147,7 @@ function DashboardContent({
     "Notificações",
     "Segurança",
     "Aparência",
+    "Assinatura",
     "Banners",
   ].includes(activeItem);
   const isCrmView = [
@@ -1665,8 +1666,10 @@ function App() {
           const authUser = sessionData?.session?.user;
           const mergedProfile = {
             ...data,
-            phone: authUser?.user_metadata?.phone || authUser?.phone || "",
-            whatsapp: authUser?.user_metadata?.whatsapp || "",
+            // Prefere o valor da tabela usuarios; cai para o Auth metadata se a
+            // coluna ainda não existir ou estiver vazia.
+            phone: data.phone || authUser?.user_metadata?.phone || authUser?.phone || "",
+            whatsapp: data.whatsapp || authUser?.user_metadata?.whatsapp || "",
           };
           setProfile(mergedProfile);
           fetchVendedorMetrics(mergedProfile);
