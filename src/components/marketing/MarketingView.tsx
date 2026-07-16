@@ -5,6 +5,7 @@ import { ClientesView } from "./ClientesView";
 import { LeadsView } from "./LeadsView";
 import { ReportsView } from "./ReportsView";
 import { CronogramaView } from "./CronogramaView";
+import { EventosView } from "./eventos/EventosView";
 import { PosVendaView } from "./PosVendaView";
 import { CriativoView } from "./criativo/CriativoView";
 
@@ -45,6 +46,10 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
 
   if (activeTab === "Cronograma") {
     return <CronogramaView />;
+  }
+
+  if (activeTab === "Eventos Marketing") {
+    return <EventosView />;
   }
 
   if (activeTab === "Pós-Venda") {

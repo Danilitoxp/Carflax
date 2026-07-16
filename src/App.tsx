@@ -1169,6 +1169,7 @@ function DashboardContent({
     "Whatsapp Evolution",
     "Whatsapp Go",
     "Cronograma",
+    "Eventos Marketing",
     "Leads",
     "Criativo",
     "Pós-Venda",
@@ -1261,7 +1262,7 @@ function DashboardContent({
 
         {/* Content Area */}
         <div className="flex flex-col h-full w-full mx-auto overflow-hidden">
-          {["Calendário", "Eventos", "Férias"].includes(activeItem) ? (
+          {["Calendário", "Agenda", "Férias"].includes(activeItem) ? (
             <CalendarSection activeTab={activeItem} userProfile={userProfile || undefined} />
           ) : isSettingsView ? (
             <SettingsSection

@@ -50,6 +50,29 @@ async function fsGetAll(collection: string): Promise<Record<string, unknown>[]> 
   return rows;
 }
 
+// ─── Motivos de perda ─────────────────────────────────────────────────────────
+// Fonte única: o filtro de orçamentos, o seletor de "marcar como perdido" e o
+// cadastro de responsáveis por notificação (Configurações) leem daqui. Estavam
+// duplicados em três lugares — incluir um motivo em só um deles fazia o motivo
+// existir sem ninguém poder ser avisado dele.
+//
+// A notificação casa o motivo por igualdade exata (crm_loss_responsibles), então
+// mudar um texto aqui órfã o cadastro que aponta para o texto antigo.
+export const LOSS_REASONS = [
+  "Preço Alto",
+  "Preço Alto (Fabricante)",
+  "Falta de Estoque",
+  "Furo de Estoque",
+  "Desistiu",
+  "Prazo de Entrega",
+  "Mão de Obra e Material",
+  "Comparativo de Linhas",
+  "Alteração de Preço",
+  "Liberação Financeira",
+] as const;
+
+export const LOSS_REASON_ALL = "Todos os Motivos";
+
 // ─── Tipos Supabase ───────────────────────────────────────────────────────────
 export interface CrmStatus {
   documento: string;

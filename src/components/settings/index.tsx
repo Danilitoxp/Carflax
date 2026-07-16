@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { LOSS_REASONS, LOSS_REASON_ALL } from "@/lib/crm-service";
 
 interface UserProfile {
   id?: string;
@@ -864,16 +865,10 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
                         }}
                         className="w-full px-2.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-600/50 focus:ring-2 focus:ring-blue-600/5 transition-all"
                       >
-                        <option value="Todos os Motivos">Todos os Motivos</option>
-                        <option value="Preço Alto">Preço Alto</option>
-                        <option value="Falta de Estoque">Falta de Estoque</option>
-                        <option value="Furo de Estoque">Furo de Estoque</option>
-                        <option value="Desistiu">Desistiu</option>
-                        <option value="Prazo de Entrega">Prazo de Entrega</option>
-                        <option value="Mão de Obra e Material">Mão de Obra e Material</option>
-                        <option value="Comparativo de Linhas">Comparativo de Linhas</option>
-                        <option value="Alteração de Preço">Alteração de Preço</option>
-                        <option value="Liberação Financeira">Liberação Financeira</option>
+                        <option value={LOSS_REASON_ALL}>{LOSS_REASON_ALL}</option>
+                        {LOSS_REASONS.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
                       </select>
                     </td>
                     <td className="px-3 py-2.5">

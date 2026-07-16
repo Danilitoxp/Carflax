@@ -14,7 +14,7 @@ export interface NavSection {
 // Adding a new subItem here automatically makes it appear in the UsersView permissions panel.
 // Módulos liberados para todos (não aparecem no painel de permissões):
 // - Dashboard > Geral e Produtos
-// - Calendário (Eventos, Férias)
+// - Calendário (Agenda, Férias)
 // - Sugestões
 export const NAV_SECTIONS: NavSection[] = [
   {
@@ -29,7 +29,10 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Calendário",
     permGroup: "CALENDÁRIO",
-    subItems: [{ label: "Eventos" }, { label: "Férias" }],
+    // "Agenda" (era "Eventos"): reuniões, aniversários, feriados e treinamentos
+    // da empresa. Renomeado para não colidir com Marketing > Eventos, que é a
+    // produção de um evento (fornecedores, convidados, verba).
+    subItems: [{ label: "Agenda" }, { label: "Férias" }],
   },
   {
     label: "Comercial",
@@ -54,6 +57,10 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Leads" },
       { label: "Criativo" },
       { label: "Cronograma" },
+      // Chave própria em vez de "Eventos": 9 usuários ainda têm "Eventos" salvo
+      // em permissions (legado do Calendário) e passariam a ver as cotas dos
+      // fornecedores sem ninguém ter liberado.
+      { label: "Eventos", value: "Eventos Marketing" },
       { label: "Pós-Venda" },
       { label: "Relatórios", value: "Relatórios Mkt" },
     ],
@@ -150,7 +157,7 @@ export interface AccessProfile {
 const PUBLIC_SECTIONS = [
   "Meu Perfil", "Aparência", "Assinatura", "Notificações", "Segurança",
   "Dashboard", "Geral", "Produtos",
-  "Calendário", "Eventos", "Férias",
+  "Calendário", "Agenda", "Férias",
   "Esteira", "Minha Esteira", "Sugestões",
   "Organograma", "Estoque", "Separação", "Conferência", "Retirada",
   "Relatórios", "Relatórios Mkt",
@@ -162,7 +169,7 @@ const VENDEDOR_SECTIONS = [
 ];
 
 const MARKETING_SECTIONS = [
-  "Marketing", "Whatsapp Evolution", "Whatsapp Go", "Leads", "Criativo", "Cronograma", "Pós-Venda", "Relatórios Mkt",
+  "Marketing", "Whatsapp Evolution", "Whatsapp Go", "Leads", "Criativo", "Cronograma", "Eventos Marketing", "Pós-Venda", "Relatórios Mkt",
 ];
 
 const VENDAS_SECTIONS = [

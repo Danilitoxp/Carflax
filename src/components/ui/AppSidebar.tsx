@@ -282,7 +282,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
     const alwaysAllowed = [
       "Meu Perfil", "Aparência", "Assinatura", "Notificações", "Segurança",
       "Dashboard", "Geral", "Produtos",
-      "Calendário", "Eventos", "Férias",
+      "Calendário", "Agenda", "Férias",
       "Esteira", "Minha Esteira", "Sugestões"
     ];
     if (alwaysAllowed.includes(label)) return true;
