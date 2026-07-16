@@ -20,11 +20,13 @@ import {
   Star,
   Activity,
   X,
-  Camera
+  Camera,
+  LayoutGrid
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import html2canvas from "html2canvas-pro";
 import { uploadImage } from "@/lib/uploadImage";
 import { apiDashboardGeral, type VendedorResumo, apiEntregasConcluidas, apiCampanhaMetas, apiVendasDiarias, type VendaDiaria, apiDashboardMetas } from "@/lib/api";
@@ -64,6 +66,7 @@ function buildTeamTotal(
   base: VendedorResumo | undefined,
   cod: string,
   nome: string,
+  memberCodes?: string[],
 ): VendedorResumo {
   const sum = (key: keyof VendedorResumo) =>
     rows.reduce((acc, r) => acc + (parseFloat(String(r[key])) || 0), 0);
@@ -79,6 +82,7 @@ function buildTeamTotal(
     ...(base || rows[0]),
     COD_VENDEDOR: cod,
     NOME_VENDEDOR: nome,
+    MEMBER_CODES: memberCodes ?? rows.map(r => String(r.COD_VENDEDOR || "").trim()),
     META: totalMETA,
     FATURADO: totalFATURADO,
     EM_ABERTO: sum("EM_ABERTO"),
@@ -225,6 +229,198 @@ const formatNameTitleCase = (name: string) => {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
 };
 
+const formatBRL = (val: number | string) => {
+  const num = typeof val === 'string' ? parseFloat(val) : val;
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(num || 0);
+};
+
+// Funções de auxílio para cálculo de tempo (Lógica Gestão de Tempo)
+const getDiasUteisNoMes = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  let count = 0;
+  for (let i = 1; i <= lastDay; i++) {
+    const dayOfWeek = new Date(y, m, i).getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+  }
+  return count;
+};
+
+const getDiasUteisRestantes = () => {
+  const d = new Date();
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  let count = 0;
+  for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
+    const day = dt.getDay();
+    if (day !== 0 && day !== 6) count++;
+  }
+  return count;
+};
+
+// Quanto o vendedor deveria ter vendido até hoje para estar no ritmo da meta.
+const calcEquilibrio = (row?: VendedorResumo | null) => {
+  if (!row) return 0;
+  const totalWorkingDays = getDiasUteisNoMes();
+  const remainingDays = getDiasUteisRestantes();
+  const daysPassed = row.dias_trabalhados ?? Math.max(0, totalWorkingDays - remainingDays);
+  const metaNum = typeof row.META === 'string' ? parseFloat(row.META) : row.META;
+  return (Number(metaNum) / totalWorkingDays) * daysPassed;
+};
+
+const calcDiarioNecessario = (row?: VendedorResumo | null) => {
+  if (!row) return 0;
+  const faltante = typeof row.FALTANTE === 'string' ? parseFloat(row.FALTANTE) : (row.FALTANTE || 0);
+  return Math.max(0, Number(faltante) / Math.max(getDiasUteisRestantes(), 1));
+};
+
+// % do ritmo: quanto já vendeu em relação ao equilíbrio do dia de hoje.
+const calcPercentVsEquilibrio = (row?: VendedorResumo | null) => {
+  const equilibrio = calcEquilibrio(row);
+  const total = Number(row?.TOTAL || 0);
+  return equilibrio > 0 ? (total / equilibrio) * 100 : 0;
+};
+
+// Tx de conversão de uma linha: vendido / (vendido + perdido).
+// Linhas agregadas (time do supervisor, ou subtotal "TEAM:") não têm código no
+// perdidoMap — nesses casos soma o perdido dos membros, em vez de cair no
+// default de perdido 0 (que renderizaria 100% de conversão).
+const calcTaxaConversao = (row: VendedorResumo, perdidoMap: Map<string, number>, teamCodes?: string[]) => {
+  const totalNum = typeof row.TOTAL === 'string' ? parseFloat(row.TOTAL) : (row.TOTAL || 0);
+  const codesToSum = (teamCodes && teamCodes.length > 0 && row.COD_VENDEDOR === "MEDIA")
+    ? teamCodes
+    : (row.COD_VENDEDOR.startsWith("TEAM:") ? row.MEMBER_CODES : undefined);
+  const perdido = codesToSum
+    ? codesToSum.reduce((acc, c) => acc + (perdidoMap.get(String(c).trim()) || 0), 0)
+    : perdidoMap.get(String(row.COD_VENDEDOR || "").trim()) || 0;
+  return Number(totalNum) + perdido > 0 ? (Number(totalNum) / (Number(totalNum) + perdido)) * 100 : 0;
+};
+
+// Versão compacta do SalesMetricsCard, usada no modal "Todos os Vendedores".
+// Repete o mesmo visual do card principal (rosca de ritmo + vendido hoje +
+// barra de meta + indicadores), com os mesmos cálculos.
+function VendedorMiniCard({ row, perdidoMap, isActive, onSelect }: {
+  row: VendedorResumo;
+  perdidoMap: Map<string, number>;
+  isActive?: boolean;
+  onSelect?: () => void;
+}) {
+  const equilibrio = calcEquilibrio(row);
+  const total = Number(row.TOTAL || 0);
+  const percent = calcPercentVsEquilibrio(row);
+  const metaNum = Number(row.META || 0);
+  const atingimento = metaNum > 0 ? (total / metaNum) * 100 : 0;
+  const diff = equilibrio - total;
+  const isTeam = row.COD_VENDEDOR.startsWith("TEAM:");
+  const isTotal = row.COD_VENDEDOR === "MEDIA";
+
+  const nome = isTotal
+    ? "Total Geral"
+    : (row.NOME_VENDEDOR || "").trim().split(/\s+/).slice(0, 2).join(" ");
+
+  const miniMetrics = [
+    { label: "Meta", value: formatBRL(row.META), icon: Target, valueColor: "text-foreground" },
+    { label: "Faltante", value: formatBRL(row.FALTANTE), icon: ArrowDownRight, valueColor: Number(row.FALTANTE) <= 0 ? "text-emerald-600" : "text-rose-600" },
+    { label: "Faturado", value: formatBRL(row.FATURADO), icon: Clock, valueColor: "text-emerald-600" },
+    { label: "Em Aberto", value: formatBRL(row.EM_ABERTO), icon: Clock, valueColor: "text-amber-600" },
+    { label: "Total", value: formatBRL(row.TOTAL), icon: TrendingUp, valueColor: "text-foreground" },
+    { label: "Diário", value: formatBRL(calcDiarioNecessario(row)), icon: Zap, valueColor: "text-foreground" },
+    { label: "Tx Conversão", value: `${calcTaxaConversao(row, perdidoMap).toFixed(1)}%`, icon: PieChart, valueColor: "text-blue-600" },
+    { label: "Ticket Médio", value: formatBRL(row.TICKET_MEDIO), icon: DollarSign, valueColor: "text-foreground" },
+  ];
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "text-left bg-card border rounded-xl p-4 flex flex-col transition-all hover:border-blue-500/50 hover:shadow-md",
+        isActive ? "border-blue-500 ring-1 ring-blue-500/30" : "border-border"
+      )}
+    >
+      {/* Nome */}
+      <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-border/40">
+        <span className={cn(
+          "text-[10px] font-black uppercase tracking-tight truncate",
+          isTotal || isTeam ? "text-blue-600 dark:text-blue-400" : "text-foreground"
+        )}>
+          {nome}
+        </span>
+        {isTeam && (
+          <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground shrink-0">Time</span>
+        )}
+      </div>
+
+      {/* Rosca de ritmo */}
+      <div className="mb-2 flex flex-col items-center">
+        <div className="relative w-20 h-20">
+          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="9" fill="transparent" className="text-secondary dark:text-slate-800" />
+            <circle
+              cx="50"
+              cy="50"
+              r="40"
+              stroke="currentColor"
+              strokeWidth="9"
+              strokeDasharray={2 * Math.PI * 40}
+              strokeDashoffset={2 * Math.PI * 40 * (1 - Math.min(percent, 100) / 100)}
+              strokeLinecap="round"
+              fill="transparent"
+              className={cn(
+                "transition-all duration-1000 ease-out",
+                percent >= 100 ? "text-blue-600 dark:text-blue-500" : "text-rose-500"
+              )}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center leading-none text-center">
+            <span className={cn("text-base font-black tracking-tighter", percent >= 100 ? "text-foreground" : "text-rose-600")}>
+              {percent.toFixed(0)}%
+            </span>
+          </div>
+        </div>
+        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1.5">
+          {diff > 0 ? `- ${formatBRL(diff)}` : `+ ${formatBRL(Math.abs(diff))}`}
+        </span>
+      </div>
+
+      {/* Vendido hoje */}
+      <div className="mb-2 flex flex-col items-center text-center">
+        <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Vendido Hoje</p>
+        <h3 className="text-base font-black text-foreground tracking-tighter">{formatBRL(row.TOTAL_VENDIDO_HOJE || 0)}</h3>
+      </div>
+
+      {/* Barra de meta */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between text-[9px] font-bold mb-1">
+          <span className="text-blue-600 dark:text-blue-500">Meta</span>
+          <span className="text-foreground">{atingimento.toFixed(1)}%</span>
+        </div>
+        <div className="h-1.5 w-full bg-secondary dark:bg-slate-800 rounded-full overflow-hidden border border-border">
+          <div
+            className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-1000"
+            style={{ width: `${Math.min(atingimento, 100)}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Indicadores */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-auto">
+        {miniMetrics.map((mm, i) => (
+          <div key={i} className="flex items-start gap-1.5 min-w-0">
+            <mm.icon className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-wider truncate">{mm.label}</span>
+              <span className={cn("text-[10px] font-black tracking-tight truncate", mm.valueColor)}>{mm.value}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </button>
+  );
+}
+
 export function SalesMetricsCard({ isCompact, userProfile, data: externalData, loading: externalLoading, perdidoMap = new Map() }: { isCompact?: boolean, userProfile?: UserProfileLite, data?: VendedorResumo, loading?: boolean, perdidoMap?: Map<string, number> }) {
   // Diretor tem visão própria (Total geral); não deve semear o painel com a linha
   // individual vinda do App — senão pisca a linha do diretor antes do efeito ajustar.
@@ -238,6 +434,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   const [teamCodes, setTeamCodes] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [isAllOpen, setIsAllOpen] = useState(false);
   const [vendasDiarias, setVendasDiarias] = useState<VendaDiaria[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsTab, setStatsTab] = useState<'vendido' | 'faturado'>('vendido');
@@ -518,7 +715,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
               const rows = [...cods].map(c => erpByCod.get(c)).filter(Boolean) as VendedorResumo[];
               if (rows.length === 0) continue;
               const primeiroNome = (sup.name || "Time").trim().split(/\s+/)[0];
-              teamTotals.push(buildTeamTotal(rows, mediaRow, `TEAM:${sup.id}`, `Time ${primeiroNome}`));
+              teamTotals.push(buildTeamTotal(rows, mediaRow, `TEAM:${sup.id}`, `Time ${primeiroNome}`, [...cods]));
             }
             teamTotals.sort(
               (a, b) => (parseFloat(String(b.FATURADO)) || 0) - (parseFloat(String(a.FATURADO)) || 0),
@@ -753,54 +950,19 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     return "Boa noite";
   };
 
-  const formatBRL = (val: number | string) => {
-    const num = typeof val === 'string' ? parseFloat(val) : val;
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(num || 0);
-  };
+  // Modal full screen não tem backdrop clicável — o Esc é a saída além do X.
+  useEffect(() => {
+    if (!isAllOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setIsAllOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isAllOpen]);
 
-
-  // Funções de auxílio para cálculo de tempo (Lógica Gestão de Tempo)
-  const getDiasUteisNoMes = () => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = d.getMonth();
-    const lastDay = new Date(y, m + 1, 0).getDate();
-    let count = 0;
-    for (let i = 1; i <= lastDay; i++) {
-      const dayOfWeek = new Date(y, m, i).getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
-    }
-    return count;
-  };
-
-  const getDiasUteisRestantes = () => {
-    const d = new Date();
-    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    let count = 0;
-    for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
-      const day = dt.getDay();
-      if (day !== 0 && day !== 6) count++;
-    }
-    return count;
-  };
-
-  const calculateEquilibrio = () => {
-    if (!data) return 0;
-    const totalWorkingDays = getDiasUteisNoMes();
-    const remainingDays = getDiasUteisRestantes();
-    const daysPassed = data.dias_trabalhados ?? Math.max(0, totalWorkingDays - remainingDays);
-    const metaNum = typeof data.META === 'string' ? parseFloat(data.META) : data.META;
-    return (metaNum / totalWorkingDays) * daysPassed;
-  };
+  const calculateEquilibrio = () => calcEquilibrio(data);
 
   const getDiasRestantes = () => getDiasUteisRestantes();
 
-  const calculateDiarioNecessario = () => {
-    if (!data) return 0;
-    const faltante = typeof data.FALTANTE === 'string' ? parseFloat(data.FALTANTE) : (data.FALTANTE || 0);
-    return Math.max(0, (faltante as number) / Math.max(getDiasRestantes(), 1));
-  };
+  const calculateDiarioNecessario = () => calcDiarioNecessario(data);
 
   const metrics = data ? [
     { label: m("Meta"), value: formatBRL(data.META), icon: Target, valueColor: "text-slate-900" },
@@ -811,16 +973,9 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     { label: m("Equilíbrio"), value: formatBRL(calculateEquilibrio()), icon: BarChart3, valueColor: "text-blue-600" },
     { label: m("Dias Restantes"), value: `${getDiasRestantes()}`, icon: Calendar, valueColor: "text-slate-900" },
     { label: m("Diário"), value: formatBRL(calculateDiarioNecessario()), icon: Zap, valueColor: "text-slate-900" },
-    { label: m("Tx Conversão"), value: (() => {
-        const totalNum = typeof data.TOTAL === 'string' ? parseFloat(data.TOTAL) : (data.TOTAL || 0);
-        // Visão "Meu Time" (supervisor): soma o perdido só dos vendedores do time,
-        // em vez de pegar o total da loja (chave "MEDIA" do perdidoMap).
-        const perdido = (teamCodes.length > 0 && selectedCod === "MEDIA")
-          ? teamCodes.reduce((acc, c) => acc + (perdidoMap.get(String(c).trim()) || 0), 0)
-          : perdidoMap.get(String(data.COD_VENDEDOR || "").trim()) || 0;
-        const taxa = totalNum + perdido > 0 ? (totalNum / (totalNum + perdido)) * 100 : 0;
-        return `${taxa.toFixed(2)}%`;
-      })(), icon: PieChart, valueColor: "text-blue-600" },
+    // Visão "Meu Time" (supervisor): soma o perdido só dos vendedores do time,
+    // em vez de pegar o total da loja (chave "MEDIA" do perdidoMap).
+    { label: m("Tx Conversão"), value: `${calcTaxaConversao(data, perdidoMap, teamCodes).toFixed(2)}%`, icon: PieChart, valueColor: "text-blue-600" },
     { label: m("Ticket Médio"), value: formatBRL(data.TICKET_MEDIO), icon: DollarSign, valueColor: "text-slate-900" },
     { label: m("Margem Real"), value: `${Number(data.MARGEM_REAL_PERC || data.MARGEM_PCT || 0).toFixed(2)}%`, icon: TrendingUp, valueColor: "text-blue-600" },
     { label: m("Prazo Médio"), value: `${Number(data.PRAZO_MEDIO_DIAS || 0).toFixed(0)} d`, icon: Clock, valueColor: "text-slate-900" },
@@ -875,7 +1030,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
     >
       {/* 1. HEADER (Com controles de Stories) */}
       <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-border/10">
-        <div className="flex items-center gap-1 z-10 flex-shrink-0">
+        <div className="z-10 flex-shrink-0 flex flex-col items-center gap-0.5 justify-start">
           {!showSocial && (
             <button
               onClick={openStats}
@@ -883,6 +1038,15 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
               title="Estatísticas diárias"
             >
               <Activity className="w-4 h-4 text-blue-500" />
+            </button>
+          )}
+          {!showSocial && canChangeSeller && (
+            <button
+              onClick={() => setIsAllOpen(true)}
+              className="p-1.5 rounded-lg transition-all hover:bg-secondary"
+              title="Ver todos os vendedores"
+            >
+              <LayoutGrid className="w-4 h-4 text-slate-400 hover:text-blue-500 transition-colors" />
             </button>
           )}
         </div>
@@ -1170,6 +1334,102 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
           </div>
         </div>
       </div>
+
+      {/* MODAL COM O CARD DE TODOS OS VENDEDORES
+          Vai via portal no body: o painel direito é um container `fixed z-40`,
+          que cria um stacking context próprio — dentro dele nenhum z-index
+          consegue passar por cima da sidebar (z-50). */}
+      {isAllOpen && createPortal(
+        <div className="fixed inset-0 z-[100] bg-background flex flex-col animate-in fade-in duration-200">
+          {/* Modal Header */}
+          <div className="shrink-0 bg-card/95 backdrop-blur-md border-b border-border px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-xl border border-blue-100 dark:border-blue-900/50">
+                <LayoutGrid className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-foreground uppercase tracking-tight">Todos os Vendedores</h3>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  {new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setIsAllOpen(false)} className="p-2 rounded-xl hover:bg-secondary transition-colors" title="Fechar (Esc)">
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+
+          {/* Modal Body */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {allVendedores.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3 opacity-40">
+                <LayoutGrid className="w-8 h-8 text-muted-foreground" />
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Nenhum vendedor disponível</span>
+              </div>
+            ) : (
+              (() => {
+                const totalGeral = allVendedores.find(v => v.COD_VENDEDOR === "MEDIA");
+                const rest = allVendedores.filter(v => v.COD_VENDEDOR !== "MEDIA");
+                const times = rest
+                  .filter(v => v.COD_VENDEDOR.startsWith("TEAM:"))
+                  .sort((a, b) => (parseFloat(String(b.FATURADO)) || 0) - (parseFloat(String(a.FATURADO)) || 0));
+                // Maior ritmo primeiro — no modal o comparativo é mais útil que a ordem alfabética.
+                const vendedores = rest
+                  .filter(v => !v.COD_VENDEDOR.startsWith("TEAM:"))
+                  .sort((a, b) => calcPercentVsEquilibrio(b) - calcPercentVsEquilibrio(a));
+
+                const select = (v: VendedorResumo) => {
+                  setSelectedCod(v.COD_VENDEDOR);
+                  setData(v);
+                  setIsAllOpen(false);
+                };
+
+                const grid = (rows: VendedorResumo[]) => (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
+                    {rows.map(v => (
+                      <VendedorMiniCard
+                        key={v.COD_VENDEDOR}
+                        row={v}
+                        perdidoMap={perdidoMap}
+                        isActive={selectedCod === v.COD_VENDEDOR}
+                        onSelect={() => select(v)}
+                      />
+                    ))}
+                  </div>
+                );
+
+                const label = (t: string) => (
+                  <div className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-3">{t}</div>
+                );
+
+                return (
+                  <div className="space-y-8 max-w-[1800px] mx-auto">
+                    {totalGeral && (
+                      <div>
+                        {label("Total Geral")}
+                        {grid([totalGeral])}
+                      </div>
+                    )}
+                    {times.length > 0 && (
+                      <div>
+                        {label("Times")}
+                        {grid(times)}
+                      </div>
+                    )}
+                    {vendedores.length > 0 && (
+                      <div>
+                        {label("Vendedores")}
+                        {grid(vendedores)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* MODAL DE ESTATÍSTICAS DIÁRIAS */}
       {isStatsOpen && (

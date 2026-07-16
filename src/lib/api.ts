@@ -62,6 +62,11 @@ export interface VendedorResumo {
   TOTAL_VENDIDO_HOJE: number | string;
   dias_trabalhados?: number;
   avatar?: string;
+  // Só nas linhas agregadas de time (COD_VENDEDOR "TEAM:<id>"): códigos dos
+  // vendedores somados. A linha do time não existe no ERP, então métricas
+  // derivadas de outras fontes (ex.: perdido, na Tx Conversão) precisam
+  // reagregar a partir dos membros.
+  MEMBER_CODES?: string[];
 }
 
 export interface VendedoresResponse {
