@@ -1373,9 +1373,12 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                 const times = rest
                   .filter(v => v.COD_VENDEDOR.startsWith("TEAM:"))
                   .sort((a, b) => (parseFloat(String(b.FATURADO)) || 0) - (parseFloat(String(a.FATURADO)) || 0));
+                // Sem meta cadastrada não há ritmo nem atingimento para comparar: o card
+                // sairia 0% / 0% e só ocuparia espaço na grade.
                 // Maior ritmo primeiro — no modal o comparativo é mais útil que a ordem alfabética.
                 const vendedores = rest
                   .filter(v => !v.COD_VENDEDOR.startsWith("TEAM:"))
+                  .filter(v => Number(v.META) > 0)
                   .sort((a, b) => calcPercentVsEquilibrio(b) - calcPercentVsEquilibrio(a));
 
                 const select = (v: VendedorResumo) => {
