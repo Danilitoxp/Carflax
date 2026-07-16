@@ -1405,18 +1405,17 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                   <div className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-3">{t}</div>
                 );
 
+                // Total Geral e times dividem a mesma grade: sozinho, o Total Geral
+                // ocupava uma célula e deixava o resto da linha vazio. Os próprios
+                // cards se identificam (nome + selo "Time"), então um rótulo basta.
+                const consolidado = [...(totalGeral ? [totalGeral] : []), ...times];
+
                 return (
                   <div className="space-y-8 max-w-[1800px] mx-auto">
-                    {totalGeral && (
+                    {consolidado.length > 0 && (
                       <div>
-                        {label("Total Geral")}
-                        {grid([totalGeral])}
-                      </div>
-                    )}
-                    {times.length > 0 && (
-                      <div>
-                        {label("Times")}
-                        {grid(times)}
+                        {label(times.length > 0 ? "Total Geral e Times" : "Total Geral")}
+                        {grid(consolidado)}
                       </div>
                     )}
                     {vendedores.length > 0 && (
