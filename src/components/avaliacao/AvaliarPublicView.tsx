@@ -18,6 +18,21 @@ export function AvaliarPublicView() {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [indo, setIndo] = useState(false);
+
+  // Formata dígitos como (DD) 9XXXX-XXXX ou (DD) XXXX-XXXX
+  const formatarTelefone = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 11);
+    if (digits.length === 0) return "";
+    if (digits.length <= 2)  return `(${digits}`;
+    if (digits.length <= 6)  return `(${digits.slice(0,2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
+  };
+
+  const handleTelefone = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTelefone(formatarTelefone(e.target.value));
+  };
+
   const [premio, setPremio] = useState("");
   const [premioImg, setPremioImg] = useState("");
 
@@ -124,7 +139,7 @@ export function AvaliarPublicView() {
                 <label className="text-[9px] font-black text-white/40 uppercase tracking-widest block mb-1 ml-1">Telefone / WhatsApp</label>
                 <input
                   value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
+                  onChange={handleTelefone}
                   inputMode="tel"
                   placeholder="(11) 9...."
                   className="w-full px-4 py-3 text-sm font-bold bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/25 outline-none focus:border-blue-500/60"
