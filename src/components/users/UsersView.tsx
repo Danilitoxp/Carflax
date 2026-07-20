@@ -37,6 +37,7 @@ interface User {
   is_admin?: boolean;
   responsavelId?: string;
   isLeader?: boolean;
+  ramal?: string;
 }
 
 export function UsersView() {
@@ -67,6 +68,7 @@ export function UsersView() {
     is_admin: boolean;
     responsavelId: string;
     isLeader: boolean;
+    ramal: string;
   }
 
   // User State for Modal
@@ -93,7 +95,8 @@ export function UsersView() {
     },
     is_admin: false,
     responsavelId: "",
-    isLeader: false
+    isLeader: false,
+    ramal: ""
   });
 
   const permissionGroups = PERMISSION_GROUPS;
@@ -191,7 +194,8 @@ export function UsersView() {
           coletorPermissions: u.coletor_permissions || {},
           is_admin: u.is_admin || false,
           responsavelId: u.responsavel_id || "",
-          isLeader: u.is_leader || false
+          isLeader: u.is_leader || false,
+          ramal: u.ramal || ""
         })));
       }
       setLoading(false);
@@ -207,15 +211,17 @@ export function UsersView() {
     ];
   }, [users, editingUser?.id]);
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole === "Todos os Cargos" || user.role === filterRole;
-    const matchesCompany = filterCompany === "Todas as Empresas" || user.company === filterCompany;
-    const matchesDept = filterDepartment === "Todos os Setores" || user.department === filterDepartment;
+  const filteredUsers = users
+    .filter(user => {
+      const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRole = filterRole === "Todos os Cargos" || user.role === filterRole;
+      const matchesCompany = filterCompany === "Todas as Empresas" || user.company === filterCompany;
+      const matchesDept = filterDepartment === "Todos os Setores" || user.department === filterDepartment;
 
-    return matchesSearch && matchesRole && matchesCompany && matchesDept;
-  });
+      return matchesSearch && matchesRole && matchesCompany && matchesDept;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
 
   const handleEditClick = (user: User) => {
     setEditingUser(user);
@@ -242,7 +248,8 @@ export function UsersView() {
       },
       is_admin: user.is_admin || false,
       responsavelId: user.responsavelId || "",
-      isLeader: user.isLeader || false
+      isLeader: user.isLeader || false,
+      ramal: user.ramal || ""
     });
     setAvatarLoading(false);
     setSaving(false);
@@ -292,7 +299,8 @@ export function UsersView() {
       coletor_permissions: newUser.coletorPermissions,
       is_admin: newUser.is_admin,
       responsavel_id: newUser.responsavelId || null,
-      is_leader: newUser.isLeader
+      is_leader: newUser.isLeader,
+      ramal: newUser.ramal || null
     };
 
     console.log("[Users] Salvando usuário. Payload final:", finalPayload);
@@ -345,7 +353,8 @@ export function UsersView() {
           coletorPermissions: u.coletor_permissions || {},
           is_admin: u.is_admin || false,
           responsavelId: u.responsavel_id || "",
-          isLeader: u.is_leader || false
+          isLeader: u.is_leader || false,
+          ramal: u.ramal || ""
         })));
 
       }
@@ -467,7 +476,8 @@ export function UsersView() {
                 },
                 is_admin: false,
                 responsavelId: "",
-                isLeader: false
+                isLeader: false,
+                ramal: ""
               });
               setAvatarLoading(false);
               setSaving(false);
@@ -532,6 +542,7 @@ export function UsersView() {
                 <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest">Colaborador</th>
                 <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest">Empresa / Setor</th>
                 <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest">Cargo</th>
+                <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest">Ramal</th>
                 <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest">Status</th>
                 <th className="py-2.5 px-6 text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest text-right">Ações</th>
               </tr>
@@ -614,6 +625,13 @@ export function UsersView() {
                     )}>
                       {user.role}
                     </div>
+                  </td>
+                  <td className="py-3 px-6">
+                    {user.ramal ? (
+                      <span className="text-[10px] font-black text-foreground/80 tabular-nums tracking-tight">{user.ramal}</span>
+                    ) : (
+                      <span className="text-[9px] font-bold text-muted-foreground/40">—</span>
+                    )}
                   </td>
                   <td className="py-3 px-6">
                     <div className="flex items-center gap-2">
@@ -736,6 +754,19 @@ export function UsersView() {
                     onChange={(e) => setNewUser({ ...newUser, operatorCode: e.target.value.replace(/\D/g, "") })} 
                     placeholder={newUser.role === "Motorista" ? "00000" : "000"} 
                     className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all text-center placeholder:text-muted-foreground/30" 
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Ramal</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={newUser.ramal}
+                    onChange={(e) => setNewUser({ ...newUser, ramal: e.target.value.replace(/\D/g, "") })}
+                    placeholder="0000"
+                    className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all text-center placeholder:text-muted-foreground/30"
                   />
                 </div>
 
