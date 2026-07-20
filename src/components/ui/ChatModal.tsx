@@ -762,7 +762,12 @@ export function ChatModal({
     const isWhatsApp = (parsed.canal || "").toLowerCase().includes("whatsapp");
 
     return (
-      <div className="w-full max-w-[420px] bg-card border border-border/80 rounded-2xl shadow-xl overflow-hidden backdrop-blur-sm flex flex-col">
+      <div className={cn(
+        "w-full bg-card border border-border/80 rounded-2xl shadow-xl overflow-hidden backdrop-blur-sm flex flex-col",
+        // Maximizado (900px): sem cap, o card preenche a largura toda (menos o
+        // padding da lista). No tamanho normal fica 420px para leitura confortável.
+        isMaximized ? "max-w-none" : "max-w-[420px]"
+      )}>
         {/* Header bar */}
         <div className="bg-secondary/40 border-b border-border/30 px-4 py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-2">

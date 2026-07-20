@@ -32,6 +32,7 @@ import { EntregasView } from "@/components/entregas";
 import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
 import { UsersView } from "@/components/users/UsersView";
 import { LoginView } from "@/components/auth/LoginView";
+import { AvaliarPublicView } from "@/components/avaliacao/AvaliarPublicView";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { OrgChartView } from "@/components/ui/OrgChartModal";
 import { SqlRunnerView } from "@/components/admin/SqlRunnerView";
@@ -779,7 +780,16 @@ function DashboardContent({
             });
           }
 
-          return [...updatedPrev, ...novosChats];
+          // Rede de segurança: remove duplicatas por doc que já tenham sido
+          // persistidas no localStorage por versões anteriores. Mantém a primeira
+          // ocorrência (updatedPrev preserva os dados mais ricos). A cada sync a
+          // lista se auto-cura e a versão limpa é regravada.
+          const seenDocs = new Set<string>();
+          return [...updatedPrev, ...novosChats].filter((c) => {
+            if (seenDocs.has(c.doc)) return false;
+            seenDocs.add(c.doc);
+            return true;
+          });
         });
 
         // Abre automaticamente o chat com a mensagem não lida mais recente
@@ -1067,9 +1077,13 @@ function DashboardContent({
           return next;
         });
 
-        const exists = activeChats.some((c) => c.doc === detail.doc);
-        if (!exists) {
-          setActiveChats((prev) => [
+        // Dedup DENTRO do updater: o closure deste listener guarda um
+        // `activeChats` defasado (as deps do effect não incluem a lista), então
+        // checar `activeChats.some(...)` aqui fora via de false para um doc que
+        // já existia — dois eventos seguidos criavam duas linhas iguais.
+        setActiveChats((prev) => {
+          if (prev.some((c) => c.doc === detail.doc)) return prev;
+          return [
             ...prev,
             {
               id: Date.now(),
@@ -1080,8 +1094,8 @@ function DashboardContent({
               items: detail.items,
               unreadCount: 0,
             },
-          ]);
-        }
+          ];
+        });
         openChatDoc(detail.doc);
       }
     };
@@ -1170,6 +1184,7 @@ function DashboardContent({
     "Whatsapp Go",
     "Cronograma",
     "Eventos Marketing",
+    "Avaliações",
     "Leads",
     "Criativo",
     "Pós-Venda",
@@ -1836,6 +1851,17 @@ function App() {
         <NotificationProvider>
           <MotoristaView />
         </NotificationProvider>
+      </ThemeProvider>
+    );
+  }
+
+  // Página pública do QR de avaliação (cliente, sem login). Usa /avaliar — não
+  // "?v=" para não colidir com a rota do motorista acima.
+  const isAvaliarRoute = window.location.pathname.includes("/avaliar");
+  if (isAvaliarRoute) {
+    return (
+      <ThemeProvider defaultTheme="dark" storageKey="carflax-theme">
+        <AvaliarPublicView />
       </ThemeProvider>
     );
   }

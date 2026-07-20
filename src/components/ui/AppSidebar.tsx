@@ -289,7 +289,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
 
     // Permissões específicas do departamento de MARKETING
     const isMarketingDept = userProfile?.department?.toUpperCase() === 'MARKETING';
-    const marketingItems = ["Marketing", "Whatsapp Evolution", "Leads", "Cronograma", "Relatórios Mkt"];
+    const marketingItems = ["Marketing", "Whatsapp Evolution", "Leads", "Cronograma", "Eventos Marketing", "Avaliações", "Relatórios Mkt"];
     if (isMarketingDept && marketingItems.includes(label)) return true;
 
     // Permissões específicas do departamento de VENDAS/COMERCIAL

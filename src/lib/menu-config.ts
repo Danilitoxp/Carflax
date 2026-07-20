@@ -61,6 +61,7 @@ export const NAV_SECTIONS: NavSection[] = [
       // em permissions (legado do Calendário) e passariam a ver as cotas dos
       // fornecedores sem ninguém ter liberado.
       { label: "Eventos", value: "Eventos Marketing" },
+      { label: "Avaliações" },
       { label: "Pós-Venda" },
       { label: "Relatórios", value: "Relatórios Mkt" },
     ],
@@ -169,7 +170,7 @@ const VENDEDOR_SECTIONS = [
 ];
 
 const MARKETING_SECTIONS = [
-  "Marketing", "Whatsapp Evolution", "Whatsapp Go", "Leads", "Criativo", "Cronograma", "Eventos Marketing", "Pós-Venda", "Relatórios Mkt",
+  "Marketing", "Whatsapp Evolution", "Whatsapp Go", "Leads", "Criativo", "Cronograma", "Eventos Marketing", "Avaliações", "Pós-Venda", "Relatórios Mkt",
 ];
 
 const VENDAS_SECTIONS = [
