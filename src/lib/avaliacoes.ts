@@ -49,20 +49,29 @@ export interface VendedorScore {
 }
 
 const REVIEW_URL_KEY = "google_review_url";
+const PREMIO_KEY = "avaliacao_premio_sorteio";
+const PREMIO_IMG_KEY = "avaliacao_premio_imagem";
 
-// ── Config (link de avaliação do Google, em crm_config) ──────────────────────
-export async function getGoogleReviewUrl(): Promise<string> {
-  const { data } = await supabase
-    .from("crm_config").select("value").eq("key", REVIEW_URL_KEY).maybeSingle();
+// ── Config (em crm_config) ───────────────────────────────────────────────────
+async function getConfig(key: string): Promise<string> {
+  const { data } = await supabase.from("crm_config").select("value").eq("key", key).maybeSingle();
   return (data?.value as string) || "";
 }
-
-export async function setGoogleReviewUrl(url: string): Promise<void> {
+async function setConfig(key: string, value: string): Promise<void> {
   const { error } = await supabase
-    .from("crm_config")
-    .upsert({ key: REVIEW_URL_KEY, value: url.trim() }, { onConflict: "key" });
+    .from("crm_config").upsert({ key, value: value.trim() }, { onConflict: "key" });
   if (error) throw error;
 }
+
+// Link fixo de avaliação do Google da Carflax. Fica no código porque não muda;
+// ainda assim um valor em crm_config (se existir) tem prioridade, caso um dia
+// precise trocar sem publicar.
+export const DEFAULT_REVIEW_URL = "https://g.page/r/CZbhPzatSAjdEAI/review";
+export const getGoogleReviewUrl = async () => (await getConfig(REVIEW_URL_KEY)) || DEFAULT_REVIEW_URL;
+export const getPremioSorteio = () => getConfig(PREMIO_KEY);
+export const setPremioSorteio = (v: string) => setConfig(PREMIO_KEY, v);
+export const getPremioImagem = () => getConfig(PREMIO_IMG_KEY);
+export const setPremioImagem = (v: string) => setConfig(PREMIO_IMG_KEY, v);
 
 // ── Página pública ───────────────────────────────────────────────────────────
 // Resolve o nome do vendedor pelo código do ERP (operator_code).
@@ -95,6 +104,22 @@ export async function registrarScan(input: {
     .single();
   if (error) return null;
   return (data?.id as string) || null;
+}
+
+// Enriquecer o scan com os dados do cliente (form da página pública).
+export async function atualizarScanCliente(id: string, cliente_nome: string | null, cliente_telefone: string | null): Promise<void> {
+  await supabase.from("avaliacao_scans")
+    .update({ cliente_nome: cliente_nome || null, cliente_telefone: cliente_telefone || null })
+    .eq("id", id);
+}
+
+// Histórico de avaliações (scans) de um vendedor, mais recentes primeiro.
+export async function fetchScansVendedor(cod: string): Promise<AvaliacaoScan[]> {
+  const { data, error } = await supabase
+    .from("avaliacao_scans").select("*").eq("vendedor_cod", cod)
+    .order("created_at", { ascending: false }).limit(500);
+  if (error) throw error;
+  return (data || []) as AvaliacaoScan[];
 }
 
 export async function resolverCanal(id: string): Promise<{ nome: string | null }> {
@@ -237,27 +262,22 @@ export async function fetchScansPendentes(): Promise<AvaliacaoScan[]> {
   return (data || []) as AvaliacaoScan[];
 }
 
-// Vendedores da campanha: departamento de vendas + cargo de vendas.
+// Colaboradores da campanha: todos os ativos das empresas Carflax, Zelex e JCM
+// (Consultoria é excluída). Precisam ter operator_code preenchido para ter QR.
 export async function fetchVendedoresCampanha(): Promise<SellerLite[]> {
   const { data, error } = await supabase
     .from("usuarios")
-    .select("name,operator_code,avatar,department,role,status")
+    .select("name,operator_code,avatar,company,status")
     .eq("status", "ativo")
     .not("operator_code", "is", null)
+    .in("company", ["Carflax", "Zelex", "JCM"])
     .order("name");
   if (error) throw error;
 
-  return (data || [])
-    .filter((u) => {
-      const dep = String(u.department || "").toUpperCase();
-      const role = String(u.role || "").toLowerCase();
-      const vendasDept = dep === "VENDAS" || dep === "COMERCIAL";
-      const vendasRole = role.includes("vendedor") || role.includes("vendas");
-      return vendasDept && vendasRole;
-    })
-    .map((u) => ({
-      operator_code: String(u.operator_code),
-      name: u.name as string,
-      avatar: (u.avatar as string) || null,
-    }));
+  return (data || []).map((u) => ({
+    operator_code: String(u.operator_code),
+    name: u.name as string,
+    avatar: (u.avatar as string) || null,
+  }));
 }
+

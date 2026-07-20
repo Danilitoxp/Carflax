@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import { Star, Download, Link2, Check, Trophy, ScanLine, Loader2, ExternalLink, Plus, Trash2, X, Settings, Ticket } from "lucide-react";
+import { Star, Download, Check, Trophy, ScanLine, Loader2, Plus, Trash2, X, Settings, Ticket, History, Gift, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  type VendedorScore, type CanalScore,
+  type VendedorScore, type CanalScore, type AvaliacaoScan,
   fetchVendedoresCampanha, fetchScoreboard, fetchCanaisScore,
-  getGoogleReviewUrl, setGoogleReviewUrl, criarCanal, removerCanal,
+  getPremioSorteio, setPremioSorteio,
+  getPremioImagem, setPremioImagem, criarCanal, removerCanal, fetchScansVendedor,
 } from "@/lib/avaliacoes";
+import { uploadImage } from "@/lib/uploadImage";
 
 // slug do nome do arquivo do QR
 const slug = (s: string) =>
@@ -23,13 +25,20 @@ function baixarQR(wrap: HTMLElement | null, nome: string) {
 }
 
 // Card do vendedor: QR (baixável) + nº de avaliações (scans).
-function VendedorCard({ score, baseUrl, rank }: { score: VendedorScore; baseUrl: string; rank: number }) {
+function VendedorCard({ score, baseUrl, rank, onHistorico }: { score: VendedorScore; baseUrl: string; rank: number; onHistorico: () => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const url = `${baseUrl}/avaliar?vendedor=${encodeURIComponent(score.vendedor_cod)}`;
   const medalha = rank === 0 ? "text-amber-400" : rank === 1 ? "text-slate-300" : rank === 2 ? "text-orange-400" : "";
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5 flex flex-col items-center text-center">
+    <div className="bg-card border border-border rounded-2xl p-5 flex flex-col items-center text-center relative">
+      <button
+        onClick={onHistorico}
+        title="Ver histórico de avaliações"
+        className="absolute top-3 right-3 p-1.5 rounded-md border border-border text-muted-foreground hover:border-blue-500 hover:text-blue-600 transition-colors"
+      >
+        <History className="w-3.5 h-3.5" />
+      </button>
       <div className="flex items-center gap-2 mb-3">
         {rank < 3 && score.scans > 0 && <Trophy className={cn("w-4 h-4", medalha)} />}
         <span className="text-xs font-black text-foreground uppercase tracking-tight truncate">{score.vendedor_nome}</span>
@@ -88,20 +97,76 @@ function CanalCard({ canal, baseUrl, onRemove }: { canal: CanalScore; baseUrl: s
   );
 }
 
+// Histórico de avaliações (scans) de um vendedor.
+function HistoricoModal({ cod, nome, onClose }: { cod: string; nome: string; onClose: () => void }) {
+  const [scans, setScans] = useState<AvaliacaoScan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchScansVendedor(cod).then(setScans).catch(() => setScans([])).finally(() => setLoading(false));
+  }, [cod]);
+
+  const fmt = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg z-10 max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <div className="border-b border-border px-5 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-blue-500" />
+            <div>
+              <h3 className="text-sm font-black text-foreground uppercase tracking-tight leading-none">{nome}</h3>
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{scans.length} avaliações</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors"><X className="w-4 h-4 text-muted-foreground" /></button>
+        </div>
+        <div className="overflow-y-auto p-4">
+          {loading ? (
+            <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 text-blue-500 animate-spin" /></div>
+          ) : scans.length === 0 ? (
+            <div className="py-10 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Nenhuma avaliação ainda</div>
+          ) : (
+            <div className="space-y-2">
+              {scans.map(s => (
+                <div key={s.id} className="flex items-center justify-between gap-3 bg-secondary/30 border border-border/50 rounded-lg px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-black text-foreground truncate">{s.cliente_nome || "Cliente não identificado"}</p>
+                    {s.cliente_telefone && <p className="text-[10px] font-bold text-muted-foreground">{s.cliente_telefone}</p>}
+                  </div>
+                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest shrink-0">{fmt(s.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AvaliacoesView() {
   const [scores, setScores] = useState<VendedorScore[]>([]);
   const [canais, setCanais] = useState<CanalScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
-  const [reviewUrl, setReviewUrl] = useState("");
-  const [urlDraft, setUrlDraft] = useState("");
+  const [premio, setPremio] = useState("");
+  const [premioDraft, setPremioDraft] = useState("");
+  const [premioImg, setPremioImg] = useState("");
+  const [premioImgDraft, setPremioImgDraft] = useState("");
+  const [enviandoImg, setEnviandoImg] = useState(false);
   const [salvandoUrl, setSalvandoUrl] = useState(false);
   const [urlSalva, setUrlSalva] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const imgInputRef = useRef<HTMLInputElement>(null);
 
   const [novoCanal, setNovoCanal] = useState("");
   const [criandoCanal, setCriandoCanal] = useState(false);
+
+  // Vendedor cujo histórico está aberto.
+  const [historico, setHistorico] = useState<{ cod: string; nome: string } | null>(null);
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -109,10 +174,11 @@ export function AvaliacoesView() {
     setLoading(true);
     setErro(null);
     try {
-      const [sellers, url, cns] = await Promise.all([
-        fetchVendedoresCampanha(), getGoogleReviewUrl(), fetchCanaisScore(),
+      const [sellers, prm, prmImg, cns] = await Promise.all([
+        fetchVendedoresCampanha(), getPremioSorteio(), getPremioImagem(), fetchCanaisScore(),
       ]);
-      setReviewUrl(url); setUrlDraft(url);
+      setPremio(prm); setPremioDraft(prm);
+      setPremioImg(prmImg); setPremioImgDraft(prmImg);
       setScores(await fetchScoreboard(sellers));
       setCanais(cns);
     } catch (e) {
@@ -124,18 +190,36 @@ export function AvaliacoesView() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  const salvarUrl = async () => {
+  const salvarConfig = async () => {
     setSalvandoUrl(true);
     setErro(null);
     try {
-      await setGoogleReviewUrl(urlDraft);
-      setReviewUrl(urlDraft.trim());
+      await Promise.all([setPremioSorteio(premioDraft), setPremioImagem(premioImgDraft)]);
+      setPremio(premioDraft.trim());
+      setPremioImg(premioImgDraft.trim());
       setUrlSalva(true);
       setTimeout(() => setUrlSalva(false), 2000);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
       setSalvandoUrl(false);
+    }
+  };
+
+  // Foto do prêmio: pula compressão para preservar o PNG (transparência do produto).
+  const enviarFotoPremio = async (file: File) => {
+    if (!file.type.startsWith("image/")) { setErro("Selecione uma imagem (PNG ou JPG)."); return; }
+    if (file.size > 4_000_000) { setErro("Imagem muito grande (máx. 4 MB)."); return; }
+    setEnviandoImg(true);
+    setErro(null);
+    try {
+      const url = await uploadImage(file, "campanhas", true);
+      if (!url) { setErro("Falha ao enviar a imagem. Tente novamente."); return; }
+      setPremioImgDraft(url);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setEnviandoImg(false);
     }
   };
 
@@ -179,22 +263,32 @@ export function AvaliacoesView() {
           </div>
         </div>
         <button
-          onClick={() => { setUrlDraft(reviewUrl); setConfigOpen(true); }}
-          title="Configurar link do Google"
+          onClick={() => { setPremioDraft(premio); setPremioImgDraft(premioImg); setConfigOpen(true); }}
+          title="Configurar prêmio do sorteio"
           className="shrink-0 p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
         >
           <Settings className="w-4 h-4" />
         </button>
       </div>
 
-      {!reviewUrl && (
-        <div className="mt-5 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/50 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-          <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300">
-            Nenhum link de avaliação do Google configurado — os QRs abrem a página mas não enviam o cliente ao Google.
-          </span>
-          <button onClick={() => { setUrlDraft(""); setConfigOpen(true); }} className="shrink-0 text-[10px] font-black uppercase tracking-widest text-rose-700 dark:text-rose-300 underline">Configurar</button>
+      {/* Prêmio do sorteio */}
+      <div className="mt-5 bg-gradient-to-r from-blue-600/10 to-transparent border border-blue-500/20 rounded-xl px-4 py-3 flex items-center gap-3">
+        {premioImg ? (
+          <img src={premioImg} alt={premio || "Prêmio"} className="w-12 h-12 rounded-lg object-contain bg-white/70 dark:bg-white/10 border border-border shrink-0" />
+        ) : (
+          <Gift className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
+        )}
+        <div className="min-w-0">
+          <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">Prêmio do sorteio</span>
+          {premio ? (
+            <span className="text-sm font-black text-foreground">{premio}</span>
+          ) : (
+            <button onClick={() => { setPremioDraft(""); setPremioImgDraft(premioImg); setConfigOpen(true); }} className="text-xs font-black text-blue-600 dark:text-blue-400 underline">
+              Definir prêmio
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
@@ -241,7 +335,7 @@ export function AvaliacoesView() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {scores.map((s, i) => <VendedorCard key={s.vendedor_cod} score={s} baseUrl={baseUrl} rank={i} />)}
+                {scores.map((s, i) => <VendedorCard key={s.vendedor_cod} score={s} baseUrl={baseUrl} rank={i} onHistorico={() => setHistorico({ cod: s.vendedor_cod, nome: s.vendedor_nome })} />)}
               </div>
             )}
           </div>
@@ -286,37 +380,73 @@ export function AvaliacoesView() {
         </>
       )}
 
-      {/* Config do link do Google */}
+      {/* Config do prêmio do sorteio */}
       {configOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfigOpen(false)} />
           <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg z-10 animate-in fade-in zoom-in-95 duration-200">
             <div className="border-b border-border px-5 py-4 flex items-center justify-between">
               <h3 className="text-sm font-black text-foreground uppercase tracking-tight flex items-center gap-2">
-                <Link2 className="w-4 h-4 text-blue-500" /> Link de avaliação do Google
+                <Gift className="w-4 h-4 text-blue-500" /> Prêmio do sorteio
               </h3>
               <button onClick={() => setConfigOpen(false)} className="p-1.5 rounded-lg hover:bg-secondary transition-colors"><X className="w-4 h-4 text-muted-foreground" /></button>
             </div>
-            <div className="p-5 space-y-3">
-              <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
-                Para onde todos os QRs (vendedores e cupons) enviam o cliente. Já está configurado — só mude se o link do Google mudar.
-              </p>
-              <input
-                value={urlDraft}
-                onChange={(e) => setUrlDraft(e.target.value)}
-                placeholder="https://g.page/r/.../review"
-                className="w-full px-3 py-2 text-xs font-bold bg-background border border-border rounded-lg focus:outline-none focus:border-blue-500"
-              />
-              <div className="flex items-center justify-end gap-2">
-                {reviewUrl && (
-                  <a href={reviewUrl} target="_blank" rel="noreferrer"
-                    className="px-3 py-2 rounded-lg border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center gap-1.5">
-                    <ExternalLink className="w-3.5 h-3.5" /> Testar
-                  </a>
-                )}
+            <div className="p-5 space-y-5">
+              <div>
+                <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5 mb-1.5">
+                  <Gift className="w-3 h-3" /> Nome do prêmio
+                </label>
+                <p className="text-[10px] font-bold text-muted-foreground/80 leading-relaxed mb-2">
+                  O que o cliente concorre ao participar. Aparece na campanha e na tela do cliente.
+                </p>
+                <input
+                  value={premioDraft}
+                  onChange={(e) => setPremioDraft(e.target.value)}
+                  placeholder="Ex.: Kit de ferramentas profissional"
+                  className="w-full px-3 py-2 text-xs font-bold bg-background border border-border rounded-lg focus:outline-none focus:border-blue-500"
+                />
+
+                {/* Foto do prêmio (PNG) */}
+                <div className="flex items-center gap-3 mt-3">
+                  <div className="w-16 h-16 rounded-lg border border-border bg-white/70 dark:bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
+                    {premioImgDraft ? (
+                      <img src={premioImgDraft} alt="Prêmio" className="w-full h-full object-contain" />
+                    ) : (
+                      <ImagePlus className="w-5 h-5 text-muted-foreground/40" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={imgInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarFotoPremio(f); e.target.value = ""; }}
+                    />
+                    <button
+                      onClick={() => imgInputRef.current?.click()}
+                      disabled={enviandoImg}
+                      className="px-3 py-2 rounded-lg border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40 flex items-center gap-1.5"
+                    >
+                      {enviandoImg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+                      {premioImgDraft ? "Trocar foto" : "Enviar foto (PNG)"}
+                    </button>
+                    {premioImgDraft && (
+                      <button
+                        onClick={() => setPremioImgDraft("")}
+                        className="px-3 py-2 rounded-lg border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-rose-500 hover:border-rose-500/50 transition-colors"
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
                 <button
-                  onClick={salvarUrl}
-                  disabled={salvandoUrl || urlDraft.trim() === reviewUrl.trim()}
+                  onClick={salvarConfig}
+                  disabled={salvandoUrl || (premioDraft.trim() === premio.trim() && premioImgDraft.trim() === premioImg.trim())}
                   className="px-4 py-2 rounded-lg bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-40 transition-colors flex items-center gap-1.5"
                 >
                   {urlSalva ? <Check className="w-3.5 h-3.5" /> : salvandoUrl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
@@ -326,6 +456,10 @@ export function AvaliacoesView() {
             </div>
           </div>
         </div>
+      )}
+
+      {historico && (
+        <HistoricoModal cod={historico.cod} nome={historico.nome} onClose={() => setHistorico(null)} />
       )}
     </div>
   );

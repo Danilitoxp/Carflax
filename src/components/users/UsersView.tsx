@@ -29,7 +29,7 @@ interface User {
   lastLogin: string;
   permissions: string[];
   operatorCode?: string;
-  company: "Carflax" | "Zelex" | "JCM";
+  company: "Carflax" | "Zelex" | "JCM" | "Consultoria";
   department: string;
   birthDate?: string;
   admissionDate?: string;
@@ -109,7 +109,7 @@ export function UsersView() {
     );
   };
 
-  const companies = ["Carflax", "Zelex", "JCM"];
+  const companies = ["Carflax", "Zelex", "JCM", "Consultoria"];
 
   const applyDateMask = (value: string) => {
     const digits = value.replace(/\D/g, "").slice(0, 8);
