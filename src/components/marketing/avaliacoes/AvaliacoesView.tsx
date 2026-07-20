@@ -46,15 +46,9 @@ function VendedorCard({ score, baseUrl, rank }: { score: VendedorScore; baseUrl:
         <Download className="w-3 h-3" /> Baixar QR
       </button>
 
-      <div className="grid grid-cols-2 gap-2 w-full mt-4 pt-4 border-t border-border/50">
-        <div>
-          <p className="text-2xl font-black text-blue-600 dark:text-blue-400 tracking-tighter leading-none">{score.scans}</p>
-          <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Avaliações</span>
-        </div>
-        <div>
-          <p className="text-2xl font-black text-foreground tracking-tighter leading-none">{score.identificados}</p>
-          <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Identificados</span>
-        </div>
+      <div className="w-full mt-4 pt-4 border-t border-border/50">
+        <p className="text-2xl font-black text-blue-600 dark:text-blue-400 tracking-tighter leading-none">{score.scans}</p>
+        <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Avaliações</span>
       </div>
     </div>
   );
