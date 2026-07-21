@@ -69,8 +69,11 @@ export async function uploadImage(file: File, bucket: string, skipCompression: b
   const ext = compressed.name.split(".").pop() ?? "jpg";
   const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
+  // upsert:false → INSERT puro (o path já é único, nunca sobrescreve). Com upsert:true
+  // o Supabase trata como UPDATE, que exige permissão de UPDATE no RLS — o que quebra
+  // o upload anônimo do motorista (que só tem policy de INSERT no bucket entregas).
   const { error } = await supabase.storage.from(bucket).upload(path, compressed, {
-    upsert: true,
+    upsert: false,
     contentType: compressed.type,
     cacheControl: '3600'
   });
