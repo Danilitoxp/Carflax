@@ -712,3 +712,41 @@ export interface RetiradaPedido {
 }
 
 export const apiRetiradaPedidos = () => get<RetiradaPedido[]>("/api/estoque/retirada/pedidos");
+
+// ── Compras (backend db: marketing-banco-de-dados) ───────────────────────────
+const API_DB = "https://marketing-banco-de-dados.velbav.easypanel.host";
+
+export interface FornecedorLeadTime {
+  cod_fornecedor: string;
+  fornecedor: string;
+  pedidos: number;
+  media_dias: number;
+  min_dias: number;
+  max_dias: number;
+  ultima_entrada: string | null;
+}
+export interface LeadTimeResponse { success: boolean; meses: number; data: FornecedorLeadTime[]; }
+export const apiComprasLeadTime = (meses = 6, minPedidos = 2) =>
+  get<LeadTimeResponse>("/api/compras/lead-time-fornecedores", { meses: String(meses), minPedidos: String(minPedidos) }, API_DB);
+
+export interface VendaGrande {
+  data: string;
+  documento: string;
+  cod_item: string;
+  item: string;
+  marca: string;
+  cliente: string;
+  vendedor: string;
+  qtd: number;
+  valor: number;
+  media_item: number;
+  ratio: number;
+  estoque_atual: number | null;
+}
+export interface VendasGrandesResponse { success: boolean; parametros: { dias: number; fator: number; piso: number }; data: VendaGrande[]; }
+export const apiComprasVendasGrandes = (opts?: { dias?: number; fator?: number; piso?: number }) =>
+  get<VendasGrandesResponse>("/api/compras/vendas-grandes", {
+    dias: String(opts?.dias ?? 30),
+    fator: String(opts?.fator ?? 5),
+    piso: String(opts?.piso ?? 10),
+  }, API_DB);

@@ -587,6 +587,7 @@ const notifSections = [
       { key: "stalePedidos", label: "Pedido parado (Balcão 2 / Entrega)" },
       { key: "clienteRetira", label: "Cliente veio retirar (Balcão 2)" },
       { key: "balcao2Prazo", label: "Prazo de retirada 72h (Balcão 2)" },
+      { key: "vendaGrande", label: "Venda grande (Compras)" },
     ],
   },
   {

@@ -75,6 +75,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Retirada" },
     ],
   },
+  { label: "Compras", permGroup: "COMPRAS" },
   {
     label: "Entregas",
     permGroup: "LOGÍSTICA",
@@ -102,7 +103,7 @@ function buildPermissionGroups() {
   const map = new Map<string, string[]>();
 
   // Define group order
-  const ORDER = ["COMERCIAL", "MARKETING", "ESTOQUE", "LOGÍSTICA", "GESTÃO & ADMIN"];
+  const ORDER = ["COMERCIAL", "MARKETING", "ESTOQUE", "COMPRAS", "LOGÍSTICA", "GESTÃO & ADMIN"];
   ORDER.forEach(g => map.set(g, []));
 
   NAV_SECTIONS.forEach(section => {
@@ -201,6 +202,8 @@ export function canAccessSection(profile: AccessProfile | null | undefined, item
 
   const dept = profile.department?.toUpperCase();
   if ((dept === "VENDAS" || dept === "COMERCIAL") && VENDAS_SECTIONS.includes(item)) return true;
+
+  if (dept === "COMPRAS" && item === "Compras") return true;
 
   // Permissões manuais atribuídas no cadastro do usuário
   if (profile.permissions?.includes(item)) return true;

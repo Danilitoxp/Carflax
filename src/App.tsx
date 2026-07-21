@@ -28,6 +28,7 @@ import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 import { ColetorView } from "@/components/coletor/ColetorView";
 import { SeparacaoView, ConferenciaView } from "@/components/estoque/ExpedicaoView";
 import { RetiradaView } from "@/components/estoque/RetiradaView";
+import { ComprasView } from "@/components/compras/ComprasView";
 import { EntregasView } from "@/components/entregas";
 import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
 import { UsersView } from "@/components/users/UsersView";
@@ -43,6 +44,7 @@ import { useNotification } from "@/hooks/useNotification";
 import { runAnnouncementAutomation } from "@/lib/announcement-automation";
 import { usePedidosParadosAlert } from "@/hooks/usePedidosParadosAlert";
 import { useBalcao2PrazoAlert } from "@/hooks/useBalcao2PrazoAlert";
+import { useVendaGrandeAlert } from "@/hooks/useVendaGrandeAlert";
 import { useRetiradaAlert, startAlertSound, stopAlertSound } from "@/hooks/useRetiradaAlert";
 import { BellRing } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
@@ -88,6 +90,7 @@ function DashboardContent({
   const { showNotification } = useNotification();
   usePedidosParadosAlert(showNotification, userProfile);
   useBalcao2PrazoAlert(showNotification, userProfile);
+  useVendaGrandeAlert(showNotification, userProfile);
 
   const [activeRetiradaAlert, setActiveRetiradaAlert] = useState<{ cliente: string; pedido: string } | null>(null);
 
@@ -1329,6 +1332,8 @@ function DashboardContent({
             <ConferenciaView />
           ) : activeItem === "Retirada" ? (
             <RetiradaView userProfile={userProfile || undefined} />
+          ) : activeItem === "Compras" ? (
+            <ComprasView />
           ) : activeItem === "Usuários" ? (
             <div className="p-6 pt-4 h-full overflow-y-auto scrollbar-hide">
               <UsersView />
