@@ -713,9 +713,8 @@ export interface RetiradaPedido {
 
 export const apiRetiradaPedidos = () => get<RetiradaPedido[]>("/api/estoque/retirada/pedidos");
 
-// ── Compras (backend db: marketing-banco-de-dados) ───────────────────────────
-const API_DB = "https://marketing-banco-de-dados.velbav.easypanel.host";
-
+// ── Compras ──────────────────────────────────────────────────────────────────
+// Usa a base padrão (/api-marketing → marketing-carflax), igual ao resto do api.ts.
 export interface FornecedorLeadTime {
   cod_fornecedor: string;
   fornecedor: string;
@@ -727,7 +726,7 @@ export interface FornecedorLeadTime {
 }
 export interface LeadTimeResponse { success: boolean; meses: number; data: FornecedorLeadTime[]; }
 export const apiComprasLeadTime = (meses = 6, minPedidos = 2) =>
-  get<LeadTimeResponse>("/api/compras/lead-time-fornecedores", { meses: String(meses), minPedidos: String(minPedidos) }, API_DB);
+  get<LeadTimeResponse>("/api/compras/lead-time-fornecedores", { meses: String(meses), minPedidos: String(minPedidos) });
 
 export interface VendaGrande {
   data: string;
@@ -749,4 +748,4 @@ export const apiComprasVendasGrandes = (opts?: { dias?: number; fator?: number; 
     dias: String(opts?.dias ?? 30),
     fator: String(opts?.fator ?? 5),
     piso: String(opts?.piso ?? 10),
-  }, API_DB);
+  });

@@ -10,7 +10,8 @@ import { useEffect, useRef } from "react";
  * alertas.vendaGrande, padrão: ligado). Dispara uma vez por (documento+item).
  */
 
-const API_SERVER = "https://marketing-banco-de-dados.velbav.easypanel.host";
+// /api-marketing → marketing-carflax (proxy no dev, rewrite no Vercel), mesmo host do api.ts.
+const API_SERVER = "/api-marketing";
 const CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 min
 const INITIAL_DELAY_MS = 25 * 1000;
 const AVISADOS_KEY = "carflax_venda_grande_avisados";
