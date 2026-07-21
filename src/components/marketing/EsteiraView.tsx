@@ -14,9 +14,16 @@ import {
   ChevronUp,
   Users,
   Lock,
+  RotateCcw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { DemandasRecorrentesModal } from "./DemandasRecorrentesModal";
+import {
+  type DemandaRecorrente,
+  loadDemandasRecorrentesLocal,
+  saveDemandasRecorrentesLocal,
+} from "./recorrentes-utils";
 
 interface KanbanCard {
   id: string;
@@ -251,10 +258,16 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
   const isManager = role.includes("ADMIN") || role.includes("GERENTE");
   const [isCreateSubquadroOpen, setIsCreateSubquadroOpen] = useState(false);
   const [isAddPeopleOpen, setIsAddPeopleOpen] = useState(false);
+  const [isRecorrentesModalOpen, setIsRecorrentesModalOpen] = useState(false);
+  const [rotinasRecorrentes, setRotinasRecorrentes] = useState<DemandaRecorrente[]>([]);
 
   // Esteira sendo exibida no momento — a própria, por padrão. Gerente/admin
   // pode trocar via seletor para acompanhar a esteira de outra pessoa.
   const [boardOwnerId, setBoardOwnerId] = useState<string>(userProfile?.id || "");
+
+  useEffect(() => {
+    setRotinasRecorrentes(loadDemandasRecorrentesLocal());
+  }, []);
 
   // Usuários (exceto eu) agrupados por setor, pra organizar o seletor de esteira.
   const usersByDepartment = useMemo(() => {
@@ -351,11 +364,173 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
     }
   }, []);
 
+  // Notifica uma pessoa sobre um evento da Esteira (silencioso — não trava o fluxo se falhar).
+  const notifyEsteira = useCallback(
+    async (
+      destino: string,
+      cardId: string,
+      cardTitle: string,
+      type: "assigned" | "completed",
+    ) => {
+      if (!userProfile?.id || destino === userProfile.id) return; // nunca notifica a si mesmo
+      try {
+        await supabase.from("esteira_notificacoes").insert([
+          {
+            destino,
+            actor_id: userProfile.id,
+            card_id: cardId,
+            card_title: cardTitle,
+            type,
+          },
+        ]);
+      } catch (err) {
+        console.error("[EsteiraView] Erro ao criar notificação:", err);
+      }
+    },
+    [userProfile?.id]
+  );
+
+  const verificarEGerarDemandasRecorrentes = useCallback(
+    async (currentCards: KanbanCard[]) => {
+      const rotinas = loadDemandasRecorrentesLocal();
+      setRotinasRecorrentes(rotinas);
+
+      const hoje = new Date();
+      const hojeStr = hoje.toISOString().split("T")[0]; // YYYY-MM-DD
+      const diaSemanaHoje = hoje.getDay(); // 0 = Dom, 1 = Seg, 2 = Ter, 3 = Qua, 4 = Qui, 5 = Sex, 6 = Sáb
+      const diaMesHoje = hoje.getDate(); // 1..31
+
+      let novasRotinasState = [...rotinas];
+      const cardsGeradosNoCheck: KanbanCard[] = [];
+
+      for (const rotina of rotinas) {
+        if (!rotina.active) continue;
+        if (rotina.last_generated_date === hojeStr) continue;
+
+        let deveRodarHoje = false;
+        if (rotina.tipo === "diario") {
+          deveRodarHoje = true;
+        } else if (rotina.tipo === "dias_semana") {
+          deveRodarHoje = (rotina.dias_semana || []).includes(diaSemanaHoje);
+        } else if (rotina.tipo === "semanal") {
+          deveRodarHoje = rotina.dia_semana_especifico === diaSemanaHoje;
+        } else if (rotina.tipo === "mensal") {
+          deveRodarHoje = rotina.dia_mes_especifico === diaMesHoje;
+        }
+
+        if (!deveRodarHoje) continue;
+
+        const jaExisteHoje = currentCards.some(
+          (c) =>
+            c.title.trim() === rotina.title.trim() &&
+            c.created_at?.startsWith(hojeStr)
+        );
+
+        if (jaExisteHoje) continue;
+
+        let desc = rotina.description || "";
+        if (rotina.subtasks && rotina.subtasks.length > 0) {
+          const checklistText = rotina.subtasks.map((st) => `- [ ] ${st}`).join("\n");
+          desc = desc ? `${desc}\n\n${checklistText}` : checklistText;
+        }
+
+        const isabelaUser = usersList.find((u) => u.name.toLowerCase().includes("isabela"));
+        const targetOwnerId = rotina.owner_id || isabelaUser?.id || boardOwnerId || userProfile?.id || null;
+
+        const payload = {
+          title: rotina.title,
+          description: desc,
+          column_id: "A FAZER" as const,
+          order_index: 0,
+          tag_name: rotina.tag_name || "Média",
+          owner_id: targetOwnerId,
+          created_by: userProfile?.id || boardOwnerId || null,
+        };
+
+        try {
+          const { data, error } = await supabase
+            .from("marketing_esteira")
+            .insert([payload])
+            .select()
+            .single();
+
+          if (!error && data) {
+            cardsGeradosNoCheck.push(data);
+            if (payload.owner_id) {
+              notifyEsteira(payload.owner_id, data.id, payload.title, "assigned");
+            }
+          }
+        } catch (e) {
+          console.warn("Fallback ao salvar card no Supabase:", e);
+        }
+
+        novasRotinasState = novasRotinasState.map((r) =>
+          r.id === rotina.id ? { ...r, last_generated_date: hojeStr } : r
+        );
+      }
+
+      if (cardsGeradosNoCheck.length > 0) {
+        setRotinasRecorrentes(novasRotinasState);
+        saveDemandasRecorrentesLocal(novasRotinasState);
+        setCards((prev) => [...cardsGeradosNoCheck, ...prev]);
+      }
+    },
+    [boardOwnerId, notifyEsteira, userProfile?.id, usersList]
+  );
+
+  const handleGerarCardManual = async (rotina: DemandaRecorrente) => {
+    let desc = rotina.description || "";
+    if (rotina.subtasks && rotina.subtasks.length > 0) {
+      const checklistText = rotina.subtasks.map((st) => `- [ ] ${st}`).join("\n");
+      desc = desc ? `${desc}\n\n${checklistText}` : checklistText;
+    }
+
+    const isabelaUser = usersList.find((u) => u.name.toLowerCase().includes("isabela"));
+    const targetOwnerId = rotina.owner_id || isabelaUser?.id || boardOwnerId || userProfile?.id || null;
+
+    const payload = {
+      title: rotina.title,
+      description: desc,
+      column_id: "A FAZER" as const,
+      order_index: 0,
+      tag_name: rotina.tag_name || "Média",
+      owner_id: targetOwnerId,
+      created_by: userProfile?.id || boardOwnerId || null,
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from("marketing_esteira")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[EsteiraView] Erro ao inserir card no banco:", error);
+        throw error;
+      }
+
+      if (data) {
+        setCards((prev) => [data, ...prev]);
+        if (payload.owner_id) {
+          notifyEsteira(payload.owner_id, data.id, payload.title, "assigned");
+        }
+      }
+    } catch (e) {
+      console.error("[EsteiraView] Falha ao salvar card de rotina manual no Supabase:", e);
+      const fallbackCard: KanbanCard = {
+        id: `card-recorrente-${rotina.id}-${Date.now()}`,
+        ...payload,
+        created_at: new Date().toISOString(),
+      };
+      setCards((prev) => [fallbackCard, ...prev]);
+    }
+  };
+
   const loadCards = useCallback(async () => {
     setLoading(true);
     try {
       if (isSubquadroView) {
-        // Quadro de equipe: agrega os cards de todo mundo que faz parte do subquadro.
         const memberIds = subquadroMembers.map((u) => u.id);
         if (memberIds.length === 0) {
           setCards([]);
@@ -367,16 +542,13 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
           .in("owner_id", memberIds)
           .order("order_index", { ascending: true });
         if (error) throw error;
-        // Só entram no quadro de equipe os cards cujo CRIADOR também é do subquadro.
-        // Assim, uma delegação feita por alguém de fora (ex.: quadro pessoal de outra
-        // área) não vaza pra cá só porque o responsável faz parte da equipe.
         const memberSet = new Set(memberIds);
-        setCards((data || []).filter((c) => !c.created_by || memberSet.has(c.created_by)));
+        const filtered = (data || []).filter((c) => !c.created_by || memberSet.has(c.created_by));
+        setCards(filtered);
+        verificarEGerarDemandasRecorrentes(filtered);
         return;
       }
 
-      // Mostra cards em que a pessoa é a responsável OU a criadora (pra poder
-      // acompanhar o andamento do que ela delegou pra outra pessoa).
       const { data, error } = await supabase
         .from("marketing_esteira")
         .select("*")
@@ -384,13 +556,15 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
         .order("order_index", { ascending: true });
 
       if (error) throw error;
-      setCards(data || []);
+      const loaded = data || [];
+      setCards(loaded);
+      verificarEGerarDemandasRecorrentes(loaded);
     } catch (err) {
       console.error("[EsteiraView] Erro ao carregar cards:", err);
     } finally {
       setLoading(false);
     }
-  }, [boardOwnerId, isSubquadroView, subquadroMembers]);
+  }, [boardOwnerId, isSubquadroView, subquadroMembers, verificarEGerarDemandasRecorrentes]);
 
   // ── Load cards and users ──────────────────────────────────────────────────
   useEffect(() => {
@@ -424,29 +598,6 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
       );
     }
     return ownerId === boardOwnerId || createdBy === boardOwnerId;
-  };
-
-  // Notifica uma pessoa sobre um evento da Esteira (silencioso — não trava o fluxo se falhar).
-  const notifyEsteira = async (
-    destino: string,
-    cardId: string,
-    cardTitle: string,
-    type: "assigned" | "completed",
-  ) => {
-    if (!userProfile?.id || destino === userProfile.id) return; // nunca notifica a si mesmo
-    try {
-      await supabase.from("esteira_notificacoes").insert([
-        {
-          destino,
-          actor_id: userProfile.id,
-          card_id: cardId,
-          card_title: cardTitle,
-          type,
-        },
-      ]);
-    } catch (err) {
-      console.error("[EsteiraView] Erro ao criar notificação:", err);
-    }
   };
 
   // ── Save (Insert or Update) ───────────────────────────────────────────────
@@ -932,6 +1083,16 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsRecorrentesModalOpen(true)}
+            className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-xl px-3 py-1.5 text-sm font-bold text-primary hover:bg-primary/20 transition-all shadow-xs"
+            title="Gerenciar demandas fixas e rotinas recorrentes"
+          >
+            <RotateCcw className="w-4 h-4 text-primary" />
+            <span>Demandas Fixas ({rotinasRecorrentes.filter((r) => r.active).length})</span>
+          </button>
 
           {isManager && (
             <button
@@ -1848,6 +2009,14 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
           }}
         />
       )}
+
+      <DemandasRecorrentesModal
+        isOpen={isRecorrentesModalOpen}
+        onClose={() => setIsRecorrentesModalOpen(false)}
+        userId={userProfile?.id}
+        onGerarCardManual={handleGerarCardManual}
+        onUpdateRotinas={() => setRotinasRecorrentes(loadDemandasRecorrentesLocal())}
+      />
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 4px; }
