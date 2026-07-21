@@ -194,7 +194,7 @@ function LeadTimeTab({ rows, busca, setBusca, sortKey, sortDir, toggleSort }: {
     <th className={cn("px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground", className)}>
       {k ? (
         <button onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
-          {children}<ArrowUpDown className={cn("w-3 h-3", sortKey === k ? "text-blue-500" : "opacity-40")} />
+          {children}<ArrowUpDown className={cn("w-3 h-3 transition-transform", sortKey === k ? "text-blue-500" : "opacity-40", sortKey === k && sortDir === "asc" && "rotate-180")} />
         </button>
       ) : children}
     </th>
