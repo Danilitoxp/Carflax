@@ -4,12 +4,13 @@ import {
   Sparkles, CheckSquare, Play
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
 import {
   type DemandaRecorrente,
   DIAS_SEMANA_LABELS,
-  loadDemandasRecorrentesLocal,
-  saveDemandasRecorrentesLocal,
+  fetchDemandasRecorrentesSupabase,
+  saveDemandaRecorrenteSupabase,
+  updateDemandaRecorrenteSupabase,
+  deleteDemandaRecorrenteSupabase,
 } from "./recorrentes-utils";
 
 interface DemandasRecorrentesModalProps {
@@ -38,29 +39,16 @@ export function DemandasRecorrentesModal({
   });
   const [newSubtask, setNewSubtask] = useState("");
 
-  const carregarRotinas = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("marketing_demandas_recorrentes")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (!error && data && data.length > 0) {
-        setRotinas(data);
-        saveDemandasRecorrentesLocal(data);
-      } else {
-        const local = loadDemandasRecorrentesLocal();
-        setRotinas(local);
-      }
-    } catch {
-      setRotinas(loadDemandasRecorrentesLocal());
-    }
-  };
-
   useEffect(() => {
+    let active = true;
     if (isOpen) {
-      carregarRotinas();
+      fetchDemandasRecorrentesSupabase().then((data) => {
+        if (active) setRotinas(data);
+      });
     }
+    return () => {
+      active = false;
+    };
   }, [isOpen]);
 
   const salvarRotina = async () => {
@@ -86,12 +74,11 @@ export function DemandasRecorrentesModal({
       : [nova, ...rotinas];
 
     setRotinas(atualizadas);
-    saveDemandasRecorrentesLocal(atualizadas);
 
     try {
-      await supabase.from("marketing_demandas_recorrentes").upsert(nova);
+      await saveDemandaRecorrenteSupabase(nova);
     } catch (e) {
-      console.warn("Supabase upsert fallback to localStorage:", e);
+      console.warn("Erro ao salvar no Supabase:", e);
     }
 
     setIsEditing(false);
@@ -106,18 +93,14 @@ export function DemandasRecorrentesModal({
   };
 
   const toggleActiveRotina = async (rotina: DemandaRecorrente) => {
-    const atualizada = { ...rotina, active: !rotina.active };
-    const novas = rotinas.map((r) => (r.id === rotina.id ? atualizada : r));
+    const novoStatus = !rotina.active;
+    const novas = rotinas.map((r) => (r.id === rotina.id ? { ...r, active: novoStatus } : r));
     setRotinas(novas);
-    saveDemandasRecorrentesLocal(novas);
 
     try {
-      await supabase
-        .from("marketing_demandas_recorrentes")
-        .update({ active: atualizada.active })
-        .eq("id", rotina.id);
-    } catch {
-      // localStorage backup handled
+      await updateDemandaRecorrenteSupabase(rotina.id, { active: novoStatus });
+    } catch (e) {
+      console.warn("Erro ao atualizar status no Supabase:", e);
     }
     if (onUpdateRotinas) onUpdateRotinas();
   };
@@ -125,12 +108,11 @@ export function DemandasRecorrentesModal({
   const excluirRotina = async (id: string) => {
     const novas = rotinas.filter((r) => r.id !== id);
     setRotinas(novas);
-    saveDemandasRecorrentesLocal(novas);
 
     try {
-      await supabase.from("marketing_demandas_recorrentes").delete().eq("id", id);
-    } catch {
-      // localStorage backup handled
+      await deleteDemandaRecorrenteSupabase(id);
+    } catch (e) {
+      console.warn("Erro ao deletar no Supabase:", e);
     }
     if (onUpdateRotinas) onUpdateRotinas();
   };

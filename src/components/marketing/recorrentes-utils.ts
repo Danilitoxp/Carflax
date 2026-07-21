@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase";
+
 export type RecorrenciaTipo = "diario" | "dias_semana" | "semanal" | "mensal";
 
 export interface DemandaRecorrente {
@@ -26,10 +28,35 @@ export const DIAS_SEMANA_LABELS = [
   { val: 0, short: "Dom", full: "Domingo" },
 ];
 
-const LOCAL_STORAGE_KEY = "carflax_marketing_demandas_recorrentes_v2";
-
 export function getDefaultRotinas(): DemandaRecorrente[] {
   return [
+    {
+      id: "rotina-stories-diarios",
+      title: "📱 3 Stories Diários (Postar Roteiros do Social Media)",
+      description: "Postar e executar a sequência de 3 Stories diários com base nos roteiros criados pelo Social Media.",
+      tipo: "dias_semana",
+      dias_semana: [1, 2, 3, 4, 5],
+      tag_name: "Alta",
+      subtasks: [
+        "Story 1 (Manhã): Postar Story do Roteiro 1",
+        "Story 2 (Tarde): Postar Story do Roteiro 2 (Produto/Dica)",
+        "Story 3 (Fim da Tarde): Postar Story do Roteiro 3 (Engajamento/CTA)",
+      ],
+      active: true,
+    },
+    {
+      id: "rotina-reels-ter-qui",
+      title: "🎬 2 Reels da Semana (Postar Roteiros do Social Media)",
+      description: "Gravar/Editar/Postar os 2 Reels semanais (Terça e Quinta) com os roteiros aprovados pelo Social Media.",
+      tipo: "dias_semana",
+      dias_semana: [2, 4],
+      tag_name: "Urgente",
+      subtasks: [
+        "Postar/Executar Reel de Terça (Roteiro do Social Media)",
+        "Postar/Executar Reel de Quinta (Roteiro do Social Media)",
+      ],
+      active: true,
+    },
     {
       id: "rotina-atendimento-directs",
       title: "💬 Atendimento & Redirecionamento de Leads das Redes",
@@ -63,7 +90,7 @@ export function getDefaultRotinas(): DemandaRecorrente[] {
       title: "🎨 Encarte de Promoções da Semana",
       description: "Divulgação dos produtos em destaque na semana para os clientes.",
       tipo: "semanal",
-      dia_semana_especifico: 3, // Quarta-feira
+      dia_semana_especifico: 3,
       tag_name: "Alta",
       subtasks: [
         "Selecionar 3 a 5 produtos em oferta com o comercial",
@@ -77,7 +104,7 @@ export function getDefaultRotinas(): DemandaRecorrente[] {
       title: "📊 Relatório Semanal & Alinhamento com Vendas",
       description: "Análise de alcance, leads gerados e planejamento da semana seguinte.",
       tipo: "semanal",
-      dia_semana_especifico: 5, // Sexta-feira
+      dia_semana_especifico: 5,
       tag_name: "Média",
       subtasks: [
         "Extrair alcance, novos seguidores e leads do WhatsApp",
@@ -114,21 +141,67 @@ export function getDefaultRotinas(): DemandaRecorrente[] {
   ];
 }
 
-export function loadDemandasRecorrentesLocal(): DemandaRecorrente[] {
+/**
+ * Busca todas as demandas recorrentes cadastradas diretamente no Supabase.
+ * Se a tabela estiver vazia, efetua o seed inicial dos registros no Supabase.
+ */
+export async function fetchDemandasRecorrentesSupabase(): Promise<DemandaRecorrente[]> {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) return getDefaultRotinas();
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : getDefaultRotinas();
-  } catch {
+    const { data, error } = await supabase
+      .from("marketing_demandas_recorrentes")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      return data;
+    }
+
+    // Se estiver vazia no Supabase, insere os registros padrão diretamente no banco
+    const defaults = getDefaultRotinas();
+    await supabase.from("marketing_demandas_recorrentes").upsert(defaults);
+    return defaults;
+  } catch (err) {
+    console.warn("[recorrentes-utils] Falha ao consultar Supabase, usando padrão:", err);
     return getDefaultRotinas();
   }
 }
 
-export function saveDemandasRecorrentesLocal(rotinas: DemandaRecorrente[]) {
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(rotinas));
-  } catch (err) {
-    console.error("Erro ao salvar rotinas locais:", err);
+export async function saveDemandaRecorrenteSupabase(rotina: DemandaRecorrente): Promise<void> {
+  const { error } = await supabase
+    .from("marketing_demandas_recorrentes")
+    .upsert([rotina]);
+
+  if (error) {
+    console.error("[recorrentes-utils] Erro ao salvar demanda no Supabase:", error);
+    throw error;
+  }
+}
+
+export async function updateDemandaRecorrenteSupabase(
+  id: string,
+  updates: Partial<DemandaRecorrente>
+): Promise<void> {
+  const { error } = await supabase
+    .from("marketing_demandas_recorrentes")
+    .update(updates)
+    .eq("id", id);
+
+  if (error) {
+    console.error("[recorrentes-utils] Erro ao atualizar demanda no Supabase:", error);
+    throw error;
+  }
+}
+
+export async function deleteDemandaRecorrenteSupabase(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("marketing_demandas_recorrentes")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("[recorrentes-utils] Erro ao deletar demanda no Supabase:", error);
+    throw error;
   }
 }

@@ -5611,6 +5611,8 @@ export function WhatsappView({
                         } else if (trimmed === "/nao") {
                           val =
                             "Infelizmente, não trabalhamos com esse material. Somos especialistas em materiais hidráulicos e elétricos. Se precisar de algum produto dessas linhas, será um prazer ajudar!";
+                        } else if (trimmed === "/avalia") {
+                          val = `Olá! 😊 Gostou do nosso atendimento?\n\nSua opinião é super importante para nós! Poderia deixar uma avaliação rápida de 5 estrelas no nosso Google? Leva menos de 1 minuto! ⭐⭐⭐⭐⭐\n\n👉 https://g.page/r/CZbhPzatSAjdEBM/review\n\nMuito obrigado pelo apoio e pela preferência! 🙌`;
                         }
                       }
                       setInputText(val);

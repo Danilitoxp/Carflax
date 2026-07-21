@@ -21,8 +21,8 @@ import { supabase } from "@/lib/supabase";
 import { DemandasRecorrentesModal } from "./DemandasRecorrentesModal";
 import {
   type DemandaRecorrente,
-  loadDemandasRecorrentesLocal,
-  saveDemandasRecorrentesLocal,
+  fetchDemandasRecorrentesSupabase,
+  updateDemandaRecorrenteSupabase,
 } from "./recorrentes-utils";
 
 interface KanbanCard {
@@ -266,7 +266,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
   const [boardOwnerId, setBoardOwnerId] = useState<string>(userProfile?.id || "");
 
   useEffect(() => {
-    setRotinasRecorrentes(loadDemandasRecorrentesLocal());
+    fetchDemandasRecorrentesSupabase().then(setRotinasRecorrentes);
   }, []);
 
   // Usuários (exceto eu) agrupados por setor, pra organizar o seletor de esteira.
@@ -392,7 +392,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
 
   const verificarEGerarDemandasRecorrentes = useCallback(
     async (currentCards: KanbanCard[]) => {
-      const rotinas = loadDemandasRecorrentesLocal();
+      const rotinas = await fetchDemandasRecorrentesSupabase();
       setRotinasRecorrentes(rotinas);
 
       const hoje = new Date();
@@ -459,6 +459,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
             if (payload.owner_id) {
               notifyEsteira(payload.owner_id, data.id, payload.title, "assigned");
             }
+            await updateDemandaRecorrenteSupabase(rotina.id, { last_generated_date: hojeStr });
           }
         } catch (e) {
           console.warn("Fallback ao salvar card no Supabase:", e);
@@ -471,7 +472,6 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
 
       if (cardsGeradosNoCheck.length > 0) {
         setRotinasRecorrentes(novasRotinasState);
-        saveDemandasRecorrentesLocal(novasRotinasState);
         setCards((prev) => [...cardsGeradosNoCheck, ...prev]);
       }
     },
@@ -1254,11 +1254,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
                             isBottom ? "bottom" : "top",
                           );
                         }}
-                        className={`bg-card hover:shadow-md border border-border hover:border-border/80 transition-all duration-150 hover:-translate-y-0.5 rounded-xl p-4 flex flex-col gap-3 justify-between cursor-grab active:cursor-grabbing relative overflow-hidden group shrink-0 ${
-                          isExpanded
-                            ? "min-h-[155px] h-auto"
-                            : "h-[165px] max-h-[155px]"
-                        } ${
+                        className={`bg-card hover:shadow-md border border-border hover:border-border/80 transition-all duration-150 hover:-translate-y-0.5 rounded-xl p-3.5 flex flex-col gap-2.5 justify-between cursor-grab active:cursor-grabbing relative overflow-hidden group shrink-0 min-h-[160px] h-auto ${
                           draggedOverCardId === card.id &&
                           draggedOverCardPart === "top"
                             ? "border-t-primary border-t-2 scale-[1.01] shadow-md"
@@ -2015,7 +2011,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
         onClose={() => setIsRecorrentesModalOpen(false)}
         userId={userProfile?.id}
         onGerarCardManual={handleGerarCardManual}
-        onUpdateRotinas={() => setRotinasRecorrentes(loadDemandasRecorrentesLocal())}
+        onUpdateRotinas={() => fetchDemandasRecorrentesSupabase().then(setRotinasRecorrentes)}
       />
 
       <style>{`

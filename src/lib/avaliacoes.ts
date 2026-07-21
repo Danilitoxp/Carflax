@@ -66,7 +66,7 @@ async function setConfig(key: string, value: string): Promise<void> {
 // Link fixo de avaliação do Google da Carflax. Fica no código porque não muda;
 // ainda assim um valor em crm_config (se existir) tem prioridade, caso um dia
 // precise trocar sem publicar.
-export const DEFAULT_REVIEW_URL = "https://g.page/r/CZbhPzatSAjdEAI/review";
+export const DEFAULT_REVIEW_URL = "https://g.page/r/CZbhPzatSAjdEBM/review";
 export const getGoogleReviewUrl = async () => (await getConfig(REVIEW_URL_KEY)) || DEFAULT_REVIEW_URL;
 export const getPremioSorteio = () => getConfig(PREMIO_KEY);
 export const setPremioSorteio = (v: string) => setConfig(PREMIO_KEY, v);
