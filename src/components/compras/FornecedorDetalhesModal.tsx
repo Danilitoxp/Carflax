@@ -124,6 +124,17 @@ export function FornecedorDetalhesModal({
               <p className="text-[10px] text-muted-foreground mt-1">
                 Min: {brNum(fornecedor.min_dias)}d · Max: {brNum(fornecedor.max_dias)}d
               </p>
+              {fornecedor.confiabilidade && (
+                <p className="text-[10px] mt-1 flex items-center gap-1 font-bold">
+                  <span className={cn("inline-block w-1.5 h-1.5 rounded-full",
+                    fornecedor.confiabilidade === "ALTA" ? "bg-emerald-500" : fornecedor.confiabilidade === "MEDIA" ? "bg-amber-500" : "bg-rose-500")} />
+                  <span className={cn(
+                    fornecedor.confiabilidade === "ALTA" ? "text-emerald-500" : fornecedor.confiabilidade === "MEDIA" ? "text-amber-500" : "text-rose-500")}>
+                    Confiabilidade {fornecedor.confiabilidade === "ALTA" ? "alta" : fornecedor.confiabilidade === "MEDIA" ? "média" : "baixa"}
+                  </span>
+                  {fornecedor.desvio_dias != null && <span className="text-muted-foreground">· ±{brNum(fornecedor.desvio_dias)}d</span>}
+                </p>
+              )}
             </div>
 
             <div className="bg-secondary/40 border border-border/50 rounded-2xl p-3.5">

@@ -720,6 +720,8 @@ export interface FornecedorLeadTime {
   fornecedor: string;
   pedidos: number;
   media_dias: number;
+  desvio_dias?: number;
+  confiabilidade?: "ALTA" | "MEDIA" | "BAIXA";
   min_dias: number;
   max_dias: number;
   ultima_entrada: string | null;
@@ -748,4 +750,57 @@ export const apiComprasVendasGrandes = (opts?: { dias?: number; fator?: number; 
     dias: String(opts?.dias ?? 30),
     fator: String(opts?.fator ?? 5),
     piso: String(opts?.piso ?? 10),
+  });
+
+// Motor de reposição (demand-driven): ROP, estoque de segurança estatístico,
+// cobertura, ABC/XYZ, em trânsito e quantidade sugerida por SKU.
+export type ReposicaoStatus = "RUPTURA" | "ABAIXO_ROP" | "EXCESSO" | "OK";
+export interface ReposicaoItem {
+  cod: string;
+  produto: string;
+  marca: string;
+  linha: string;
+  cod_fornecedor: string;
+  fornecedor: string;
+  d_dia: number;
+  d_forecast: number;
+  fator_sazonal: number;
+  semanas_venda: number;
+  receita: number;
+  custo: number;
+  saldo: number;
+  em_transito: number;
+  posicao: number;
+  lead_time: number;
+  lead_time_desvio: number;
+  lead_time_estimado: boolean;
+  estoque_seguranca: number;
+  rop: number;
+  cobertura_dias: number | null;
+  sugerido: number;
+  valor_sugerido: number;
+  valor_estoque: number;
+  cv: number;
+  xyz: "X" | "Y" | "Z";
+  irregular: boolean;
+  abc: "A" | "B" | "C";
+  status: ReposicaoStatus;
+}
+export interface ReposicaoResumo {
+  skus: number; ruptura: number; abaixo_rop: number; excesso: number; ok: number;
+  irregulares: number; valor_comprar: number; valor_parado: number;
+}
+export interface ReposicaoResponse {
+  success: boolean;
+  computing?: boolean;
+  resumo: ReposicaoResumo | null;
+  data: ReposicaoItem[];
+  parametros?: { dias: number; nivel: number; limiteExcesso: number; z?: number };
+  cache?: { hit: boolean; idade_s?: number };
+}
+export const apiComprasReposicao = (opts?: { dias?: number; nivel?: number; limiteExcesso?: number }) =>
+  get<ReposicaoResponse>("/api/compras/reposicao", {
+    dias: String(opts?.dias ?? 90),
+    nivel: String(opts?.nivel ?? 95),
+    limiteExcesso: String(opts?.limiteExcesso ?? 90),
   });

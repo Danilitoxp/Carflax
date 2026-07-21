@@ -12,7 +12,7 @@ import {
 import { ComprasHeader } from "./ComprasHeader";
 import { LeadTimeTab } from "./LeadTimeTab";
 import { RecompraTab } from "./RecompraTab";
-import { SugestaoCompraTab } from "./SugestaoCompraTab";
+import { ReposicaoTab } from "./ReposicaoTab";
 import { FornecedorDetalhesModal } from "./FornecedorDetalhesModal";
 import { SimuladorCompraModal } from "./SimuladorCompraModal";
 
@@ -149,7 +149,7 @@ export function ComprasView() {
   const TABS: { id: Tab; label: string; count?: number; icon: React.ElementType }[] = [
     { id: "leadtime", label: "Lead Time", count: lead.length, icon: Truck },
     { id: "alertas", label: "Recompra", count: vendas.length, icon: AlertTriangle },
-    { id: "sugestoes", label: "Sugestões (ROP)", icon: Lightbulb },
+    { id: "sugestoes", label: "Reposição", icon: Lightbulb },
   ];
 
   return (
@@ -238,10 +238,7 @@ export function ComprasView() {
               onNovaCotacao={handleOpenSimuladorItem}
             />
           ) : (
-            <SugestaoCompraTab
-              vendasGrandes={vendas}
-              onNovaCotacao={handleOpenSimuladorItem}
-            />
+            <ReposicaoTab />
           )}
         </div>
       </div>
