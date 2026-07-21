@@ -1,19 +1,25 @@
 import { useState, useEffect, useCallback } from "react";
-import { 
-  MapPin, 
-  CheckCircle2, 
-  Navigation, 
+import {
+  MapPin,
+  CheckCircle2,
+  Navigation,
   Camera,
   User as UserIcon,
   RefreshCw,
   X,
   Package,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  LogOut,
+  ArrowRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { uploadImage } from "@/lib/uploadImage";
 import { motion, AnimatePresence } from "framer-motion";
+
+const API_SERVER = "https://marketing-banco-de-dados.velbav.easypanel.host";
+const AUTH_KEY = "carflax_motorista_auth";
 
 interface Delivery {
   id: string;
@@ -37,15 +43,59 @@ export function MotoristaView() {
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<"pending" | "history">("pending");
-  
-  const searchParams = new URLSearchParams(window.location.search);
-  const driverCode = searchParams.get("v") || "geral";
+
+  // Autenticação do motorista via ERP (valida código + senha no backend).
+  // O código do link (?v=) só pré-preenche o campo — a senha é sempre obrigatória.
+  const linkCode = new URLSearchParams(window.location.search).get("v") || "";
+  const [driverCode, setDriverCode] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(AUTH_KEY); } catch { return null; }
+  });
+  const [loginCode, setLoginCode] = useState(linkCode);
+  const [loginPass, setLoginPass] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const hoje = new Date().toISOString().split('T')[0];
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const codigo = loginCode.trim();
+    const senha = loginPass.trim();
+    if (!codigo || !senha) { setLoginError("Informe o código e a senha."); return; }
+    setLoginLoading(true);
+    setLoginError(null);
+    try {
+      const res = await fetch(`${API_SERVER}/api/entregas/operador-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo, senha }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setLoginError(json?.error || "Código ou senha inválidos.");
+        return;
+      }
+      try { sessionStorage.setItem(AUTH_KEY, codigo); } catch { /* ignore */ }
+      setLoginPass("");
+      setDriverCode(codigo);
+    } catch {
+      setLoginError("Falha de conexão. Tente novamente.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    try { sessionStorage.removeItem(AUTH_KEY); } catch { /* ignore */ }
+    setDriverCode(null);
+    setEntregas([]);
+    setLoginPass("");
+  };
+
   const fetchData = useCallback(async () => {
+    if (!driverCode) return;
     try {
       setLoading(true);
-      
+
       const { data: users } = await supabase
         .from("usuarios")
         .select("avatar, name")
@@ -104,7 +154,7 @@ export function MotoristaView() {
     if (!selectedDelivery) return;
     try {
       setUploading(true);
-      const publicUrl = await uploadImage(file, "entregas");
+      const publicUrl = await uploadImage(file, "entregas", false, true);
       if (!publicUrl) {
         alert("Erro ao enviar imagem do comprovante.");
         return;
@@ -153,6 +203,79 @@ export function MotoristaView() {
     pendentes: entregas.filter(e => e.status === "pending").length
   };
 
+  // ── TELA DE LOGIN ───────────────────────────────────────────────────────────
+  if (!driverCode) {
+    return (
+      <div className="flex-1 flex flex-col min-h-screen bg-[#FDFDFF] font-sans antialiased text-slate-900 items-center justify-center px-6">
+        <div className="w-full max-w-sm">
+          <div className="flex flex-col items-center text-center gap-3 mb-8">
+            <div className="w-16 h-16 rounded-3xl bg-blue-600 flex items-center justify-center text-white shadow-xl shadow-blue-600/20">
+              <Package size={30} />
+            </div>
+            <div>
+              <p className="text-lg font-black tracking-tight">Área do Motorista</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">Entre com seu operador</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleLogin} className="bg-white rounded-[32px] p-6 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Código do operador</label>
+              <div className="flex items-center gap-3 bg-slate-50 rounded-2xl px-4 h-14 border border-slate-100 focus-within:border-blue-300 transition-colors">
+                <UserIcon size={18} className="text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="username"
+                  value={loginCode}
+                  onChange={(e) => setLoginCode(e.target.value)}
+                  placeholder="Ex: 00002"
+                  className="flex-1 bg-transparent outline-none text-sm font-bold placeholder:text-slate-300"
+                  disabled={loginLoading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Senha</label>
+              <div className="flex items-center gap-3 bg-slate-50 rounded-2xl px-4 h-14 border border-slate-100 focus-within:border-blue-300 transition-colors">
+                <Lock size={18} className="text-slate-400 shrink-0" />
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={loginPass}
+                  onChange={(e) => setLoginPass(e.target.value)}
+                  placeholder="Sua senha"
+                  className="flex-1 bg-transparent outline-none text-sm font-bold placeholder:text-slate-300"
+                  disabled={loginLoading}
+                />
+              </div>
+            </div>
+
+            {loginError && (
+              <div className="flex items-center gap-2 text-rose-600 bg-rose-50 rounded-2xl px-4 py-3 text-xs font-bold">
+                <AlertCircle size={16} className="shrink-0" />
+                {loginError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="mt-1 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center gap-3 font-black text-sm uppercase tracking-widest shadow-xl shadow-blue-500/30 active:scale-[0.98] transition-all disabled:opacity-60"
+            >
+              {loginLoading ? (
+                <><RefreshCw size={18} className="animate-spin" /> Entrando...</>
+              ) : (
+                <>Entrar <ArrowRight size={18} /></>
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#FDFDFF] pb-12 font-sans antialiased text-slate-900 leading-relaxed">
       
@@ -176,8 +299,17 @@ export function MotoristaView() {
               </p>
             </div>
           </div>
-          <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">
-            Online
+          <div className="flex items-center gap-2">
+            <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">
+              Online
+            </div>
+            <button
+              onClick={handleLogout}
+              aria-label="Sair"
+              className="w-9 h-9 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100 active:scale-95 transition-transform"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
       </nav>

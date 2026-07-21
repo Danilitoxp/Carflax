@@ -48,10 +48,15 @@ function compressImage(file: File): Promise<File> {
   });
 }
 
-export async function uploadImage(file: File, bucket: string, skipCompression: boolean = false): Promise<string | null> {
+/**
+ * @param allowAnon Permite o upload sem sessão do Supabase Auth (ex.: página pública
+ * do motorista, aberta por link `?v=` sem login). Nesse caso o envio usa apenas a
+ * chave anônima e depende da policy do bucket permitir INSERT anônimo.
+ */
+export async function uploadImage(file: File, bucket: string, skipCompression: boolean = false, allowAnon: boolean = false): Promise<string | null> {
   const { data: { session }, error: authError } = await supabase.auth.getSession();
-  
-  if (authError || !session) {
+
+  if (!allowAnon && (authError || !session)) {
     console.error("[Storage] Erro de autenticação:", authError);
     // Propagar erro específico para que o componente possa tratar (ex: sugerir logout)
     if (authError?.message?.includes("Refresh Token Not Found")) {

@@ -609,6 +609,16 @@ function DashboardContent({
     const myRole = userProfile.role || "Membro";
     const myResponsavelId = userProfile.responsavel_id;
 
+    // Uma mensagem é "diálogo" (digitada por uma pessoa) quando NÃO é do SISTEMA nem
+    // um card de atualização de status (enviado/perdido/negociação, etc.). Só diálogos
+    // aparecem e notificam no ChatCentral.
+    const isDialogMessage = (m: CrmConversa): boolean => {
+      const sender = (m.enviado_por_nome || "").toUpperCase().trim();
+      if (sender === "SISTEMA") return false;
+      if ((m.obs || "").includes("ATUALIZAÇÃO DE STATUS")) return false;
+      return true;
+    };
+
     async function carregarTodasConversas() {
       try {
         const isManager = myRole.toUpperCase() === "ADMIN" || myRole.toUpperCase().includes("GERENTE");
@@ -729,8 +739,10 @@ function DashboardContent({
           const updatedPrev = prev.map((c) => {
             const msgs = byDoc[c.doc];
             if (!msgs) return c;
-            const lastMsg = msgs[0];
-            const unread = msgs.filter(
+            // Só diálogos contam para última mensagem / não-lidas.
+            const dialogMsgs = msgs.filter(isDialogMessage);
+            const lastMsg = dialogMsgs[0] || msgs[0];
+            const unread = dialogMsgs.filter(
               (m) =>
                 !m.lida &&
                 m.enviado_por !== myId &&
@@ -757,9 +769,12 @@ function DashboardContent({
             if (dismissedChatDocsRef.current.has(doc)) continue;
             // Conversa fechada no banco (via "Limpar Todas") só reaparece com mensagem nova.
             if (msgs.every((m) => m.fechada)) continue;
+            // Conversa só com atualizações de status (sem diálogo) não entra no ChatCentral.
+            const dialogMsgs = msgs.filter(isDialogMessage);
+            if (dialogMsgs.length === 0) continue;
 
-            const lastMsg = msgs[0];
-            const unreadCount = msgs.filter(
+            const lastMsg = dialogMsgs[0];
+            const unreadCount = dialogMsgs.filter(
               (m) =>
                 !m.lida &&
                 m.enviado_por !== myId &&
@@ -788,17 +803,21 @@ function DashboardContent({
           return [...updatedPrev, ...novosChats].filter((c) => {
             if (seenDocs.has(c.doc)) return false;
             seenDocs.add(c.doc);
+            // Remove da lista conversas já carregadas que só têm status (sem diálogo).
+            const msgs = byDoc[c.doc];
+            if (msgs && !msgs.some(isDialogMessage)) return false;
             return true;
           });
         });
 
-        // Abre automaticamente o chat com a mensagem não lida mais recente
+        // Abre automaticamente o chat com a mensagem não lida mais recente (só diálogos)
         const primeiraComUnread = allMsgs.find(
           (m) =>
             !m.lida &&
             m.enviado_por !== myId &&
             !dismissedChatDocsRef.current.has(m.documento) &&
-            m.destino === myId
+            m.destino === myId &&
+            isDialogMessage(m)
         );
         if (primeiraComUnread && openChatDocsRef.current.length === 0) {
           openChatDoc(primeiraComUnread.documento);
@@ -852,6 +871,9 @@ function DashboardContent({
           arr.splice(0, 250).forEach(id => seenMsgIds.delete(id));
         }
       }
+
+          // Ignora atualizações de status (SISTEMA): não entram no ChatCentral nem notificam.
+          if (!isDialogMessage(newMsg)) return;
 
           const isForMe = newMsg.destino === myId;
 

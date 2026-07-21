@@ -231,8 +231,9 @@ export function AvaliacoesView() {
     try {
       await criarCanal(nome);
       setNovoCanal("");
-      carregar();
+      await carregar();
     } catch (e) {
+      console.error("[adicionarCanal] Falha:", e);
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
       setCriandoCanal(false);

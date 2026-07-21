@@ -86,20 +86,42 @@ export function ChatModal({
   const [headerLoading, setHeaderLoading] = useState(false);
   const [centralizer, setCentralizer] = useState<{ id: string; name: string; avatar: string } | null>(null);
 
-  // Resolve, a partir do vendedor desta conversa (sellerCode), quem é o responsável dele.
+  // sellerCode pode não chegar (ex.: conversa que só tem mensagens de SISTEMA, que
+  // trazem o NOME do vendedor mas não o código). Sem ele, o responsável não é
+  // resolvido → a mensagem sai com destino null (não chega na caixa de ninguém) e o
+  // avatar não resolve. Fallback: pega o código do vendedor no crm_status do documento.
+  const [fallbackSellerCode, setFallbackSellerCode] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (sellerCode) { setFallbackSellerCode(null); return; }
+    const docId = documento.replace("#", "").split("-")[0].trim();
+    if (!docId) { setFallbackSellerCode(null); return; }
+    supabase
+      .from("crm_status")
+      .select("vendedor_codigo")
+      .eq("documento", docId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setFallbackSellerCode(data?.vendedor_codigo ? String(data.vendedor_codigo) : null);
+      });
+    return () => { cancelled = true; };
+  }, [sellerCode, documento]);
+  const effectiveSellerCode = sellerCode || fallbackSellerCode || undefined;
+
+  // Resolve, a partir do vendedor desta conversa (effectiveSellerCode), quem é o responsável dele.
   // Isso substitui o antigo centralizador único global: cada vendedor tem o seu.
   const [resolvedResponsavelId, setResolvedResponsavelId] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    if (!sellerCode) {
+    if (!effectiveSellerCode) {
       setResolvedResponsavelId(null);
       return;
     }
-    getResponsavelIdForVendedor(sellerCode).then((id) => {
+    getResponsavelIdForVendedor(effectiveSellerCode).then((id) => {
       if (!cancelled) setResolvedResponsavelId(id);
     });
     return () => { cancelled = true; };
-  }, [sellerCode]);
+  }, [effectiveSellerCode]);
 
   const amICentralizer = useMemo(() => {
     const role = userProfile?.role?.toUpperCase() || "";
@@ -159,7 +181,7 @@ export function ChatModal({
       // Se for chat com separador, busca o separador em vez do responsável
       if (isChatWithSeparator) {
         try {
-          const vCode = sellerCode;
+          const vCode = effectiveSellerCode;
           const vName = sellerName;
 
           // Tenta resolver pelo cache global primeiro
@@ -285,9 +307,13 @@ export function ChatModal({
     ]).then(([, data]) => {
       setConversas(data);
       setLoading(false);
-      if (data.length > 0) {
-        const last = data[data.length - 1];
-        onUpdateLastMessage?.(last.obs, last.timestamp || new Date().toISOString());
+      // Prévia da lista usa o último DIÁLOGO (ignora atualizações de status do SISTEMA).
+      const lastDialog = [...data].reverse().find((m) => {
+        const sender = (m.enviado_por_nome || "").toUpperCase().trim();
+        return sender !== "SISTEMA" && !(m.obs || "").includes("ATUALIZAÇÃO DE STATUS");
+      });
+      if (lastDialog) {
+        onUpdateLastMessage?.(lastDialog.obs, lastDialog.timestamp || new Date().toISOString());
       }
     }).catch(() => setLoading(false));
 
@@ -367,7 +393,7 @@ export function ChatModal({
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, documento, userProfile?.id, userProfile?.name, itemsInitial, amICentralizer, resolvedResponsavelId, sellerCode, sellerName]);
+  }, [isOpen, documento, userProfile?.id, userProfile?.name, itemsInitial, amICentralizer, resolvedResponsavelId, sellerCode, effectiveSellerCode, sellerName]);
 
   // 2. Efeito de Resolução Dinâmica de Perfil baseada em Mensagens e Cache Global
   useEffect(() => {
@@ -567,6 +593,18 @@ export function ChatModal({
     };
   }, [conversas, userProfile?.name, ownerProfile, centralizer, amICentralizer, sellerName, title, documento]);
 
+  // Só diálogos aparecem nos balões — atualizações de status (SISTEMA: enviado,
+  // perdido, negociação, etc.) ficam ocultas do ChatCentral.
+  const visibleConversas = useMemo(
+    () => conversas.filter((m) => {
+      const sender = (m.enviado_por_nome || "").toUpperCase().trim();
+      if (sender === "SISTEMA") return false;
+      if ((m.obs || "").includes("ATUALIZAÇÃO DE STATUS")) return false;
+      return true;
+    }),
+    [conversas]
+  );
+
   if (!isOpen) return null;
 
   const handleToggleItems = async () => {
@@ -614,10 +652,38 @@ export function ChatModal({
     setSending(true);
 
     // destinoId é resolvido antecipadamente no useEffect (fetchOwner).
-    // Não fazemos queries síncronas aqui para não bloquear o click handler.
-    const destinoId: string | null = (amICentralizer || isChatWithSeparator)
+    let destinoId: string | null = (amICentralizer || isChatWithSeparator)
       ? (budgetOwner || null)
       : (resolvedResponsavelId || centralizer?.id || null);
+
+    // Blindagem: se o destinatário não foi resolvido (perfil ainda carregando, ou
+    // conversa só com mensagens de SISTEMA que não trazem o código), resolve agora —
+    // caso contrário a mensagem grava com destino null e não chega na caixa de ninguém.
+    if (!destinoId) {
+      try {
+        if (amICentralizer || isChatWithSeparator) {
+          // Destinatário é o vendedor do orçamento.
+          const code = String(effectiveSellerCode || "").trim();
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code);
+          if (isUuid && code !== userProfile?.id) {
+            destinoId = code;
+          } else if (code) {
+            const codeClean = code.replace(/^0+/, "");
+            const { data: rows } = await supabase
+              .from("usuarios")
+              .select("id, operator_code")
+              .or(`operator_code.eq.${code},operator_code.eq.${codeClean}`);
+            const u = (rows || []).find((r) => r.id !== userProfile?.id);
+            if (u?.id) destinoId = u.id;
+          }
+        } else if (effectiveSellerCode) {
+          // Sou o vendedor: destinatário é o meu responsável.
+          destinoId = await getResponsavelIdForVendedor(effectiveSellerCode);
+        }
+      } catch (e) {
+        console.error("[Chat] Falha ao resolver destino no envio:", e);
+      }
+    }
 
     const cleanDoc = documento.replace("#", "").trim();
     const nova: Omit<CrmConversa, "id"> = {
@@ -1122,7 +1188,7 @@ export function ChatModal({
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
               {(loading || headerLoading) && <ChatSkeleton />}
-              {!(loading || headerLoading) && conversas.length === 0 && (
+              {!(loading || headerLoading) && visibleConversas.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-8 gap-2">
                   <div className="w-10 h-10 bg-secondary/30 rounded-full flex items-center justify-center border border-border">
                     <Send className="w-4 h-4 text-muted-foreground/40" />
@@ -1130,8 +1196,8 @@ export function ChatModal({
                   <p className="text-[10px] text-muted-foreground font-black uppercase tracking-wider">Nenhuma conversa ainda</p>
                 </div>
               )}
-              {!(loading || headerLoading) && conversas.map((msg, index) => {
-                const prevMsg = index > 0 ? conversas[index - 1] : null;
+              {!(loading || headerLoading) && visibleConversas.map((msg, index) => {
+                const prevMsg = index > 0 ? visibleConversas[index - 1] : null;
                 const showDateSeparator = !prevMsg || (() => {
                   if (!msg.timestamp || !prevMsg.timestamp) return false;
                   const d1 = new Date(msg.timestamp).toDateString();

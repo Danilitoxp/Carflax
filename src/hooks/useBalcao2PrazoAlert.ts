@@ -1,14 +1,17 @@
 import { useEffect, useRef } from "react";
-import { isBalcao2, parseOrderCreated, b2RemainingMs, B2_AVISO_MS } from "@/lib/balcao2-prazo";
+import { isBalcao2, parseOrderCreated, b2RemainingMs, B2_AVISO_MS, formatB2Remaining } from "@/lib/balcao2-prazo";
 
 /**
  * Alerta de prazo dos pedidos de BALCÃO 2: cada pedido B2 tem 72h para retirada.
- * Quando faltar 1 dia (24h) ou menos e o prazo ainda não estourou, notifica:
+ * Notifica em dois momentos:
+ *  - AVISO: quando faltar 1 dia (24h) ou menos e o prazo ainda não estourou; e
+ *  - VENCIDO: quando o prazo de 72h estourar.
+ * Destinatários (ambos os eventos):
  *  - o VENDEDOR do pedido (quando é o usuário logado); e
- *  - quem tiver a notificação de "Retirada" (clienteRetira) habilitada.
+ *  - o GERENTE DE ESTOQUE.
  *
  * Gated pelo toggle "Prazo Balcão 2" (localStorage: carflax_notif_prefs → alertas.balcao2Prazo,
- * padrão: ligado). Dispara uma vez por pedido (dedup em localStorage).
+ * padrão: ligado). Dispara uma vez por pedido para cada evento (dedup em localStorage).
  */
 
 const API_SERVER = "https://marketing-banco-de-dados.velbav.easypanel.host";
@@ -30,6 +33,7 @@ type ShowNotification = (
 interface UP {
   operator_code?: string;
   operatorCode?: string;
+  role?: string;
 }
 
 /** Master toggle do alerta de prazo B2 (padrão: ligado). */
@@ -45,17 +49,10 @@ function masterEnabled(): boolean {
   }
 }
 
-/** Pref "Retirada" (mesma do useRetiradaAlert: clienteRetira, padrão ligado). */
-function retiradaEnabled(): boolean {
-  try {
-    const raw = localStorage.getItem("carflax_notif_prefs");
-    if (!raw) return true;
-    const s = JSON.parse(raw);
-    if (s?.alertas && s.alertas.clienteRetira !== undefined) return !!s.alertas.clienteRetira;
-    return true;
-  } catch {
-    return true;
-  }
+/** True quando o cargo do usuário é Gerente de Estoque. */
+function isGerenteEstoque(role?: string): boolean {
+  const r = (role || "").toUpperCase();
+  return r.includes("GERENTE") && r.includes("ESTOQUE");
 }
 
 function loadAvisados(): Record<string, number> {
@@ -115,7 +112,7 @@ export function useBalcao2PrazoAlert(showNotification: ShowNotification, userPro
 
         const meuCodigo = String(userProfile?.operator_code || userProfile?.operatorCode || "").trim();
         const meuCodigoNorm = meuCodigo.replace(/^0+/, "") || meuCodigo;
-        const podeRetirada = retiradaEnabled();
+        const souGerenteEstoque = isGerenteEstoque(userProfile?.role);
 
         const now = Date.now();
         const avisados = loadAvisados();
@@ -127,35 +124,47 @@ export function useBalcao2PrazoAlert(showNotification: ShowNotification, userPro
           if (created == null) continue;
 
           const remaining = b2RemainingMs(created, now);
-          // Só quando falta 1 dia ou menos e o prazo ainda não estourou.
-          if (remaining > B2_AVISO_MS || remaining <= 0) continue;
+          // Dois eventos: AVISO (falta <=1 dia e ainda no prazo) e VENCIDO (prazo estourou).
+          let evento: "aviso" | "vencido" | null = null;
+          if (remaining > 0 && remaining <= B2_AVISO_MS) evento = "aviso";
+          else if (remaining <= 0) evento = "vencido";
+          if (!evento) continue;
 
-          const numDoc = String(order.FGO_NUMDOC).trim();
-          const normalizedId = numDoc.padStart(12, "0");
-          if (avisados[normalizedId]) continue; // já avisado
-
-          // Destinatários: o vendedor do pedido, ou quem tem a notificação de Retirada.
+          // Destinatários: o vendedor do pedido ou o gerente de estoque.
           const codVen = String(order.FGO_CODVEN || "").trim();
           const codVenNorm = codVen.replace(/^0+/, "") || codVen;
           const souVendedor = !!meuCodigoNorm && (codVenNorm === meuCodigoNorm || codVen === meuCodigo);
-          if (!souVendedor && !podeRetirada) continue;
+          if (!souVendedor && !souGerenteEstoque) continue;
+
+          const numDoc = String(order.FGO_NUMDOC).trim();
+          const normalizedId = numDoc.padStart(12, "0");
+          const dedupId = `${normalizedId}-${evento}`;
+          if (avisados[dedupId]) continue; // já avisado neste evento
 
           const pedidoDisplay = String(Number(numDoc) || numDoc);
           const cliente = String(order.NOME_CLIENTE || "").trim();
-          const horasRestantes = Math.max(1, Math.round(remaining / 3600000));
-          const message = `Pedido #${pedidoDisplay} (Balcão 2)${cliente ? ` — ${cliente}` : ""} vence em ${horasRestantes}h. Falta menos de 1 dia para a retirada.`;
-          const tag = `b2-prazo-${normalizedId}`;
+          const tag = `b2-prazo-${dedupId}`;
 
-          showRef.current("error", "⏰ PRAZO BALCÃO 2", message, true, tag);
+          let title: string;
+          let message: string;
+          if (evento === "aviso") {
+            title = "⏰ PRAZO BALCÃO 2";
+            message = `Pedido #${pedidoDisplay} (Balcão 2)${cliente ? ` — ${cliente}` : ""} vence em ${formatB2Remaining(remaining)}. Falta menos de 1 dia para a retirada.`;
+          } else {
+            title = "⛔ BALCÃO 2 VENCIDO";
+            message = `Pedido #${pedidoDisplay} (Balcão 2)${cliente ? ` — ${cliente}` : ""} venceu o prazo de 72h de retirada (${formatB2Remaining(remaining)}). Se o cliente não vier retirar em 24h, o pedido será devolvido ao estoque e cancelado.`;
+          }
+
+          showRef.current("error", title, message, true, tag);
           try {
             if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-              new Notification("⏰ Prazo Balcão 2", { body: message, tag });
+              new Notification(title, { body: message, tag });
             }
           } catch {
             /* ignore */
           }
 
-          marcarAvisado(normalizedId);
+          marcarAvisado(dedupId);
         }
       } catch (err) {
         console.error("[Balcao2Prazo] erro ao verificar:", err);

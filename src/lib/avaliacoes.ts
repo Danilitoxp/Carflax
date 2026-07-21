@@ -149,7 +149,10 @@ export async function fetchCanaisScore(): Promise<CanalScore[]> {
 
 export async function criarCanal(nome: string): Promise<void> {
   const { error } = await supabase.from("avaliacao_canais").insert([{ nome: nome.trim() }]);
-  if (error) throw error;
+  if (error) {
+    console.error("[criarCanal] Erro Supabase:", JSON.stringify(error, null, 2));
+    throw new Error(error.message || JSON.stringify(error));
+  }
 }
 
 export async function removerCanal(id: string): Promise<void> {
