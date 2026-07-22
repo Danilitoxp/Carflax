@@ -326,9 +326,11 @@ function VendedorMiniCard({ row, perdidoMap, isActive, onSelect }: {
     { label: "Faturado", value: formatBRL(row.FATURADO), icon: Clock, valueColor: "text-emerald-600" },
     { label: "Em Aberto", value: formatBRL(row.EM_ABERTO), icon: Clock, valueColor: "text-amber-600" },
     { label: "Total", value: formatBRL(row.TOTAL), icon: TrendingUp, valueColor: "text-foreground" },
+    { label: "Equilíbrio", value: formatBRL(equilibrio), icon: BarChart3, valueColor: "text-blue-600" },
     { label: "Diário", value: formatBRL(calcDiarioNecessario(row)), icon: Zap, valueColor: "text-foreground" },
     { label: "Tx Conversão", value: `${calcTaxaConversao(row, perdidoMap).toFixed(1)}%`, icon: PieChart, valueColor: "text-blue-600" },
     { label: "Ticket Médio", value: formatBRL(row.TICKET_MEDIO), icon: DollarSign, valueColor: "text-foreground" },
+    { label: "Margem", value: `${Number(row.MARGEM_REAL_PERC || row.MARGEM_PCT || 0).toFixed(1)}%`, icon: TrendingUp, valueColor: "text-blue-600" },
   ];
 
   return (
