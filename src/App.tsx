@@ -835,9 +835,14 @@ function DashboardContent({
           return [...updatedPrev, ...novosChats].filter((c) => {
             if (seenDocs.has(c.doc)) return false;
             seenDocs.add(c.doc);
-            // Remove da lista conversas já carregadas que só têm status (sem diálogo).
             const msgs = byDoc[c.doc];
-            if (msgs && !msgs.some(isDialogMessage)) return false;
+            // Sem mensagens deste usuário no doc = ele NÃO é participante. É uma
+            // entrada órfã vinda do localStorage (ex.: chat de pedido de um vendedor
+            // subordinado que o supervisor abriu no "Meus Pedidos"). Não deve ficar
+            // na central — o supervisor só vê o que é dele (enviado_por/destino).
+            if (!msgs) return false;
+            // Remove conversas que só têm status (sem diálogo).
+            if (!msgs.some(isDialogMessage)) return false;
             // Remove conversas ocultas por este usuário (sem mensagem nova desde então).
             if (isDocOculto(c.doc)) return false;
             return true;

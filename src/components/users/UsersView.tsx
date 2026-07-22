@@ -749,10 +749,10 @@ export function UsersView() {
                   <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Cód. Operador</label>
                   <input 
                     type="text" 
-                    maxLength={newUser.role === "Motorista" ? 5 : 3} 
-                    value={newUser.operatorCode} 
-                    onChange={(e) => setNewUser({ ...newUser, operatorCode: e.target.value.replace(/\D/g, "") })} 
-                    placeholder={newUser.role === "Motorista" ? "00000" : "000"} 
+                    maxLength={5}
+                    value={newUser.operatorCode}
+                    onChange={(e) => setNewUser({ ...newUser, operatorCode: e.target.value.replace(/\D/g, "") })}
+                    placeholder="00000"
                     className="w-full h-11 bg-background border border-border rounded-xl px-4 text-xs font-bold text-foreground outline-none focus:border-blue-600/50 transition-all text-center placeholder:text-muted-foreground/30" 
                   />
                 </div>

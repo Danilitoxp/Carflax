@@ -97,6 +97,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
           client: d.client,
           address: d.address,
           status: d.status as "pending" | "completed" | "failed",
+          time: d.time || undefined,
           value: `R$ ${Number(d.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
           instrucoes: d.instructions || "",
           image: d.image,
@@ -491,7 +492,9 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
                                   "text-[9px] font-black uppercase tracking-widest",
                                   delivery.status === "completed" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
                                 )}>
-                                  {delivery.status === "completed" ? delivery.time : "AGUARD."}
+                                  {delivery.status === "completed"
+                                    ? (delivery.time ? `ENTREGUE · ${delivery.time.slice(0, 5)}` : "ENTREGUE")
+                                    : "AGUARD."}
                                 </span>
                               </div>
                             </td>
