@@ -658,6 +658,35 @@ function DashboardContent({
           byDoc[msg.documento].push(msg);
         }
 
+        // Conversas que ESTE usuário ocultou da própria central ("Limpar Todas").
+        // Uma conversa oculta só reaparece se houver diálogo com timestamp
+        // posterior a `ocultado_em`. É por usuário — não afeta os outros.
+        const { getConversasOcultas } = await import("@/lib/crm-service");
+        const ocultasMap = await getConversasOcultas(myId);
+        const isDocOculto = (doc: string): boolean => {
+          const ocultadoEm = ocultasMap.get(doc);
+          if (!ocultadoEm) return false;
+          const msgs = byDoc[doc] || [];
+          // msgs vêm ordenadas por timestamp desc; pega o diálogo mais recente.
+          const ultimoDialogo = msgs.find(isDialogMessage);
+          if (!ultimoDialogo || !ultimoDialogo.timestamp) return true;
+          return new Date(ultimoDialogo.timestamp) <= new Date(ocultadoEm);
+        };
+
+        // Reconcilia o "dismiss" local (localStorage legado) com a verdade do banco:
+        // mantém só as entradas que continuam ocultas por este usuário no banco.
+        // Fechamentos antigos por documento (de antes da migração para ocultar por
+        // usuário) não estão na tabela e caem fora — o histórico volta a aparecer
+        // sem precisar limpar cache. Uso o conjunto reconciliado já neste ciclo.
+        const dismissedReconciled = new Set<string>();
+        for (const d of dismissedChatDocsRef.current) {
+          if (ocultasMap.has(d)) dismissedReconciled.add(d);
+        }
+        if (dismissedReconciled.size !== dismissedChatDocsRef.current.size) {
+          dismissedChatDocsRef.current = dismissedReconciled;
+          setDismissedChatDocs(dismissedReconciled);
+        }
+
         setActiveChats((prev) => {
           const existingDocs = new Set(prev.map((c) => c.doc));
 
@@ -770,8 +799,8 @@ function DashboardContent({
           for (const [doc, msgs] of Object.entries(byDoc)) {
             if (existingDocs.has(doc)) continue;
             if (dismissedChatDocsRef.current.has(doc)) continue;
-            // Conversa fechada no banco (via "Limpar Todas") só reaparece com mensagem nova.
-            if (msgs.every((m) => m.fechada)) continue;
+            // Oculta na central DESTE usuário (via "Limpar Todas") só reaparece com mensagem nova.
+            if (isDocOculto(doc)) continue;
             // Conversa só com atualizações de status (sem diálogo) não entra no ChatCentral.
             const dialogMsgs = msgs.filter(isDialogMessage);
             if (dialogMsgs.length === 0) continue;
@@ -809,6 +838,8 @@ function DashboardContent({
             // Remove da lista conversas já carregadas que só têm status (sem diálogo).
             const msgs = byDoc[c.doc];
             if (msgs && !msgs.some(isDialogMessage)) return false;
+            // Remove conversas ocultas por este usuário (sem mensagem nova desde então).
+            if (isDocOculto(c.doc)) return false;
             return true;
           });
         });
@@ -1439,6 +1470,14 @@ function DashboardContent({
           setOpenChatDocs((prev) => prev.filter((d) => d !== doc));
 
           if (userProfile?.id) {
+            // Oculta na central deste usuário (persiste entre dispositivos, sem
+            // afetar os outros participantes) e marca como lidas.
+            try {
+              const { ocultarConversas } = await import("@/lib/crm-service");
+              await ocultarConversas(userProfile.id, [doc]);
+            } catch (err) {
+              console.error("[ChatCenter] Falha ao ocultar conversa no banco:", err);
+            }
             try {
               await supabase
                 .from("crm_conversas")
@@ -1468,12 +1507,15 @@ function DashboardContent({
             docs.forEach((d) => next.add(d));
             return next;
           });
-          // Fecha no banco (persiste entre dispositivos/sessões)
+          // Oculta na central DESTE usuário (persiste entre dispositivos/sessões,
+          // sem afetar a central dos outros participantes do orçamento).
           try {
-            const { fecharConversas } = await import("@/lib/crm-service");
-            await fecharConversas(docs);
+            if (userProfile?.id) {
+              const { ocultarConversas } = await import("@/lib/crm-service");
+              await ocultarConversas(userProfile.id, docs);
+            }
           } catch (err) {
-            console.error("[ChatCenter] Falha ao fechar conversas no banco:", err);
+            console.error("[ChatCenter] Falha ao ocultar conversas no banco:", err);
           }
         }}
         onUpdateChat={(doc, data) => {

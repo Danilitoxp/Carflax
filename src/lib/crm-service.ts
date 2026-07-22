@@ -138,23 +138,55 @@ export async function getConversas(documento: string): Promise<CrmConversa[]> {
   return data ?? [];
 }
 
-// Fecha (esconde) conversas no banco marcando fechada=true — persiste entre
-// dispositivos/sessões, sem apagar o histórico. Uma nova mensagem reabre a conversa.
-export async function fecharConversas(documentos: string[]): Promise<void> {
+// Oculta conversas da central DO USUÁRIO (não afeta os outros participantes) —
+// persiste entre dispositivos/sessões, sem apagar o histórico. Uma mensagem nova
+// (diálogo com timestamp posterior a `ocultado_em`) reabre a conversa na central.
+// Substitui o antigo `fecharConversas`, que marcava crm_conversas.fechada=true por
+// DOCUMENTO e escondia a conversa para todos os participantes daquele orçamento.
+export async function ocultarConversas(
+  userId: string,
+  documentos: string[]
+): Promise<void> {
+  if (!userId) return;
   const docs = [...new Set(documentos.filter(Boolean))];
   if (docs.length === 0) return;
-  const CHUNK = 200; // evita URL longa demais no filtro .in()
+  const agora = new Date().toISOString();
+  const CHUNK = 500;
   for (let i = 0; i < docs.length; i += CHUNK) {
-    const batch = docs.slice(i, i + CHUNK);
+    const batch = docs.slice(i, i + CHUNK).map((documento) => ({
+      user_id: userId,
+      documento,
+      ocultado_em: agora,
+    }));
     const { error } = await supabase
-      .from("crm_conversas")
-      .update({ fechada: true })
-      .in("documento", batch);
+      .from("crm_central_ocultas")
+      .upsert(batch, { onConflict: "user_id,documento" });
     if (error) {
-      console.error("[CRM] erro ao fechar conversas:", error.message);
+      console.error("[CRM] erro ao ocultar conversas:", error.message);
       throw error;
     }
   }
+}
+
+// Retorna o mapa documento → ocultado_em (ISO) das conversas que o usuário ocultou
+// da própria central. Usado para esconder da lista as conversas sem mensagem nova.
+export async function getConversasOcultas(
+  userId: string
+): Promise<Map<string, string>> {
+  const mapa = new Map<string, string>();
+  if (!userId) return mapa;
+  const { data, error } = await supabase
+    .from("crm_central_ocultas")
+    .select("documento, ocultado_em")
+    .eq("user_id", userId);
+  if (error) {
+    console.error("[CRM] erro ao buscar conversas ocultas:", error.message);
+    return mapa;
+  }
+  for (const row of data ?? []) {
+    if (row.documento) mapa.set(row.documento, row.ocultado_em);
+  }
+  return mapa;
 }
 
 export async function addConversa(conversa: Omit<CrmConversa, "id">): Promise<void> {

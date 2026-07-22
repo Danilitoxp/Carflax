@@ -593,15 +593,17 @@ export function ChatModal({
     };
   }, [conversas, userProfile?.name, ownerProfile, centralizer, amICentralizer, sellerName, title, documento]);
 
-  // Só diálogos aparecem nos balões — atualizações de status (SISTEMA: enviado,
-  // perdido, negociação, etc.) ficam ocultas do ChatCentral.
+  // O histórico do orçamento mostra TUDO: diálogos (balões) e atualizações de
+  // status (SISTEMA: enviado, perdido, negociação, etc.), estas renderizadas como
+  // cards via renderStatusUpdateCard. Assim o supervisor vê o histórico completo
+  // ao abrir a conversa pelo orçamento.
+  //
+  // As atualizações de status continuam FORA do ChatCenter (lista) e NÃO abrem o
+  // modal automaticamente — esse controle é feito em App.tsx (isDialogMessage no
+  // carregarTodasConversas e o early-return no processRealtimeMessage). Aqui é só a
+  // visão do histórico, então nada é escondido.
   const visibleConversas = useMemo(
-    () => conversas.filter((m) => {
-      const sender = (m.enviado_por_nome || "").toUpperCase().trim();
-      if (sender === "SISTEMA") return false;
-      if ((m.obs || "").includes("ATUALIZAÇÃO DE STATUS")) return false;
-      return true;
-    }),
+    () => conversas.filter((m) => (m.obs || "").trim().length > 0),
     [conversas]
   );
 
