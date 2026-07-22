@@ -530,14 +530,21 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
   const toggleCliSort = (key: CliSortKey) =>
     setCliSort((s) => ({ key, dir: s.key === key && s.dir === "desc" ? "asc" : "desc" }));
 
-  // Vendedores de destino para transferência (exclui o vendedor atual do cliente)
+  // Vendedores de destino para transferência (todos com meta no mês, exclui o vendedor atual)
   const destinoOptions = useMemo(() => {
     const atual = (transferindo?.cod_vendedor || "").trim();
+    // Usa a lista de vendedores com meta vinda do backend (CADMET)
+    if (data?.vendedores?.length) {
+      return data.vendedores
+        .filter((v) => v.cod !== atual)
+        .map((v) => ({ label: `${v.nome} (${v.cod})`, value: v.cod }));
+    }
+    // Fallback: usa os vendedores que já têm clientes na carteira
     return [...carteiras]
       .filter((v) => v.cod !== "—" && v.cod !== atual)
       .sort((a, b) => a.nome.localeCompare(b.nome))
       .map((v) => ({ label: `${v.nome} (${v.cod})`, value: v.cod }));
-  }, [carteiras, transferindo]);
+  }, [data?.vendedores, carteiras, transferindo]);
 
   const abrirTransferencia = (c: CarteiraCliente) => {
     setTransferindo(c);

@@ -588,6 +588,7 @@ export interface CarteiraResponse {
   gerado_em: string;
   mes: string; // 'YYYY-MM'
   clientes: CarteiraCliente[];
+  vendedores?: { cod: string; nome: string }[];
 }
 
 export const apiCarteira = () => get<CarteiraResponse>("/api/crm/carteira");
