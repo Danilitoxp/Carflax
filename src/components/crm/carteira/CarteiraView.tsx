@@ -404,7 +404,7 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
       out.push({ id: supId, nome: `Time ${primeiroNome}`, codes: codesComDados });
     }
     return out.sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [isAdmin, usuariosOrg, carteirasVisiveis]);
+  }, [isAdmin, isFullAccess, usuariosOrg, carteirasVisiveis]);
 
   // Códigos (normalizados) do time atualmente selecionado no filtro, se houver.
   const codesDoTimeFiltrado = useMemo(() => {
