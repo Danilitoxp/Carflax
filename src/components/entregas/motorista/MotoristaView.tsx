@@ -8,11 +8,14 @@ import {
   RefreshCw,
   X,
   Package,
-  AlertCircle
+  AlertCircle,
+  Sun,
+  Moon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { uploadImage } from "@/lib/uploadImage";
+import { useTheme } from "@/context/theme-provider";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Delivery {
@@ -29,6 +32,8 @@ interface Delivery {
 }
 
 export function MotoristaView() {
+  const { theme, setTheme } = useTheme();
+  const isDark = theme === "dark";
   const [loading, setLoading] = useState(true);
   const [entregas, setEntregas] = useState<Delivery[]>([]);
   const [driverName, setDriverName] = useState("");
@@ -154,11 +159,11 @@ export function MotoristaView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#FDFDFF] pb-12 font-sans antialiased text-slate-900 leading-relaxed">
-      
+    <div className="flex-1 flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 pb-12 font-sans antialiased text-slate-900 dark:text-slate-100 leading-relaxed transition-colors">
+
       {/* APP BAR - LIMPISSIMA */}
-      <nav className="sticky top-0 z-40 px-4 pt-4 pb-2 bg-[#FDFDFF]/80 backdrop-blur-xl">
-        <div className="bg-white rounded-3xl p-3 shadow-xl shadow-slate-200/50 border border-slate-100 flex items-center justify-between">
+      <nav className="sticky top-0 z-40 px-4 pt-4 pb-2 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-3 shadow-xl shadow-slate-200/50 dark:shadow-black/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white border-2 border-white shadow-lg overflow-hidden shrink-0">
                {driverAvatar ? (
@@ -168,7 +173,7 @@ export function MotoristaView() {
                )}
             </div>
             <div>
-              <h1 className="text-sm font-black uppercase tracking-tight leading-none text-slate-900">
+              <h1 className="text-sm font-black uppercase tracking-tight leading-none text-slate-900 dark:text-white">
                 {driverName.split(' ')[0] || "Motorista"}
               </h1>
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
@@ -176,9 +181,14 @@ export function MotoristaView() {
               </p>
             </div>
           </div>
-          <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">
-            Online
-          </div>
+          <button
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+            aria-label="Alternar tema"
+            title={isDark ? "Modo claro" : "Modo escuro"}
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-amber-400 dark:border-slate-700 transition-colors active:scale-95"
+          >
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
         </div>
       </nav>
 
@@ -204,22 +214,22 @@ export function MotoristaView() {
 
       {/* SELETOR DE ABAS */}
       <div className="px-4 mt-6">
-        <div className="flex bg-slate-100 p-1 rounded-2xl gap-1">
-          <button 
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl gap-1">
+          <button
             onClick={() => setActiveTab("pending")}
             className={cn(
               "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-              activeTab === "pending" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400"
+              activeTab === "pending" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-slate-400 dark:text-slate-500"
             )}
           >
             <Package size={14} />
             Entregas
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab("history")}
             className={cn(
               "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-              activeTab === "history" ? "bg-white text-emerald-600 shadow-sm" : "text-slate-400"
+              activeTab === "history" ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm" : "text-slate-400 dark:text-slate-500"
             )}
           >
             <RefreshCw size={14} />
@@ -239,7 +249,7 @@ export function MotoristaView() {
         {loading ? (
           <div className="space-y-4">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-44 w-full bg-slate-100 animate-pulse rounded-[32px]" />
+              <div key={i} className="h-44 w-full bg-slate-100 dark:bg-slate-800 animate-pulse rounded-[32px]" />
             ))}
           </div>
         ) : (() => {
@@ -248,10 +258,10 @@ export function MotoristaView() {
           if (filtered.length === 0) {
             return (
               <div className="flex flex-col items-center justify-center py-20 text-center px-8">
-                <div className="w-20 h-20 bg-slate-50 rounded-[40px] flex items-center justify-center mb-6 border-4 border-white shadow-sm">
-                  {activeTab === "pending" ? <CheckCircle2 className="text-emerald-500" size={40} /> : <AlertCircle className="text-slate-300" size={40} />}
+                <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-[40px] flex items-center justify-center mb-6 border-4 border-white dark:border-slate-700 shadow-sm">
+                  {activeTab === "pending" ? <CheckCircle2 className="text-emerald-500" size={40} /> : <AlertCircle className="text-slate-300 dark:text-slate-600" size={40} />}
                 </div>
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
                   {activeTab === "pending" ? "Tudo Pronto!" : "Histórico Vazio"}
                 </h3>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
@@ -268,8 +278,8 @@ export function MotoristaView() {
               animate={{ opacity: 1, scale: 1 }}
               key={e.id} 
               className={cn(
-                "bg-white rounded-[32px] p-6 border-2 transition-all relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)]",
-                e.status === "completed" ? "border-emerald-100 bg-emerald-50/10 grayscale-[0.5] opacity-80" : "border-slate-50"
+                "bg-white dark:bg-slate-900 rounded-[32px] p-6 border-2 transition-all relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)]",
+                e.status === "completed" ? "border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/10 dark:bg-emerald-950/20 grayscale-[0.5] opacity-80" : "border-slate-50 dark:border-slate-800"
               )}
             >
               {/* BADGE CONCLUIDO */}
@@ -290,13 +300,13 @@ export function MotoristaView() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md uppercase tracking-wider">NF #{e.nf}</span>
-                    <span className="text-[9px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md uppercase tracking-wider">{e.value}</span>
+                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md uppercase tracking-wider">{e.value}</span>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-1.5 mb-6">
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-tight mb-2">{e.client}</h3>
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight mb-2">{e.client}</h3>
                 <div className="flex items-start gap-2 text-slate-400">
                   <MapPin size={14} className="shrink-0 mt-0.5" />
                   <p className="text-[10px] font-bold uppercase tracking-tight leading-normal">{e.address}</p>
@@ -309,7 +319,7 @@ export function MotoristaView() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-50">
+              <div className="flex items-center gap-3 pt-4 border-t border-slate-50 dark:border-slate-800">
                 {e.status === "pending" ? (
                   <div className="grid grid-cols-2 gap-3 w-full">
                       <motion.button 
@@ -336,7 +346,7 @@ export function MotoristaView() {
                   <motion.button 
                     whileTap={{ scale: 0.98 }}
                     onClick={() => e.image && window.open(e.image, "_blank")}
-                    className="w-full h-14 bg-white border-2 border-slate-100 text-slate-400 rounded-[24px] text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3"
+                    className="w-full h-14 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 text-slate-400 dark:text-slate-300 rounded-[24px] text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3"
                   >
                     <Package size={18} />
                     Ver Comprovante
@@ -364,38 +374,38 @@ export function MotoristaView() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative bg-white rounded-t-[48px] p-8 pb-12 space-y-6 shadow-2xl"
+              className="relative bg-white dark:bg-slate-900 rounded-t-[48px] p-8 pb-12 space-y-6 shadow-2xl"
             >
-              <div className="w-16 h-1.5 bg-slate-100 rounded-full mx-auto" />
-              
+              <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full mx-auto" />
+
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Finalizar Entrega</h3>
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-2 flex items-center gap-2">
-                    <span className="px-2 py-1 bg-slate-100 rounded-md">NF #{selectedDelivery.nf}</span>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Finalizar Entrega</h3>
+                  <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2 flex items-center gap-2">
+                    <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md">NF #{selectedDelivery.nf}</span>
                     <span>•</span>
                     <span className="truncate max-w-[150px]">{selectedDelivery.client}</span>
                   </p>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsFinishModalOpen(false)}
-                  className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100"
+                  className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-300 border border-slate-100 dark:border-slate-700"
                 >
                   <X size={24} />
                 </button>
               </div>
 
-              <div className="p-8 bg-blue-50/50 rounded-[40px] border-2 border-blue-100 flex flex-col items-center justify-center text-center gap-6">
-                <motion.div 
-                  animate={{ scale: [1, 1.05, 1] }} 
+              <div className="p-8 bg-blue-50/50 dark:bg-blue-950/20 rounded-[40px] border-2 border-blue-100 dark:border-blue-900/40 flex flex-col items-center justify-center text-center gap-6">
+                <motion.div
+                  animate={{ scale: [1, 1.05, 1] }}
                   transition={{ repeat: Infinity, duration: 2 }}
-                  className="w-20 h-20 rounded-3xl bg-white flex items-center justify-center shadow-xl shadow-blue-600/10"
+                  className="w-20 h-20 rounded-3xl bg-white dark:bg-slate-800 flex items-center justify-center shadow-xl shadow-blue-600/10"
                 >
                   <Camera size={38} className="text-blue-600" />
                 </motion.div>
                 
                 <div className="space-y-2">
-                   <p className="text-sm font-black text-blue-900 uppercase tracking-tight">Comprovante de Entrega</p>
+                   <p className="text-sm font-black text-blue-900 dark:text-blue-200 uppercase tracking-tight">Comprovante de Entrega</p>
                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest leading-relaxed">
                      Capture uma foto legível do canhoto<br/>para confirmar a entrega.
                    </p>
