@@ -149,6 +149,7 @@ export function UsersView() {
     "Marketing":    ["Gerente de Marketing", "Auxiliar de Marketing"],
     "Recursos H":   ["Gerente de RH", "Auxiliar de RH"],
     "Financeiro":   ["Gerente Administrativo", "Assistente Administrativo", "Gerente Contábil", "Auxiliar Contábil", "Faturista", "Caixa"],
+    "Administrativo": ["Auxiliar Administrativo"],
     "Tecnologia":   ["Gerente de TI", "Auxiliar de TI", "admin"],
     "Limpeza":      ["Gerente de Limpeza", "Auxiliar de Limpeza"],
     "Consultoria":  ["Consultor"],
@@ -157,7 +158,7 @@ export function UsersView() {
 
   const departments = [
     "Estoque", "Segurança", "Vendas", "Compras",
-    "Marketing", "Recursos H", "Financeiro", "Tecnologia", "Limpeza",
+    "Marketing", "Recursos H", "Financeiro", "Administrativo", "Tecnologia", "Limpeza",
     "Consultoria", "Diretoria",
   ];
 
