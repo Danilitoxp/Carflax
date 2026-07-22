@@ -446,6 +446,14 @@ export const marketingService = {
       updated_at: new Date().toISOString()
     };
 
+    // Ao finalizar/arquivar, o lead deixa de ser oportunidade "aberta": marca o desfecho
+    // na temperatura — "Convertido" se houve venda, senão "Perdido" — para não continuar
+    // constando como Quente (ex.: quentes que não fecharam no fim do mês). Ao desarquivar,
+    // não mexe na temperatura.
+    if (archived) {
+      updatePayload.temperatura = motivo === "Convertido" ? "Convertido" : "Perdido";
+    }
+
     // Salva o motivo no campo 'status' que já existe na tabela
     if (motivo) {
       updatePayload.status = motivo;
@@ -497,6 +505,7 @@ export const marketingService = {
       .update({
         arquivado: true,
         status: motivo,
+        temperatura: "Perdido",
         updated_at: new Date().toISOString()
       })
       .or("arquivado.eq.false,arquivado.is.null")

@@ -44,7 +44,7 @@ import { supabase } from "@/lib/supabase";
 import { marketingService } from "@/lib/marketing-service";
 import { cn, formatBrTime, formatBrDate } from "@/lib/utils";
 import { apiDashboardProdutos, apiGetLinkPreview, apiCrmOrcamentos } from "@/lib/api";
-import { transcribeAudio, classifyTemperature } from "@/lib/gemini-service";
+import { transcribeAudio, classifyByRules } from "@/lib/gemini-service";
 import { Package } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
 
@@ -118,7 +118,9 @@ interface Message {
   vendedorId?: string;
 }
 
-type Temperature = "Quente" | "Morno" | "Frio";
+// Quente/Morno/Frio = temperatura de leads abertos (classificada).
+// Perdido/Convertido = desfecho terminal, gravado ao finalizar/arquivar o chat.
+type Temperature = "Quente" | "Morno" | "Frio" | "Perdido" | "Convertido";
 
 interface LeadMetadata {
   source?: string;
@@ -412,6 +414,10 @@ const getTempColor = (temp?: string) => {
       return "text-amber-500 bg-amber-500/10 border-amber-500/20";
     case "Frio":
       return "text-blue-500 bg-blue-500/10 border-blue-500/20";
+    case "Convertido":
+      return "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
+    case "Perdido":
+      return "text-slate-400 bg-slate-500/10 border-slate-500/20";
     default:
       return "text-muted-foreground bg-secondary/50 border-border";
   }
@@ -1027,6 +1033,8 @@ export function WhatsappView({
   const lastSeenMap = useRef<Map<string, Date>>(new Map());
   const processedMsgIds = useRef<Set<string>>(new Set());
   const manualOverrideRef = useRef<Map<string, number>>(new Map());
+  // Última temperatura conhecida por lead — evita reescrever quando já está no topo.
+  const knownTempRef = useRef<Map<string, Temperature>>(new Map());
   const tempClassifyTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
@@ -1102,12 +1110,26 @@ export function WhatsappView({
           const updated = payload.new as {
             remote_jid: string;
             vendedor_id?: string | null;
+            temperatura?: Temperature | null;
           };
           if (updated.remote_jid) {
+            // Temperatura é classificada no servidor (webhook) e chega por aqui.
+            if (updated.temperatura) {
+              knownTempRef.current.set(updated.remote_jid, updated.temperatura);
+            }
             setChats((prev) =>
               prev.map((c) => {
                 if (c.id !== updated.remote_jid) return c;
-                return { ...c, vendedor_id: updated.vendedor_id || undefined };
+                return {
+                  ...c,
+                  vendedor_id: updated.vendedor_id || undefined,
+                  leadInfo: updated.temperatura
+                    ? {
+                        ...(c.leadInfo || {}),
+                        temperature: updated.temperatura,
+                      }
+                    : c.leadInfo,
+                };
               }),
             );
             setSelectedChat((prev) => {
@@ -1115,6 +1137,12 @@ export function WhatsappView({
                 return {
                   ...prev,
                   vendedor_id: updated.vendedor_id || undefined,
+                  leadInfo: updated.temperatura
+                    ? {
+                        ...(prev.leadInfo || {}),
+                        temperature: updated.temperatura,
+                      }
+                    : prev.leadInfo,
                 };
               }
               return prev;
@@ -1526,6 +1554,12 @@ export function WhatsappView({
     const finalPayment = finalReason === "Convertido" ? paymentMethod : "";
     const finalObs = finalReason === "Convertido" ? archiveObservation : "";
 
+    // Finalizou: grava o desfecho (Convertido se houve venda, senão Perdido) e limpa
+    // o guard, para o lead deixar de constar como Quente e poder ser reclassificado do
+    // zero caso o cliente volte a conversar.
+    const outcomeTemp: Temperature =
+      finalReason === "Convertido" ? "Convertido" : "Perdido";
+    knownTempRef.current.delete(targetId);
     setChats((prev) =>
       prev.map((c) =>
         c.id === targetId
@@ -1536,11 +1570,13 @@ export function WhatsappView({
                 ? {
                     ...c.leadInfo,
                     status: finalReason,
+                    temperature: outcomeTemp,
                     formaPagamento: finalPayment,
                     observacao: finalObs,
                   }
                 : {
                     status: finalReason,
+                    temperature: outcomeTemp,
                     formaPagamento: finalPayment,
                     observacao: finalObs,
                   },
@@ -2385,13 +2421,18 @@ export function WhatsappView({
     };
   }, [fetchAvatar, vendedorId]);
 
-  // Realtime: escuta inserções e edições de mensagens salvas no Supabase (inclui notas internas)
+  // Realtime: escuta inserções e edições de mensagens salvas no Supabase (inclui notas internas).
+  // Filtra server-side pelo chat ABERTO — sem isso o Supabase transmitia toda mensagem de
+  // todas as conversas para todos os clientes conectados (grande fonte de egress). A lista
+  // de conversas continua atualizando pelo socket.io da Evolution.
   useEffect(() => {
+    const jid = selectedChat?.id;
+    if (!jid) return;
     const channel = supabase
-      .channel("whatsapp-msg-changes")
+      .channel(`whatsapp-msg-changes-${jid}`)
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "marketing_whatsapp" },
+        { event: "UPDATE", schema: "public", table: "marketing_whatsapp", filter: `remote_jid=eq.${jid}` },
         (payload) => {
           const updated = payload.new as {
             message_id?: string;
@@ -2416,7 +2457,7 @@ export function WhatsappView({
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "marketing_whatsapp" },
+        { event: "INSERT", schema: "public", table: "marketing_whatsapp", filter: `remote_jid=eq.${jid}` },
         (payload) => {
           interface SupabaseMessageInsert {
             message_id: string;
@@ -2467,14 +2508,16 @@ export function WhatsappView({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [selectedChat?.id]);
 
   useEffect(() => {
     loadChats();
     setLoading(false);
   }, [loadChats]);
 
-  // Reclassifica leads sem temperatura definida (Frio padrão) ao carregar
+  // Reclassifica leads sem temperatura definida (Frio padrão) ao carregar.
+  // Usa APENAS a heurística (custo zero) — sem chamadas de IA no carregamento.
+  // A IA fica reservada ao fluxo de mensagens novas (com cooldown e parada no Quente).
   useEffect(() => {
     const reclassifyUnclassified = async () => {
       try {
@@ -2495,13 +2538,17 @@ export function WhatsappView({
               15,
             );
             if (!msgs || msgs.length < 3) continue;
-            const newTemp = await classifyTemperature(
+            const newTemp = classifyByRules(
               msgs.map((m) => ({
                 sender: m.sender as "me" | "contact",
                 text: m.texto || "",
               })),
             );
-            if (newTemp !== "Frio") {
+            if (newTemp && newTemp !== "Frio") {
+              knownTempRef.current.set(
+                cliente.remote_jid,
+                newTemp as Temperature,
+              );
               await marketingService.upsertCliente({
                 remote_jid: cliente.remote_jid,
                 temperatura: newTemp,
@@ -3378,6 +3425,7 @@ export function WhatsappView({
     (newTemp: Temperature) => {
       if (!selectedChat) return;
       manualOverrideRef.current.set(selectedChat.id, Date.now());
+      knownTempRef.current.set(selectedChat.id, newTemp);
       const updatedLeadInfo = {
         ...(selectedChat.leadInfo || {}),
         temperature: newTemp,
@@ -3404,20 +3452,27 @@ export function WhatsappView({
       const lastOverride = manualOverrideRef.current.get(remoteJid);
       if (lastOverride && Date.now() - lastOverride < OVERRIDE_TTL) return;
 
+      // Já está no topo: não há para onde subir.
+      if (knownTempRef.current.get(remoteJid) === "Quente") return;
+
       try {
-        setIsClassifyingTemp(true);
         const dbMessages = await marketingService.getMessagesByJid(
           remoteJid,
           15,
         );
         if (dbMessages.length < 3) return;
 
-        const newTemp = await classifyTemperature(
-          dbMessages.map((m) => ({
-            sender: m.sender as "me" | "contact",
-            text: m.texto || "",
-          })),
-        );
+        const mapped = dbMessages.map((m) => ({
+          sender: m.sender as "me" | "contact",
+          text: m.texto || "",
+        }));
+
+        // Só heurística no cliente (custo zero) — feedback imediato na UI.
+        // A IA para casos ambíguos roda no servidor (webhook) e chega por realtime.
+        const newTemp = classifyByRules(mapped) as Temperature | null;
+        if (!newTemp) return;
+
+        knownTempRef.current.set(remoteJid, newTemp);
 
         await marketingService.upsertCliente({
           remote_jid: remoteJid,

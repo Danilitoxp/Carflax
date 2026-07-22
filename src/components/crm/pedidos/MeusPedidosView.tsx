@@ -382,7 +382,10 @@ export function MeusPedidosView({ userProfile }: Props) {
 
   useEffect(() => {
     fetchData();
-    const timer = setInterval(fetchData, 30000);
+    // Refresh a cada 30s, só com a aba visível (evita egress em segundo plano).
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") fetchData();
+    }, 30000);
     return () => clearInterval(timer);
   }, [fetchData]);
 

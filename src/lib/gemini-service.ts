@@ -2,6 +2,83 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_IA || "");
 
+export type Temperatura = "Quente" | "Morno" | "Frio";
+
+// Remove acentos e normaliza para casar as regras sem depender de acentuação.
+const normalize = (t: string) =>
+  t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+// Sinais de alta intenção de compra → Quente.
+const HOT_PATTERNS: RegExp[] = [
+  /\bpreco\b/, /quanto\s+(custa|fica|sai|e|da|vale)/, /\bvalor\b/, /\borcamento\b/,
+  /tem\s+(em\s+)?estoque/, /disponivel/, /\breservar?\b/, /(pode|consegue|da\s+pra)\s+separar/,
+  /\bpix\b/, /\bboleto\b/, /cartao/, /parcel/, /forma\s+de\s+pagamento/,
+  /prazo\s+de\s+entrega/, /\bfrete\b/, /quero\s+(comprar|levar|fechar|esse|essa)/,
+  /vou\s+(levar|querer|comprar)/, /manda(r)?\s+o\s+pix/, /fech(ar|ado|amos|a)\b/,
+  /qual\s+o\s+total/, /pode\s+faturar/,
+];
+
+// Perguntas sobre produto / compatibilidade → Morno.
+const WARM_PATTERNS: RegExp[] = [
+  /\bserve\b/, /compativel/, /diferenca/, /\boriginal\b/, /\bparalela\b/, /encaixa/,
+  /funciona\s+n[oa]/, /\bmedida\b/, /referencia/, /\bcodigo\b/, /\bmarca\b/, /\bmodelo\b/,
+  /voce?s?\s+tem/, /\bvcs?\s+tem/, /tem\s+(pra|para|pro|de|o|a|um|uma)\b/,
+];
+
+// Mensagens sem contexto de compra → Frio.
+const GREETING_ONLY =
+  /^(oi+|ola|e?\s*ai|bom\s+dia|boa\s+tarde|boa\s+noite|opa|blz|beleza|tudo\s+bem|ok+|obrigad[oa]|valeu|\?|\.|\!)+$/;
+
+/**
+ * Classificação por regras (heurística, custo zero). Cobre a maioria das conversas
+ * sem chamar IA. Retorna a temperatura quando há sinal claro, ou `null` quando é
+ * ambíguo — nesse caso o chamador deve cair no fallback de IA (classifyTemperature).
+ */
+export function classifyByRules(
+  messages: Array<{ sender: "me" | "contact"; text: string }>
+): Temperatura | null {
+  const contactMsgs = messages
+    .filter(
+      (m) =>
+        m.sender === "contact" &&
+        m.text &&
+        !m.text.startsWith("🎵") &&
+        !m.text.startsWith("📎"),
+    )
+    .map((m) => m.text.trim())
+    .filter(Boolean);
+
+  if (contactMsgs.length === 0) return "Frio";
+
+  const joined = normalize(contactMsgs.join(" "));
+  const recent = normalize(contactMsgs.slice(-5).join(" "));
+
+  // Alta intenção em qualquer ponto da conversa → Quente.
+  if (HOT_PATTERNS.some((r) => r.test(joined))) return "Quente";
+
+  // Apenas cumprimentos / mensagens vazias de contexto → Frio.
+  if (contactMsgs.every((m) => GREETING_ONLY.test(normalize(m)))) return "Frio";
+
+  // Pergunta sobre produto/compatibilidade, ou qualquer pergunta com contexto → Morno.
+  if (WARM_PATTERNS.some((r) => r.test(recent)) || recent.includes("?"))
+    return "Morno";
+
+  // Sem sinal claro → deixa a IA decidir.
+  return null;
+}
+
+/**
+ * Classificação inteligente: tenta as regras primeiro (grátis) e só usa IA quando
+ * o resultado é ambíguo. Reduz drasticamente o número de chamadas ao Gemini.
+ */
+export async function classifyTemperatureSmart(
+  messages: Array<{ sender: "me" | "contact"; text: string }>
+): Promise<Temperatura> {
+  const byRules = classifyByRules(messages);
+  if (byRules) return byRules;
+  return classifyTemperature(messages);
+}
+
 export async function classifyTemperature(
   messages: Array<{ sender: "me" | "contact"; text: string }>
 ): Promise<"Quente" | "Morno" | "Frio"> {

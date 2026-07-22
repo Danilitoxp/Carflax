@@ -1064,12 +1064,15 @@ function DashboardContent({
         }
       });
 
-    // Fallback: poll para mensagens perdidas a cada 15s
+    // Fallback: poll para mensagens perdidas a cada 15s.
+    // Só roda com a aba visível — quando oculta, o handleVisibilityChange faz o
+    // catch-up ao voltar. Evita egress contínuo com o app em segundo plano.
     const pollInterval = setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
       try {
         const { data } = await supabase
           .from("crm_conversas")
-          .select("*")
+          .select("id, documento, empresa, obs, enviado_por, enviado_por_nome, timestamp, lida, fechada, destino")
           .gt("timestamp", lastSeenTimestamp)
           .or(`destino.eq.${myId},destino.eq.todos`)
           .neq("enviado_por", myId)
@@ -1092,7 +1095,7 @@ function DashboardContent({
         try {
           const { data } = await supabase
             .from("crm_conversas")
-            .select("*")
+            .select("id, documento, empresa, obs, enviado_por, enviado_por_nome, timestamp, lida, fechada, destino")
             .gt("timestamp", lastSeenTimestamp)
             .or(`destino.eq.${myId},destino.eq.todos`)
             .neq("enviado_por", myId)

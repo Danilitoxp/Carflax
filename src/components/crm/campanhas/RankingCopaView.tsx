@@ -49,7 +49,10 @@ export function RankingCopaView() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => fetchData(true), 30000); // Auto refresh every 30s
+    // Auto refresh a cada 30s, só com a aba visível (evita egress em segundo plano).
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchData(true);
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 

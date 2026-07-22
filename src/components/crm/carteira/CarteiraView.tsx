@@ -34,6 +34,7 @@ const POR_PAGINA = 12; // vendedores por página
 const CLI_POR_PAGINA = 15; // clientes por página no drill-down
 
 interface UserProfile {
+  id?: string;
   role?: string;
   department?: string;
   operator_code?: string;
@@ -232,6 +233,10 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
   });
   const [cliPage, setCliPage] = useState(1);
   const [avatarsMap, setAvatarsMap] = useState<Record<string, string>>({});
+  // Usuários (para montar os times: supervisor via responsavel_id + operator_code)
+  const [usuariosOrg, setUsuariosOrg] = useState<
+    { id: string; operator_code: string | null; name: string | null; responsavel_id: string | null }[]
+  >([]);
 
   // Transferência de cliente para outro vendedor (admin)
   const [transferindo, setTransferindo] = useState<CarteiraCliente | null>(null);
@@ -239,10 +244,17 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
   const [transferLoading, setTransferLoading] = useState(false);
   const [transferErro, setTransferErro] = useState<string | null>(null);
 
-  // Admin/gestor vê todos os vendedores + filtro; vendedor comum vê só a própria carteira
+  // Elevado (is_leader/gestor/admin): carrega usuários e habilita ações de gestão.
   const isAdmin =
     userProfile?.is_admin === true ||
     userProfile?.is_leader === true ||
+    (userProfile?.role || "").toUpperCase().includes("GERENTE") ||
+    (userProfile?.role || "").toUpperCase().includes("DIRETOR") ||
+    (userProfile?.role || "").toUpperCase().includes("ADMIN");
+  // Acesso TOTAL (vê todos os vendedores): admin, diretoria ou gerência. Supervisor de
+  // vendas NÃO é acesso total — fica limitado ao próprio time (ver carteirasVisiveis).
+  const isFullAccess =
+    userProfile?.is_admin === true ||
     (userProfile?.role || "").toUpperCase().includes("GERENTE") ||
     (userProfile?.role || "").toUpperCase().includes("DIRETOR") ||
     (userProfile?.role || "").toUpperCase().includes("ADMIN");
@@ -290,6 +302,23 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
     return () => { cancelled = true; };
   }, []);
 
+  // Carrega os usuários para montar os times (supervisor = responsável por ≥1 pessoa).
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("id, operator_code, name, responsavel_id");
+      if (error) {
+        console.error("[CarteiraView] Erro ao carregar usuários (times):", error);
+        return;
+      }
+      if (!cancelled && data) setUsuariosOrg(data);
+    })();
+    return () => { cancelled = true; };
+  }, [isAdmin]);
+
   // Agrupa clientes por vendedor
   const carteiras = useMemo<Carteira[]>(() => {
     if (!Array.isArray(data?.clientes) || data.clientes.length === 0) return [];
@@ -322,31 +351,100 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
     return out;
   }, [data]);
 
-  // Escopo por permissão
+  // Time do usuário LOGADO, se ele for supervisor (responsável por ≥1 pessoa).
+  // Usado para limitar a visão de um supervisor de vendas ao próprio time.
+  const meuTimeCodes = useMemo(() => {
+    if (isFullAccess) return null; // acesso total não precisa de escopo
+    const eu = userProfile?.id
+      ? usuariosOrg.find((u) => u.id === userProfile.id)
+      : usuariosOrg.find((u) => meuCod && normCod(u.operator_code || undefined) === meuCod);
+    if (!eu) return null;
+    const reports = usuariosOrg.filter((u) => u.responsavel_id === eu.id);
+    if (reports.length === 0) return null; // não é supervisor
+    const codes = new Set<string>();
+    if (eu.operator_code) codes.add(normCod(eu.operator_code));
+    reports.forEach((m) => { if (m.operator_code) codes.add(normCod(m.operator_code)); });
+    return codes;
+  }, [isFullAccess, usuariosOrg, userProfile?.id, meuCod]);
+
+  // Escopo por permissão: acesso total vê todos; supervisor vê só o próprio time;
+  // vendedor comum vê só a própria carteira.
   const carteirasVisiveis = useMemo(() => {
-    if (isAdmin) return carteiras;
-    if (!meuCod) return carteiras;
-    return carteiras.filter((v) => normCod(v.cod) === meuCod);
-  }, [carteiras, isAdmin, meuCod]);
+    if (isFullAccess) return carteiras;
+    if (meuTimeCodes) return carteiras.filter((v) => meuTimeCodes.has(normCod(v.cod)));
+    if (meuCod) return carteiras.filter((v) => normCod(v.cod) === meuCod);
+    return carteiras;
+  }, [carteiras, isFullAccess, meuTimeCodes, meuCod]);
 
   const showBackButton = isAdmin || carteirasVisiveis.length > 1;
 
-  // Opções do filtro de vendedor
-  const vendedorOptions = useMemo(
-    () => [
-      { label: "Todos os vendedores", value: "todos" },
-      ...[...carteirasVisiveis]
-        .sort((a, b) => a.nome.localeCompare(b.nome))
-        .map((v) => ({ label: `${v.nome} (${v.cod})`, value: v.cod })),
-    ],
-    [carteirasVisiveis]
+  // Times: agrupa vendedores por supervisor (responsavel_id). Só inclui times com ao
+  // menos um vendedor que tenha carteira visível. Valor do filtro: "time:<supId>".
+  const times = useMemo(() => {
+    if (!isFullAccess || usuariosOrg.length === 0) return [];
+    const membrosPorResp = new Map<string, typeof usuariosOrg>();
+    for (const u of usuariosOrg) {
+      if (!u.responsavel_id) continue;
+      if (!membrosPorResp.has(u.responsavel_id)) membrosPorResp.set(u.responsavel_id, []);
+      membrosPorResp.get(u.responsavel_id)!.push(u);
+    }
+    const byId = new Map(usuariosOrg.map((u) => [u.id, u]));
+    const out: { id: string; nome: string; codes: string[] }[] = [];
+    for (const [supId, membros] of membrosPorResp) {
+      const sup = byId.get(supId);
+      if (!sup) continue;
+      const codes = new Set<string>();
+      if (sup.operator_code) codes.add(normCod(sup.operator_code));
+      membros.forEach((m) => { if (m.operator_code) codes.add(normCod(m.operator_code)); });
+      const codesComDados = [...codes].filter((c) =>
+        carteirasVisiveis.some((v) => normCod(v.cod) === c)
+      );
+      if (codesComDados.length === 0) continue;
+      const primeiroNome = (sup.name || "Time").trim().split(/\s+/)[0];
+      out.push({ id: supId, nome: `Time ${primeiroNome}`, codes: codesComDados });
+    }
+    return out.sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [isAdmin, usuariosOrg, carteirasVisiveis]);
+
+  // Códigos (normalizados) do time atualmente selecionado no filtro, se houver.
+  const codesDoTimeFiltrado = useMemo(() => {
+    if (!filtroVendedor.startsWith("time:")) return null;
+    return times.find((t) => `time:${t.id}` === filtroVendedor)?.codes ?? [];
+  }, [filtroVendedor, times]);
+
+  // Testa se uma carteira passa no filtro de vendedor/time selecionado.
+  const matchFiltro = useCallback(
+    (v: Carteira) => {
+      if (filtroVendedor === "todos") return true;
+      if (codesDoTimeFiltrado) return codesDoTimeFiltrado.includes(normCod(v.cod));
+      return v.cod === filtroVendedor;
+    },
+    [filtroVendedor, codesDoTimeFiltrado]
   );
+
+  // Opções do filtro: Todos + grupo de Times + grupo de Vendedores
+  const vendedorOptions = useMemo(() => {
+    const vendedores = [...carteirasVisiveis]
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .map((v) => ({ label: `${v.nome} (${v.cod})`, value: v.cod }));
+    return [
+      { label: "Todos os vendedores", value: "todos" },
+      ...(times.length > 0
+        ? [
+            { label: "Times", value: "__hdr_times", isHeader: true },
+            ...times.map((t) => ({ label: t.nome, value: `time:${t.id}` })),
+            { label: "Vendedores", value: "__hdr_vend", isHeader: true },
+          ]
+        : []),
+      ...vendedores,
+    ];
+  }, [carteirasVisiveis, times]);
 
   // KPIs globais
   const kpis = useMemo(() => {
     const base =
       filtroVendedor !== "todos"
-        ? carteirasVisiveis.filter((v) => v.cod === filtroVendedor)
+        ? carteirasVisiveis.filter(matchFiltro)
         : carteirasVisiveis;
     const totalVend = base.length;
     const totalCli = base.reduce((s, v) => s + v.numClientes, 0);
@@ -358,12 +456,12 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
       totalValor,
       margemPct: totalValor > 0 ? (totalMargem / totalValor) * 100 : 0,
     };
-  }, [carteirasVisiveis, filtroVendedor]);
+  }, [carteirasVisiveis, filtroVendedor, matchFiltro]);
 
   // Lista ordenada + filtrada
   const carteirasFiltradas = useMemo(() => {
     let arr = carteirasVisiveis;
-    if (filtroVendedor !== "todos") arr = arr.filter((v) => v.cod === filtroVendedor);
+    if (filtroVendedor !== "todos") arr = arr.filter(matchFiltro);
     const q = busca.trim().toLowerCase();
     if (q) arr = arr.filter((v) => v.nome.toLowerCase().includes(q) || v.cod.toLowerCase().includes(q));
     const { key, dir } = vendSort;
@@ -372,7 +470,7 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
       if (key === "nome") return a.nome.localeCompare(b.nome) * mult;
       return ((a[key] as number) - (b[key] as number)) * mult;
     });
-  }, [carteirasVisiveis, filtroVendedor, busca, vendSort]);
+  }, [carteirasVisiveis, filtroVendedor, busca, vendSort, matchFiltro]);
 
   useEffect(() => {
     setPage(1);
