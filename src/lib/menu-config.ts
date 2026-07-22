@@ -73,6 +73,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Separação" },
       { label: "Conferência" },
       { label: "Retirada" },
+      { label: "Furos" },
     ],
   },
   { label: "Compras", permGroup: "COMPRAS" },
@@ -161,7 +162,7 @@ const PUBLIC_SECTIONS = [
   "Dashboard", "Geral", "Produtos",
   "Calendário", "Agenda", "Férias",
   "Esteira", "Minha Esteira", "Sugestões",
-  "Organograma", "Estoque", "Separação", "Conferência", "Retirada",
+  "Organograma", "Estoque", "Separação", "Conferência", "Retirada", "Furos",
   "Relatórios", "Relatórios Mkt",
 ];
 

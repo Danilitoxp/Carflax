@@ -1,15 +1,26 @@
 import { useState, useMemo, useEffect } from "react";
-import { 
-  TrendingDown, 
-  Users, 
-  PackageX, 
+import {
+  TrendingUp,
+  TrendingDown,
+  Users,
+  PackageX,
   Download,
   Search,
-  Package
+  Calendar,
+  ChevronDown,
+  DollarSign,
+  Target,
+  Award,
+  ArrowUpRight,
+  ArrowDownRight,
+  AlertTriangle,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiCrmOrcamentos } from "@/lib/api";
+import { apiCrmOrcamentos, apiCrmFaturamento, type FaturamentoResumo } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
+import { MiniCalendar } from "@/components/ui/MiniCalendar";
+import * as XLSX from "xlsx";
 
 interface UserProfile {
   id?: string;
@@ -40,6 +51,7 @@ interface Orcamento {
   lossReason: string;
   items: OrcamentoItem[];
   empresa: string;
+  docGerado?: string;
 }
 
 interface RelatoriosViewProps {
@@ -47,127 +59,276 @@ interface RelatoriosViewProps {
   userProfile?: UserProfile;
 }
 
-export function RelatoriosView({ 
+type TabId = "overview" | "losses_stock" | "losses_price" | "sellers" | "clients";
+
+const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
+  { id: "overview", label: "Visão Geral", icon: Target },
+  { id: "losses_stock", label: "Perdas por Estoque", icon: PackageX },
+  { id: "losses_price", label: "Perdas por Preço", icon: Tag },
+  { id: "sellers", label: "Desempenho de Vendedores", icon: Award },
+  { id: "clients", label: "Clientes & Ocorrências", icon: Users },
+];
+
+const formatCurrency = (val: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val || 0);
+
+export function RelatoriosView({
   orcamentos: propsOrcamentos = [],
-  userProfile 
+  userProfile,
 }: RelatoriosViewProps) {
   const [localOrcamentos, setLocalOrcamentos] = useState<Orcamento[]>([]);
+  const [faturamentoData, setFaturamentoData] = useState<FaturamentoResumo | null>(null);
   const [loading, setLoading] = useState(false);
-  const [dateRange, setDateRange] = useState("este-mes");
+  const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 0. Carregamento de Dados (Independente)
-  useEffect(() => {
-    async function fetchData() {
-      if (propsOrcamentos.length > 0) {
-        setLocalOrcamentos(propsOrcamentos);
-        return;
+  // Dates: Default to start of current month until today
+  const [startDate, setStartDate] = useState<Date>(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [endDate, setEndDate] = useState<Date | null>(new Date());
+  const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+
+  // Carregamento de Dados (Dinâmico por período ou via props)
+  const loadData = async () => {
+    if (propsOrcamentos.length > 0) {
+      setLocalOrcamentos(propsOrcamentos);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const startStr = startDate ? startDate.toISOString().split("T")[0] : "";
+      const endStr = endDate ? endDate.toISOString().split("T")[0] : startStr;
+
+      const [raw, fatRes] = await Promise.all([
+        apiCrmOrcamentos({ inicio: startStr, fim: endStr }),
+        apiCrmFaturamento({ inicio: startStr, fim: endStr }).catch(() => null),
+      ]);
+
+      if (fatRes && (Number(fatRes.QTD_VENDAS) > 0 || Number(fatRes.TOTAL_VENDIDO) > 0)) {
+        setFaturamentoData(fatRes);
+      } else {
+        setFaturamentoData(null);
       }
 
-      setLoading(true);
-      try {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-        
-        // 1. Busca Orçamentos do Mês
-        let raw = await apiCrmOrcamentos({ inicio: startOfMonth, fim: endOfMonth });
-        
-        // 4. Filtro de Privacidade (Vendedor só vê o dele)
-        if (userProfile?.role?.toUpperCase() === 'VENDEDOR' && userProfile?.name) {
-          const userName = userProfile.name.toUpperCase();
-          raw = raw.filter(o => {
-            const sellerName = (o.VENDEDOR || "").toUpperCase();
-            return sellerName.includes(userName) || userName.includes(sellerName);
-          });
-          console.log(`[Relatorios] Filtro aplicado para vendedor: ${userProfile.name} (${raw.length} registros)`);
+      // Filtro de Privacidade (Vendedor só vê o dele)
+      let filteredRaw = raw || [];
+      if (userProfile?.role?.toUpperCase() === "VENDEDOR" && userProfile?.name) {
+        const userName = userProfile.name.toUpperCase();
+        filteredRaw = filteredRaw.filter((o) => {
+          const sellerName = (o.VENDEDOR || "").toUpperCase();
+          return sellerName.includes(userName) || userName.includes(sellerName);
+        });
+      }
+
+      // Status do CRM no Supabase
+      const { data: statuses } = await supabase.from("crm_status").select("*");
+
+      let parsed: Orcamento[] = filteredRaw.map((o: any) => {
+        const apiId = String(o.ORCAMENTO).replace("-OR", "").trim();
+
+        const s = (statuses || []).find((st) => {
+          const dbId = String(st.documento).replace("-OR", "").trim();
+          return dbId === apiId || st.documento === o.ORCAMENTO;
+        });
+
+        // 1. ERP Status (CITEL/ERP):
+        let erpStatus = "EMITIDO";
+        const motCan = String(o.MOTIVO_CANCELAMENTO || "").trim();
+        if (motCan && motCan !== "SEM MOTIVO") {
+          erpStatus = "PERDIDO";
+        } else if (
+          o.PEDIDO === "Sim" ||
+          (o.NOTA_FISCAL && String(o.NOTA_FISCAL).trim() !== "") ||
+          (o.DATA_BAIXA && o.DATA_BAIXA !== "SEM DATA") ||
+          (o.DOC_GERADO && String(o.DOC_GERADO).trim() !== "")
+        ) {
+          erpStatus = "VENDA";
         }
 
-        // 2. Busca Status do CRM
-        const { data: statuses } = await supabase.from("crm_status").select("*");
-        
-        // 3. Cruzamento de Dados (Busca Inteligente via Colunas Reais)
-        const merged = (raw || []).map(o => {
-          const apiId = String(o.ORCAMENTO).replace("-OR", "").trim();
-          
-          const s = (statuses || []).find(st => {
-            const dbId = String(st.documento).replace("-OR", "").trim();
-            return dbId === apiId || st.documento === o.ORCAMENTO;
-          });
+        // 2. Supabase CRM overlay:
+        let status = erpStatus;
+        if (s?.status_crm) {
+          const crmStatus = s.status_crm.toUpperCase().trim();
+          if (crmStatus === "VENDA" || crmStatus === "GANHO") {
+            status = "VENDA";
+          } else if (crmStatus === "PERDIDO" || crmStatus === "CANCELADO") {
+            status = "PERDIDO";
+          } else if (erpStatus === "EMITIDO") {
+            status = crmStatus;
+          }
+        }
 
-          const status = (s?.status_crm || "ABERTO").toUpperCase();
-          const lossReason = (s?.motivo_perda || "").toUpperCase();
+        const lossReason = (
+          (motCan && motCan !== "SEM MOTIVO" ? motCan : s?.motivo_perda) || ""
+        ).toUpperCase().trim();
 
-          // Lógica de Filtragem de Itens Perdidos (Fonte: Novas Colunas)
-          let itemsToCount: OrcamentoItem[] = [];
-          
-          if (status === "PERDIDO") {
-            const idsEstoque = s?.itens_estoque || [];
-            const idsPreco = s?.itens_preco || [];
-            const allSpecificIds = [...(Array.isArray(idsEstoque) ? idsEstoque : []), ...(Array.isArray(idsPreco) ? idsPreco : [])];
+        let itemsToCount: OrcamentoItem[] = [];
 
-            if (allSpecificIds.length > 1 || (allSpecificIds.length > 0)) {
-              itemsToCount = (o.PRODUTOS || []).filter((it: OrcamentoItem) => 
-                allSpecificIds.map(String).includes(String(it.COD_PRODUTO))
-              );
-            } 
+        if (status === "PERDIDO" || status === "CANCELADO") {
+          const idsEstoque = s?.itens_estoque || [];
+          const idsPreco = s?.itens_preco || [];
+          const allSpecificIds = [
+            ...(Array.isArray(idsEstoque) ? idsEstoque : []),
+            ...(Array.isArray(idsPreco) ? idsPreco : []),
+          ];
+
+          if (allSpecificIds.length > 0) {
+            itemsToCount = (o.PRODUTOS || []).filter((it: OrcamentoItem) =>
+              allSpecificIds.map(String).includes(String(it.COD_PRODUTO))
+            );
           } else {
             itemsToCount = o.PRODUTOS || [];
           }
+        }
 
-          return {
-            id: o.ORCAMENTO,
-            client: o.CLIENTE,
-            seller: o.VENDEDOR,
-            numericValue: parseFloat(String(o.VALOR_TOTAL_ORCAMENTO || 0)),
-            value: o.VALOR_TOTAL_ORCAMENTO ? parseFloat(String(o.VALOR_TOTAL_ORCAMENTO)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : "R$ 0,00",
-            status,
-            lossReason,
-            items: itemsToCount,
-            empresa: o.EMPRESA
-          };
-        });
-        
-        setLocalOrcamentos(merged);
-      } catch (e) {
-        console.error("[Relatorios] Erro ao carregar dados:", e);
-      } finally {
-        setLoading(false);
+        const numVal = (o.PRODUTOS || []).reduce((acc: number, it: any) => {
+          const q = parseFloat(String(it.QUANTIDADE || 0)) || 0;
+          const p = parseFloat(String(it.PRECO_UNITARIO || 0)) || 0;
+          return acc + q * p;
+        }, 0) || parseFloat(String(o.VALOR_TOTAL_ORCAMENTO || 0)) || 0;
+
+        return {
+          id: o.ORCAMENTO,
+          client: o.CLIENTE || "CLIENTE NÃO INFORMADO",
+          seller: o.VENDEDOR || "SEM VENDEDOR",
+          numericValue: numVal,
+          value: numVal ? formatCurrency(numVal) : "R$ 0,00",
+          status,
+          lossReason,
+          items: itemsToCount,
+          empresa: o.EMPRESA || "",
+          docGerado: o.DOC_GERADO || undefined,
+        };
+      });
+
+      // 3. Deduplicação de orçamentos por documento entre lojas
+      const statusPriority: Record<string, number> = { VENDA: 3, PERDIDO: 2 };
+      const byDoc = new Map<string, Orcamento>();
+      for (const o of parsed) {
+        const key = o.id.trim();
+        const existing = byDoc.get(key);
+        if (!existing) {
+          byDoc.set(key, o);
+        } else {
+          const existingPrio = statusPriority[existing.status] || 0;
+          const currentPrio = statusPriority[o.status] || 0;
+          if (currentPrio > existingPrio) {
+            byDoc.set(key, o);
+          }
+        }
       }
+      parsed = Array.from(byDoc.values());
+
+      // 4. Deduplicação de orçamentos "migrados" entre empresas
+      const normDoc = (s?: string) =>
+        String(s || "").split("-")[0].replace(/\D/g, "").padStart(12, "0");
+      const idsPresentes = new Set(parsed.map((o) => normDoc(o.id)));
+      parsed = parsed.filter((o) => {
+        if (o.status === "VENDA" || o.status === "PERDIDO") return true;
+        if (!o.docGerado) return true;
+        const gerado = normDoc(o.docGerado);
+        if (gerado === normDoc(o.id)) return true;
+        return !idsPresentes.has(gerado);
+      });
+
+      setLocalOrcamentos(parsed);
+    } catch (e) {
+      console.error("[RelatoriosView] Erro ao carregar dados:", e);
+    } finally {
+      setLoading(false);
     }
-    fetchData();
-  }, [propsOrcamentos, userProfile?.name, userProfile?.role]);
+  };
+
+  useEffect(() => {
+    loadData();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [startDate, endDate, propsOrcamentos, userProfile?.name, userProfile?.role]);
 
   const orcamentos = localOrcamentos;
 
-  // 1. Cálculos de Perda de Estoque
+  // ─── Cálculos Globais ────────────────────────────────────────────────────────
+  const totals = useMemo(() => {
+    const totalCount = orcamentos.length;
+    const totalValue = orcamentos.reduce((acc, o) => acc + (o.numericValue || 0), 0);
+
+    const ganhoArr = orcamentos.filter((o) => o.status === "GANHO" || o.status === "VENDA");
+    const localWonCount = ganhoArr.length;
+    const localWonValue = ganhoArr.reduce((acc, o) => acc + (o.numericValue || 0), 0);
+
+    const fatQtd = faturamentoData ? Number(faturamentoData.QTD_VENDAS) || 0 : 0;
+    const fatValor = faturamentoData ? Number(faturamentoData.TOTAL_VENDIDO) || 0 : 0;
+    const useFaturamento = faturamentoData != null && (fatQtd > 0 || fatValor > 0);
+
+    const wonCount = useFaturamento ? fatQtd : localWonCount;
+    const wonValue = useFaturamento ? fatValor : localWonValue;
+
+    const perdidosArr = orcamentos.filter((o) => o.status === "PERDIDO" || o.status === "CANCELADO");
+    const lostCount = perdidosArr.length;
+    const lostValue = perdidosArr.reduce((acc, o) => acc + (o.numericValue || 0), 0);
+
+    const openCount = totalCount - (wonCount + lostCount);
+    const openValue = Math.max(0, totalValue - (wonValue + lostValue));
+
+    // Taxa de conversão real = vendas / (vendas + perdidos) -> igualzinho OrcamentosView
+    const decididos = wonValue + lostValue;
+    const convByValue = decididos > 0 ? (wonValue / decididos) * 100 : 0;
+    const avgTicket = totalCount > 0 ? totalValue / totalCount : 0;
+
+    return {
+      totalCount,
+      totalValue,
+      wonCount,
+      wonValue,
+      lostCount,
+      lostValue,
+      openCount,
+      openValue,
+      convByValue,
+      avgTicket,
+    };
+  }, [orcamentos, faturamentoData]);
+
+  // ─── Perdas por Estoque ────────────────────────────────────────────────────────
   const perdasPorEstoque = useMemo(() => {
-    const perdidos = orcamentos.filter(o => o.status === "PERDIDO" && (o.lossReason?.includes("ESTOQUE") || o.lossReason?.includes("PREÇO")));
-    
-    // Agrupar por produto
-    const ranking: Record<string, { cod: string, nome: string, total: number, qtd: number, orcamentos: number }> = {};
-    
-    perdidos.forEach(o => {
-      // Priorizar os itens identificados via metadata (os selecionados pelo usuário)
-      // Se não houver itens específicos, mas o orçamento for perdido por estoque,
-      // ele foi filtrado para virar [] na nossa lógica anterior. 
-      // Precisamos garantir que usamos o o.items que foi filtrado no merged.
+    const perdidos = orcamentos.filter((o) => {
+      if (o.status !== "PERDIDO" && o.status !== "CANCELADO") return false;
+      const reason = (o.lossReason || "").toUpperCase();
+      return (
+        reason.includes("ESTOQUE") ||
+        reason.includes("FALTA") ||
+        reason.includes("FURO") ||
+        reason === "" ||
+        reason === "SEM MOTIVO" ||
+        (o.items && o.items.length > 0)
+      );
+    });
+
+    const ranking: Record<
+      string,
+      { cod: string; nome: string; total: number; qtd: number; orcamentos: number }
+    > = {};
+
+    perdidos.forEach((o) => {
       const lostItems = o.items || [];
-      
+
       lostItems.forEach((item: OrcamentoItem) => {
         const cod = String(item.COD_PRODUTO || item.cod || "S/C");
         const nome = String(item.PRODUTO || item.nome || "PRODUTO NÃO IDENTIFICADO");
-        const valor = parseFloat(String(item.VALOR_TOTAL || item.total || (Number(item.QUANTIDADE || 0) * Number(item.PRECO_UNITARIO || 0)) || 0));
+        const valor = parseFloat(
+          String(
+            item.VALOR_TOTAL ||
+              item.total ||
+              Number(item.QUANTIDADE || 0) * Number(item.PRECO_UNITARIO || 0) ||
+              0
+          )
+        );
         const qtd = Number(item.QUANTIDADE || item.qtd || 1);
 
         if (!ranking[cod]) {
-          ranking[cod] = { 
-            cod, 
-            nome, 
-            total: 0, 
-            qtd: 0,
-            orcamentos: 0
-          };
+          ranking[cod] = { cod, nome, total: 0, qtd: 0, orcamentos: 0 };
         }
         ranking[cod].total += valor;
         ranking[cod].qtd += qtd;
@@ -178,282 +339,987 @@ export function RelatoriosView({
     return Object.values(ranking).sort((a, b) => b.total - a.total);
   }, [orcamentos]);
 
-  // 2. Métricas por Vendedor
-  const metricasClientes = useMemo(() => {
-    const clients: Record<string, { 
-      nome: string, 
-      total: number, 
-      fechados: number, 
-      perdidos: number,
-      valorPerdido: number,
-      items: Orcamento[]
-    }> = {};
+  const totalPerdaEstoqueValor = useMemo(
+    () => perdasPorEstoque.reduce((acc, curr) => acc + curr.total, 0),
+    [perdasPorEstoque]
+  );
 
-    orcamentos.forEach(o => {
+  // ─── Perdas por Preço ──────────────────────────────────────────────────────────
+  const perdasPorPreco = useMemo(() => {
+    const perdidosPreco = orcamentos.filter((o) => {
+      if (o.status !== "PERDIDO" && o.status !== "CANCELADO") return false;
+      const reason = (o.lossReason || "").toUpperCase();
+      return (
+        reason.includes("PREÇO") ||
+        reason.includes("PRECO") ||
+        reason.includes("VALOR") ||
+        reason.includes("ALTERAÇÃO DE PREÇO") ||
+        reason.includes("PREÇO ALTO")
+      );
+    });
+
+    return perdidosPreco.sort((a, b) => (b.numericValue || 0) - (a.numericValue || 0));
+  }, [orcamentos]);
+
+  const totalPerdaPrecoValor = useMemo(
+    () => perdasPorPreco.reduce((acc, curr) => acc + (curr.numericValue || 0), 0),
+    [perdasPorPreco]
+  );
+
+  // ─── Métricas por Vendedor ───────────────────────────────────────────────────
+  const metricasVendedores = useMemo(() => {
+    const map: Record<
+      string,
+      {
+        nome: string;
+        sellerCode: string;
+        total: number;
+        valTotal: number;
+        ganhos: number;
+        valGanhos: number;
+        perdidos: number;
+        valPerdidos: number;
+        abertos: number;
+        valAbertos: number;
+        conversao: number;
+      }
+    > = {};
+
+    orcamentos.forEach((o) => {
+      const rawSeller = o.seller || "SEM VENDEDOR";
+      const parts = rawSeller.split("-");
+      const sellerCode = parts.length > 1 ? parts[0].trim() : "";
+      const cleanName = parts.length > 1 ? parts.slice(1).join("-").trim() : rawSeller.trim();
+      const displayName = sellerCode ? `${sellerCode}-${cleanName}` : cleanName;
+
+      if (!map[displayName]) {
+        map[displayName] = {
+          nome: displayName,
+          sellerCode,
+          total: 0,
+          valTotal: 0,
+          ganhos: 0,
+          valGanhos: 0,
+          perdidos: 0,
+          valPerdidos: 0,
+          abertos: 0,
+          valAbertos: 0,
+          conversao: 0,
+        };
+      }
+      const v = map[displayName];
+      const val = o.numericValue || 0;
+
+      v.total += 1;
+      v.valTotal += val;
+
+      if (o.status === "GANHO" || o.status === "VENDA") {
+        v.ganhos += 1;
+        v.valGanhos += val;
+      } else if (o.status === "PERDIDO" || o.status === "CANCELADO") {
+        v.perdidos += 1;
+        v.valPerdidos += val;
+      } else {
+        v.abertos += 1;
+        v.valAbertos += val;
+      }
+    });
+
+    return Object.values(map)
+      .map((v) => {
+        // Taxa de conversão real por valor (Decididos: Ganhos vs Perdidos) idêntica a OrcamentosView
+        const decididosValor = v.valGanhos + v.valPerdidos;
+        const convVal = decididosValor > 0 ? (v.valGanhos / decididosValor) * 100 : 0;
+
+        return {
+          ...v,
+          conversao: convVal,
+        };
+      })
+      .sort((a, b) => b.valGanhos - a.valGanhos);
+  }, [orcamentos]);
+
+  // ─── Métricas por Cliente ────────────────────────────────────────────────────
+  const metricasClientes = useMemo(() => {
+    const clients: Record<
+      string,
+      {
+        nome: string;
+        total: number;
+        valTotal: number;
+        fechados: number;
+        valFechados: number;
+        perdidos: number;
+        valorPerdido: number;
+      }
+    > = {};
+
+    orcamentos.forEach((o) => {
       const clientName = o.client || "CLIENTE NÃO IDENTIFICADO";
       if (!clients[clientName]) {
-        clients[clientName] = { 
-          nome: clientName, 
-          total: 0, 
-          fechados: 0, 
-          perdidos: 0, 
+        clients[clientName] = {
+          nome: clientName,
+          total: 0,
+          valTotal: 0,
+          fechados: 0,
+          valFechados: 0,
+          perdidos: 0,
           valorPerdido: 0,
-          items: []
         };
       }
       const c = clients[clientName];
       c.total += 1;
       const val = o.numericValue || 0;
-      
+      c.valTotal += val;
+
       if (o.status === "GANHO" || o.status === "VENDA") {
         c.fechados += 1;
-      } else if (o.status === "PERDIDO") {
+        c.valFechados += val;
+      } else if (o.status === "PERDIDO" || o.status === "CANCELADO") {
         c.perdidos += 1;
         c.valorPerdido += val;
       }
-      c.items.push(o);
     });
 
-    // Ordenar pelos que mais PERDERAM orçamentos
-    return Object.values(clients).sort((a, b) => b.perdidos - a.perdidos).slice(0, 50);
+    return Object.values(clients).sort((a, b) => b.valorPerdido - a.valorPerdido);
   }, [orcamentos]);
 
-  const stats = [
-    { label: "Vendas Perdidas (Valor)", value: perdasPorEstoque.reduce((acc, curr) => acc + curr.total, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: PackageX, color: "text-rose-500", bg: "bg-rose-500/10" },
-    { label: "Itens Afetados", value: perdasPorEstoque.length.toString(), icon: Package, color: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "Total de Clientes", value: metricasClientes.length.toString(), icon: Users, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  // ─── Filtros de Busca Aplicados ──────────────────────────────────────────────
+  const perdasPorEstoqueFiltradas = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return perdasPorEstoque;
+    return perdasPorEstoque.filter(
+      (p) => p.cod.toLowerCase().includes(q) || p.nome.toLowerCase().includes(q)
+    );
+  }, [perdasPorEstoque, searchTerm]);
+
+  const perdasPorPrecoFiltradas = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return perdasPorPreco;
+    return perdasPorPreco.filter(
+      (p) =>
+        p.id.toLowerCase().includes(q) ||
+        p.client.toLowerCase().includes(q) ||
+        p.seller.toLowerCase().includes(q) ||
+        p.lossReason.toLowerCase().includes(q)
+    );
+  }, [perdasPorPreco, searchTerm]);
+
+  const vendedoresFiltrados = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return metricasVendedores;
+    return metricasVendedores.filter((v) => v.nome.toLowerCase().includes(q));
+  }, [metricasVendedores, searchTerm]);
+
+  const clientesFiltrados = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return metricasClientes;
+    return metricasClientes.filter((c) => c.nome.toLowerCase().includes(q));
+  }, [metricasClientes, searchTerm]);
+
+  // Funil Comercial (Orçamentos -> Abertos -> Ganhos)
+  const funnelData = [
+    {
+      label: "Total Criado",
+      value: totals.totalValue,
+      count: totals.totalCount,
+      color: "bg-blue-500",
+      pct: 100,
+    },
+    {
+      label: "Em Negociação",
+      value: totals.openValue,
+      count: totals.openCount,
+      color: "bg-amber-500",
+      pct: totals.totalValue > 0 ? (totals.openValue / totals.totalValue) * 100 : 0,
+    },
+    {
+      label: "Vendas Ganhas",
+      value: totals.wonValue,
+      count: totals.wonCount,
+      color: "bg-emerald-500",
+      pct: totals.totalValue > 0 ? (totals.wonValue / totals.totalValue) * 100 : 0,
+    },
+    {
+      label: "Perdidos",
+      value: totals.lostValue,
+      count: totals.lostCount,
+      color: "bg-rose-500",
+      pct: totals.totalValue > 0 ? (totals.lostValue / totals.totalValue) * 100 : 0,
+    },
   ];
 
-  if (loading) {
-    return (
-      <div className="h-full flex flex-col p-3 sm:p-6 space-y-6 bg-background overflow-hidden">
-        {/* Skeleton Action Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="h-10 w-full md:w-64 bg-card/50 rounded-xl animate-pulse border border-border" />
-          <div className="flex gap-2">
-            <div className="h-10 w-48 bg-card/50 rounded-xl animate-pulse border border-border" />
-            <div className="h-10 w-24 bg-card/50 rounded-xl animate-pulse border border-border" />
-          </div>
-        </div>
+  // ─── Exportação Excel ───────────────────────────────────────────────────────
+  const handleExportExcel = () => {
+    const wb = XLSX.utils.book_new();
 
-        {/* Skeleton Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3].map(i => (
-            <div key={i} className="h-28 bg-card/50 rounded-2xl animate-pulse border border-border" />
-          ))}
-        </div>
+    // 1. Resumo Geral
+    const wsGeralData = [
+      { Métrica: "Total Orçamentado (R$)", Valor: totals.totalValue },
+      { Métrica: "Total Orçamentos (Qtd)", Valor: totals.totalCount },
+      { Métrica: "Vendas Ganhas (R$)", Valor: totals.wonValue },
+      { Métrica: "Vendas Ganhas (Qtd)", Valor: totals.wonCount },
+      { Métrica: "Orçamentos Perdidos (R$)", Valor: totals.lostValue },
+      { Métrica: "Orçamentos Perdidos (Qtd)", Valor: totals.lostCount },
+      { Métrica: "Perda por Falta de Estoque (R$)", Valor: totalPerdaEstoqueValor },
+      { Métrica: "Perda por Preço (R$)", Valor: totalPerdaPrecoValor },
+      { Métrica: "Taxa Conversão (Valor)", Valor: `${totals.convByValue.toFixed(1)}%` },
+      { Métrica: "Ticket Médio", Valor: totals.avgTicket },
+    ];
+    const wsGeral = XLSX.utils.json_to_sheet(wsGeralData);
+    XLSX.utils.book_append_sheet(wb, wsGeral, "Resumo");
 
-        {/* Skeleton Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-[400px] bg-card/50 rounded-2xl animate-pulse border border-border" />
-          <div className="h-[400px] bg-card/50 rounded-2xl animate-pulse border border-border" />
-        </div>
-      </div>
-    );
-  }
+    // 2. Perdas Por Estoque
+    const wsPerdasEstoqueData = perdasPorEstoque.map((p) => ({
+      Código: p.cod,
+      Produto: p.nome,
+      "Qtd Perdida": p.qtd,
+      "Ocorrências em Orçamentos": p.orcamentos,
+      "Valor Perdido Total (R$)": p.total,
+    }));
+    const wsPerdasEstoque = XLSX.utils.json_to_sheet(wsPerdasEstoqueData);
+    XLSX.utils.book_append_sheet(wb, wsPerdasEstoque, "Perdas Estoque");
 
-  const handleExportCSV = () => {
-    const headers = ["Orçamento", "Vendedor", "Cliente", "Total (R$)", "Status Comercial", "Motivo da Perda", "Empresa"];
-    const rows = orcamentos.map(o => [
-      o.id,
-      o.seller,
-      o.client,
-      o.numericValue.toFixed(2),
-      o.status,
-      o.lossReason || "",
-      o.empresa || ""
-    ]);
+    // 3. Perdas Por Preço (Valor do Orçamento)
+    const wsPerdasPrecoData = perdasPorPreco.map((p) => ({
+      Orçamento: p.id,
+      Cliente: p.client,
+      Vendedor: p.seller,
+      Motivo: p.lossReason || "PREÇO ALTO",
+      "Qtd Itens": p.items.length,
+      "Valor do Orçamento (R$)": p.numericValue,
+    }));
+    const wsPerdasPreco = XLSX.utils.json_to_sheet(wsPerdasPrecoData);
+    XLSX.utils.book_append_sheet(wb, wsPerdasPreco, "Perdas Preço");
 
-    const csvContent = [headers, ...rows].map(e => e.join(";")).join("\n");
-    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `relatorio_perdas_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+    // 4. Vendedores
+    const wsVendData = metricasVendedores.map((v) => ({
+      Vendedor: v.nome,
+      "Total Orçamentos": v.total,
+      "Valor Total (R$)": v.valTotal,
+      "Ganhos (Qtd)": v.ganhos,
+      "Ganhos (R$)": v.valGanhos,
+      "Perdidos (Qtd)": v.perdidos,
+      "Perdidos (R$)": v.valPerdidos,
+      "Conversão (%)": Number(v.conversao.toFixed(1)),
+    }));
+    const wsVend = XLSX.utils.json_to_sheet(wsVendData);
+    XLSX.utils.book_append_sheet(wb, wsVend, "Desempenho Vendedores");
+
+    const dateStr = new Date().toISOString().split("T")[0];
+    XLSX.writeFile(wb, `Relatorio_Comercial_${dateStr}.xlsx`);
   };
 
+  const dateLabel =
+    endDate !== null
+      ? `${startDate?.toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })} até ${endDate.toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })}`
+      : startDate
+      ? `${startDate.toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })}...`
+      : "Selecione o período...";
+
   return (
-    <div className="h-full flex flex-col p-6 space-y-6 bg-background overflow-hidden">
-      {/* Barra de Ações Compacta */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="relative group flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
-          <input 
-            type="text" 
-            placeholder="PESQUISAR PRODUTO OU VENDEDOR..."
-            className="w-full bg-card/50 border border-border rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-wider outline-none focus:border-blue-500/50 transition-all shadow-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-card/50 rounded-xl border border-border p-1">
-            {["este-mes", "ultimo-mes", "total"].map((range) => (
+    <div className="w-full h-full min-h-0 flex flex-col bg-background">
+      <div className="max-w-6xl w-full mx-auto flex flex-col min-h-0 flex-1 px-6 md:px-8 pt-6">
+        {/* Header Superior */}
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between shrink-0 px-1">
+          <div>
+            <h1 className="text-2xl font-black uppercase tracking-tight text-foreground flex items-center gap-2.5">
+              <span className="w-1.5 h-6 bg-primary rounded-full" />
+              Desempenho Comercial & Perdas
+            </h1>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">
+              Análise de orçamentos, vendas ganhas, perdas por estoque e performance por vendedor
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-start md:justify-end">
+            {/* Range Date Picker */}
+            <div className="relative">
               <button
-                key={range}
-                onClick={() => setDateRange(range)}
+                onClick={() => setIsDateModalOpen(!isDateModalOpen)}
                 className={cn(
-                  "px-3 py-1.5 text-[9px] font-black uppercase tracking-tighter rounded-lg transition-all",
-                  dateRange === range ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-muted-foreground hover:bg-secondary/50"
+                  "h-10 px-4 rounded-xl border text-[10px] font-black uppercase tracking-tight flex items-center gap-2 transition-all outline-none",
+                  startDate && endDate
+                    ? "bg-blue-600/10 dark:bg-blue-500/20 border-blue-600/20 text-blue-600 dark:text-blue-400 shadow-sm"
+                    : "bg-card border-border text-muted-foreground hover:border-border/80 shadow-sm",
+                  isDateModalOpen && "ring-4 ring-blue-500/10 border-blue-500/50"
                 )}
               >
-                {range.replace("-", " ")}
+                <Calendar className="w-3.5 h-3.5 opacity-40 shrink-0" />
+                <span className="truncate max-w-[210px]">{dateLabel}</span>
+                <ChevronDown
+                  className={cn(
+                    "w-3 h-3 transition-transform duration-300 opacity-40 shrink-0",
+                    isDateModalOpen && "rotate-180"
+                  )}
+                />
               </button>
-            ))}
-          </div>
-          
-          <button 
-            onClick={handleExportCSV}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20 active:scale-95"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Exportar
-          </button>
-        </div>
-      </div>
 
-      <div className="flex-1 flex flex-col space-y-6 overflow-hidden">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 shrink-0">
-          {stats.map((stat, i) => (
-            <div key={i} className="p-5 bg-card border border-border rounded-2xl shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
-              <div className={cn("absolute -right-4 -bottom-4 w-24 h-24 opacity-5 group-hover:scale-125 transition-transform duration-500", stat.color)}>
-                <stat.icon className="w-full h-full" />
-              </div>
-              <div className="flex items-center gap-3 mb-3">
-                <div className={cn("p-2 rounded-xl", stat.bg)}>
-                  <stat.icon className={cn("w-4 h-4", stat.color)} />
-                </div>
-                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{stat.label}</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-foreground">{stat.value}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
-          {/* Top Produtos Perdidos (Falta de Estoque) */}
-          <div className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-[500px]">
-            <div className="p-4 border-b border-border bg-secondary/10 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <PackageX className="w-4 h-4 text-rose-500" />
-                <span className="text-[11px] font-black uppercase tracking-widest">Top Perdas por Estoque</span>
-              </div>
-              <span className="text-[9px] font-bold text-muted-foreground uppercase bg-rose-500/10 text-rose-500 px-2 py-0.5 rounded-full">Alerta de Compras</span>
-            </div>
-            <div className="flex-1 overflow-y-auto scrollbar-hide">
-              {perdasPorEstoque.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <Package className="w-12 h-12 opacity-10 mb-4" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Nenhuma perda registrada</p>
-                </div>
-              ) : (
-                <table className="w-full text-left border-collapse">
-                  <thead className="sticky top-0 bg-card z-10 shadow-sm border-b border-border">
-                    <tr>
-                      <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Produto</th>
-                      <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-center">Qtd.</th>
-                      <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-right">Valor Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {perdasPorEstoque.map((p, i) => (
-                      <tr key={i} className="border-b border-border/50 hover:bg-secondary/20 transition-colors group">
-                        <td className="p-4">
-                          <div className="flex flex-col">
-                            <span className="text-[9px] font-black text-blue-500 uppercase tracking-tighter">CÓD: {p.cod}</span>
-                            <span className="text-[10px] font-bold text-foreground line-clamp-1 uppercase tracking-tight">{p.nome}</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-center">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary text-[10px] font-black text-foreground">
-                            {p.qtd}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right">
-                          <span className="text-[11px] font-black text-rose-500">
-                            {p.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {isDateModalOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsDateModalOpen(false)}
+                  />
+                  <div className="absolute top-full right-0 mt-2 z-50">
+                    <MiniCalendar
+                      mode="range"
+                      onSelectRange={(start, end) => {
+                        setStartDate(start);
+                        setEndDate(end);
+                        if (start && end) setIsDateModalOpen(false);
+                      }}
+                      initialStartDate={startDate}
+                      initialEndDate={endDate}
+                    />
+                  </div>
+                </>
               )}
             </div>
-          </div>
 
-          {/* Clientes com Mais Perdas */}
-          <div className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col shadow-sm min-h-[500px]">
-            <div className="p-4 border-b border-border bg-secondary/10 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-500" />
-                <span className="text-[11px] font-black uppercase tracking-widest">Clientes com Mais Perdas</span>
-              </div>
-              <TrendingDown className="w-4 h-4 text-rose-500/30" />
-            </div>
-            <div className="flex-1 overflow-y-auto scrollbar-hide">
-              <table className="w-full text-left border-collapse">
-                <thead className="sticky top-0 bg-card z-10 shadow-sm border-b border-border">
-                  <tr>
-                    <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Cliente</th>
-                    <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-center">Status Perda</th>
-                    <th className="p-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-right">Valor Perdido</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {metricasClientes
-                    .filter(c => c.perdidos > 0)
-                    .sort((a, b) => {
-                      if (b.perdidos !== a.perdidos) return b.perdidos - a.perdidos;
-                      return b.valorPerdido - a.valorPerdido;
-                    })
-                    .slice(0, 50)
-                    .map((c, i) => (
-                    <tr key={i} className="border-b border-border/50 hover:bg-secondary/20 transition-colors">
-                      <td className="p-4 font-bold text-[10px] uppercase tracking-tight flex items-center gap-3">
-                        <div className={cn(
-                          "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 shadow-sm",
-                          i === 0 ? "bg-amber-500/20 text-amber-500 border border-amber-500/20" :
-                          i === 1 ? "bg-slate-400/20 text-slate-400 border border-slate-400/20" :
-                          i === 2 ? "bg-orange-600/20 text-orange-600 border border-orange-600/20" :
-                          "bg-secondary text-muted-foreground"
-                        )}>
-                          {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (i + 1)}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className={cn("truncate w-32 md:w-48", i < 3 ? "text-foreground" : "text-muted-foreground")}>{c.nome}</span>
-                          <span className="text-[8px] text-muted-foreground font-medium">{c.total} orçamentos totais</span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex flex-col items-center gap-1">
-                          <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-rose-500 transition-all duration-1000" 
-                              style={{ width: `${(c.perdidos / (c.total || 1)) * 100}%` }}
-                            />
-                          </div>
-                          <span className="text-[9px] font-black text-rose-500">{((c.perdidos / (c.total || 1)) * 100).toFixed(1)}% de perda</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-rose-500">{c.valorPerdido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                          <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">{c.perdidos} OCORRÊNCIAS</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {/* Export button */}
+            <button
+              onClick={handleExportExcel}
+              className="h-10 px-4 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
+              title="Exportar dados em Excel"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Exportar</span>
+            </button>
           </div>
         </div>
 
+        {/* Minimal Tabs */}
+        <div className="shrink-0 flex items-center gap-1 border-b border-border mt-5">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const isActive = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={cn(
+                  "relative px-4 py-3 text-[11px] font-black uppercase tracking-wider transition-colors flex items-center gap-2",
+                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{t.label}</span>
+                {isActive && (
+                  <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content Container */}
+        <div className="flex-1 min-h-0 overflow-y-auto py-5 pr-1 scrollbar-hide">
+          {loading ? (
+            <div className="h-full flex flex-col items-center justify-center gap-3 py-20">
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs font-black uppercase tracking-widest text-primary">
+                Gerando relatórios comerciais...
+              </span>
+            </div>
+          ) : (
+            <>
+              {/* TAB 1: VISÃO GERAL */}
+              {activeTab === "overview" && (
+                <div className="flex flex-col gap-6">
+                  {/* Stats Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Total Orçamentado */}
+                    <div className="p-5 bg-card/60 border border-border rounded-2xl shadow-sm relative overflow-hidden group">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500">
+                          <DollarSign className="w-4 h-4" />
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
+                          {totals.totalCount} Orçamentos
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                        Total Orçamentado
+                      </span>
+                      <div className="text-2xl font-black text-foreground mt-1">
+                        {formatCurrency(totals.totalValue)}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-1 font-medium">
+                        Ticket médio: <strong className="text-foreground">{formatCurrency(totals.avgTicket)}</strong>
+                      </div>
+                    </div>
+
+                    {/* Vendas Ganhas */}
+                    <div className="p-5 bg-card/60 border border-border rounded-2xl shadow-sm relative overflow-hidden group">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
+                          <TrendingUp className="w-4 h-4" />
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <ArrowUpRight className="w-3 h-3" />
+                          {totals.convByValue.toFixed(1)}% Conv
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                        Vendas Convertidas
+                      </span>
+                      <div className="text-2xl font-black text-emerald-500 mt-1">
+                        {formatCurrency(totals.wonValue)}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-1 font-medium">
+                        <strong className="text-foreground">{totals.wonCount}</strong> pedidos ganhos
+                      </div>
+                    </div>
+
+                    {/* Perdas Comerciais Totais */}
+                    <div className="p-5 bg-card/60 border border-border rounded-2xl shadow-sm relative overflow-hidden group">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">
+                          <TrendingDown className="w-4 h-4" />
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <ArrowDownRight className="w-3 h-3" />
+                          {totals.lostCount} Perdidos
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                        Total de Perdas
+                      </span>
+                      <div className="text-2xl font-black text-rose-500 mt-1">
+                        {formatCurrency(totals.lostValue)}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-1 font-medium">
+                        Em negociação: <strong className="text-foreground">{formatCurrency(totals.openValue)}</strong>
+                      </div>
+                    </div>
+
+                    {/* Perdas por Falta de Estoque */}
+                    <div className="p-5 bg-card/60 border border-border rounded-2xl shadow-sm relative overflow-hidden group">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
+                          <PackageX className="w-4 h-4" />
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                          {perdasPorEstoque.length} Itens
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">
+                        Perda por Estoque
+                      </span>
+                      <div className="text-2xl font-black text-amber-500 mt-1">
+                        {formatCurrency(totalPerdaEstoqueValor)}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-1 font-medium">
+                        Itens com ruptura reportada
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Funil Comercial & Destaques */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Funil Comercial */}
+                    <div className="lg:col-span-2 bg-card/50 border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-xs font-black uppercase tracking-widest text-foreground flex items-center gap-2">
+                            <Target className="w-4 h-4 text-primary" />
+                            Funil Comercial do Período
+                          </h3>
+                          <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                            Evolução dos orçamentos do valor total até os ganhos e perdas
+                          </p>
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground bg-secondary px-2.5 py-1 rounded-lg">
+                          {totals.totalCount} Registros
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-4 my-2">
+                        {funnelData.map((item, idx) => (
+                          <div key={idx} className="flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className={cn("w-2.5 h-2.5 rounded-full", item.color)} />
+                                <span className="font-bold text-foreground">{item.label}</span>
+                                <span className="text-[10px] text-muted-foreground font-medium">
+                                  ({item.count} orçamentos)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="font-black text-foreground">{formatCurrency(item.value)}</span>
+                                <span className="text-[10px] font-black text-muted-foreground w-12 text-right">
+                                  {item.pct.toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                            <div className="w-full bg-secondary h-2.5 rounded-full overflow-hidden">
+                              <div
+                                className={cn("h-full rounded-full transition-all duration-700", item.color)}
+                                style={{ width: `${Math.min(100, Math.max(2, item.pct))}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Resumo Rápido Top Perdas Estoque */}
+                    <div className="bg-card/50 border border-border rounded-2xl p-6 shadow-sm flex flex-col">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xs font-black uppercase tracking-widest text-foreground flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-500" />
+                          Top Perdas por Estoque
+                        </h3>
+                        <button
+                          onClick={() => setActiveTab("losses_stock")}
+                          className="text-[9px] font-black uppercase tracking-widest text-primary hover:underline"
+                        >
+                          Ver tudo
+                        </button>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                        {perdasPorEstoque.length === 0 ? (
+                          <div className="h-full flex flex-col items-center justify-center text-center opacity-50 py-10">
+                            <PackageX className="w-8 h-8 text-muted-foreground mb-2" />
+                            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground italic">
+                              Sem registros de falta no período
+                            </span>
+                          </div>
+                        ) : (
+                          perdasPorEstoque.slice(0, 5).map((p, i) => (
+                            <div
+                              key={p.cod}
+                              className="p-3 bg-secondary/30 border border-border/50 rounded-xl flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <span className="w-5 h-5 shrink-0 rounded-md bg-rose-500/10 text-rose-500 text-[10px] font-black flex items-center justify-center">
+                                  {i + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <span className="text-[10px] font-black text-blue-500 block truncate">
+                                    {p.cod}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-muted-foreground block truncate uppercase">
+                                    {p.nome}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="text-xs font-black text-rose-500 shrink-0 tabular-nums">
+                                {formatCurrency(p.total)}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: PERDAS POR ESTOQUE */}
+              {activeTab === "losses_stock" && (
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="relative flex-1 min-w-[240px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Buscar por código de produto ou descrição..."
+                        className="w-full h-10 pl-9 pr-4 bg-secondary/40 border border-border rounded-xl text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                    <span className="px-3 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-xl text-[10px] font-black uppercase tracking-wider">
+                      Total Perda Estoque: {formatCurrency(totalPerdaEstoqueValor)}
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl border border-border overflow-hidden bg-card/30">
+                    <table className="w-full text-left">
+                      <thead className="bg-secondary/60 border-b border-border sticky top-0 backdrop-blur-md z-10">
+                        <tr>
+                          <th className="p-3.5 pl-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">#</th>
+                          <th className="p-3.5 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Código / Produto</th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Qtd Perdida</th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Orçamentos Afetados</th>
+                          <th className="p-3.5 pr-4 text-right text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Valor Total Perdido</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50">
+                        {perdasPorEstoqueFiltradas.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-16 text-center">
+                              <div className="flex flex-col items-center gap-2 opacity-50">
+                                <PackageX className="w-8 h-8 text-muted-foreground" />
+                                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground italic">
+                                  Nenhuma perda por estoque encontrada
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          perdasPorEstoqueFiltradas.map((p, idx) => (
+                            <tr key={p.cod} className="hover:bg-secondary/20 transition-colors">
+                              <td className="p-3.5 pl-4">
+                                <span className={cn("w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black", idx < 3 ? "bg-amber-500/15 text-amber-500 border border-amber-500/20" : "bg-secondary text-muted-foreground")}>
+                                  {idx + 1}
+                                </span>
+                              </td>
+                              <td className="p-3.5">
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-black text-blue-500">CÓD: {p.cod}</span>
+                                  <span className="text-[10px] font-bold text-foreground uppercase truncate max-w-[360px]">{p.nome}</span>
+                                </div>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="px-2.5 py-1 rounded-lg bg-secondary text-foreground text-xs font-black">{p.qtd} un</span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="text-xs font-bold text-muted-foreground">{p.orcamentos} {p.orcamentos === 1 ? "orçamento" : "orçamentos"}</span>
+                              </td>
+                              <td className="p-3.5 pr-4 text-right">
+                                <span className="text-sm font-black text-amber-500 tabular-nums">{formatCurrency(p.total)}</span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: PERDAS POR PREÇO (VALOR DO ORÇAMENTO) */}
+              {activeTab === "losses_price" && (
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="relative flex-1 min-w-[240px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Buscar por número do orçamento, cliente, vendedor ou motivo..."
+                        className="w-full h-10 pl-9 pr-4 bg-secondary/40 border border-border rounded-xl text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                    <span className="px-3 py-2 bg-purple-500/10 border border-purple-500/20 text-purple-500 rounded-xl text-[10px] font-black uppercase tracking-wider">
+                      Total Preço (Valor Orçamentos): {formatCurrency(totalPerdaPrecoValor)}
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl border border-border overflow-hidden bg-card/30">
+                    <table className="w-full text-left">
+                      <thead className="bg-secondary/60 border-b border-border sticky top-0 backdrop-blur-md z-10">
+                        <tr>
+                          <th className="p-3.5 pl-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]"># Orçamento</th>
+                          <th className="p-3.5 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Cliente</th>
+                          <th className="p-3.5 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Vendedor</th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Motivo da Perda</th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Qtd Itens</th>
+                          <th className="p-3.5 pr-4 text-right text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Valor do Orçamento</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50">
+                        {perdasPorPrecoFiltradas.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-16 text-center">
+                              <div className="flex flex-col items-center gap-2 opacity-50">
+                                <Tag className="w-8 h-8 text-muted-foreground" />
+                                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground italic">
+                                  Nenhuma perda por preço registrada no período
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          perdasPorPrecoFiltradas.map((o, idx) => (
+                            <tr key={o.id} className="hover:bg-secondary/20 transition-colors">
+                              <td className="p-3.5 pl-4">
+                                <div className="flex items-center gap-2">
+                                  <span className={cn("w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0", idx < 3 ? "bg-purple-500/15 text-purple-500 border border-purple-500/20" : "bg-secondary text-muted-foreground")}>
+                                    {idx + 1}
+                                  </span>
+                                  <span className="text-xs font-black text-foreground">#{o.id}</span>
+                                </div>
+                              </td>
+                              <td className="p-3.5">
+                                <span className="text-xs font-bold text-foreground uppercase truncate max-w-[220px] block">{o.client}</span>
+                              </td>
+                              <td className="p-3.5">
+                                <span className="text-xs font-black text-blue-500 uppercase">{o.seller}</span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/20 text-[10px] font-black uppercase">
+                                  {o.lossReason || "PREÇO ALTO"}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="text-xs font-bold text-muted-foreground">{o.items?.length || 0} {o.items?.length === 1 ? "item" : "itens"}</span>
+                              </td>
+                              <td className="p-3.5 pr-4 text-right">
+                                <span className="text-sm font-black text-purple-500 tabular-nums">{formatCurrency(o.numericValue)}</span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: DESEMPENHO DE VENDEDORES */}
+              {activeTab === "sellers" && (
+                <div className="flex flex-col gap-4">
+                  {/* Busca */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Buscar por nome do vendedor..."
+                        className="w-full h-10 pl-9 pr-4 bg-secondary/40 border border-border rounded-xl text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                    <span className="px-3 py-2 bg-secondary/40 border border-border rounded-xl text-[10px] font-bold text-muted-foreground">
+                      Total: <strong className="text-foreground font-black">{vendedoresFiltrados.length}</strong> vendedores
+                    </span>
+                  </div>
+
+                  {/* Tabela de Vendedores */}
+                  <div className="rounded-2xl border border-border overflow-hidden bg-card/30">
+                    <table className="w-full text-left">
+                      <thead className="bg-secondary/60 border-b border-border sticky top-0 backdrop-blur-md z-10">
+                        <tr>
+                          <th className="p-3.5 pl-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Vendedor
+                          </th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Total Orçamentos
+                          </th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Vendas Ganhas
+                          </th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Perdas
+                          </th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Taxa de Conversão
+                          </th>
+                          <th className="p-3.5 pr-4 text-right text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Total Ganho (R$)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50">
+                        {vendedoresFiltrados.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-16 text-center">
+                              <div className="flex flex-col items-center gap-2 opacity-50">
+                                <Users className="w-8 h-8 text-muted-foreground" />
+                                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground italic">
+                                  Nenhum vendedor encontrado
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          vendedoresFiltrados.map((v, idx) => (
+                            <tr
+                              key={v.nome}
+                              className="hover:bg-secondary/20 transition-colors"
+                            >
+                              <td className="p-3.5 pl-4">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={cn(
+                                      "w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0",
+                                      idx === 0
+                                        ? "bg-amber-500/20 text-amber-500 border border-amber-500/20"
+                                        : idx === 1
+                                        ? "bg-slate-400/20 text-slate-400 border border-slate-400/20"
+                                        : idx === 2
+                                        ? "bg-orange-600/20 text-orange-600 border border-orange-600/20"
+                                        : "bg-secondary text-muted-foreground"
+                                    )}
+                                  >
+                                    {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-black text-foreground uppercase">
+                                      {v.nome}
+                                    </span>
+                                    <span className="text-[9px] text-muted-foreground font-bold">
+                                      {formatCurrency(v.valTotal)} orçamentados
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-3.5 text-center font-bold text-xs">
+                                {v.total}
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="text-xs font-black text-emerald-500">
+                                  {v.ganhos}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="text-xs font-black text-rose-500">
+                                  {v.perdidos}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="text-xs font-black text-foreground">
+                                    {v.conversao.toFixed(1)}%
+                                  </span>
+                                  <div className="w-24 bg-secondary h-1.5 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-emerald-500 rounded-full"
+                                      style={{ width: `${Math.min(100, v.conversao)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-3.5 pr-4 text-right">
+                                <span className="text-sm font-black text-emerald-500 tabular-nums">
+                                  {formatCurrency(v.valGanhos)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: CLIENTES & OCORRÊNCIAS */}
+              {activeTab === "clients" && (
+                <div className="flex flex-col gap-4">
+                  {/* Busca */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Buscar por cliente..."
+                        className="w-full h-10 pl-9 pr-4 bg-secondary/40 border border-border rounded-xl text-xs font-bold text-foreground outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                    <span className="px-3 py-2 bg-secondary/40 border border-border rounded-xl text-[10px] font-bold text-muted-foreground">
+                      Total: <strong className="text-foreground font-black">{clientesFiltrados.length}</strong> clientes
+                    </span>
+                  </div>
+
+                  {/* Tabela de Clientes */}
+                  <div className="rounded-2xl border border-border overflow-hidden bg-card/30">
+                    <table className="w-full text-left">
+                      <thead className="bg-secondary/60 border-b border-border sticky top-0 backdrop-blur-md z-10">
+                        <tr>
+                          <th className="p-3.5 pl-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Cliente
+                          </th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Orçamentos Totais
+                          </th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Vendas Fechadas
+                          </th>
+                          <th className="p-3.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Perdas Registradas
+                          </th>
+                          <th className="p-3.5 pr-4 text-right text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                            Valor Total Perdido
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50">
+                        {clientesFiltrados.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-16 text-center">
+                              <div className="flex flex-col items-center gap-2 opacity-50">
+                                <Users className="w-8 h-8 text-muted-foreground" />
+                                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground italic">
+                                  Nenhum cliente encontrado
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          clientesFiltrados.map((c, idx) => (
+                            <tr
+                              key={c.nome}
+                              className="hover:bg-secondary/20 transition-colors"
+                            >
+                              <td className="p-3.5 pl-4">
+                                <div className="flex items-center gap-3">
+                                  <span
+                                    className={cn(
+                                      "w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0",
+                                      idx < 3
+                                        ? "bg-rose-500/15 text-rose-500 border border-rose-500/20"
+                                        : "bg-secondary text-muted-foreground"
+                                    )}
+                                  >
+                                    {idx + 1}
+                                  </span>
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-black text-foreground uppercase truncate max-w-[300px]">
+                                      {c.nome}
+                                    </span>
+                                    <span className="text-[9px] text-muted-foreground font-bold">
+                                      Total Orçamentado: {formatCurrency(c.valTotal)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-3.5 text-center font-bold text-xs">
+                                {c.total}
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="text-xs font-black text-emerald-500">
+                                  {c.fechados}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="text-xs font-black text-rose-500">
+                                  {c.perdidos}
+                                </span>
+                              </td>
+                              <td className="p-3.5 pr-4 text-right">
+                                <span className="text-sm font-black text-rose-500 tabular-nums">
+                                  {formatCurrency(c.valorPerdido)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

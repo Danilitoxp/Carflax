@@ -33,10 +33,10 @@ interface CrmSectionProps {
 export function CrmSection({ activeTab, userProfile }: CrmSectionProps) {
   return (
     <div className={cn(
-      "flex flex-col h-full bg-[#F8FAFC] overflow-hidden p-0",
+      "flex flex-col h-full bg-background overflow-hidden p-0",
     )}>
       <div className="w-full h-full flex flex-col">
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 h-full flex flex-col">
           {activeTab === "Analytics" ? (
             <div className="h-full overflow-y-auto scrollbar-hide py-4">
               <AnalyticsView />

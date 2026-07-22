@@ -28,6 +28,7 @@ import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 import { ColetorView } from "@/components/coletor/ColetorView";
 import { SeparacaoView, ConferenciaView } from "@/components/estoque/ExpedicaoView";
 import { RetiradaView } from "@/components/estoque/RetiradaView";
+import { FurosView } from "@/components/estoque/FurosView";
 import { ComprasView } from "@/components/compras/ComprasView";
 import { EntregasView } from "@/components/entregas";
 import { MotoristaView } from "@/components/entregas/motorista/MotoristaView";
@@ -1368,6 +1369,8 @@ function DashboardContent({
             <ConferenciaView />
           ) : activeItem === "Retirada" ? (
             <RetiradaView userProfile={userProfile || undefined} />
+          ) : activeItem === "Furos" ? (
+            <FurosView />
           ) : activeItem === "Compras" ? (
             <ComprasView />
           ) : activeItem === "Usuários" ? (
