@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Truck, AlertTriangle, RefreshCw, Lightbulb, Hourglass } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
@@ -35,15 +35,18 @@ export function ComprasView() {
   const [simuladorItemAlert, setSimuladorItemAlert] = useState<VendaGrande | null>(null);
   const [simuladorFornecedor, setSimuladorFornecedor] = useState<FornecedorLeadTime | null>(null);
 
-  const carregar = async () => {
+  // O Lead Time (fornecedores) NÃO depende de dias/fator — só de Recompra depende.
+  // Por isso carregamos o lead time uma vez e refazemos apenas as vendas quando o
+  // filtro muda, evitando um scan pesado desnecessário a cada ajuste.
+  const carregar = async ({ lead = true }: { lead?: boolean } = {}) => {
     setLoading(true);
     setErro(null);
     try {
       const [lt, vg] = await Promise.all([
-        apiComprasLeadTime(6),
+        lead ? apiComprasLeadTime(6) : Promise.resolve(null),
         apiComprasVendasGrandes({ dias, fator, piso: 10 }),
       ]);
-      setLead(lt.success ? lt.data : []);
+      if (lt) setLead(lt.success ? lt.data : []);
       setVendas(vg.success ? vg.data : []);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao carregar dados de compras.");
@@ -52,8 +55,11 @@ export function ComprasView() {
     }
   };
 
+  const primeiraCarga = useRef(true);
   useEffect(() => {
-    carregar();
+    // Primeira montagem: carrega tudo. Mudança de dias/fator: só as vendas.
+    carregar({ lead: primeiraCarga.current });
+    primeiraCarga.current = false;
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [dias, fator]);
 
@@ -158,7 +164,7 @@ export function ComprasView() {
         {/* Header */}
         <ComprasHeader
           loading={loading}
-          onRefresh={carregar}
+          onRefresh={() => carregar({ lead: true })}
           onExport={handleExportExcel}
           onNovaCotacao={handleNovaCotacaoAvulsa}
           kpis={kpis}
