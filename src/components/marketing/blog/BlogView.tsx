@@ -19,7 +19,6 @@ import {
   FileText,
   ImageIcon,
   X,
-  Info,
   Globe,
   Sliders,
   ArrowRight
@@ -27,6 +26,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { uploadImage } from "@/lib/uploadImage";
 import { cn } from "@/lib/utils";
+import { ComposerInput, type Attachment } from "@/components/ui/composer-input";
 
 export interface BlogCard {
   id: string;
@@ -133,6 +133,7 @@ export function BlogView() {
 
   async function handleSaveCard(e: React.FormEvent) {
     e.preventDefault();
+
     if (!formTitle.trim() || !formQuote.trim()) {
       alert("Por favor, preencha o Título e o Conteúdo do artigo.");
       return;
@@ -220,6 +221,23 @@ export function BlogView() {
       alert("Erro ao excluir card.");
     }
   }
+
+  // Helper para preview limpo sem marcadores
+  function cleanSnippet(text: string) {
+    if (!text) return "";
+    return text.replace(/<[^>]*>?/gm, '').replace(/\*\*/g, '').replace(/\*/g, '');
+  }
+
+  const attachmentsList: Attachment[] = formSrc
+    ? [
+        {
+          id: "capa-1",
+          fileName: "Capa-do-Post.jpg",
+          fileType: "image",
+          thumbnailUrl: formSrc,
+        },
+      ]
+    : [];
 
   const embedCodeScript = `<script>
   // Integração com o HUB Carflax (Busca cards do Marketing em tempo real do Supabase)
@@ -375,7 +393,7 @@ export function BlogView() {
 
                   {/* Body quote snippet */}
                   <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 italic">
-                    "{card.quote}"
+                    "{cleanSnippet(card.quote)}"
                   </p>
 
                   {/* Produto Vinculado */}
@@ -445,7 +463,7 @@ export function BlogView() {
         )}
       </div>
 
-      {/* MODAL ULTRA-PREMIUM */}
+      {/* MODAL ULTRA-PREMIUM (CRIAR / EDITAR POST COM COMPOSER INPUT INTEGRADO) */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-card border border-border/80 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
@@ -460,7 +478,7 @@ export function BlogView() {
                     {editingCard ? "Editar Publicação do Blog" : "Criar Nova Publicação do Blog"}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Preencha os campos para publicar no carrossel e otimizar o SEO do seu site.
+                    Insira as informações do post com upload de imagem e composer interativo.
                   </p>
                 </div>
               </div>
@@ -572,7 +590,7 @@ export function BlogView() {
                 )}
               </div>
 
-              {/* Section 3: Conteúdo Formatado */}
+              {/* Section 3: Conteúdo Completo do Artigo (ComposerInput Component) */}
               <div className="bg-secondary/30 border border-border/80 p-5 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between border-b border-border/50 pb-2">
                   <div className="flex items-center gap-2">
@@ -583,20 +601,13 @@ export function BlogView() {
                   </div>
                 </div>
 
-                <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl flex items-start gap-2 text-[11px] text-blue-700 dark:text-blue-300">
-                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" />
-                  <span>
-                    <strong>Dica de Formatação:</strong> Linhas que começam com números (ex: <code>1. Título</code>) serão transformadas em <strong>Subcabeçalhos Azuis</strong> no artigo do site!
-                  </span>
-                </div>
-
-                <textarea
-                  required
-                  rows={7}
+                <ComposerInput
                   value={formQuote}
-                  onChange={(e) => setFormQuote(e.target.value)}
-                  placeholder="Escreva o texto completo do post aqui..."
-                  className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-medium focus:outline-none focus:border-blue-500 text-xs leading-relaxed resize-y"
+                  onChange={(val) => setFormQuote(val)}
+                  onFileUpload={handleImageFileChange}
+                  attachments={attachmentsList}
+                  onRemoveAttachment={() => setFormSrc("")}
+                  placeholder="Digite o texto completo do seu artigo..."
                 />
               </div>
 
@@ -660,7 +671,7 @@ export function BlogView() {
                       className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-medium focus:outline-none focus:border-blue-500 text-xs"
                     />
                     <p className="text-[10px] text-muted-foreground italic">
-                      Separadas por vírgula. Essas palavras-chave são inseridas automaticamente no cabeçalho (Meta Keywords e Schema.org) da página do seu site para melhorar o ranqueamento no Google.
+                      Separadas por vírgula. As palavras-chave ajudam o Google a ranquear a página do seu site.
                     </p>
                   </div>
 
