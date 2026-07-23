@@ -1,4 +1,3 @@
-import React from "react";
 import { CircularTestimonials } from '@/components/ui/circular-testimonials';
 
 const testimonials = [

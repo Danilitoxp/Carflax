@@ -1,5 +1,5 @@
 "use client";
-import React, {
+import {
   useEffect,
   useRef,
   useState,
@@ -70,7 +70,7 @@ export const CircularTestimonials = ({
   const [containerWidth, setContainerWidth] = useState(1200);
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
-  const autoplayIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoplayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const testimonialsLength = useMemo(() => testimonials.length, [testimonials]);
   const activeTestimonial = useMemo(
