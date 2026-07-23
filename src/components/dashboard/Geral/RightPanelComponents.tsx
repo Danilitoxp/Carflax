@@ -235,27 +235,80 @@ const formatBRL = (val: number | string) => {
 };
 
 // Funções de auxílio para cálculo de tempo (Lógica Gestão de Tempo)
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const toISODate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+// Domingo de Páscoa (algoritmo de Meeus/Butcher) — base p/ Sexta-feira Santa.
+const getEasterSunday = (year: number) => {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const mth = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * mth + 114) / 31);
+  const day = ((h + l - 7 * mth + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+};
+
+// Feriados que fecham a loja e NÃO contam como dia útil: nacionais oficiais +
+// Sexta-feira Santa (móvel) + 09/07 (Revolução Constitucionalista, estadual SP).
+// Carnaval e Corpus Christi são pontos facultativos — adicione aqui se a loja fechar.
+const feriadosCache: Record<number, Set<string>> = {};
+const getFeriados = (year: number): Set<string> => {
+  if (feriadosCache[year]) return feriadosCache[year];
+  const set = new Set<string>([
+    `${year}-01-01`, // Confraternização Universal
+    `${year}-04-21`, // Tiradentes
+    `${year}-05-01`, // Dia do Trabalho
+    `${year}-07-09`, // Revolução Constitucionalista (SP)
+    `${year}-09-07`, // Independência
+    `${year}-10-12`, // N. Sra. Aparecida
+    `${year}-11-02`, // Finados
+    `${year}-11-15`, // Proclamação da República
+    `${year}-11-20`, // Consciência Negra
+    `${year}-12-25`, // Natal
+  ]);
+  const goodFriday = getEasterSunday(year);
+  goodFriday.setDate(goodFriday.getDate() - 2); // Sexta-feira Santa
+  set.add(toISODate(goodFriday));
+  feriadosCache[year] = set;
+  return set;
+};
+
+const isDiaUtil = (d: Date, feriados: Set<string>) => {
+  const dow = d.getDay();
+  return dow !== 0 && dow !== 6 && !feriados.has(toISODate(d));
+};
+
 const getDiasUteisNoMes = () => {
   const d = new Date();
   const y = d.getFullYear();
   const m = d.getMonth();
+  const feriados = getFeriados(y);
   const lastDay = new Date(y, m + 1, 0).getDate();
   let count = 0;
   for (let i = 1; i <= lastDay; i++) {
-    const dayOfWeek = new Date(y, m, i).getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+    if (isDiaUtil(new Date(y, m, i), feriados)) count++;
   }
   return count;
 };
 
 const getDiasUteisRestantes = () => {
   const d = new Date();
-  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  const y = d.getFullYear();
+  const feriados = getFeriados(y);
+  const start = new Date(y, d.getMonth(), d.getDate());
+  const end = new Date(y, d.getMonth() + 1, 0);
   let count = 0;
   for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
-    const day = dt.getDay();
-    if (day !== 0 && day !== 6) count++;
+    if (isDiaUtil(dt, feriados)) count++;
   }
   return count;
 };
