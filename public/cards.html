@@ -1,10 +1,25 @@
-<!-- Circular Testimonials Card Component -->
+<!-- Circular Testimonials Card Component com Botão Ver Mais e Modal -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <div id="circular-testimonials" class="testimonial-container"></div>
 
+<!-- Modal Container Encapsulado -->
+<div id="card-modal-backdrop" class="card-modal-backdrop">
+  <div class="card-modal-content">
+    <button id="card-modal-close" class="card-modal-close" aria-label="Fechar Modal">&times;</button>
+    <div class="card-modal-body">
+      <img id="card-modal-img" class="card-modal-img" src="" alt="Imagem do Card" />
+      <div class="card-modal-info">
+        <h2 id="card-modal-title" class="card-modal-title"></h2>
+        <p id="card-modal-designation" class="card-modal-designation"></p>
+        <div id="card-modal-quote" class="card-modal-quote"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <style>
-  /* Encapsulated Card Styles Only (No Body / Global Page Styles) */
+  /* Encapsulated Card Styles Only */
   .testimonial-container {
     width: 100%;
     max-width: 56rem;
@@ -78,6 +93,11 @@
   .quote {
     line-height: 1.75;
     font-weight: 400;
+    display: -webkit-box;
+    line-clamp: 4;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .word {
@@ -97,16 +117,48 @@
     }
   }
 
-  .arrow-buttons {
+  .actions-wrapper {
     display: flex;
-    gap: 1.5rem;
-    padding-top: 2rem;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 1.5rem;
+    gap: 1rem;
   }
 
-  @media (min-width: 768px) {
-    .arrow-buttons {
-      padding-top: 0;
-    }
+  .ver-mais-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1.25rem;
+    background-color: #141414;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.875rem;
+    border: none;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  }
+
+  .ver-mais-btn:hover {
+    background-color: #00A6FB;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 166, 251, 0.3);
+  }
+
+  .ver-mais-btn i {
+    font-size: 0.75rem;
+    transition: transform 0.3s ease;
+  }
+
+  .ver-mais-btn:hover i {
+    transform: translateX(4px);
+  }
+
+  .arrow-buttons {
+    display: flex;
+    gap: 1.25rem;
   }
 
   .arrow-button {
@@ -131,6 +183,126 @@
     font-size: 1.25rem;
     transition: color 0.3s ease;
   }
+
+  /* Modal Overlay Styles */
+  .card-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 10, 10, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    box-sizing: border-box;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+
+  .card-modal-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .card-modal-content {
+    position: relative;
+    background: #ffffff;
+    width: 100%;
+    max-width: 42rem;
+    border-radius: 1.75rem;
+    padding: 2.25rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+    transform: scale(0.92) translateY(15px);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 90vh;
+    overflow-y: auto;
+    color: #1e293b;
+    box-sizing: border-box;
+  }
+
+  .card-modal-backdrop.active .card-modal-content {
+    transform: scale(1) translateY(0);
+  }
+
+  .card-modal-close {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: #f1f5f9;
+    border: none;
+    color: #475569;
+    font-size: 1.25rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .card-modal-close:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+    transform: rotate(90deg);
+  }
+
+  .card-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 640px) {
+    .card-modal-body {
+      flex-direction: row;
+      align-items: flex-start;
+    }
+  }
+
+  .card-modal-img {
+    width: 100%;
+    max-width: 14rem;
+    height: 16rem;
+    object-fit: cover;
+    border-radius: 1.25rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    flex-shrink: 0;
+  }
+
+  .card-modal-info {
+    flex: 1;
+  }
+
+  .card-modal-title {
+    font-size: 1.65rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 0.35rem;
+    line-height: 1.2;
+  }
+
+  .card-modal-designation {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #0284c7;
+    margin-bottom: 1.25rem;
+  }
+
+  .card-modal-quote {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #334155;
+    white-space: pre-wrap;
+  }
 </style>
 
 <script>
@@ -138,22 +310,16 @@
     // Default fallback testimonials data
     const defaultTestimonials = [
       {
-        quote: "I was impressed by the food! And I could really tell that they use high-quality ingredients. The staff was friendly and attentive. I'll definitely be back for more!",
+        quote: "Fiquei muito impressionada com a qualidade e o sabor! Dá para perceber o cuidado com cada detalhe. O atendimento foi impecável e com certeza voltarei sempre!",
         name: "Tamar Mendelson",
-        designation: "Restaurant Critic",
-        src: "https://images.unsplash.com/photo-1512316609839-ce289d3eba0a?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3"
+        designation: "Crítica Gastronômica",
+        src: "https://images.unsplash.com/photo-1512316609839-ce289d3eba0a?q=80&w=1368&auto=format&fit=crop"
       },
       {
-        quote: "This place exceeded all expectations! The atmosphere is inviting, and the staff truly goes above and beyond. I'll keep returning for more exceptional dining experience.",
+        quote: "Este lugar superou todas as minhas expectativas! O ambiente é super acolhedor e a equipe realmente vai além para proporcionar a melhor experiência possível.",
         name: "Joe Charlescraft",
-        designation: "Frequent Visitor",
-        src: "https://images.unsplash.com/photo-1628749528992-f5702133b686?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3"
-      },
-      {
-        quote: "Shining Yam is a hidden gem! The impeccable service and overall attention to detail created a memorable experience. I highly recommend it!",
-        name: "Martina Edelweist",
-        designation: "Satisfied Customer",
-        src: "https://images.unsplash.com/photo-1524267213992-b76e8577d046?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3"
+        designation: "Cliente Frequente",
+        src: "https://images.unsplash.com/photo-1628749528992-f5702133b686?q=80&w=1368&auto=format&fit=crop"
       }
     ];
 
@@ -180,6 +346,7 @@
         this.autoplayTimer = null;
 
         this.initDOM();
+        this.initModal();
         this.bindEvents();
         this.render();
         if (this.autoplay) this.startAutoplay();
@@ -195,13 +362,19 @@
                 <p class="designation"></p>
                 <p class="quote"></p>
               </div>
-              <div class="arrow-buttons">
-                <button class="arrow-button prev-button" aria-label="Previous testimonial">
-                  <i class="fa-solid fa-arrow-left"></i>
-                </button>
-                <button class="arrow-button next-button" aria-label="Next testimonial">
+              <div class="actions-wrapper">
+                <button class="ver-mais-btn">
+                  <span>Ver Mais</span>
                   <i class="fa-solid fa-arrow-right"></i>
                 </button>
+                <div class="arrow-buttons">
+                  <button class="arrow-button prev-button" aria-label="Anterior">
+                    <i class="fa-solid fa-arrow-left"></i>
+                  </button>
+                  <button class="arrow-button next-button" aria-label="Próximo">
+                    <i class="fa-solid fa-arrow-right"></i>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -211,6 +384,7 @@
         this.nameEl = this.container.querySelector('.name');
         this.designationEl = this.container.querySelector('.designation');
         this.quoteEl = this.container.querySelector('.quote');
+        this.verMaisBtn = this.container.querySelector('.ver-mais-btn');
         this.prevBtn = this.container.querySelector('.prev-button');
         this.nextBtn = this.container.querySelector('.next-button');
 
@@ -251,9 +425,56 @@
         });
       }
 
+      initModal() {
+        this.modalBackdrop = document.getElementById('card-modal-backdrop');
+        this.modalClose = document.getElementById('card-modal-close');
+        this.modalImg = document.getElementById('card-modal-img');
+        this.modalTitle = document.getElementById('card-modal-title');
+        this.modalDesignation = document.getElementById('card-modal-designation');
+        this.modalQuote = document.getElementById('card-modal-quote');
+
+        if (this.modalClose) {
+          this.modalClose.addEventListener('click', () => this.closeModal());
+        }
+
+        if (this.modalBackdrop) {
+          this.modalBackdrop.addEventListener('click', (e) => {
+            if (e.target === this.modalBackdrop) this.closeModal();
+          });
+        }
+
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') this.closeModal();
+        });
+      }
+
+      openModal() {
+        const active = this.testimonials[this.activeIndex];
+        if (!active || !this.modalBackdrop) return;
+
+        this.stopAutoplay();
+        this.modalImg.src = active.src;
+        this.modalTitle.textContent = active.name;
+        this.modalDesignation.textContent = active.designation || '';
+        this.modalQuote.textContent = active.quote;
+
+        this.modalBackdrop.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+
+      closeModal() {
+        if (!this.modalBackdrop) return;
+        this.modalBackdrop.classList.remove('active');
+        document.body.style.overflow = '';
+        if (this.autoplay) this.startAutoplay();
+      }
+
       bindEvents() {
         this.prevBtn.addEventListener('click', () => this.prev());
         this.nextBtn.addEventListener('click', () => this.next());
+        if (this.verMaisBtn) {
+          this.verMaisBtn.addEventListener('click', () => this.openModal());
+        }
 
         window.addEventListener('resize', () => {
           this.updateWidth();
@@ -358,12 +579,21 @@
     }
 
     async function loadTestimonials() {
+      const SUPABASE_URL = "https://zwfvrmqffxcqurxpfewi.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3ZnZybXFmZnhjcXVyeHBmZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NDMwMzksImV4cCI6MjA5MjAxOTAzOX0.6Q02L0XYE7xWtn0AcCwN2KDTvRaYQgGwoTPLblR-VgE";
+
       try {
-        const res = await fetch('/api/marketing/blog-cards?activeOnly=true');
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/marketing_blog_cards?active=eq.true&select=*&order=order_index.asc`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        });
+
         if (res.ok) {
-          const json = await res.json();
-          if (json.success && Array.isArray(json.cards) && json.cards.length > 0) {
-            return json.cards.map(c => ({
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            return data.map(c => ({
               name: c.title,
               designation: c.designation || '',
               quote: c.quote,
@@ -372,7 +602,7 @@
           }
         }
       } catch (err) {
-        console.warn('[Cards] Direct API error, using default fallback:', err);
+        console.warn('[Cards] erro ao buscar do Supabase:', err);
       }
       return defaultTestimonials;
     }

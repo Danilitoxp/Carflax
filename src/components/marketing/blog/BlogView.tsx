@@ -213,22 +213,28 @@ export function BlogView() {
     }));
 
   const embedCodeScript = `<script>
-  // Integração com o HUB Carflax (Busca cards do Marketing em tempo real)
-  fetch('https://mlyjggtggawxngayzvhx.supabase.co/rest/v1/marketing_blog_cards?active=eq.true&select=*&order=order_index.asc')
+  // Integração com o HUB Carflax (Busca cards do Marketing em tempo real do Supabase)
+  const SUPABASE_URL = 'https://zwfvrmqffxcqurxpfewi.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3ZnZybXFmZnhjcXVyeHBmZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NDMwMzksImV4cCI6MjA5MjAxOTAzOX0.6Q02L0XYE7xWtn0AcCwN2KDTvRaYQgGwoTPLblR-VgE';
+
+  fetch(SUPABASE_URL + '/rest/v1/marketing_blog_cards?active=eq.true&select=*&order=order_index.asc', {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+  })
     .then(res => res.json())
     .then(data => {
-      const testimonials = data.map(item => ({
-        name: item.title,
-        designation: item.designation,
-        quote: item.quote,
-        src: item.src
-      }));
-      // Inicializa o carrossel do site com os dados recebidos
-      if (typeof CircularTestimonials !== 'undefined') {
-        new CircularTestimonials(document.getElementById('circular-testimonials'), {
-          testimonials: testimonials,
-          autoplay: true
-        });
+      if (Array.isArray(data) && data.length > 0) {
+        const testimonials = data.map(item => ({
+          name: item.title,
+          designation: item.designation || '',
+          quote: item.quote,
+          src: item.src
+        }));
+        if (typeof CircularTestimonials !== 'undefined') {
+          new CircularTestimonials(document.getElementById('circular-testimonials'), {
+            testimonials: testimonials,
+            autoplay: true
+          });
+        }
       }
     });
 </script>`;
