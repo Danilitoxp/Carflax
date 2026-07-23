@@ -153,12 +153,9 @@ export function BlogView() {
 
       const payload = {
         title: formTitle.trim(),
-        designation: "",
         quote: formQuote.trim(),
         src: formSrc.trim(),
         tags: tagsArray,
-        product_name: formProductName.trim(),
-        product_url: formProductUrl.trim(),
         active: formActive,
         order_index: Number(formOrderIndex) || 1,
       };

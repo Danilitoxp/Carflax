@@ -118,6 +118,7 @@ const ComposerInput = React.forwardRef<HTMLDivElement, ComposerInputProps>(
       initialAttachments = [],
       attachments: externalAttachments,
       onRemoveAttachment,
+      onFileUpload: _onFileUpload, // consumed here so it doesn't leak to the DOM via ...props
       placeholder = "Digite o conteúdo do artigo...",
       showSendButton = false,
       ...props
