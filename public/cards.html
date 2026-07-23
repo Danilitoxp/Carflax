@@ -1,31 +1,16 @@
-<!-- Circular Testimonials Card Component com Botão Ver Mais e Modal -->
+<!-- Circular Testimonials Card Component com Post de Blog Estilizado (#0F5196), SEO Invisible Keywords & Produto Vinculado -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <div id="circular-testimonials" class="testimonial-container"></div>
 
-<!-- Modal Container Encapsulado -->
-<div id="card-modal-backdrop" class="card-modal-backdrop">
-  <div class="card-modal-content">
-    <button id="card-modal-close" class="card-modal-close" aria-label="Fechar Modal">&times;</button>
-    <div class="card-modal-body">
-      <img id="card-modal-img" class="card-modal-img" src="" alt="Imagem do Card" />
-      <div class="card-modal-info">
-        <h2 id="card-modal-title" class="card-modal-title"></h2>
-        <p id="card-modal-designation" class="card-modal-designation"></p>
-        <div id="card-modal-quote" class="card-modal-quote"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <style>
-  /* Encapsulated Card Styles Only */
+  /* Encapsulated Card & Blog Post View Styles */
   .testimonial-container {
     width: 100%;
-    max-width: 56rem;
+    max-width: 58rem;
     padding: 1.5rem;
     margin: 0 auto;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     box-sizing: border-box;
   }
 
@@ -35,6 +20,12 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+  }
+
+  /* 1. VISÃO CARROSSEL / CARDS */
+  .carousel-wrapper-view {
+    display: block;
+    animation: fadeInView 0.4s ease;
   }
 
   .testimonial-grid {
@@ -86,7 +77,7 @@
   }
 
   .designation {
-    margin-bottom: 1.75rem;
+    margin-bottom: 1.5rem;
     font-weight: 500;
   }
 
@@ -94,8 +85,8 @@
     line-height: 1.75;
     font-weight: 400;
     display: -webkit-box;
-    line-clamp: 4;
-    -webkit-line-clamp: 4;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -125,26 +116,27 @@
     gap: 1rem;
   }
 
+  /* BOTÃO AZUL #0F5196 */
   .ver-mais-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.65rem 1.25rem;
-    background-color: #141414;
+    gap: 0.55rem;
+    padding: 0.725rem 1.4rem;
+    background-color: #0F5196;
     color: #ffffff;
     font-weight: 700;
     font-size: 0.875rem;
     border: none;
     border-radius: 9999px;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 14px rgba(15, 81, 150, 0.3);
   }
 
   .ver-mais-btn:hover {
-    background-color: #00A6FB;
+    background-color: #0c437d;
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 166, 251, 0.3);
+    box-shadow: 0 6px 20px rgba(15, 81, 150, 0.45);
   }
 
   .ver-mais-btn i {
@@ -184,124 +176,175 @@
     transition: color 0.3s ease;
   }
 
-  /* Modal Overlay Styles */
-  .card-modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(10, 10, 10, 0.75);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    z-index: 99999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem;
-    box-sizing: border-box;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-  }
 
-  .card-modal-backdrop.active {
-    opacity: 1;
-    visibility: visible;
-  }
-
-  .card-modal-content {
-    position: relative;
+  /* 2. VISÃO PÁGINA DO POST / ARTIGO DO BLOG ESTILIZADO */
+  .blog-post-view {
+    display: none;
+    animation: fadeInView 0.4s ease;
     background: #ffffff;
-    width: 100%;
-    max-width: 42rem;
-    border-radius: 1.75rem;
     padding: 2.25rem;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
-    transform: scale(0.92) translateY(15px);
-    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    max-height: 90vh;
-    overflow-y: auto;
-    color: #1e293b;
-    box-sizing: border-box;
+    border-radius: 2rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+    border: 1px solid #f1f5f9;
   }
 
-  .card-modal-backdrop.active .card-modal-content {
-    transform: scale(1) translateY(0);
-  }
-
-  .card-modal-close {
-    position: absolute;
-    top: 1.25rem;
-    right: 1.25rem;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 50%;
-    background: #f1f5f9;
-    border: none;
-    color: #475569;
-    font-size: 1.25rem;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
+  .back-to-blog-btn {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
+    gap: 0.6rem;
+    padding: 0.6rem 1.25rem;
+    background: #f0f6ff;
+    color: #0F5196;
+    font-weight: 700;
+    font-size: 0.875rem;
+    border: 1px solid #d0e2ff;
+    border-radius: 9999px;
+    cursor: pointer;
+    margin-bottom: 2rem;
+    transition: all 0.25s ease;
   }
 
-  .card-modal-close:hover {
-    background: #e2e8f0;
+  .back-to-blog-btn:hover {
+    background: #0F5196;
+    color: #ffffff;
+    transform: translateX(-3px);
+    box-shadow: 0 4px 14px rgba(15, 81, 150, 0.25);
+  }
+
+  .blog-article-header {
+    margin-bottom: 2rem;
+  }
+
+  .blog-article-title {
+    font-size: 2.25rem;
+    font-weight: 900;
     color: #0f172a;
-    transform: rotate(90deg);
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    margin-bottom: 1.5rem;
   }
 
-  .card-modal-body {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-
-  @media (min-width: 640px) {
-    .card-modal-body {
-      flex-direction: row;
-      align-items: flex-start;
+  @media (min-width: 768px) {
+    .blog-article-title {
+      font-size: 2.75rem;
     }
   }
 
-  .card-modal-img {
+  .blog-article-banner {
     width: 100%;
-    max-width: 14rem;
-    height: 16rem;
+    max-height: 28rem;
     object-fit: cover;
+    border-radius: 1.75rem;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
+    margin-bottom: 2.5rem;
+  }
+
+  /* ESTILIZAÇÃO RICA DO TEXTO DO ARTIGO */
+  .blog-article-content {
+    font-size: 1.125rem;
+    line-height: 1.9;
+    color: #334155;
+  }
+
+  .blog-paragraph {
+    margin-bottom: 1.75rem;
+    color: #334155;
+    line-height: 1.9;
+  }
+
+  .blog-subheading {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #0F5196;
+    margin-top: 2.25rem;
+    margin-bottom: 1rem;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    border-left: 4px solid #0F5196;
+    padding-left: 0.85rem;
+  }
+
+  .blog-list-item {
+    margin-left: 1.5rem;
+    margin-bottom: 0.75rem;
+    list-style-type: disc;
+    color: #334155;
+    line-height: 1.8;
+  }
+
+  /* BLOCO DE PRODUTO VINCULADO NO ARTIGO */
+  .blog-product-recommendation {
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1.5px solid #e2e8f0;
+  }
+
+  .blog-product-box {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
     border-radius: 1.25rem;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    padding: 1.5rem;
+  }
+
+  @media (min-width: 640px) {
+    .blog-product-box {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  .blog-product-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #0F5196;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.35rem;
+  }
+
+  .blog-product-name {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .blog-product-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.4rem;
+    background: #0F5196;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.875rem;
+    border-radius: 0.75rem;
+    text-decoration: none;
+    transition: all 0.25s ease;
     flex-shrink: 0;
   }
 
-  .card-modal-info {
-    flex: 1;
+  .blog-product-link:hover {
+    background: #0c437d;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(15, 81, 150, 0.3);
   }
 
-  .card-modal-title {
-    font-size: 1.65rem;
-    font-weight: 800;
-    color: #0f172a;
-    margin-bottom: 0.35rem;
-    line-height: 1.2;
-  }
-
-  .card-modal-designation {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #0284c7;
-    margin-bottom: 1.25rem;
-  }
-
-  .card-modal-quote {
-    font-size: 1rem;
-    line-height: 1.7;
-    color: #334155;
-    white-space: pre-wrap;
+  @keyframes fadeInView {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>
 
@@ -312,14 +355,8 @@
       {
         quote: "Fiquei muito impressionada com a qualidade e o sabor! Dá para perceber o cuidado com cada detalhe. O atendimento foi impecável e com certeza voltarei sempre!",
         name: "Tamar Mendelson",
-        designation: "Crítica Gastronômica",
+        designation: "",
         src: "https://images.unsplash.com/photo-1512316609839-ce289d3eba0a?q=80&w=1368&auto=format&fit=crop"
-      },
-      {
-        quote: "Este lugar superou todas as minhas expectativas! O ambiente é super acolhedor e a equipe realmente vai além para proporcionar a melhor experiência possível.",
-        name: "Joe Charlescraft",
-        designation: "Cliente Frequente",
-        src: "https://images.unsplash.com/photo-1628749528992-f5702133b686?q=80&w=1368&auto=format&fit=crop"
       }
     ];
 
@@ -331,6 +368,27 @@
       if (width <= minWidth) return minGap;
       if (width >= maxWidth) return Math.max(minGap, maxGap + 0.06018 * (width - maxWidth));
       return minGap + (maxGap - minGap) * ((width - minWidth) / (maxWidth - minWidth));
+    }
+
+    function formatBlogArticleHTML(text) {
+      if (!text) return '';
+      const lines = text.split(/\n+/);
+      return lines.map(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return '';
+        
+        // Formata linhas numeradas ou tópicos (Ex: 1. Entenda..., A. Dispositivos...)
+        if (/^(\d+\.|[A-Z]\.)\s+/.test(trimmed)) {
+          return `<h3 class="blog-subheading">${trimmed}</h3>`;
+        }
+        
+        // Formata itens de lista com marcador
+        if (/^[-*]\s+/.test(trimmed)) {
+          return `<li class="blog-list-item">${trimmed.replace(/^[-*]\s+/, '')}</li>`;
+        }
+
+        return `<p class="blog-paragraph">${trimmed}</p>`;
+      }).join('');
     }
 
     class CircularTestimonials {
@@ -346,7 +404,6 @@
         this.autoplayTimer = null;
 
         this.initDOM();
-        this.initModal();
         this.bindEvents();
         this.render();
         if (this.autoplay) this.startAutoplay();
@@ -354,31 +411,68 @@
 
       initDOM() {
         this.container.innerHTML = `
-          <div class="testimonial-grid">
-            <div class="image-container"></div>
-            <div class="testimonial-content">
-              <div class="text-animated-wrapper">
-                <h3 class="name"></h3>
-                <p class="designation"></p>
-                <p class="quote"></p>
-              </div>
-              <div class="actions-wrapper">
-                <button class="ver-mais-btn">
-                  <span>Ver Mais</span>
-                  <i class="fa-solid fa-arrow-right"></i>
-                </button>
-                <div class="arrow-buttons">
-                  <button class="arrow-button prev-button" aria-label="Anterior">
-                    <i class="fa-solid fa-arrow-left"></i>
-                  </button>
-                  <button class="arrow-button next-button" aria-label="Próximo">
+          <!-- Visão 1: Carrossel 3D -->
+          <div class="carousel-wrapper-view">
+            <div class="testimonial-grid">
+              <div class="image-container"></div>
+              <div class="testimonial-content">
+                <div class="text-animated-wrapper">
+                  <h3 class="name"></h3>
+                  <p class="designation" style="display: none;"></p>
+                  <p class="quote"></p>
+                </div>
+                <div class="actions-wrapper">
+                  <button class="ver-mais-btn">
+                    <span>Ler Artigo Completo</span>
                     <i class="fa-solid fa-arrow-right"></i>
                   </button>
+                  <div class="arrow-buttons">
+                    <button class="arrow-button prev-button" aria-label="Anterior">
+                      <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <button class="arrow-button next-button" aria-label="Próximo">
+                      <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+
+          <!-- Visão 2: Artigo Completo do Blog Estilizado (Meta SEO no Head Invisível) -->
+          <div class="blog-post-view">
+            <button class="back-to-blog-btn">
+              <i class="fa-solid fa-arrow-left"></i>
+              <span>Voltar para o Carrossel</span>
+            </button>
+            <article class="blog-article-container" itemScope itemType="https://schema.org/BlogPosting">
+              <header class="blog-article-header">
+                <h1 class="blog-article-title" itemProp="headline"></h1>
+              </header>
+              <img class="blog-article-banner" itemProp="image" src="" alt="Capa do Post" />
+              <div class="blog-article-content" itemProp="articleBody"></div>
+
+              <!-- Produto Vinculado no Artigo -->
+              <div class="blog-product-recommendation" style="display: none;">
+                <div class="blog-product-box">
+                  <div class="blog-product-info">
+                    <span class="blog-product-tag">
+                      <i class="fa-solid fa-bag-shopping"></i> Produto Mencionado no Artigo
+                    </span>
+                    <h4 class="blog-product-name"></h4>
+                  </div>
+                  <a class="blog-product-link" href="" target="_blank" rel="noopener noreferrer">
+                    <span>Ver Produto no Site</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                  </a>
+                </div>
+              </div>
+            </article>
+          </div>
         `;
+
+        this.carouselView = this.container.querySelector('.carousel-wrapper-view');
+        this.postView = this.container.querySelector('.blog-post-view');
 
         this.imageContainer = this.container.querySelector('.image-container');
         this.nameEl = this.container.querySelector('.name');
@@ -388,11 +482,19 @@
         this.prevBtn = this.container.querySelector('.prev-button');
         this.nextBtn = this.container.querySelector('.next-button');
 
+        // Elementos do Post Completo
+        this.backBtn = this.container.querySelector('.back-to-blog-btn');
+        this.articleTitle = this.container.querySelector('.blog-article-title');
+        this.articleBanner = this.container.querySelector('.blog-article-banner');
+        this.articleContent = this.container.querySelector('.blog-article-content');
+
+        // Elementos do Produto Vinculado
+        this.productBoxWrapper = this.container.querySelector('.blog-product-recommendation');
+        this.productNameEl = this.container.querySelector('.blog-product-name');
+        this.productLinkEl = this.container.querySelector('.blog-product-link');
+
         this.nameEl.style.color = this.colors.name || '#000';
         this.nameEl.style.fontSize = this.fontSizes.name || '1.5rem';
-
-        this.designationEl.style.color = this.colors.designation || '#6b7280';
-        this.designationEl.style.fontSize = this.fontSizes.designation || '0.925rem';
 
         this.quoteEl.style.color = this.colors.testimony || '#4b5563';
         this.quoteEl.style.fontSize = this.fontSizes.quote || '1.125rem';
@@ -425,55 +527,59 @@
         });
       }
 
-      initModal() {
-        this.modalBackdrop = document.getElementById('card-modal-backdrop');
-        this.modalClose = document.getElementById('card-modal-close');
-        this.modalImg = document.getElementById('card-modal-img');
-        this.modalTitle = document.getElementById('card-modal-title');
-        this.modalDesignation = document.getElementById('card-modal-designation');
-        this.modalQuote = document.getElementById('card-modal-quote');
-
-        if (this.modalClose) {
-          this.modalClose.addEventListener('click', () => this.closeModal());
-        }
-
-        if (this.modalBackdrop) {
-          this.modalBackdrop.addEventListener('click', (e) => {
-            if (e.target === this.modalBackdrop) this.closeModal();
-          });
-        }
-
-        window.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape') this.closeModal();
-        });
-      }
-
-      openModal() {
+      openBlogPost() {
         const active = this.testimonials[this.activeIndex];
-        if (!active || !this.modalBackdrop) return;
+        if (!active) return;
 
         this.stopAutoplay();
-        this.modalImg.src = active.src;
-        this.modalTitle.textContent = active.name;
-        this.modalDesignation.textContent = active.designation || '';
-        this.modalQuote.textContent = active.quote;
 
-        this.modalBackdrop.classList.add('active');
-        document.body.style.overflow = 'hidden';
+        // Injeta as Meta Tags de SEO (Keywords) invisíveis diretamente no <head> para o Google ler
+        if (active.tags && Array.isArray(active.tags) && active.tags.length > 0) {
+          let metaKeywords = document.querySelector('meta[name="keywords"]');
+          if (!metaKeywords) {
+            metaKeywords = document.createElement('meta');
+            metaKeywords.name = 'keywords';
+            document.head.appendChild(metaKeywords);
+          }
+          metaKeywords.content = active.tags.join(', ');
+        }
+
+        this.articleTitle.textContent = active.name;
+        this.articleBanner.src = active.src;
+        this.articleBanner.alt = active.name;
+        this.articleContent.innerHTML = formatBlogArticleHTML(active.quote);
+
+        // Exibe produto vinculado se houver
+        if (active.product_name && this.productBoxWrapper) {
+          this.productNameEl.textContent = active.product_name;
+          this.productLinkEl.href = active.product_url || '#';
+          this.productBoxWrapper.style.display = 'block';
+        } else if (this.productBoxWrapper) {
+          this.productBoxWrapper.style.display = 'none';
+        }
+
+        this.carouselView.style.display = 'none';
+        this.postView.style.display = 'block';
+
+        this.container.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
 
-      closeModal() {
-        if (!this.modalBackdrop) return;
-        this.modalBackdrop.classList.remove('active');
-        document.body.style.overflow = '';
+      closeBlogPost() {
+        this.postView.style.display = 'none';
+        this.carouselView.style.display = 'block';
         if (this.autoplay) this.startAutoplay();
       }
 
       bindEvents() {
         this.prevBtn.addEventListener('click', () => this.prev());
         this.nextBtn.addEventListener('click', () => this.next());
+        
         if (this.verMaisBtn) {
-          this.verMaisBtn.addEventListener('click', () => this.openModal());
+          this.verMaisBtn.addEventListener('click', () => this.openBlogPost());
+        }
+
+        if (this.backBtn) {
+          this.backBtn.addEventListener('click', () => this.closeBlogPost());
         }
 
         window.addEventListener('resize', () => {
@@ -482,6 +588,10 @@
         });
 
         window.addEventListener('keydown', (e) => {
+          if (this.postView.style.display === 'block' && e.key === 'Escape') {
+            this.closeBlogPost();
+            return;
+          }
           if (e.key === 'ArrowLeft') this.prev();
           if (e.key === 'ArrowRight') this.next();
         });
@@ -563,7 +673,6 @@
         if (!active) return;
 
         this.nameEl.textContent = active.name;
-        this.designationEl.textContent = active.designation;
 
         const words = active.quote.split(" ");
         this.quoteEl.innerHTML = words.map((word, i) => {
@@ -597,7 +706,10 @@
               name: c.title,
               designation: c.designation || '',
               quote: c.quote,
-              src: c.src
+              src: c.src,
+              tags: c.tags || [],
+              product_name: c.product_name || '',
+              product_url: c.product_url || ''
             }));
           }
         }
