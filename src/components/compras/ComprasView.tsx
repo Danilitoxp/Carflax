@@ -222,7 +222,7 @@ export function ComprasView() {
               </div>
               <p className="text-sm font-black uppercase tracking-tight text-foreground">{erro}</p>
               <button
-                onClick={carregar}
+                onClick={() => carregar({ lead: true })}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-black uppercase tracking-widest hover:opacity-90 transition-opacity"
               >
                 <RefreshCw className="w-4 h-4" /> Tentar novamente
