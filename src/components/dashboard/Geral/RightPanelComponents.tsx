@@ -365,7 +365,7 @@ function VendedorMiniCard({ row, perdidoMap, isActive, onSelect }: {
   const percent = calcPercentVsEquilibrio(row);
   const metaNum = Number(row.META || 0);
   const atingimento = metaNum > 0 ? (total / metaNum) * 100 : 0;
-  const diff = equilibrio - total;
+  const diffMeta = metaNum - total;
   const isTeam = row.COD_VENDEDOR.startsWith("TEAM:");
   const isTotal = row.COD_VENDEDOR === "MEDIA";
 
@@ -408,7 +408,7 @@ function VendedorMiniCard({ row, perdidoMap, isActive, onSelect }: {
         )}
       </div>
 
-      {/* Rosca de ritmo */}
+      {/* Rosca de meta */}
       <div className="mb-2 flex flex-col items-center">
         <div className="relative w-20 h-20">
           <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
@@ -420,23 +420,23 @@ function VendedorMiniCard({ row, perdidoMap, isActive, onSelect }: {
               stroke="currentColor"
               strokeWidth="9"
               strokeDasharray={2 * Math.PI * 40}
-              strokeDashoffset={2 * Math.PI * 40 * (1 - Math.min(percent, 100) / 100)}
+              strokeDashoffset={2 * Math.PI * 40 * (1 - Math.min(atingimento, 100) / 100)}
               strokeLinecap="round"
               fill="transparent"
               className={cn(
                 "transition-all duration-1000 ease-out",
-                percent >= 100 ? "text-blue-600 dark:text-blue-500" : "text-rose-500"
+                atingimento >= 100 ? "text-blue-600 dark:text-blue-500" : "text-rose-500"
               )}
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center leading-none text-center">
-            <span className={cn("text-base font-black tracking-tighter", percent >= 100 ? "text-foreground" : "text-rose-600")}>
-              {percent.toFixed(0)}%
+            <span className={cn("text-base font-black tracking-tighter", atingimento >= 100 ? "text-foreground" : "text-rose-600")}>
+              {atingimento.toFixed(0)}%
             </span>
           </div>
         </div>
         <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1.5">
-          {diff > 0 ? `- ${formatBRL(diff)}` : `+ ${formatBRL(Math.abs(diff))}`}
+          {metaNum <= 0 ? "Sem Meta" : (diffMeta > 0 ? `- ${formatBRL(diffMeta)}` : `+ ${formatBRL(Math.abs(diffMeta))}`)}
         </span>
       </div>
 
@@ -446,16 +446,16 @@ function VendedorMiniCard({ row, perdidoMap, isActive, onSelect }: {
         <h3 className="text-base font-black text-foreground tracking-tighter">{formatBRL(row.TOTAL_VENDIDO_HOJE || 0)}</h3>
       </div>
 
-      {/* Barra de meta */}
+      {/* Barra de equilíbrio */}
       <div className="mb-3">
         <div className="flex items-center justify-between text-[9px] font-bold mb-1">
-          <span className="text-blue-600 dark:text-blue-500">Meta</span>
-          <span className="text-foreground">{atingimento.toFixed(1)}%</span>
+          <span className="text-blue-600 dark:text-blue-500">Equilíbrio</span>
+          <span className="text-foreground">{percent.toFixed(1)}%</span>
         </div>
         <div className="h-1.5 w-full bg-secondary dark:bg-slate-800 rounded-full overflow-hidden border border-border">
           <div
             className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-1000"
-            style={{ width: `${Math.min(atingimento, 100)}%` }}
+            style={{ width: `${Math.min(percent, 100)}%` }}
           />
         </div>
       </div>
@@ -1067,6 +1067,9 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
   const equilibrio = calculateEquilibrio();
   const total = data ? (typeof data.TOTAL === 'string' ? parseFloat(data.TOTAL) : data.TOTAL) : 0;
   const percentageVsEquilibrio = equilibrio > 0 ? (Number(total) / equilibrio) * 100 : 0;
+  const metaNum = Number(data?.META || 0);
+  const atingimento = metaNum > 0 ? (Number(total) / metaNum) * 100 : 0;
+  const diffMeta = metaNum - Number(total);
 
   const roleUpper = userProfile?.role?.toUpperCase() || "";
   const canChangeSeller = roleUpper.includes("DIRETOR") || 
@@ -1289,7 +1292,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             ? "opacity-100 scale-100 pointer-events-auto" 
             : "opacity-0 scale-95 pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden"
         )}>
-          {/* 2. GRÁFICO DE ROSCA (TOP) */}
+          {/* 2. GRÁFICO DE ROSCA (TOP) - META */}
           <div className="mb-3 flex flex-col items-center">
             <div className="relative w-32 h-32">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
@@ -1309,28 +1312,31 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
                   stroke="currentColor"
                   strokeWidth="8"
                   strokeDasharray={2 * Math.PI * 40}
-                  strokeDashoffset={2 * Math.PI * 40 * (1 - Math.min(percentageVsEquilibrio, 100) / 100)}
+                  strokeDashoffset={2 * Math.PI * 40 * (1 - Math.min(atingimento, 100) / 100)}
                   strokeLinecap="round"
                   fill="transparent"
                   className={cn(
                     "transition-all duration-1000 ease-out",
-                    percentageVsEquilibrio >= 100 ? "text-blue-600 dark:text-blue-500" : "text-rose-500"
+                    atingimento >= 100 ? "text-blue-600 dark:text-blue-500" : "text-rose-500"
                   )}
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center leading-none text-center">
                 <span className={cn(
                   "text-2xl font-black tracking-tighter",
-                  percentageVsEquilibrio >= 100 ? "text-foreground" : "text-rose-600"
+                  atingimento >= 100 ? "text-foreground" : "text-rose-600"
                 )}>
-                  {percentageVsEquilibrio.toFixed(0)}%
+                  {atingimento.toFixed(0)}%
                 </span>
                 <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
-                  {percentageVsEquilibrio.toFixed(0) === '100' 
-                    ? "Equilíbrio" 
-                    : (equilibrio - Number(total) > 0 
-                        ? `- ${formatBRL(equilibrio - Number(total))}` 
-                        : `+ ${formatBRL(Math.abs(equilibrio - Number(total)))}`
+                  {metaNum <= 0 
+                    ? "Sem Meta" 
+                    : (atingimento.toFixed(0) === '100' 
+                        ? "Meta Batida" 
+                        : (diffMeta > 0 
+                            ? `- ${formatBRL(diffMeta)}` 
+                            : `+ ${formatBRL(Math.abs(diffMeta))}`
+                          )
                       )
                   }
                 </span>
@@ -1348,28 +1354,19 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
             </h3>
           </div>
 
-          {/* Progress Bar (Meta) */}
-          {(() => {
-            // Sem meta cadastrada (META <= 0): não há como calcular atingimento — mostra 0%
-            // em vez de estourar (TOTAL / 1 * 100 gerava percentuais absurdos).
-            const metaNum = Number(data?.META || 0);
-            const totalNum = Number(data?.TOTAL || 0);
-            const atingimento = metaNum > 0 ? (totalNum / metaNum) * 100 : 0;
-            return (
-              <div className="mb-4 px-2">
-                <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
-                  <span className="text-blue-600 dark:text-blue-500">Meta</span>
-                  <span className="text-foreground">{atingimento.toFixed(1)}%</span>
-                </div>
-                <div className="h-2 w-full bg-secondary dark:bg-slate-800 rounded-full overflow-hidden border border-border">
-                  <div
-                    className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(37,99,235,0.4)]"
-                    style={{ width: `${Math.min(atingimento, 100)}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })()}
+          {/* Progress Bar (Equilíbrio) */}
+          <div className="mb-4 px-2">
+            <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
+              <span className="text-blue-600 dark:text-blue-500">Equilíbrio</span>
+              <span className="text-foreground">{percentageVsEquilibrio.toFixed(1)}%</span>
+            </div>
+            <div className="h-2 w-full bg-secondary dark:bg-slate-800 rounded-full overflow-hidden border border-border">
+              <div
+                className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(37,99,235,0.4)]"
+                style={{ width: `${Math.min(percentageVsEquilibrio, 100)}%` }}
+              />
+            </div>
+          </div>
 
           {/* 4. GRID DE INDICADORES (Sober/Professional) */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
