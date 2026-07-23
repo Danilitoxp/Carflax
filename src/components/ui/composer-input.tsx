@@ -10,7 +10,7 @@ import {
   Code,
   Link as LinkIcon,
   Trash2,
-  Paperclip,
+  Baseline,
   CornerDownLeft,
   X
 } from "lucide-react"
@@ -100,7 +100,7 @@ function normalizeToHtml(src = ""): string {
 }
 
 const isEmptyHtml = (html: string) =>
-  !html || html === "<br>" || html.replace(/<[^>]*>/g, "").replace(/ |&nbsp;/g, "").trim() === ""
+  !html || html === "<br>" || html.replace(/<[^>]*>/g, "").replace(/\u00a0| /g, "").trim() === ""
 
 // Paleta de cores de texto (rápidas). O usuário também pode escolher uma cor livre.
 const TEXT_COLORS = [
@@ -118,7 +118,6 @@ const ComposerInput = React.forwardRef<HTMLDivElement, ComposerInputProps>(
       initialAttachments = [],
       attachments: externalAttachments,
       onRemoveAttachment,
-      onFileUpload,
       placeholder = "Digite o conteúdo do artigo...",
       showSendButton = false,
       ...props
@@ -128,7 +127,6 @@ const ComposerInput = React.forwardRef<HTMLDivElement, ComposerInputProps>(
     const [internalMessage, setInternalMessage] = React.useState("")
     const [internalAttachments, setInternalAttachments] = React.useState<Attachment[]>(initialAttachments)
     const editorRef = React.useRef<HTMLDivElement>(null)
-    const fileInputRef = React.useRef<HTMLInputElement>(null)
     // Última string emitida por nós — evita reescrever o innerHTML (e resetar o cursor)
     // quando o valor que volta pelo props é o mesmo que acabamos de emitir.
     const lastEmitted = React.useRef<string | null>(null)
@@ -232,24 +230,6 @@ const ComposerInput = React.forwardRef<HTMLDivElement, ComposerInputProps>(
       if (!onRemoveAttachment) setInternalAttachments([])
     }
 
-    const handleOpenFile = () => fileInputRef.current?.click()
-
-    const toolbarItems = [
-      { id: "bold", icon: Bold, tooltip: "Negrito", action: () => exec("bold") },
-      { id: "italic", icon: Italic, tooltip: "Itálico", action: () => exec("italic") },
-      { id: "underline", icon: Underline, tooltip: "Sublinhado", action: () => exec("underline") },
-      { id: "list", icon: List, tooltip: "Lista de tópicos", action: () => exec("insertUnorderedList") },
-      { id: "ordered", icon: ListOrdered, tooltip: "Lista numerada", action: () => exec("insertOrderedList") },
-      { id: "quote", icon: Quote, tooltip: "Citação / destaque", action: () => exec("formatBlock", "blockquote") },
-      { id: "code", icon: Code, tooltip: "Código", action: wrapCode },
-      { id: "link", icon: LinkIcon, tooltip: "Link", action: insertLink },
-    ]
-
-    const actionItems = [
-      { id: "paperclip", icon: Paperclip, tooltip: "Anexar arquivo / imagem", action: handleOpenFile },
-      { id: "image", icon: ImageIcon, tooltip: "Upload de imagem", action: handleOpenFile },
-      { id: "heading", icon: Type, tooltip: "Subtítulo de seção", action: () => exec("formatBlock", "h3") },
-    ]
 
     return (
       <TooltipProvider>
@@ -274,37 +254,49 @@ const ComposerInput = React.forwardRef<HTMLDivElement, ComposerInputProps>(
             .blog-wysiwyg a { color: hsl(var(--primary)); text-decoration: underline; }
           `}</style>
 
-          {/* Input invisível de arquivo */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={onFileUpload}
-            accept="image/*"
-            className="hidden"
-          />
-
           {/* Toolbar Superior */}
           <div className="flex items-center justify-between p-2 border-b bg-secondary/20 rounded-t-2xl">
             <div className="flex items-center gap-1 flex-wrap">
-              {toolbarItems.map((item) => (
-                <Tooltip key={item.id}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 hover:bg-secondary hover:text-blue-500 transition-colors"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={item.action}
-                    >
-                      <item.icon className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{item.tooltip}</p>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
+
+              <Tooltip><TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-secondary hover:text-blue-500 transition-colors" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")}>
+                  <Bold className="h-4 w-4" />
+                </Button></TooltipTrigger><TooltipContent><p>Negrito</p></TooltipContent></Tooltip>
+
+              <Tooltip><TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-secondary hover:text-blue-500 transition-colors" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")}>
+                  <Italic className="h-4 w-4" />
+                </Button></TooltipTrigger><TooltipContent><p>Itálico</p></TooltipContent></Tooltip>
+
+              <Tooltip><TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-secondary hover:text-blue-500 transition-colors" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("underline")}>
+                  <Underline className="h-4 w-4" />
+                </Button></TooltipTrigger><TooltipContent><p>Sublinhado</p></TooltipContent></Tooltip>
+
+              <Tooltip><TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-secondary hover:text-blue-500 transition-colors" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertUnorderedList")}>
+                  <List className="h-4 w-4" />
+                </Button></TooltipTrigger><TooltipContent><p>Lista de tópicos</p></TooltipContent></Tooltip>
+
+              <Tooltip><TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-secondary hover:text-blue-500 transition-colors" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertOrderedList")}>
+                  <ListOrdered className="h-4 w-4" />
+                </Button></TooltipTrigger><TooltipContent><p>Lista numerada</p></TooltipContent></Tooltip>
+
+              <Tooltip><TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-secondary hover:text-blue-500 transition-colors" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("formatBlock", "blockquote")}>
+                  <Quote className="h-4 w-4" />
+                </Button></TooltipTrigger><TooltipContent><p>Citação / destaque</p></TooltipContent></Tooltip>
+
+              <Tooltip><TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-secondary hover:text-blue-500 transition-colors" onMouseDown={(e) => e.preventDefault()} onClick={wrapCode}>
+                  <Code className="h-4 w-4" />
+                </Button></TooltipTrigger><TooltipContent><p>Código</p></TooltipContent></Tooltip>
+
+              <Tooltip><TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-secondary hover:text-blue-500 transition-colors" onMouseDown={(e) => e.preventDefault()} onClick={insertLink}>
+                  <LinkIcon className="h-4 w-4" />
+                </Button></TooltipTrigger><TooltipContent><p>Link</p></TooltipContent></Tooltip>
 
               {/* Cor do texto */}
               <div className="relative">
@@ -412,7 +404,7 @@ const ComposerInput = React.forwardRef<HTMLDivElement, ComposerInputProps>(
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <Paperclip className="h-6 w-6 text-muted-foreground" />
+                          <Code className="h-6 w-6 text-muted-foreground" />
                         )}
                         <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-mono truncate max-w-[90%]">
                           {att.fileName}
@@ -434,29 +426,7 @@ const ComposerInput = React.forwardRef<HTMLDivElement, ComposerInputProps>(
           )}
 
           {/* Barra Inferior de Ações */}
-          <div className="flex items-center justify-between p-2 border-t bg-secondary/10 rounded-b-2xl">
-            <div className="flex items-center gap-1">
-              {actionItems.map((item) => (
-                <Tooltip key={item.id}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 hover:bg-secondary hover:text-blue-500 transition-colors"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={item.action}
-                    >
-                      <item.icon className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{item.tooltip}</p>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
-
+          <div className="flex items-center justify-end p-2 border-t bg-secondary/10 rounded-b-2xl">
             {showSendButton && (
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button type="button" onClick={handleSend} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl">
