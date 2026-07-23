@@ -21,7 +21,7 @@ import {
   Loader2
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn, formatTeamName } from "@/lib/utils";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 import { useNotification } from "@/hooks/useNotification";
@@ -427,9 +427,8 @@ export function OrcamentosView({ userProfile }: { userProfile?: UserProfile }) {
         if (!hasActiveMembers) continue;
 
         if (codes.size > 0) {
-          const primeiroNome = (sup.name || "Time").trim().split(/\s+/)[0];
           teams.push({
-            label: `Time ${primeiroNome}`,
+            label: formatTeamName(sup.name),
             value: `TEAM:${sup.id}`,
             codes,
           });

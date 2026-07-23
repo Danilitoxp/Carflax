@@ -23,7 +23,7 @@ import {
   Camera,
   LayoutGrid
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatTeamName } from "@/lib/utils";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -769,8 +769,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
               membros.forEach(m => { if (m.operator_code) cods.add(String(m.operator_code).trim()); });
               const rows = [...cods].map(c => erpByCod.get(c)).filter(Boolean) as VendedorResumo[];
               if (rows.length === 0) continue;
-              const primeiroNome = (sup.name || "Time").trim().split(/\s+/)[0];
-              teamTotals.push(buildTeamTotal(rows, mediaRow, `TEAM:${sup.id}`, `Time ${primeiroNome}`, [...cods]));
+              teamTotals.push(buildTeamTotal(rows, mediaRow, `TEAM:${sup.id}`, formatTeamName(sup.name), [...cods]));
             }
             teamTotals.sort(
               (a, b) => (parseFloat(String(b.FATURADO)) || 0) - (parseFloat(String(a.FATURADO)) || 0),
@@ -884,7 +883,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
               const teamTotal: VendedorResumo = {
                 ...(mediaRow || subSet[0]),
                 COD_VENDEDOR: "MEDIA",
-                NOME_VENDEDOR: "Meu Time",
+                NOME_VENDEDOR: userProfile?.name ? formatTeamName(userProfile.name) : "Meu Time",
                 META: totalMETA,
                 FATURADO: totalFATURADO,
                 EM_ABERTO: totalEM_ABERTO,

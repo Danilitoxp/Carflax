@@ -21,3 +21,16 @@ export function formatBrDate(input: string | number | Date): string {
   if (isNaN(d.getTime())) return "";
   return d.toLocaleDateString("pt-BR", { timeZone: BR_TIMEZONE });
 }
+
+/** Mapeia nomes de times de supervisores para nomes personalizados no HUB (ex: João -> Canal Mesa, Alan -> Canal Balcão). */
+export function formatTeamName(supName?: string | null): string {
+  if (!supName) return "Time";
+  const norm = supName.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (norm.includes("joao")) return "Canal Mesa";
+  if (norm.includes("alan")) return "Canal Balcao";
+  if (norm.startsWith("canal mesa")) return "Canal Mesa";
+  if (norm.startsWith("canal balcao") || norm.startsWith("canal balcão")) return "Canal Balcao";
+  const primeiroNome = supName.trim().split(/\s+/)[0];
+  return `Time ${primeiroNome}`;
+}
+

@@ -20,7 +20,7 @@ import {
   X,
   Check,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatTeamName } from "@/lib/utils";
 import { apiCarteira, apiTransferirCliente, type CarteiraResponse, type CarteiraCliente } from "@/lib/api";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
@@ -400,11 +400,10 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
         carteirasVisiveis.some((v) => normCod(v.cod) === c)
       );
       if (codesComDados.length === 0) continue;
-      const primeiroNome = (sup.name || "Time").trim().split(/\s+/)[0];
-      out.push({ id: supId, nome: `Time ${primeiroNome}`, codes: codesComDados });
+      out.push({ id: supId, nome: formatTeamName(sup.name), codes: codesComDados });
     }
     return out.sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [isAdmin, isFullAccess, usuariosOrg, carteirasVisiveis]);
+  }, [isFullAccess, usuariosOrg, carteirasVisiveis]);
 
   // Códigos (normalizados) do time atualmente selecionado no filtro, se houver.
   const codesDoTimeFiltrado = useMemo(() => {
