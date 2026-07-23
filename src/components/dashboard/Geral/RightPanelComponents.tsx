@@ -87,7 +87,7 @@ function buildTeamTotal(
     FATURADO: totalFATURADO,
     EM_ABERTO: sum("EM_ABERTO"),
     TOTAL: sum("TOTAL"),
-    FALTANTE: totalMETA - totalFATURADO,
+    FALTANTE: Math.max(0, totalMETA - sum("TOTAL")),
     TOTAL_VENDIDO_HOJE: sum("TOTAL_VENDIDO_HOJE"),
     QTD_VENDAS: totalQtdVendas,
     QTD_ORCAMENTOS: sum("QTD_ORCAMENTOS"),
@@ -821,7 +821,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, l
               const totalOrcFechados = sum("ORC_FECHADOS");
               const totalMargemReal = sum("MARGEM_REAL");
               const totalCusto = sum("CUSTO");
-              const totalFALTANTE = totalMETA - totalFATURADO;
+              const totalFALTANTE = Math.max(0, totalMETA - totalTOTAL);
               // Prazo médio ponderado pelo faturado de cada vendedor
               const prazoPonderado = subSet.reduce(
                 (acc, r) => acc + (parseFloat(String(r.PRAZO_MEDIO_DIAS)) || 0) * (parseFloat(String(r.FATURADO)) || 0),
