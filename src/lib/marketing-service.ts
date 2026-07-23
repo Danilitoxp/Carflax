@@ -545,8 +545,15 @@ export const marketingService = {
       query = query.or(orConditions.join(","));
     }
 
-    if (filterTemperature !== "Todas as Temperaturas") {
-      query = query.eq("temperatura", filterTemperature);
+    if (filterTemperature === "Convertido") {
+      // "Convertido" é derivado da venda, não da temperatura salva (que pode estar
+      // defasada, ex.: "Perdido" com venda lançada depois).
+      query = query.gt("valor_venda", 0);
+    } else if (filterTemperature !== "Todas as Temperaturas") {
+      // Demais buckets excluem quem tem venda (esses aparecem como Convertido).
+      query = query
+        .eq("temperatura", filterTemperature)
+        .or("valor_venda.is.null,valor_venda.eq.0");
     }
 
     const { data, error, count } = await query

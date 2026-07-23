@@ -1246,6 +1246,9 @@ function DashboardContent({
   const isMarketingView = [
     "Marketing",
     "Whatsapp Evolution",
+    "Automação",
+    "Blog Marketing",
+    "Blog Cards",
     "Cronograma",
     "Eventos Marketing",
     "Avaliações",

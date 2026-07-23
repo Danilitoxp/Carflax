@@ -805,3 +805,49 @@ export const apiComprasReposicao = (opts?: { dias?: number; nivel?: number; limi
     nivel: String(opts?.nivel ?? 95),
     limiteExcesso: String(opts?.limiteExcesso ?? 90),
   });
+
+// ── Automação: campanha de avaliação no Google (Evolution API) ────────────────
+export interface AvaliacaoCampanhaConfig {
+  id: number;
+  status: "idle" | "running" | "paused";
+  review_url: string;
+  templates: string[];
+  daily_cap: number;
+  min_gap_seconds: number;
+  max_gap_seconds: number;
+  hora_inicio: number;
+  hora_fim: number;
+  dias_semana: number[];
+  reask_days: number;
+  sent_today: number;
+  last_sent_date?: string | null;
+  last_sent_at?: string | null;
+}
+export interface AvaliacaoCampanhaEnvio {
+  nome: string | null;
+  remote_jid: string;
+  status: string;
+  sent_at: string | null;
+  error: string | null;
+}
+export interface AvaliacaoCampanhaStatus {
+  success: boolean;
+  campanha: AvaliacaoCampanhaConfig;
+  contadores: { pending: number; sent: number; failed: number };
+  recentes: AvaliacaoCampanhaEnvio[];
+}
+
+export const apiAvaliacaoStatus = () =>
+  get<AvaliacaoCampanhaStatus>("/api/avaliacao-campanha/status");
+
+export const apiAvaliacaoSaveConfig = (cfg: Partial<AvaliacaoCampanhaConfig>) =>
+  post<{ success: boolean }>("/api/avaliacao-campanha/config", cfg);
+
+export const apiAvaliacaoBuild = () =>
+  post<{ success: boolean; elegiveis: number; inseridos: number; pending: number }>(
+    "/api/avaliacao-campanha/build",
+    {},
+  );
+
+export const apiAvaliacaoControl = (action: "start" | "pause" | "stop") =>
+  post<{ success: boolean; status: string }>("/api/avaliacao-campanha/control", { action });

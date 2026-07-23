@@ -53,7 +53,9 @@ export const NAV_SECTIONS: NavSection[] = [
     permGroup: "MARKETING",
     subItems: [
       { label: "Whatsapp", value: "Whatsapp Evolution" },
+      { label: "Automação" },
       { label: "Leads" },
+      { label: "Blog Cards", value: "Blog Marketing" },
       { label: "Criativo" },
       { label: "Cronograma" },
       // Chave própria em vez de "Eventos": 9 usuários ainda têm "Eventos" salvo
@@ -171,7 +173,7 @@ const VENDEDOR_SECTIONS = [
 ];
 
 const MARKETING_SECTIONS = [
-  "Marketing", "Whatsapp Evolution", "Leads", "Criativo", "Cronograma", "Eventos Marketing", "Avaliações", "Pós-Venda", "Relatórios Mkt",
+  "Marketing", "Whatsapp Evolution", "Automação", "Leads", "Blog Marketing", "Criativo", "Cronograma", "Eventos Marketing", "Avaliações", "Pós-Venda", "Relatórios Mkt",
 ];
 
 const VENDAS_SECTIONS = [

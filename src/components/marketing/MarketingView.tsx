@@ -1,5 +1,6 @@
 import { Megaphone, Calendar } from "lucide-react";
 import { WhatsappView } from "./whatsapp/WhatsappView";
+import { AutomacaoView } from "./automacao/AutomacaoView";
 import { ClientesView } from "./ClientesView";
 import { LeadsView } from "./LeadsView";
 import { ReportsView } from "./ReportsView";
@@ -8,6 +9,7 @@ import { EventosView } from "./eventos/EventosView";
 import { AvaliacoesView } from "./avaliacoes/AvaliacoesView";
 import { PosVendaView } from "./PosVendaView";
 import { CriativoView } from "./criativo/CriativoView";
+import { BlogView } from "./blog/BlogView";
 
 interface UserProfile {
   id?: string;
@@ -28,6 +30,10 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
     return <WhatsappView vendedorId={userProfile?.id} userProfile={userProfile} />;
   }
 
+  if (activeTab === "Automação") {
+    return <AutomacaoView />;
+  }
+
   if (activeTab === "Clientes") {
     return <ClientesView />;
   }
@@ -35,6 +41,11 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
   if (activeTab === "Leads") {
     return <LeadsView />;
   }
+
+  if (activeTab === "Blog Marketing" || activeTab === "Blog") {
+    return <BlogView />;
+  }
+
 
   if (activeTab === "Criativo") {
     return <CriativoView />;

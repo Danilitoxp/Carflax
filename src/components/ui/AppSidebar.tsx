@@ -30,6 +30,7 @@ import {
   Package,
   PackageX,
   ShoppingCart,
+  Bot,
   Kanban,
   MessageSquare,
   Wallet,
@@ -77,6 +78,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "Relatórios Mkt": FileBarChart,
   Marketing: Megaphone,
   "Whatsapp Evolution": Smartphone,
+  "Automação": Bot,
   Leads: Users,
   Cronograma: Calendar,
   Esteira: Kanban,
@@ -294,7 +296,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
 
     // Permissões específicas do departamento de MARKETING
     const isMarketingDept = userProfile?.department?.toUpperCase() === 'MARKETING';
-    const marketingItems = ["Marketing", "Whatsapp Evolution", "Leads", "Cronograma", "Eventos Marketing", "Avaliações", "Relatórios Mkt"];
+    const marketingItems = ["Marketing", "Whatsapp Evolution", "Leads", "Blog Marketing", "Blog Cards", "Cronograma", "Eventos Marketing", "Avaliações", "Relatórios Mkt"];
     if (isMarketingDept && marketingItems.includes(label)) return true;
 
     // Permissões específicas do departamento de VENDAS/COMERCIAL

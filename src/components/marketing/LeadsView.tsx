@@ -29,10 +29,18 @@ function formatCurrencyInput(value: string): string {
 }
 
 const TEMP_CONFIG = {
+  Convertido: { color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20", dot: "bg-emerald-500" },
   Quente: { color: "text-rose-500 bg-rose-500/10 border-rose-500/20", dot: "bg-rose-500" },
   Morno:  { color: "text-amber-500 bg-amber-500/10 border-amber-500/20", dot: "bg-amber-500" },
   Frio:   { color: "text-blue-500 bg-blue-500/10 border-blue-500/20", dot: "bg-blue-500" },
+  Perdido: { color: "text-slate-400 bg-slate-500/10 border-slate-500/20", dot: "bg-slate-400" },
 };
+
+// Um lead com venda registrada é sempre "Convertido" no badge — tem prioridade
+// sobre a temperatura salva, que pode estar defasada (ex.: marcado "Perdido" e a
+// venda lançada depois).
+const statusDoLead = (lead: { valor_venda?: number | null; temperatura?: string }) =>
+  (lead.valor_venda ?? 0) > 0 ? "Convertido" : (lead.temperatura || "Frio");
 
 export function LeadsView() {
   const [leads, setLeads] = useState<MarketingCliente[]>([]);
@@ -193,7 +201,7 @@ export function LeadsView() {
           
           <TinyDropdown 
             value={filterTemperature} 
-            options={["Todas as Temperaturas", "Quente", "Morno", "Frio"]} 
+            options={["Todas as Temperaturas", "Convertido", "Quente", "Morno", "Frio", "Perdido"]}
             onChange={setFilterTemperature} 
             icon={Flame} 
             variant="amber" 
@@ -228,7 +236,7 @@ export function LeadsView() {
             {filtered.map(lead => {
               const displayNome = lead.nome || lead.push_name || lead.remote_jid.split('@')[0];
               const phone = lead.remote_jid.split('@')[0];
-              const temp = lead.temperatura || "Frio";
+              const temp = statusDoLead(lead);
               const tempCfg = TEMP_CONFIG[temp as keyof typeof TEMP_CONFIG] || TEMP_CONFIG.Frio;
 
               return (
