@@ -14,16 +14,10 @@ import {
   ChevronUp,
   Users,
   Lock,
-  RotateCcw,
+  Repeat,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
-import { DemandasRecorrentesModal } from "./DemandasRecorrentesModal";
-import {
-  type DemandaRecorrente,
-  fetchDemandasRecorrentesSupabase,
-  updateDemandaRecorrenteSupabase,
-} from "./recorrentes-utils";
 
 interface KanbanCard {
   id: string;
@@ -37,6 +31,9 @@ interface KanbanCard {
   owner_id: string | null;
   created_by: string | null;
   created_at?: string;
+  // Recorrente: ao ser concluído, volta sozinho para "A FAZER" no dia seguinte.
+  recurring?: boolean;
+  completed_at?: string | null;
 }
 
 interface UserProfile {
@@ -143,6 +140,26 @@ const updateDescriptionText = (description: string, newCleanText: string): strin
     return newCleanText;
   }
   return `${newCleanText}\n${subtaskLines.join("\n")}`;
+};
+
+// Desmarca todos os subtasks de uma descrição ([x] -> [ ]). Usado ao reciclar um
+// card recorrente concluído, para a rotina recomeçar do zero no dia seguinte.
+const uncheckAllSubtasks = (description = "") =>
+  description
+    .split("\n")
+    .map((line) => line.replace(/^(\s*[-*•]?\s*)\[[xX]\]/, "$1[ ]"))
+    .join("\n");
+
+// Patch de conclusão ao mover um card entre colunas: carimba/limpa completed_at
+// apenas quando a coluna realmente muda (base da recorrência do dia seguinte).
+const completionPatch = (
+  fromCol?: KanbanCard["column_id"],
+  toCol?: KanbanCard["column_id"],
+): { completed_at?: string | null } => {
+  if (fromCol === toCol) return {};
+  if (toCol === "CONCLUIDOS") return { completed_at: new Date().toISOString() };
+  if (fromCol === "CONCLUIDOS") return { completed_at: null };
+  return {};
 };
 
 interface Subtask {
@@ -258,16 +275,10 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
   const isManager = role.includes("ADMIN") || role.includes("GERENTE");
   const [isCreateSubquadroOpen, setIsCreateSubquadroOpen] = useState(false);
   const [isAddPeopleOpen, setIsAddPeopleOpen] = useState(false);
-  const [isRecorrentesModalOpen, setIsRecorrentesModalOpen] = useState(false);
-  const [rotinasRecorrentes, setRotinasRecorrentes] = useState<DemandaRecorrente[]>([]);
 
   // Esteira sendo exibida no momento — a própria, por padrão. Gerente/admin
   // pode trocar via seletor para acompanhar a esteira de outra pessoa.
   const [boardOwnerId, setBoardOwnerId] = useState<string>(userProfile?.id || "");
-
-  useEffect(() => {
-    fetchDemandasRecorrentesSupabase().then(setRotinasRecorrentes);
-  }, []);
 
   // Usuários (exceto eu) agrupados por setor, pra organizar o seletor de esteira.
   const usersByDepartment = useMemo(() => {
@@ -390,142 +401,54 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
     [userProfile?.id]
   );
 
-  const verificarEGerarDemandasRecorrentes = useCallback(
+  // Recicla cards recorrentes concluídos: se um card marcado como recorrente foi
+  // concluído num dia anterior, no dia seguinte ele volta para "A FAZER" com os
+  // subtasks desmarcados. Roda a cada carregamento do quadro.
+  const resetRecurringCompleted = useCallback(
     async (currentCards: KanbanCard[]) => {
-      const rotinas = await fetchDemandasRecorrentesSupabase();
-      setRotinasRecorrentes(rotinas);
+      const hojeStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const paraReciclar = currentCards.filter(
+        (c) =>
+          c.recurring &&
+          c.column_id === "CONCLUIDOS" &&
+          !!c.completed_at &&
+          c.completed_at.split("T")[0] < hojeStr,
+      );
+      if (paraReciclar.length === 0) return;
 
-      const hoje = new Date();
-      const hojeStr = hoje.toISOString().split("T")[0]; // YYYY-MM-DD
-      const diaSemanaHoje = hoje.getDay(); // 0 = Dom, 1 = Seg, 2 = Ter, 3 = Qua, 4 = Qui, 5 = Sex, 6 = Sáb
-      const diaMesHoje = hoje.getDate(); // 1..31
+      const ids = new Set(paraReciclar.map((c) => c.id));
+      setCards((prev) =>
+        prev.map((c) =>
+          ids.has(c.id)
+            ? {
+                ...c,
+                column_id: "A FAZER",
+                completed_at: null,
+                order_index: 0,
+                description: uncheckAllSubtasks(c.description),
+              }
+            : c,
+        ),
+      );
 
-      let novasRotinasState = [...rotinas];
-      const cardsGeradosNoCheck: KanbanCard[] = [];
-
-      for (const rotina of rotinas) {
-        if (!rotina.active) continue;
-        if (rotina.last_generated_date === hojeStr) continue;
-
-        let deveRodarHoje = false;
-        if (rotina.tipo === "diario") {
-          deveRodarHoje = true;
-        } else if (rotina.tipo === "dias_semana") {
-          deveRodarHoje = (rotina.dias_semana || []).includes(diaSemanaHoje);
-        } else if (rotina.tipo === "semanal") {
-          deveRodarHoje = rotina.dia_semana_especifico === diaSemanaHoje;
-        } else if (rotina.tipo === "mensal") {
-          deveRodarHoje = rotina.dia_mes_especifico === diaMesHoje;
-        }
-
-        if (!deveRodarHoje) continue;
-
-        const jaExisteHoje = currentCards.some(
-          (c) =>
-            c.title.trim() === rotina.title.trim() &&
-            c.created_at?.startsWith(hojeStr)
-        );
-
-        if (jaExisteHoje) continue;
-
-        let desc = rotina.description || "";
-        if (rotina.subtasks && rotina.subtasks.length > 0) {
-          const checklistText = rotina.subtasks.map((st) => `- [ ] ${st}`).join("\n");
-          desc = desc ? `${desc}\n\n${checklistText}` : checklistText;
-        }
-
-        const isabelaUser = usersList.find((u) => u.name.toLowerCase().includes("isabela"));
-        const targetOwnerId = rotina.owner_id || isabelaUser?.id || boardOwnerId || userProfile?.id || null;
-
-        const payload = {
-          title: rotina.title,
-          description: desc,
-          column_id: "A FAZER" as const,
-          order_index: 0,
-          tag_name: rotina.tag_name || "Média",
-          owner_id: targetOwnerId,
-          created_by: userProfile?.id || boardOwnerId || null,
-        };
-
+      for (const c of paraReciclar) {
         try {
-          const { data, error } = await supabase
+          await supabase
             .from("marketing_esteira")
-            .insert([payload])
-            .select()
-            .single();
-
-          if (!error && data) {
-            cardsGeradosNoCheck.push(data);
-            if (payload.owner_id) {
-              notifyEsteira(payload.owner_id, data.id, payload.title, "assigned");
-            }
-            await updateDemandaRecorrenteSupabase(rotina.id, { last_generated_date: hojeStr });
-          }
+            .update({
+              column_id: "A FAZER",
+              completed_at: null,
+              order_index: 0,
+              description: uncheckAllSubtasks(c.description),
+            })
+            .eq("id", c.id);
         } catch (e) {
-          console.warn("Fallback ao salvar card no Supabase:", e);
+          console.warn("[EsteiraView] Falha ao reciclar card recorrente:", e);
         }
-
-        novasRotinasState = novasRotinasState.map((r) =>
-          r.id === rotina.id ? { ...r, last_generated_date: hojeStr } : r
-        );
-      }
-
-      if (cardsGeradosNoCheck.length > 0) {
-        setRotinasRecorrentes(novasRotinasState);
-        setCards((prev) => [...cardsGeradosNoCheck, ...prev]);
       }
     },
-    [boardOwnerId, notifyEsteira, userProfile?.id, usersList]
+    [],
   );
-
-  const handleGerarCardManual = async (rotina: DemandaRecorrente) => {
-    let desc = rotina.description || "";
-    if (rotina.subtasks && rotina.subtasks.length > 0) {
-      const checklistText = rotina.subtasks.map((st) => `- [ ] ${st}`).join("\n");
-      desc = desc ? `${desc}\n\n${checklistText}` : checklistText;
-    }
-
-    const isabelaUser = usersList.find((u) => u.name.toLowerCase().includes("isabela"));
-    const targetOwnerId = rotina.owner_id || isabelaUser?.id || boardOwnerId || userProfile?.id || null;
-
-    const payload = {
-      title: rotina.title,
-      description: desc,
-      column_id: "A FAZER" as const,
-      order_index: 0,
-      tag_name: rotina.tag_name || "Média",
-      owner_id: targetOwnerId,
-      created_by: userProfile?.id || boardOwnerId || null,
-    };
-
-    try {
-      const { data, error } = await supabase
-        .from("marketing_esteira")
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) {
-        console.error("[EsteiraView] Erro ao inserir card no banco:", error);
-        throw error;
-      }
-
-      if (data) {
-        setCards((prev) => [data, ...prev]);
-        if (payload.owner_id) {
-          notifyEsteira(payload.owner_id, data.id, payload.title, "assigned");
-        }
-      }
-    } catch (e) {
-      console.error("[EsteiraView] Falha ao salvar card de rotina manual no Supabase:", e);
-      const fallbackCard: KanbanCard = {
-        id: `card-recorrente-${rotina.id}-${Date.now()}`,
-        ...payload,
-        created_at: new Date().toISOString(),
-      };
-      setCards((prev) => [fallbackCard, ...prev]);
-    }
-  };
 
   const loadCards = useCallback(async () => {
     setLoading(true);
@@ -545,7 +468,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
         const memberSet = new Set(memberIds);
         const filtered = (data || []).filter((c) => !c.created_by || memberSet.has(c.created_by));
         setCards(filtered);
-        verificarEGerarDemandasRecorrentes(filtered);
+        resetRecurringCompleted(filtered);
         return;
       }
 
@@ -558,13 +481,13 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
       if (error) throw error;
       const loaded = data || [];
       setCards(loaded);
-      verificarEGerarDemandasRecorrentes(loaded);
+      resetRecurringCompleted(loaded);
     } catch (err) {
       console.error("[EsteiraView] Erro ao carregar cards:", err);
     } finally {
       setLoading(false);
     }
-  }, [boardOwnerId, isSubquadroView, subquadroMembers, verificarEGerarDemandasRecorrentes]);
+  }, [boardOwnerId, isSubquadroView, subquadroMembers, resetRecurringCompleted]);
 
   // ── Load cards and users ──────────────────────────────────────────────────
   useEffect(() => {
@@ -608,18 +531,19 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
     try {
       if (!cardData.id) {
         // INSERT
+        const insertCol = cardData.column_id || "A FAZER";
         const payload = {
           title: cardData.title.trim(),
           description: cardData.description?.trim() || "",
-          column_id: cardData.column_id || "A FAZER",
-          order_index: cards.filter(
-            (c) => c.column_id === (cardData.column_id || "A FAZER"),
-          ).length,
+          column_id: insertCol,
+          order_index: cards.filter((c) => c.column_id === insertCol).length,
           tag_name: cardData.tag_name || null,
           tag_color: cardData.tag_color || null,
           due_date: cardData.due_date || null,
           owner_id: cardData.owner_id,
           created_by: userProfile?.id || null,
+          recurring: cardData.recurring ?? false,
+          completed_at: insertCol === "CONCLUIDOS" ? new Date().toISOString() : null,
         };
 
         const { data, error } = await supabase
@@ -644,6 +568,8 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
           tag_color: cardData.tag_color || null,
           due_date: cardData.due_date || null,
           owner_id: cardData.owner_id,
+          recurring: cardData.recurring ?? false,
+          ...completionPatch(origCard?.column_id, cardData.column_id),
         };
 
         const { error } = await supabase
@@ -803,6 +729,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
       ...targetCard,
       column_id: targetColumnId,
       order_index: newOrderIndex,
+      ...completionPatch(targetCard.column_id, targetColumnId),
     };
 
     // Re-index source column
@@ -841,9 +768,14 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
       });
 
       for (const card of changedCards) {
+        const orig = cards.find((oc) => oc.id === card.id);
         await supabase
           .from("marketing_esteira")
-          .update({ column_id: card.column_id, order_index: card.order_index })
+          .update({
+            column_id: card.column_id,
+            order_index: card.order_index,
+            ...completionPatch(orig?.column_id, card.column_id),
+          })
           .eq("id", card.id);
       }
     } catch (err) {
@@ -924,6 +856,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
           ...draggedCard,
           column_id: targetColumnId,
           order_index: targetIndex,
+          ...completionPatch(draggedCard.column_id, targetColumnId),
         };
       }
       return updatedCardsMap.get(c.id) || c;
@@ -947,9 +880,14 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
       });
 
       for (const card of changedCards) {
+        const orig = cards.find((oc) => oc.id === card.id);
         await supabase
           .from("marketing_esteira")
-          .update({ column_id: card.column_id, order_index: card.order_index })
+          .update({
+            column_id: card.column_id,
+            order_index: card.order_index,
+            ...completionPatch(orig?.column_id, card.column_id),
+          })
           .eq("id", card.id);
       }
     } catch (err) {
@@ -1083,16 +1021,6 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
               </div>
             )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => setIsRecorrentesModalOpen(true)}
-            className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-xl px-3 py-1.5 text-sm font-bold text-primary hover:bg-primary/20 transition-all shadow-xs"
-            title="Gerenciar demandas fixas e rotinas recorrentes"
-          >
-            <RotateCcw className="w-4 h-4 text-primary" />
-            <span>Demandas Fixas ({rotinasRecorrentes.filter((r) => r.active).length})</span>
-          </button>
 
           {isManager && (
             <button
@@ -1289,6 +1217,16 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
                               >
                                 <Calendar className="w-3 h-3 shrink-0" />
                                 <span>{formatDate(card.due_date)}</span>
+                              </span>
+                            )}
+
+                            {card.recurring && (
+                              <span
+                                className="px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0 bg-primary/5 text-primary border-primary/20"
+                                title="Tarefa recorrente: volta para A Fazer no dia seguinte"
+                              >
+                                <Repeat className="w-3 h-3 shrink-0" />
+                                <span>Diária</span>
                               </span>
                             )}
                           </div>
@@ -1936,6 +1874,50 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
                     })}
                   </div>
                 </div>
+
+                {/* Recorrência: card volta sozinho para "A Fazer" no dia seguinte */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">
+                    Recorrência
+                  </label>
+                  <button
+                    type="button"
+                    disabled={isViewOnly}
+                    onClick={() => {
+                      if (isViewOnly) return;
+                      setSelectedCard({
+                        ...selectedCard,
+                        recurring: !selectedCard.recurring,
+                      });
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left disabled:cursor-not-allowed ${
+                      selectedCard.recurring
+                        ? "bg-primary/10 border-primary/30 ring-2 ring-primary/20"
+                        : "bg-secondary border-border opacity-80 hover:opacity-100"
+                    }`}
+                  >
+                    <span
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                        selectedCard.recurring
+                          ? "bg-primary/20 text-primary"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <Repeat className="w-4 h-4" />
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-xs font-black text-foreground">
+                        Tarefa recorrente
+                      </span>
+                      <span className="block text-[10px] font-semibold text-muted-foreground leading-tight">
+                        Ao concluir, volta para "A Fazer" no dia seguinte.
+                      </span>
+                    </span>
+                    {selectedCard.recurring && (
+                      <Check className="w-4 h-4 text-primary shrink-0" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Modal Actions - Fixed */}
@@ -2005,14 +1987,6 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
           }}
         />
       )}
-
-      <DemandasRecorrentesModal
-        isOpen={isRecorrentesModalOpen}
-        onClose={() => setIsRecorrentesModalOpen(false)}
-        userId={userProfile?.id}
-        onGerarCardManual={handleGerarCardManual}
-        onUpdateRotinas={() => fetchDemandasRecorrentesSupabase().then(setRotinasRecorrentes)}
-      />
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 4px; }
