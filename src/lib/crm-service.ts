@@ -65,6 +65,7 @@ export const LOSS_REASONS = [
   "Furo de Estoque",
   "Desistiu",
   "Prazo de Entrega",
+  "Condição de Pagamento",
   "Mão de Obra e Material",
   "Comparativo de Linhas",
   "Alteração de Preço",
