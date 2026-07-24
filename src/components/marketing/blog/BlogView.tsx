@@ -26,7 +26,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { uploadImage } from "@/lib/uploadImage";
 import { cn } from "@/lib/utils";
-import { ComposerInput, type Attachment } from "@/components/ui/composer-input";
+import { ComposerInput } from "@/components/ui/composer-input";
 
 export interface BlogCard {
   id: string;
@@ -114,20 +114,25 @@ export function BlogView() {
   }
 
   async function handleImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const inputEl = e.target;
+    const file = inputEl.files?.[0];
     if (!file) return;
+
+    // Preview instantâneo sem delay de rede
+    const instantPreviewUrl = URL.createObjectURL(file);
+    setFormSrc(instantPreviewUrl);
 
     try {
       setUploadingImage(true);
-      const publicUrl = await uploadImage(file, "blog-cards", true, true);
+      const publicUrl = await uploadImage(file, "campanhas", true, true);
       if (publicUrl) {
         setFormSrc(publicUrl);
       }
     } catch (err) {
       console.error("Erro ao enviar imagem:", err);
-      alert("Falha ao enviar imagem. Tente novamente.");
     } finally {
       setUploadingImage(false);
+      inputEl.value = "";
     }
   }
 
@@ -225,16 +230,6 @@ export function BlogView() {
     return text.replace(/<[^>]*>?/gm, '').replace(/\*\*/g, '').replace(/\*/g, '');
   }
 
-  const attachmentsList: Attachment[] = formSrc
-    ? [
-        {
-          id: "capa-1",
-          fileName: "Capa-do-Post.jpg",
-          fileType: "image",
-          thumbnailUrl: formSrc,
-        },
-      ]
-    : [];
 
   const embedCodeScript = `<script>
   // Integração com o HUB Carflax (Busca cards do Marketing em tempo real do Supabase)
@@ -532,14 +527,11 @@ export function BlogView() {
                       <img src={formSrc} alt="Capa da Publicação" className="w-full h-full object-cover" />
                     </div>
 
-                    <div className="flex-1 space-y-1 text-center md:text-left">
+                    <div className="flex-1 text-center md:text-left min-w-0">
                       <div className="flex items-center gap-1.5 justify-center md:justify-start text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                         <Check className="w-4 h-4" />
                         <span>Foto Carregada com Sucesso</span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground line-clamp-1 break-all">
-                        {formSrc}
-                      </p>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
@@ -601,9 +593,6 @@ export function BlogView() {
                 <ComposerInput
                   value={formQuote}
                   onChange={(val) => setFormQuote(val)}
-                  onFileUpload={handleImageFileChange}
-                  attachments={attachmentsList}
-                  onRemoveAttachment={() => setFormSrc("")}
                   placeholder="Digite o texto completo do seu artigo..."
                 />
               </div>
