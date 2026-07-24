@@ -203,7 +203,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
   const allowedSubquadros = useMemo(() => {
     if (!userProfile) return [];
     const role = userProfile.role?.toUpperCase() || "";
-    const isManager = userProfile.is_admin || role.includes("ADMIN") || role.includes("GERENTE") || role.includes("DIRETOR");
+    const isManager = userProfile.is_admin || role === "ADMIN" || role.includes("GERENTE") || role.includes("DIRETOR");
     if (isManager) return subquadros;
 
     const userDept = userProfile.department?.trim().toLowerCase();
@@ -270,7 +270,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
   const isAllowed = (label: string) => {
     // Admin e Gerente vê tudo
     const role = userProfile?.role?.toUpperCase() || "";
-    if (role.includes('ADMIN') || role.includes('GERENTE')) return true;
+    if (role === 'ADMIN' || role.includes('GERENTE')) return true;
 
     // Subquadros da Esteira: apenas membros do próprio subquadro (via departamento) ou admin/gerente/diretor
     if (label.startsWith(ESTEIRA_SUBQUADRO_PREFIX)) {
@@ -278,7 +278,7 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
       const sub = subquadros.find(s => s.id === subquadroId);
       if (!sub) return false;
       
-      const isManager = role.includes('ADMIN') || role.includes('GERENTE') || role.includes('DIRETOR') || userProfile?.is_admin;
+      const isManager = role === 'ADMIN' || role.includes('GERENTE') || role.includes('DIRETOR') || userProfile?.is_admin;
       if (isManager) return true;
 
       const userDept = userProfile?.department?.trim().toLowerCase();

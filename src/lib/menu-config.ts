@@ -189,7 +189,7 @@ export function canAccessSection(profile: AccessProfile | null | undefined, item
 
   const role = profile.role?.toUpperCase() || "";
   // Admin e Gerente veem tudo
-  if (profile.is_admin || role.includes("ADMIN") || role.includes("GERENTE")) return true;
+  if (profile.is_admin || role === "ADMIN" || role.includes("GERENTE")) return true;
 
   // Subquadros da Esteira são abertos pra todo mundo, igual a própria Esteira
   if (item.startsWith(ESTEIRA_SUBQUADRO_PREFIX)) return true;

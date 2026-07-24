@@ -167,7 +167,7 @@ export function FollowUpReminder({ userProfile, onNavigateToFollowUps }: Props) 
 
   const isManager = (() => {
     const role = userProfile?.role?.toUpperCase() || "";
-    return role.includes("ADMIN") || role.includes("GERENTE") || role.includes("DIRETOR");
+    return role === "ADMIN" || role.includes("GERENTE") || role.includes("DIRETOR");
   })();
 
   const handleSnooze = () => {

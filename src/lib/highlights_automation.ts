@@ -22,7 +22,7 @@ export async function calculateMonthlyWinner(_mesano: string) {
         const userRole = usersRoles?.find(u => String(u.operator_code) === String(v.COD_VENDEDOR))?.role || "Consultor de Vendas";
         
         // Critério de exclusão: Gerentes e Admins não entram no destaque de performance de vendas
-        const isManager = userRole.toUpperCase().includes("GERENTE") || userRole.toUpperCase().includes("ADMIN");
+        const isManager = userRole.toUpperCase().includes("GERENTE") || userRole.toUpperCase() === "ADMIN";
         if (isManager) return null;
 
         const faturado = parseFloat(String(v.FATURADO)) || 0;

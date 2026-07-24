@@ -625,7 +625,7 @@ function NotificationsTab({ userProfile }: { userProfile?: UserProfile | null })
   const [savedResp, setSavedResp] = useState(false);
 
   const isManager = userProfile?.is_admin ||
-    userProfile?.role?.toUpperCase().includes('ADMIN') ||
+    userProfile?.role?.toUpperCase() === 'ADMIN' ||
     userProfile?.role?.toUpperCase().includes('GERENTE');
 
   const [testingId, setTestingId] = useState<string | null>(null);

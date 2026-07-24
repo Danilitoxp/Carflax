@@ -272,7 +272,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
   const [newSubtaskText, setNewSubtaskText] = useState("");
 
   const role = userProfile?.role?.toUpperCase() || "";
-  const isManager = role.includes("ADMIN") || role.includes("GERENTE");
+  const isManager = role === "ADMIN" || role.includes("GERENTE");
   const [isCreateSubquadroOpen, setIsCreateSubquadroOpen] = useState(false);
   const [isAddPeopleOpen, setIsAddPeopleOpen] = useState(false);
 
@@ -306,7 +306,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
   const isAllowedToViewSubquadro = useMemo(() => {
     if (!isSubquadroView || !subquadro || !userProfile) return true;
     const roleUpper = userProfile.role?.toUpperCase() || "";
-    const isManagerOrAdmin = userProfile.is_admin || roleUpper.includes("ADMIN") || roleUpper.includes("GERENTE") || roleUpper.includes("DIRETOR");
+    const isManagerOrAdmin = userProfile.is_admin || roleUpper === "ADMIN" || roleUpper.includes("GERENTE") || roleUpper.includes("DIRETOR");
     if (isManagerOrAdmin) return true;
 
     const userDept = userProfile.department?.trim().toLowerCase();

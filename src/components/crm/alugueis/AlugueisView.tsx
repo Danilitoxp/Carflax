@@ -212,8 +212,8 @@ export function AlugueisView({ userProfile }: AlugueisViewProps) {
   const [configMachines, setConfigMachines] = useState<Machine[]>([]);
 
   const isUserAdmin = userProfile ? (
-    userProfile.role?.toUpperCase().includes("ADMIN") || 
-    userProfile.role?.toUpperCase().includes("TI") || 
+    userProfile.role?.toUpperCase() === "ADMIN" ||
+    userProfile.role?.toUpperCase() === "TI" ||
     userProfile.role?.toUpperCase().includes("DIRETOR") || 
     userProfile.is_admin
   ) : false;

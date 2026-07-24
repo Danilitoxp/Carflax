@@ -250,14 +250,14 @@ export function CarteiraView({ userProfile }: { userProfile?: UserProfile }) {
     userProfile?.is_leader === true ||
     (userProfile?.role || "").toUpperCase().includes("GERENTE") ||
     (userProfile?.role || "").toUpperCase().includes("DIRETOR") ||
-    (userProfile?.role || "").toUpperCase().includes("ADMIN");
+    (userProfile?.role || "").toUpperCase() === "ADMIN";
   // Acesso TOTAL (vê todos os vendedores): admin, diretoria ou gerência. Supervisor de
   // vendas NÃO é acesso total — fica limitado ao próprio time (ver carteirasVisiveis).
   const isFullAccess =
     userProfile?.is_admin === true ||
     (userProfile?.role || "").toUpperCase().includes("GERENTE") ||
     (userProfile?.role || "").toUpperCase().includes("DIRETOR") ||
-    (userProfile?.role || "").toUpperCase().includes("ADMIN");
+    (userProfile?.role || "").toUpperCase() === "ADMIN";
   const meuCod = normCod(userProfile?.operator_code || userProfile?.operatorCode);
 
   const loadData = useCallback(async () => {
