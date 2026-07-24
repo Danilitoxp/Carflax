@@ -19,7 +19,9 @@ import { SimuladorCompraModal } from "./SimuladorCompraModal";
 type Tab = "leadtime" | "alertas" | "sugestoes";
 
 export function ComprasView() {
-  const [tab, setTab] = useState<Tab>("leadtime");
+  // Abre direto na Reposição: é a tela acionável do comprador (o que precisa
+  // comprar agora). Lead Time e Recompra ficam como apoio nas abas seguintes.
+  const [tab, setTab] = useState<Tab>("sugestoes");
   const [lead, setLead] = useState<FornecedorLeadTime[]>([]);
   const [vendas, setVendas] = useState<VendaGrande[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,9 +155,9 @@ export function ComprasView() {
   };
 
   const TABS: { id: Tab; label: string; count?: number; icon: React.ElementType }[] = [
-    { id: "leadtime", label: "Lead Time", count: lead.length, icon: Truck },
-    { id: "alertas", label: "Recompra", count: vendas.length, icon: AlertTriangle },
     { id: "sugestoes", label: "Reposição", icon: Lightbulb },
+    { id: "alertas", label: "Recompra", count: vendas.length, icon: AlertTriangle },
+    { id: "leadtime", label: "Lead Time", count: lead.length, icon: Truck },
   ];
 
   return (

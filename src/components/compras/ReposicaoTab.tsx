@@ -6,7 +6,7 @@ import {
 import { cn } from "@/lib/utils";
 import { apiComprasReposicao, type ReposicaoItem, type ReposicaoResumo } from "@/lib/api";
 
-type Vista = "comprar" | "ruptura" | "excesso" | "todos";
+type Vista = "comprar" | "ruptura" | "transito" | "excesso" | "todos";
 
 const brNum = (n: number, dec = 0) =>
   n.toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
@@ -64,6 +64,36 @@ export function ReposicaoTab() {
     return () => { if (pollRef.current) clearTimeout(pollRef.current); };
   }, [carregar]);
 
+  // ── Prioridade de compra ────────────────────────────────────────────────────
+  // "O que eu compro agora?". Score composto (maior = mais urgente), sempre sobre
+  // o catálogo inteiro (independe de busca/filtro/vista):
+  //   • Risco de prazo (PRINCIPAL): atraso = lead time − cobertura de estoque.
+  //     Quanto maior o atraso, mais o estoque acaba antes de a reposição chegar.
+  //   • Ruptura: item já sem estoque recebe um degrau forte pra frente.
+  //   • Curva ABC e faturamento: dão preferência aos itens comercialmente pesados
+  //     entre os de risco parecido (A/maior receita passam na frente).
+  const { prioridade, proximos } = useMemo(() => {
+    const cand = data.filter((x) => x.sugerido > 0 && x.d_dia > 0 && !x.irregular);
+    if (cand.length === 0) return { prioridade: null, proximos: [] };
+
+    const atrasoDe = (x: ReposicaoItem) => x.lead_time - (x.cobertura_dias ?? 0);
+    const atrasos = cand.map(atrasoDe);
+    const minAtraso = Math.min(...atrasos);
+    const spanAtraso = Math.max(...atrasos) - minAtraso || 1;
+    const maxReceita = Math.max(...cand.map((x) => x.receita || 0), 1);
+    const abcPeso = (abc: string) => (abc === "A" ? 1 : abc === "B" ? 0.6 : 0.3);
+
+    const score = (x: ReposicaoItem) => {
+      const riscoPrazo = (atrasoDe(x) - minAtraso) / spanAtraso;   // 0..1 (considera lead time)
+      const receita = (x.receita || 0) / maxReceita;               // 0..1 (faturamento)
+      const emRuptura = x.saldo <= 0 || x.status === "RUPTURA";
+      return (emRuptura ? 1 : 0) + 0.9 * riscoPrazo + 0.5 * abcPeso(x.abc) + 0.35 * receita;
+    };
+
+    const ranked = [...cand].sort((a, b) => score(b) - score(a));
+    return { prioridade: ranked[0] ?? null, proximos: ranked.slice(1, 4) };
+  }, [data]);
+
   const rows = useMemo(() => {
     const q = busca.trim().toLowerCase();
     let arr = data.filter((x) => {
@@ -71,14 +101,26 @@ export function ReposicaoTab() {
       if (q && !(x.produto.toLowerCase().includes(q) || x.cod.includes(q) || x.fornecedor.toLowerCase().includes(q))) return false;
       if (vista === "comprar") return x.sugerido > 0;
       if (vista === "ruptura") return x.status === "RUPTURA";
+      if (vista === "transito") return x.em_transito > 0; // já comprado, a caminho
       if (vista === "excesso") return x.status === "EXCESSO";
       return true;
     });
     if (vista === "excesso") arr.sort((a, b) => b.valor_estoque - a.valor_estoque);
     else if (vista === "ruptura") arr.sort((a, b) => (b.d_dia - a.d_dia));
+    else if (vista === "transito") arr.sort((a, b) => b.em_transito - a.em_transito);
     else arr.sort((a, b) => b.valor_sugerido - a.valor_sugerido);
     return arr.slice(0, 400);
   }, [data, busca, abcFiltro, vista]);
+
+  // O que já foi comprado e está a caminho (o backend só devolve o total somado
+  // por produto — aqui consolidamos SKUs e unidades para o KPI e a vista Trânsito).
+  const transito = useMemo(() => {
+    const itens = data.filter((x) => x.em_transito > 0);
+    return {
+      skus: itens.length,
+      unidades: itens.reduce((s, x) => s + x.em_transito, 0),
+    };
+  }, [data]);
 
   const copiarPedido = (x: ReposicaoItem) => {
     const txt = `🛒 *SUGESTÃO DE COMPRA - CARFLAX HUB*
@@ -165,13 +207,25 @@ ${blocos.join("\n\n")}
     { label: "Ruptura", value: brNum(resumo?.ruptura ?? 0), icon: PackageX, tone: "text-rose-500 bg-rose-500/10", vista: "ruptura" as Vista },
     { label: "Abaixo do ROP", value: brNum(resumo?.abaixo_rop ?? 0), icon: TrendingDown, tone: "text-amber-500 bg-amber-500/10", vista: "comprar" as Vista },
     { label: "Comprar (estim.)", value: brMoney(resumo?.valor_comprar ?? 0), icon: ShieldAlert, tone: "text-primary bg-primary/10", vista: "comprar" as Vista },
+    { label: "Já comprado (trânsito)", value: brNum(transito.skus), sub: `${brNum(transito.unidades)} un a caminho`, icon: Truck, tone: "text-blue-500 bg-blue-500/10", vista: "transito" as Vista },
     { label: "Capital parado", value: brMoney(resumo?.valor_parado ?? 0), icon: Boxes, tone: "text-indigo-500 bg-indigo-500/10", vista: "excesso" as Vista },
   ];
 
   return (
     <div className="space-y-4">
+      {/* Prioridade de compra — primeira coisa que o comprador vê */}
+      {prioridade && (
+        <PrioridadeCard
+          item={prioridade}
+          proximos={proximos}
+          copiado={copiado === prioridade.cod}
+          onCopiar={() => copiarPedido(prioridade)}
+          onVerProximo={(cod) => { setBusca(cod); setVista("comprar"); }}
+        />
+      )}
+
       {/* KPIs executivos (clicáveis → viram filtro) */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         {KPIS.map((k) => {
           const Icon = k.icon;
           return (
@@ -184,6 +238,7 @@ ${blocos.join("\n\n")}
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground truncate">{k.label}</p>
                 <p className="text-lg font-black text-foreground leading-tight truncate">{k.value}</p>
+                {k.sub && <p className="text-[9px] font-bold text-muted-foreground truncate">{k.sub}</p>}
               </div>
             </button>
           );
@@ -202,7 +257,7 @@ ${blocos.join("\n\n")}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Vistas */}
           <div className="flex bg-card border border-border p-1 rounded-xl gap-1">
-            {([["comprar", "Comprar"], ["ruptura", "Ruptura"], ["excesso", "Excesso"], ["todos", "Todos"]] as [Vista, string][]).map(([v, lbl]) => (
+            {([["comprar", "Comprar"], ["ruptura", "Ruptura"], ["transito", "Trânsito"], ["excesso", "Excesso"], ["todos", "Todos"]] as [Vista, string][]).map(([v, lbl]) => (
               <button key={v} onClick={() => setVista(v)}
                 className={cn("px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
                   vista === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
@@ -256,7 +311,7 @@ ${blocos.join("\n\n")}
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={9} className="py-14 text-center text-muted-foreground text-xs font-black uppercase tracking-wider">Nenhum item nesta vista</td></tr>
+                <tr><td colSpan={9} className="py-14 text-center text-muted-foreground text-xs font-black uppercase tracking-wider">{vista === "transito" ? "Nenhuma compra a caminho" : "Nenhum item nesta vista"}</td></tr>
               ) : rows.map((x) => {
                 const critico = x.status === "RUPTURA";
                 return (
@@ -340,6 +395,143 @@ ${blocos.join("\n\n")}
           {cacheIdade != null && <span className="ml-1 opacity-70">· dados de {cacheIdade < 60 ? "agora" : `${Math.round(cacheIdade / 60)} min atrás`}</span>}
         </span>
       </p>
+    </div>
+  );
+}
+
+// ── Card de prioridade ──────────────────────────────────────────────────────
+// Destaca o item mais crítico a comprar. A urgência considera o lead time:
+// folga = cobertura de estoque − lead time. Folga negativa = o pedido já deveria
+// ter saído (o estoque acaba antes de a reposição chegar).
+function PrioridadeCard({
+  item, proximos, copiado, onCopiar, onVerProximo,
+}: {
+  item: ReposicaoItem;
+  proximos: ReposicaoItem[];
+  copiado: boolean;
+  onCopiar: () => void;
+  onVerProximo: (cod: string) => void;
+}) {
+  const emRuptura = item.saldo <= 0 || item.status === "RUPTURA";
+  const folga = Math.round((item.cobertura_dias ?? 0) - item.lead_time);
+
+  const urgencia = emRuptura
+    ? "Sem estoque agora"
+    : folga < 0
+    ? `Pedido atrasado ${Math.abs(folga)}d`
+    : folga === 0
+    ? "Comprar hoje"
+    : `Comprar em até ${folga}d`;
+
+  // Crítico (vermelho): já rompeu ou o pedido está atrasado. Senão, atenção (âmbar).
+  const critico = emRuptura || folga < 0;
+
+  return (
+    <div className={cn(
+      "relative overflow-hidden rounded-3xl border p-5 md:p-6",
+      critico
+        ? "border-rose-500/30 bg-gradient-to-br from-rose-500/[0.07] via-card to-card"
+        : "border-amber-500/30 bg-gradient-to-br from-amber-500/[0.06] via-card to-card",
+    )}>
+      <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", critico ? "bg-rose-500" : "bg-amber-500")} />
+
+      <div className="flex flex-col lg:flex-row lg:items-center gap-5 pl-2">
+        {/* Identidade do produto */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-60", critico ? "bg-rose-500" : "bg-amber-500")} />
+              <span className={cn("relative inline-flex rounded-full h-2.5 w-2.5", critico ? "bg-rose-500" : "bg-amber-500")} />
+            </span>
+            <span className={cn("text-[10px] font-black uppercase tracking-[0.2em]", critico ? "text-rose-500" : "text-amber-500")}>
+              {emRuptura ? "Ruptura · comprar agora" : "Prioridade de compra"}
+            </span>
+          </div>
+          <h2 className="text-xl md:text-2xl font-black text-foreground leading-tight line-clamp-2">
+            {item.produto || "—"}
+          </h2>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-1">
+            #{item.cod}{item.marca ? ` · ${item.marca}` : ""} · curva {item.abc}
+          </p>
+          <div className="flex items-center gap-1.5 mt-2.5 text-sm">
+            <Truck className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="font-bold text-foreground truncate">{item.fornecedor || "Fornecedor a definir"}</span>
+            <span className="text-muted-foreground whitespace-nowrap">
+              · lead time ~{brNum(item.lead_time)}d{item.lead_time_estimado ? " (estim.)" : ""}
+            </span>
+          </div>
+        </div>
+
+        {/* Métricas */}
+        <div className="grid grid-cols-3 gap-4 lg:gap-6 shrink-0">
+          <Metric
+            label="Estoque"
+            value={brNum(item.saldo)}
+            sub={item.em_transito > 0 ? `+${brNum(item.em_transito)} trânsito` : "sem trânsito"}
+            tone={item.saldo <= 0 ? "text-rose-500" : "text-foreground"}
+          />
+          <Metric label="Demanda" value={brNum(item.d_dia, 1)} sub="un/dia" />
+          <Metric
+            label="Cobertura"
+            value={item.cobertura_dias == null ? "—" : `${brNum(item.cobertura_dias)}d`}
+            sub={urgencia}
+            tone={coberturaCor(item.cobertura_dias)}
+          />
+        </div>
+
+        {/* Ação */}
+        <div className="shrink-0 flex flex-col items-stretch lg:items-end gap-2 lg:pl-6 lg:border-l lg:border-border">
+          <div className="text-center lg:text-right">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Comprar</p>
+            <p className="text-3xl font-black text-foreground leading-none">
+              {brNum(item.sugerido)}<span className="text-base text-muted-foreground ml-1">un</span>
+            </p>
+            <p className="text-xs font-bold text-primary mt-0.5">{brMoney(item.valor_sugerido)}</p>
+          </div>
+          <button
+            onClick={onCopiar}
+            className={cn(
+              "h-10 px-4 rounded-xl text-[11px] font-black uppercase tracking-wider inline-flex items-center justify-center gap-1.5 border transition-all",
+              copiado
+                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+                : "bg-primary text-primary-foreground border-primary hover:opacity-90",
+            )}
+          >
+            {copiado ? <><Check className="w-3.5 h-3.5" /> Copiado</> : <><Copy className="w-3.5 h-3.5" /> Copiar pedido</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Próximos da fila */}
+      {proximos.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-border/60 flex flex-wrap items-center gap-x-2 gap-y-1.5 pl-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mr-1">Na sequência</span>
+          {proximos.map((p) => (
+            <button
+              key={p.cod}
+              onClick={() => onVerProximo(p.cod)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/60 hover:bg-secondary border border-border/60 text-[11px] font-bold text-foreground transition-colors max-w-[240px]"
+              title={p.produto}
+            >
+              {(p.saldo <= 0 || p.status === "RUPTURA") && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />}
+              <span className="truncate">{p.produto || `#${p.cod}`}</span>
+              <span className="text-muted-foreground whitespace-nowrap">· {brNum(p.sugerido)}un</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Metric({ label, value, sub, tone = "text-foreground" }: {
+  label: string; value: string; sub: string; tone?: string;
+}) {
+  return (
+    <div className="text-center">
+      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className={cn("text-lg font-black leading-tight tabular-nums", tone)}>{value}</p>
+      <p className="text-[9px] font-bold text-muted-foreground mt-0.5 whitespace-nowrap">{sub}</p>
     </div>
   );
 }
