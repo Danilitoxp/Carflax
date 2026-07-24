@@ -851,3 +851,42 @@ export const apiAvaliacaoBuild = () =>
 
 export const apiAvaliacaoControl = (action: "start" | "pause" | "stop") =>
   post<{ success: boolean; status: string }>("/api/avaliacao-campanha/control", { action });
+
+// ── Automação: campanhas de envio genéricas por tipo (ex.: café da manhã) ─────
+export interface CampanhaEnvioConfig {
+  tipo: string;
+  nome: string;
+  publico: string;
+  status: "idle" | "running" | "paused";
+  templates: string[];
+  daily_cap: number;
+  min_gap_seconds: number;
+  max_gap_seconds: number;
+  hora_inicio: number;
+  hora_fim: number;
+  dias_semana: number[];
+  reask_days: number;
+  sent_today: number;
+  last_sent_at?: string | null;
+}
+export interface CampanhaEnvioStatus {
+  success: boolean;
+  campanha: CampanhaEnvioConfig;
+  contadores: { pending: number; sent: number; failed: number };
+  recentes: AvaliacaoCampanhaEnvio[];
+}
+
+export const apiCampanhaStatus = (tipo: string) =>
+  get<CampanhaEnvioStatus>(`/api/campanhas/${tipo}/status`);
+
+export const apiCampanhaSaveConfig = (tipo: string, cfg: Partial<CampanhaEnvioConfig>) =>
+  post<{ success: boolean }>(`/api/campanhas/${tipo}/config`, cfg);
+
+export const apiCampanhaBuild = (tipo: string) =>
+  post<{ success: boolean; elegiveis: number; inseridos: number; pending: number }>(
+    `/api/campanhas/${tipo}/build`,
+    {},
+  );
+
+export const apiCampanhaControl = (tipo: string, action: "start" | "pause" | "stop") =>
+  post<{ success: boolean; status: string }>(`/api/campanhas/${tipo}/control`, { action });

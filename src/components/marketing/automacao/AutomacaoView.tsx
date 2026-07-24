@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Save,
   ListPlus,
+  Coffee,
 } from "lucide-react";
 import {
   apiAvaliacaoStatus,
@@ -21,6 +22,42 @@ import {
   type AvaliacaoCampanhaStatus,
   type AvaliacaoCampanhaConfig,
 } from "@/lib/api";
+import { CampanhaEnvioPanel } from "./CampanhaEnvioPanel";
+
+// Automação suporta vários "tipos de envio". Avaliações é o legado dedicado;
+// os demais (café da manhã etc.) usam o motor genérico de campanhas.
+type Aba = "avaliacao" | "cafe_manha";
+
+export function AutomacaoView() {
+  const [aba, setAba] = useState<Aba>("avaliacao");
+
+  const TABS: [Aba, string, React.ElementType][] = [
+    ["avaliacao", "Avaliações", Star],
+    ["cafe_manha", "Café da manhã", Coffee],
+  ];
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-background text-foreground overflow-y-auto">
+      <div className="max-w-5xl w-full mx-auto px-6 md:px-8 pt-6 md:pt-8">
+        <div className="inline-flex bg-card border border-border p-1 rounded-2xl gap-1">
+          {TABS.map(([id, label, Ic]) => (
+            <button
+              key={id}
+              onClick={() => setAba(id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                aba === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Ic className="w-4 h-4" /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {aba === "avaliacao" ? <AvaliacaoPanel /> : <CampanhaEnvioPanel tipo="cafe_manha" />}
+    </div>
+  );
+}
 
 const DIAS = [
   { v: 1, l: "Seg" },
@@ -38,7 +75,7 @@ const STATUS_INFO: Record<string, { label: string; cls: string }> = {
   idle: { label: "Parado", cls: "bg-muted text-muted-foreground border-border" },
 };
 
-export function AutomacaoView() {
+function AvaliacaoPanel() {
   const [data, setData] = useState<AvaliacaoCampanhaStatus | null>(null);
   const [cfg, setCfg] = useState<AvaliacaoCampanhaConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,8 +165,7 @@ export function AutomacaoView() {
   const cap = data?.campanha.daily_cap || 0;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-background text-foreground overflow-y-auto">
-      <div className="max-w-5xl w-full mx-auto p-6 md:p-8 space-y-6">
+      <div className="max-w-5xl w-full mx-auto px-6 md:px-8 pt-6 pb-8 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
@@ -333,7 +369,6 @@ export function AutomacaoView() {
           )}
         </div>
       </div>
-    </div>
   );
 }
 
