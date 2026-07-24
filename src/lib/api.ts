@@ -859,6 +859,9 @@ export interface CampanhaEnvioConfig {
   publico: string;
   status: "idle" | "running" | "paused";
   templates: string[];
+  data_evento?: string | null;
+  image_url?: string | null;
+  video_url?: string | null;
   daily_cap: number;
   min_gap_seconds: number;
   max_gap_seconds: number;
@@ -890,3 +893,6 @@ export const apiCampanhaBuild = (tipo: string) =>
 
 export const apiCampanhaControl = (tipo: string, action: "start" | "pause" | "stop") =>
   post<{ success: boolean; status: string }>(`/api/campanhas/${tipo}/control`, { action });
+
+export const apiCampanhaTest = (tipo: string, phone: string) =>
+  post<{ success: boolean; phone?: string; warning?: string | null; error?: string }>(`/api/campanhas/${tipo}/test`, { phone });

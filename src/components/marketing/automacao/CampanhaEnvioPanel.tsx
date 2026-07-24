@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Play, Pause, Square, RefreshCw, ShieldCheck, Clock, Send, AlertTriangle, Save, ListPlus, Coffee, Megaphone,
+  ImagePlus, Film, X, Loader2, Bold, Italic, Strikethrough, Code,
 } from "lucide-react";
 import {
-  apiCampanhaStatus, apiCampanhaSaveConfig, apiCampanhaBuild, apiCampanhaControl,
+  apiCampanhaStatus, apiCampanhaSaveConfig, apiCampanhaBuild, apiCampanhaControl, apiCampanhaTest,
   type CampanhaEnvioStatus, type CampanhaEnvioConfig,
 } from "@/lib/api";
+import { uploadImage } from "@/lib/uploadImage";
 
 const DIAS = [
   { v: 1, l: "Seg" }, { v: 2, l: "Ter" }, { v: 3, l: "Qua" }, { v: 4, l: "Qui" },
@@ -21,6 +23,48 @@ const STATUS_INFO: Record<string, { label: string; cls: string }> = {
 const PUBLICO_LABEL: Record<string, string> = {
   trafego_pago: "Leads do tráfego pago (Meta, Google, Instagram…)",
 };
+
+// Máscara de telefone BR: (47) 99999-9999
+function formatPhoneBR(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
+// Reencoda imagem para JPEG (máx. 1600px) para o Evolution nunca receber formatos
+// que ele não decodifica (HEIC/WEBP etc.). Se o navegador não conseguir decodificar
+// (ex.: HEIC), REJEITA — assim nunca salvamos uma imagem que o WhatsApp vai recusar.
+function toJpegFile(file: File, maxDim = 1600, quality = 0.85): Promise<File> {
+  if (!file.type.startsWith("image/")) return Promise.resolve(file);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const width = Math.round(img.width * scale);
+      const height = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => blob
+          ? resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }))
+          : reject(new Error("Não foi possível processar a imagem.")),
+        "image/jpeg",
+        quality,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Formato de imagem não suportado (ex.: HEIC). Use JPG ou PNG."));
+    };
+    img.src = url;
+  });
+}
 
 // Ícone e textos por tipo — hoje só café da manhã, mas o painel é genérico.
 const TIPO_UI: Record<string, { icon: React.ElementType; titulo: string; subtitulo: string }> = {
@@ -76,6 +120,69 @@ export function CampanhaEnvioPanel({ tipo }: { tipo: string }) {
     } finally {
       setBusy(null);
     }
+  };
+
+  const [uploading, setUploading] = useState<"image" | "video" | null>(null);
+  const [testPhone, setTestPhone] = useState("");
+  const templatesRef = useRef<HTMLTextAreaElement>(null);
+
+  // Envolve o trecho selecionado com o marcador de formatação do WhatsApp.
+  const wrapSelecao = (marca: string) => {
+    const ta = templatesRef.current;
+    if (!ta) return;
+    const { selectionStart: s, selectionEnd: e, value } = ta;
+    if (s == null || e == null || s === e) return; // precisa de texto selecionado
+    const novo = value.slice(0, s) + marca + value.slice(s, e) + marca + value.slice(e);
+    patch({ templates: [novo] });
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.selectionStart = s + marca.length;
+      ta.selectionEnd = e + marca.length;
+    });
+  };
+
+  const enviarTeste = async () => {
+    setBusy("test");
+    setMsg(null);
+    try {
+      const r = await apiCampanhaTest(tipo, testPhone);
+      if (!r.success) throw new Error(r.error || "Falha no teste.");
+      setMsg(r.warning ? `Teste enviado para ${r.phone || testPhone} — ⚠️ ${r.warning}` : `Teste enviado para ${r.phone || testPhone}.`);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Falha ao enviar teste.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Mídia é persistida na hora (envia a config inteira) pra não se perder num reload.
+  const persistCfg = async (next: CampanhaEnvioConfig) => {
+    setCfg(next);
+    await apiCampanhaSaveConfig(tipo, next);
+    dirty.current = false;
+    await load();
+  };
+
+  const handleMedia = async (file: File, kind: "image" | "video") => {
+    if (!cfg) return;
+    setUploading(kind);
+    setMsg(null);
+    try {
+      const toUpload = kind === "image" ? await toJpegFile(file) : file;
+      const url = await uploadImage(toUpload, "whatsapp-media", true);
+      if (!url) throw new Error("Falha no upload da mídia.");
+      await persistCfg({ ...cfg, [kind === "image" ? "image_url" : "video_url"]: url });
+      setMsg(kind === "image" ? "Imagem adicionada." : "Vídeo adicionado.");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Falha no upload da mídia.");
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const removeMedia = async (kind: "image" | "video") => {
+    if (!cfg) return;
+    await persistCfg({ ...cfg, [kind === "image" ? "image_url" : "video_url"]: "" });
   };
 
   const montarFila = async () => {
@@ -250,14 +357,51 @@ export function CampanhaEnvioPanel({ tipo }: { tipo: string }) {
             </div>
           </Field>
 
-          <Field label="Variações de mensagem (uma por linha) — use {nome}. Inclua a data/hora do café no texto.">
+          <Field label="Imagem e vídeo (opcional) — enviados junto com o texto">
+            <div className="flex flex-wrap gap-3 pt-1">
+              <MediaSlot kind="image" url={cfg.image_url} uploading={uploading === "image"}
+                onFile={(f) => handleMedia(f, "image")} onRemove={() => removeMedia("image")} />
+              <MediaSlot kind="video" url={cfg.video_url} uploading={uploading === "video"}
+                onFile={(f) => handleMedia(f, "video")} onRemove={() => removeMedia("video")} />
+            </div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-2">
+              Se houver imagem e vídeo, a imagem vai com o texto como legenda e o vídeo logo em seguida.
+            </p>
+          </Field>
+
+          <Field label="Data e horário do café (entra no lugar de {data})">
+            <input type="text" value={cfg.data_evento || ""}
+              onChange={(e) => patch({ data_evento: e.target.value })}
+              className={`${inputCls} max-w-md`} placeholder="ex.: quinta, 15/08 às 9h" />
+          </Field>
+
+          <Field label="Mensagem — use {nome} e {data}. O local já está fixo (Carflax).">
+            <div className="flex items-center gap-1 mb-2">
+              {([
+                [Bold, "*", "Negrito"],
+                [Italic, "_", "Itálico"],
+                [Strikethrough, "~", "Tachado"],
+                [Code, "```", "Monoespaçado"],
+              ] as [React.ElementType, string, string][]).map(([Ic, marca, titulo]) => (
+                <button key={titulo} type="button" title={`${titulo} — selecione o texto e clique`}
+                  onMouseDown={(e) => { e.preventDefault(); wrapSelecao(marca); }}
+                  className="w-8 h-8 rounded-lg border border-border bg-secondary text-muted-foreground flex items-center justify-center hover:text-primary hover:border-primary/40 transition-colors">
+                  <Ic className="w-4 h-4" />
+                </button>
+              ))}
+              <span className="text-[10px] text-muted-foreground font-medium ml-1">Selecione o texto e clique</span>
+            </div>
             <textarea
-              value={cfg.templates.join("\n")}
-              onChange={(e) => patch({ templates: e.target.value.split("\n") })}
-              rows={6}
+              ref={templatesRef}
+              value={cfg.templates[0] || ""}
+              onChange={(e) => patch({ templates: [e.target.value] })}
+              rows={7}
               className={`${inputCls} font-mono text-[11px] leading-relaxed resize-y`}
-              placeholder="Oi {nome}! Vem tomar um café da manhã com a gente na Carflax dia XX/XX às 9h ☕"
+              placeholder={"Olá {nome}! ☕ Você está convidado(a) para um *café da manhã* na Carflax!\n\n📅 *Quando:* {data}\n📍 *Onde:* Av. Américo Bruno, 75 — Ponte São João"}
             />
+            <p className="text-[10px] text-muted-foreground font-medium mt-1.5">
+              Formatação do WhatsApp: <b>*negrito*</b>, <i>_itálico_</i>, ~tachado~, <code>```mono```</code>. Enter quebra linha.
+            </p>
           </Field>
 
           <div className="flex justify-end">
@@ -268,6 +412,31 @@ export function CampanhaEnvioPanel({ tipo }: { tipo: string }) {
           </div>
         </div>
       )}
+
+      {/* Testar antes de disparar pra base */}
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Testar antes de enviar</h2>
+        <p className="text-xs text-muted-foreground font-medium">
+          Manda a mensagem (com imagem/vídeo) só para um número, na hora, sem montar a fila.
+          Use para conferir como fica. <b>Salve a configuração antes</b> para testar o texto atual.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={testPhone}
+            onChange={(e) => setTestPhone(formatPhoneBR(e.target.value))}
+            inputMode="numeric"
+            placeholder="(47) 99999-9999"
+            className={`${inputCls} max-w-xs`}
+          />
+          <button
+            onClick={enviarTeste}
+            disabled={busy === "test" || testPhone.replace(/\D/g, "").length < 10}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary border border-border font-bold text-xs hover:border-primary/40 transition-all disabled:opacity-50"
+          >
+            <Send className="w-4 h-4" /> {busy === "test" ? "Enviando…" : "Enviar teste"}
+          </button>
+        </div>
+      </div>
 
       {/* Últimos envios */}
       <div className="rounded-2xl border border-border bg-card p-5">
@@ -311,6 +480,47 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1">
       <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function MediaSlot({ kind, url, uploading, onFile, onRemove }: {
+  kind: "image" | "video";
+  url?: string | null;
+  uploading: boolean;
+  onFile: (f: File) => void;
+  onRemove: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isImage = kind === "image";
+  return (
+    <div className="relative w-36 h-36 rounded-2xl border border-border bg-secondary overflow-hidden flex items-center justify-center shrink-0">
+      {url ? (
+        <>
+          {isImage ? (
+            <img src={url} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <video src={url} className="w-full h-full object-cover" muted playsInline />
+          )}
+          <button type="button" onClick={onRemove}
+            className="absolute top-1.5 right-1.5 w-7 h-7 rounded-lg bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+          <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/60 text-white text-[9px] font-black uppercase tracking-wider">
+            {isImage ? "Imagem" : "Vídeo"}
+          </span>
+        </>
+      ) : (
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+          className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-60">
+          {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : isImage ? <ImagePlus className="w-6 h-6" /> : <Film className="w-6 h-6" />}
+          <span className="text-[10px] font-black uppercase tracking-wider">
+            {uploading ? "Enviando…" : isImage ? "Add imagem" : "Add vídeo"}
+          </span>
+        </button>
+      )}
+      <input ref={inputRef} type="file" accept={isImage ? "image/*" : "video/*"} className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
     </div>
   );
 }
