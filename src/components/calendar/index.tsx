@@ -29,6 +29,7 @@ interface UserProfile {
   operator_code?: string; // Nome usado no App.tsx
   permissions?: string[];
   is_leader?: boolean;
+  department?: string;
 }
 
 interface CalendarEvent {
@@ -40,6 +41,15 @@ interface CalendarEvent {
   vendedor_codigo?: string; // Novo campo
   month?: number;
   year?: number;
+  setor_destino?: string | null;
+  usuario_destino_id?: string | null;
+  created_by?: string | null;
+}
+
+interface DirectoryUser {
+  id: string;
+  name: string;
+  department: string;
 }
 
 interface Vacation {
@@ -79,6 +89,7 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [vacations, setVacations] = useState<Vacation[]>([]);
   const [employees, setEmployees] = useState<{ name: string; avatar?: string }[]>([]);
+  const [directory, setDirectory] = useState<DirectoryUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Sincronizar aba ativa vinda do componente pai
@@ -96,10 +107,13 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
     title: string;
     description: string;
     type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch" | "follow-up";
+    // "" = todos; "setor:<Nome>" = setor específico; "user:<id>" = pessoa específica
+    destinatario: string;
   }>({
     title: "",
     description: "",
-    type: "video"
+    type: "video",
+    destinatario: ""
   });
 
   const year = currentDate.getFullYear();
@@ -122,7 +136,7 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
       const [evResp, vacResp, userResp, holidayResp] = await Promise.all([
         supabase.from("eventos_calendario").select("*").eq("month", month + 1).eq("year", year),
         supabase.from("ferias").select("*"),
-        supabase.from("usuarios").select("name, avatar, birth_date, admission_date"),
+        supabase.from("usuarios").select("id, name, avatar, department, birth_date, admission_date"),
         calendarCache.holidays[year] 
           ? Promise.resolve(calendarCache.holidays[year]) 
           : fetch(`https://brasilapi.com.br/api/feriados/v1/${year}`).then(r => r.ok ? r.json() : [])
@@ -142,7 +156,10 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
         title: e.title,
         type: e.type as CalendarEvent["type"],
         description: e.description || "",
-        vendedor_codigo: e.vendedor_codigo // Capturar o código do vendedor
+        vendedor_codigo: e.vendedor_codigo, // Capturar o código do vendedor
+        setor_destino: e.setor_destino || null,
+        usuario_destino_id: e.usuario_destino_id || null,
+        created_by: e.created_by || null
       }));
 
       // Processar Férias
@@ -161,6 +178,9 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
 
       // Processar Usuários
       const emps = (userResp.data || []).map(u => ({ name: u.name, avatar: u.avatar }));
+      const dir = (userResp.data || [])
+        .filter(u => u.id)
+        .map(u => ({ id: u.id as string, name: u.name, department: u.department || "" }));
 
       const birthdayEvents = (userResp.data || [])
         .filter(u => u.birth_date)
@@ -212,14 +232,23 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
 
       const finalEvents = [...manualEvents, ...birthdayEvents, ...admissionEvents, ...currentHolidayEvents];
 
-      // 5. Filtro de Privacidade para Follow-ups — apenas o próprio vendedor vê e ocultar passados
+      // 5. Filtro de Privacidade — eventos direcionados a um setor ou pessoa
+      // específica só aparecem para quem se encaixa; follow-ups seguem a regra
+      // antiga de ficar visível só pro próprio vendedor e sumir depois de vencer.
       const myCode = String(userProfile?.operator_code || userProfile?.seller_code || "").replace(/^0+/, '');
+      const myId = userProfile?.id;
+      const myDept = userProfile?.department;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const visibleEvents = finalEvents.filter(ev => {
+        // Quem criou o evento também precisa vê-lo no próprio calendário, senão
+        // não sobra nenhuma confirmação visual de que o direcionamento funcionou.
+        if (ev.usuario_destino_id) return ev.usuario_destino_id === myId || (!!ev.created_by && ev.created_by === myId);
+        if (ev.setor_destino) return (!!myDept && ev.setor_destino === myDept) || (!!ev.created_by && ev.created_by === myId);
+
         if (ev.type !== "follow-up") return true;
-        
+
         // Ocultar follow-ups que já passaram
         const evDate = new Date(ev.year, ev.month, ev.day);
         if (evDate < today) return false;
@@ -237,12 +266,13 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
       setEvents(visibleEvents);
       setVacations(loadedVacations);
       setEmployees(emps);
+      setDirectory(dir);
     } catch (e) {
       console.error("[Calendar] Erro ao carregar dados:", e);
     } finally {
       setLoading(false);
     }
-  }, [month, year, userProfile?.role, userProfile?.permissions, userProfile?.seller_code, userProfile?.operator_code]);
+  }, [month, year, userProfile?.role, userProfile?.permissions, userProfile?.seller_code, userProfile?.operator_code, userProfile?.id, userProfile?.department]);
 
   useEffect(() => {
     fetchAllData();
@@ -284,25 +314,40 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
   const handleSaveEvent = async () => {
     if (!newEvent.title || !selectedDay) return;
     try {
+      const [destKind, destValue] = newEvent.destinatario.split(":");
       const payload = {
         title: newEvent.title,
         description: newEvent.description || "",
         type: newEvent.type,
         day: Number(selectedDay),
         month: Number(month + 1),
-        year: Number(year)
+        year: Number(year),
+        setor_destino: destKind === "setor" ? destValue : null,
+        usuario_destino_id: destKind === "user" ? destValue : null
       };
-      if (editingEventId) {
-        await supabase.from("eventos_calendario").update(payload).eq("id", editingEventId);
-      } else {
-        await supabase.from("eventos_calendario").insert([payload]);
+      // Quem criou o evento continua vendo ele no próprio calendário mesmo
+      // direcionado a outra pessoa/setor. Eventos antigos não tinham `created_by`
+      // gravado — sem herdar a autoria aqui, direcionar um evento legado some ele
+      // até de quem acabou de editar, porque não bate com ninguém.
+      const existing = events.find(e => e.id === editingEventId);
+      const createdBy = existing?.created_by || userProfile?.id || null;
+      const { error } = editingEventId
+        ? await supabase.from("eventos_calendario").update({ ...payload, created_by: createdBy }).eq("id", editingEventId)
+        : await supabase.from("eventos_calendario").insert([{ ...payload, created_by: createdBy }]);
+
+      if (error) {
+        console.error("[Calendar] Erro ao salvar evento:", error);
+        alert(`Não foi possível salvar o evento: ${error.message}`);
+        return;
       }
+
       fetchAllData();
       setIsModalOpen(false);
       setEditingEventId(null);
-      setNewEvent({ title: "", description: "", type: "video" });
+      setNewEvent({ title: "", description: "", type: "video", destinatario: "" });
     } catch (err) {
       console.error("[Calendar] Erro evento:", err);
+      alert("Não foi possível salvar o evento. Tente novamente.");
     }
   };
 
@@ -338,7 +383,7 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
     if (!canManageEvents) return;
     setEditingEventId(null);
     setSelectedDay(day);
-    setNewEvent({ title: "", description: "", type: "video" });
+    setNewEvent({ title: "", description: "", type: "video", destinatario: "" });
     setIsModalOpen(true);
   };
 
@@ -346,7 +391,12 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
     e.stopPropagation();
     setEditingEventId(event.id);
     setSelectedDay(event.day);
-    setNewEvent({ title: event.title, description: event.description || "", type: event.type });
+    const destinatario = event.usuario_destino_id
+      ? `user:${event.usuario_destino_id}`
+      : event.setor_destino
+        ? `setor:${event.setor_destino}`
+        : "";
+    setNewEvent({ title: event.title, description: event.description || "", type: event.type, destinatario });
     setIsModalOpen(true);
   };
 
@@ -367,9 +417,10 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
         onDelete={handleDeleteEvent}
         selectedDay={selectedDay} 
         editingEventId={editingEventId} 
-        newEvent={newEvent} 
-        setNewEvent={setNewEvent} 
+        newEvent={newEvent}
+        setNewEvent={setNewEvent}
         canManage={canManageEvents}
+        directory={directory}
       />
       <div className="flex-1 overflow-hidden px-6 pt-4 pb-2 flex flex-col min-h-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border shrink-0">

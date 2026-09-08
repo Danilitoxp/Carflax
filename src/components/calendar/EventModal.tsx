@@ -1,6 +1,13 @@
-import { X, Calendar as CalendarIcon, Tag } from "lucide-react";
+import { X, Calendar as CalendarIcon, Tag, Users2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { TinyDropdown } from "../ui/TinyDropdown";
+import { SearchSelect } from "../ui/SearchSelect";
+
+interface DirectoryUser {
+  id: string;
+  name: string;
+  department: string;
+}
 
 interface EventModalProps {
   isOpen: boolean;
@@ -13,9 +20,11 @@ interface EventModalProps {
     title: string;
     description: string;
     type: "birthday" | "star" | "education" | "video" | "holiday" | "meeting" | "celebration" | "finance" | "important" | "launch" | "follow-up";
+    destinatario: string;
   };
   setNewEvent: (event: EventModalProps["newEvent"]) => void;
   canManage?: boolean;
+  directory?: DirectoryUser[];
 }
 
 export function EventModal({
@@ -27,8 +36,18 @@ export function EventModal({
   editingEventId,
   newEvent,
   setNewEvent,
-  canManage = true
+  canManage = true,
+  directory = []
 }: EventModalProps) {
+  const departments = [...new Set(directory.map(u => u.department).filter(Boolean))].sort();
+  const destinatarioOptions = [
+    { label: "Todos (Padrão)", value: "" },
+    ...departments.map(d => ({ label: d, value: `setor:${d}`, group: "Setores" })),
+    ...directory
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(u => ({ label: u.name, value: `user:${u.id}`, group: "Pessoas" }))
+  ];
   return (
     <>
       {isOpen && (
@@ -104,6 +123,19 @@ export function EventModal({
                         onChange={(val) => setNewEvent({...newEvent, type: val as EventModalProps["newEvent"]["type"]})}
                         icon={Tag}
                         variant="blue"
+                        className="w-full"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider ml-1">Destinatário</label>
+                    <SearchSelect
+                        value={newEvent.destinatario}
+                        options={destinatarioOptions}
+                        onChange={(val) => setNewEvent({...newEvent, destinatario: val})}
+                        icon={Users2}
+                        placeholder="Buscar setor ou pessoa..."
+                        emptyLabel="Nenhum setor ou pessoa encontrado"
                         className="w-full"
                     />
                   </div>
