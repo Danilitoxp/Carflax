@@ -932,12 +932,15 @@ export { API_BASE };
 export interface AmancoVendedor {
   COD_VENDEDOR: string;
   NOME_VENDEDOR: string;
+  QTD_TOTAL: number;
   TOTAL_FATURADO: number;
+  PREMIO_TOTAL: number;
 }
 
 export interface AmancoCliente {
   COD_CLIENTE: string;
   CLIENTE: string;
+  QTD_TOTAL: number;
   TOTAL_FATURADO: number;
 }
 

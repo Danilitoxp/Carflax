@@ -447,9 +447,9 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
               <div className="space-y-1.5">
                 <p className="text-[9px] font-black text-cyan-500 uppercase tracking-[0.2em] opacity-80">Campanha Especial</p>
                 <h3 className="text-[11px] font-black text-foreground tracking-tight leading-tight uppercase">
-                  Seleção de Prêmios
+                  Caixa D'Água
                 </h3>
-                <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">Amanco</p>
+                <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">Amanco Wavin</p>
               </div>
               <div className="px-4 py-1.5 rounded-2xl bg-cyan-600/10 border border-cyan-500/20 flex items-center gap-2 group-hover:bg-cyan-600 group-hover:text-white transition-all">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-ping" />
