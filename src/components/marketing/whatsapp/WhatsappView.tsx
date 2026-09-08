@@ -1524,6 +1524,17 @@ export function WhatsappView({
       (userProfile.permissions || []).some((p: string) => /whatsapp/i.test(String(p))),
     [userProfile],
   );
+  /** Pode reatribuir atendente: admin, líder ou cargo gerencial. */
+  const isAdminUser = useMemo(() => {
+    const role = (userProfile?.role || "").toUpperCase();
+    return (
+      userProfile?.is_admin === true ||
+      userProfile?.is_leader === true ||
+      role === "ADMIN" ||
+      role.includes("GERENTE") ||
+      role.includes("DIRETOR")
+    );
+  }, [userProfile]);
   const [customArchiveReason, setCustomArchiveReason] = useState("");
   const [isEnteringCustomReason, setIsEnteringCustomReason] = useState(false);
   const [materialInput, setMaterialInput] = useState("");
@@ -1532,6 +1543,7 @@ export function WhatsappView({
   const [paymentMethod, setPaymentMethod] = useState("");
   const [archiveObservation, setArchiveObservation] = useState("");
   const [showTempDropdown, setShowTempDropdown] = useState(false);
+  const [showAtendentePicker, setShowAtendentePicker] = useState(false);
   const [isNoteMode, setIsNoteMode] = useState(false);
 
   // Atribuição de atendente e resposta a mensagens
@@ -1581,6 +1593,8 @@ export function WhatsappView({
 
   const chatListRef = useRef<HTMLDivElement>(null);
   const tempBtnRef = useRef<HTMLButtonElement>(null);
+  const atendenteBtnRef = useRef<HTMLDivElement>(null);
+  const [atendenteBtnRect, setAtendenteBtnRect] = useState<{ top: number; left: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   // O auto-scroll só vale quando o atendente já está no fim da conversa. Sem
   // isso, qualquer mensagem nova (de qualquer cliente, pelo realtime) jogava a
@@ -1665,16 +1679,24 @@ export function WhatsappView({
     }
   }, []);
 
-  // Carrega operadores (usuários)
+  // Carrega operadores (usuários) — apenas quem tem acesso ao WhatsApp no Hub:
+  // permissão "Whatsapp API" OU admin/gerente/diretor (acesso implícito a tudo).
   useEffect(() => {
     const loadOperators = async () => {
       try {
         const { data, error } = await supabase
           .from("usuarios")
-          .select("id, name, avatar")
+          .select("id, name, avatar, permissions, is_admin, role")
           .order("name");
         if (!error && data) {
-          setOperators(data);
+          const comAcesso = data.filter((u) => {
+            if (u.is_admin) return true;
+            const role = (u.role || "").toUpperCase();
+            if (role === "ADMIN" || role.includes("GERENTE") || role.includes("DIRETOR")) return true;
+            const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
+            return perms.includes("Whatsapp API");
+          });
+          setOperators(comAcesso);
         }
       } catch (err) {
         console.error("Erro ao carregar operadores:", err);
@@ -4925,6 +4947,50 @@ export function WhatsappView({
     [selectedChat],
   );
 
+  /**
+   * Admin troca o atendente da conversa selecionada.
+   * `novoId` = null remove o atendente (campo vira null no banco).
+   */
+  const handleTrocarAtendente = useCallback(
+    async (novoId: string | null) => {
+      if (!selectedChat) return;
+      setShowAtendentePicker(false);
+      // Otimista
+      setSelectedChat((prev) =>
+        prev ? { ...prev, vendedor_id: novoId ?? undefined } : null,
+      );
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === selectedChat.id
+            ? { ...c, vendedor_id: novoId ?? undefined }
+            : c,
+        ),
+      );
+      try {
+        await supabase
+          .from("marketing_clientes")
+          .update({ vendedor_id: novoId, updated_at: new Date().toISOString() })
+          .eq("remote_jid", selectedChat.id);
+      } catch (err) {
+        console.error("[Atendente] Erro ao trocar atendente:", err);
+        // Reverte
+        setSelectedChat((prev) =>
+          prev
+            ? { ...prev, vendedor_id: selectedChat.vendedor_id }
+            : null,
+        );
+        setChats((prev) =>
+          prev.map((c) =>
+            c.id === selectedChat.id
+              ? { ...c, vendedor_id: selectedChat.vendedor_id }
+              : c,
+          ),
+        );
+      }
+    },
+    [selectedChat],
+  );
+
   const triggerTemperatureClassification = useCallback(
     async (remoteJid: string) => {
       const OVERRIDE_TTL = 10 * 60 * 1000;
@@ -6200,11 +6266,21 @@ export function WhatsappView({
                   max-w-[60%] — sem o teto, a fileira toma a largura que quiser e
                   o nome do contato é esmagado até desaparecer. */}
               <div className="flex items-center gap-2 min-w-0 max-w-[60%] overflow-x-auto scrollbar-hide [&>*]:shrink-0">
-                {/* Atendente (vendedor_id) Estático */}
+                {/* Atendente (vendedor_id) — clicável para admins */}
                 {selectedChat.vendedor_id ? (
                   <div
-                    className="h-8 pl-1 pr-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5"
-                    title={`Atendido por ${operators.find((o) => o.id === selectedChat.vendedor_id)?.name || "atendente"}`}
+                    ref={atendenteBtnRef}
+                    className={cn(
+                      "h-8 pl-1 pr-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5",
+                      isAdminUser && "cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/20 transition-colors",
+                    )}
+                    title={`Atendido por ${operators.find((o) => o.id === selectedChat.vendedor_id)?.name || "atendente"}${isAdminUser ? " · Clique para trocar" : ""}`}
+                    onClick={() => {
+                      if (!isAdminUser) return;
+                      const rect = atendenteBtnRef.current?.getBoundingClientRect();
+                      if (rect) setAtendenteBtnRect({ top: rect.bottom + 4, left: rect.left });
+                      setShowAtendentePicker((v) => !v);
+                    }}
                   >
                     <div className="w-6 h-6 rounded-full overflow-hidden border border-emerald-500/30 flex items-center justify-center shrink-0">
                       {(() => {
@@ -6226,13 +6302,28 @@ export function WhatsappView({
                         .find((o) => o.id === selectedChat.vendedor_id)
                         ?.name?.split(" ")[0] || "Atendente"}
                     </span>
+                    {isAdminUser && <ChevronDown className="w-3 h-3 opacity-60 pointer-events-none" />}
                   </div>
                 ) : (
-                  <div className="h-8 px-2.5 rounded-lg border border-dashed border-border/80 bg-secondary/30 flex items-center justify-center gap-1.5 text-muted-foreground">
+                  <div
+                    ref={atendenteBtnRef}
+                    className={cn(
+                      "h-8 px-2.5 rounded-lg border border-dashed border-border/80 bg-secondary/30 flex items-center justify-center gap-1.5 text-muted-foreground",
+                      isAdminUser && "cursor-pointer hover:border-primary/40 hover:bg-secondary/50 transition-colors",
+                    )}
+                    title={isAdminUser ? "Clique para atribuir atendente" : "Sem atendente"}
+                    onClick={() => {
+                      if (!isAdminUser) return;
+                      const rect = atendenteBtnRef.current?.getBoundingClientRect();
+                      if (rect) setAtendenteBtnRect({ top: rect.bottom + 4, left: rect.left });
+                      setShowAtendentePicker((v) => !v);
+                    }}
+                  >
                     <User className="w-3.5 h-3.5 shrink-0" />
                     <span className="text-[10px] font-black uppercase whitespace-nowrap">
                       Aguardando
                     </span>
+                    {isAdminUser && <ChevronDown className="w-3 h-3 opacity-60" />}
                   </div>
                 )}
 
@@ -6362,6 +6453,51 @@ export function WhatsappView({
                 )}
               </div>
             </div>
+            {/* Dropdown de atendente — position:fixed escapa de qualquer overflow
+                pai (overflow-hidden no chat area, overflow-x-auto nos badges). */}
+            {isAdminUser && showAtendentePicker && selectedChat && atendenteBtnRect && (
+              <div
+                className="fixed w-56 bg-card border border-border rounded-xl shadow-2xl z-[9999] overflow-hidden"
+                style={{ top: atendenteBtnRect.top, left: atendenteBtnRect.left }}
+              >
+                <div className="px-3 py-2 border-b border-border">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Atribuir para</span>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {operators.map((op) => (
+                    <button
+                      key={op.id}
+                      onClick={() => handleTrocarAtendente(op.id)}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-secondary transition-colors",
+                        selectedChat.vendedor_id === op.id && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                      )}
+                    >
+                      <div className="w-6 h-6 rounded-full overflow-hidden border border-border flex items-center justify-center shrink-0 bg-secondary">
+                        {op.avatar ? (
+                          <img src={op.avatar} className="w-full h-full object-cover" alt="" />
+                        ) : (
+                          <User className="w-3 h-3 text-muted-foreground" />
+                        )}
+                      </div>
+                      <span className="text-[11px] font-bold truncate flex-1">{op.name}</span>
+                      {selectedChat.vendedor_id === op.id && (
+                        <span className="text-[9px] font-black text-emerald-500">✓</span>
+                      )}
+                    </button>
+                  ))}
+                  {selectedChat.vendedor_id && (
+                    <button
+                      onClick={() => handleTrocarAtendente(null)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors border-t border-border"
+                    >
+                      <X className="w-3.5 h-3.5 shrink-0" />
+                      <span className="text-[11px] font-bold">Remover atendente</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div
               onDragEnter={handleDragEnter}
