@@ -378,11 +378,14 @@ export const evolutionGoApi = {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'marketing_whatsapp' }, (p) => {
         const row = p.new as any;
         if (!passaFiltro(row)) return;
+        // NOTA INTERNA é exclusiva do HUB, não é mensagem do WhatsApp nem deve ser re-emitida como mensagem de conversa
+        if (row?.tipo === 'internal_note' || row?.message_id?.startsWith('note_')) return;
         emit('messages.upsert', { data: rowToEvo(row) });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'marketing_whatsapp' }, (p) => {
         const row = p.new as any;
         if (!passaFiltro(row)) return;
+        if (row?.tipo === 'internal_note' || row?.message_id?.startsWith('note_')) return;
         const status = row.status === 'read' ? 'READ' : row.status === 'delivered' ? 'DELIVERY_ACK' : row.status;
         emit('messages.update', { data: { keyId: row.message_id, status } });
       })

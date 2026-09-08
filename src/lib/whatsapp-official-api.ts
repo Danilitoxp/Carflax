@@ -293,10 +293,13 @@ export const whatsappOfficialApi = {
       channel = supabase
         .channel(`official_wpp_${Date.now()}`)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "marketing_whatsapp" }, (p) => {
-          emit("messages.upsert", { data: rowToEvo(p.new as any) });
+          const row = p.new as any;
+          if (row?.tipo === "internal_note" || row?.message_id?.startsWith("note_")) return;
+          emit("messages.upsert", { data: rowToEvo(row) });
         })
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "marketing_whatsapp" }, (p) => {
           const row = p.new as any;
+          if (row?.tipo === "internal_note" || row?.message_id?.startsWith("note_")) return;
           const status = row.status === "read" ? "READ" : row.status === "delivered" ? "DELIVERY_ACK" : row.status;
           // `remoteJid` é essencial: sem ele a tela não sabe de qual conversa é o
           // recibo e acabava aplicando o status na lista inteira.

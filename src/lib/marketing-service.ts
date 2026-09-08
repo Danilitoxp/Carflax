@@ -486,24 +486,32 @@ export const marketingService = {
    * Salva uma nova mensagem
    */
   async saveMessage(msg: MarketingMessage) {
+    // Garante que notas internas mantenham tipo 'internal_note' e status 'read'
+    const isNote = msg.tipo === "internal_note" || msg.message_id?.startsWith("note_");
+    const payload = isNote
+      ? { ...msg, tipo: "internal_note" as const, status: "read" as const }
+      : msg;
+
     const { error } = await supabase
       .from("marketing_whatsapp")
-      .upsert(msg, { onConflict: "message_id" });
+      .upsert(payload, { onConflict: "message_id" });
 
     if (error) {
       console.error("[MarketingService] Erro ao salvar mensagem:", error.message);
       return false;
     }
 
-    // Atualiza ou cria o registro do cliente
-    await supabase
-      .from("marketing_clientes")
-      .upsert({
-        remote_jid: msg.remote_jid,
-        ultima_mensagem: msg.texto,
-        ultima_conversa_em: msg.timestamp,
-        updated_at: new Date().toISOString()
-      }, { onConflict: "remote_jid", ignoreDuplicates: false });
+    // Atualiza ou cria o registro do cliente — apenas para conversas reais, nunca para notas internas
+    if (!isNote) {
+      await supabase
+        .from("marketing_clientes")
+        .upsert({
+          remote_jid: msg.remote_jid,
+          ultima_mensagem: msg.texto,
+          ultima_conversa_em: msg.timestamp,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "remote_jid", ignoreDuplicates: false });
+    }
 
     return true;
   },

@@ -920,9 +920,11 @@ function inferMsgType(text?: string): string | undefined {
 function normalizeMsgFromDb(m: {
   texto?: string | null;
   tipo?: string | null;
+  message_id?: string | null;
 }): { text: string; tipo: string; locationData?: { latitude: number; longitude: number; name?: string; address?: string } } {
   const raw = m.texto || "";
-  const tipo = m.tipo || "text";
+  const isNote = m.tipo === "internal_note" || !!m.message_id?.startsWith("note_");
+  const tipo = isNote ? "internal_note" : (m.tipo || "text");
 
   // Mensagens de localização gravadas pelo webhook da Evolution API (antigo)
   // chegam com texto "[Mídia não suportada: location]" e tipo null/text
@@ -2568,6 +2570,9 @@ export function WhatsappView({
     const socket = api.connectWebSocket();
 
     const processMessage = async (message: EvoMessageResponse) => {
+      // Notas internas são criadas e exibidas internamente no HUB; nunca devem ser processadas como eco do WhatsApp
+      if (message.key?.id?.startsWith("note_")) return;
+
       const remoteJid = message.key?.remoteJid;
       if (!remoteJid || !remoteJid.endsWith("@s.whatsapp.net")) return;
 
