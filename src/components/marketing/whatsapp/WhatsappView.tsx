@@ -6310,15 +6310,16 @@ export function WhatsappView({
                     {isAdminUser && <ChevronDown className="w-3 h-3 opacity-60 pointer-events-none" />}
                   </div>
                 ) : (
+                  // Sem atendente: QUALQUER atendente pode clicar e assumir para
+                  // si, não só admin/líder — restringir isso era o motivo de
+                  // lead novo/sem dono ficar preso sem ninguém poder pegar.
+                  // Reatribuir uma conversa que já tem dono continua exclusivo
+                  // de admin (bloco acima).
                   <div
                     ref={atendenteBtnRef}
-                    className={cn(
-                      "h-8 px-2.5 rounded-lg border border-dashed border-border/80 bg-secondary/30 flex items-center justify-center gap-1.5 text-muted-foreground",
-                      isAdminUser && "cursor-pointer hover:border-primary/40 hover:bg-secondary/50 transition-colors",
-                    )}
-                    title={isAdminUser ? "Clique para atribuir atendente" : "Sem atendente"}
+                    className="h-8 px-2.5 rounded-lg border border-dashed border-border/80 bg-secondary/30 flex items-center justify-center gap-1.5 text-muted-foreground cursor-pointer hover:border-primary/40 hover:bg-secondary/50 transition-colors"
+                    title="Clique para assumir este atendimento"
                     onClick={() => {
-                      if (!isAdminUser) return;
                       const rect = atendenteBtnRef.current?.getBoundingClientRect();
                       if (rect) setAtendenteBtnRect({ top: rect.bottom + 4, left: rect.left });
                       setShowAtendentePicker((v) => !v);
@@ -6328,7 +6329,7 @@ export function WhatsappView({
                     <span className="text-[10px] font-black uppercase whitespace-nowrap">
                       Aguardando
                     </span>
-                    {isAdminUser && <ChevronDown className="w-3 h-3 opacity-60" />}
+                    <ChevronDown className="w-3 h-3 opacity-60" />
                   </div>
                 )}
 
@@ -6460,44 +6461,62 @@ export function WhatsappView({
             </div>
             {/* Dropdown de atendente — position:fixed escapa de qualquer overflow
                 pai (overflow-hidden no chat area, overflow-x-auto nos badges). */}
-            {isAdminUser && showAtendentePicker && selectedChat && atendenteBtnRect && (
+            {/* Admin/líder vê a lista inteira (reatribuir para qualquer um).
+                Atendente comum só vê isto quando a conversa está SEM dono —
+                e a única ação possível é assumir para si mesmo, nunca
+                atribuir para outro colega. */}
+            {(isAdminUser || !selectedChat?.vendedor_id) && showAtendentePicker && selectedChat && atendenteBtnRect && (
               <div
                 className="fixed w-56 bg-card border border-border rounded-xl shadow-2xl z-[9999] overflow-hidden"
                 style={{ top: atendenteBtnRect.top, left: atendenteBtnRect.left }}
               >
                 <div className="px-3 py-2 border-b border-border">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Atribuir para</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                    {isAdminUser ? "Atribuir para" : "Assumir atendimento"}
+                  </span>
                 </div>
                 <div className="max-h-64 overflow-y-auto">
-                  {operators.map((op) => (
-                    <button
-                      key={op.id}
-                      onClick={() => handleTrocarAtendente(op.id)}
-                      className={cn(
-                        "w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-secondary transition-colors",
-                        selectedChat.vendedor_id === op.id && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                  {isAdminUser ? (
+                    <>
+                      {operators.map((op) => (
+                        <button
+                          key={op.id}
+                          onClick={() => handleTrocarAtendente(op.id)}
+                          className={cn(
+                            "w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-secondary transition-colors",
+                            selectedChat.vendedor_id === op.id && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                          )}
+                        >
+                          <div className="w-6 h-6 rounded-full overflow-hidden border border-border flex items-center justify-center shrink-0 bg-secondary">
+                            {op.avatar ? (
+                              <img src={op.avatar} className="w-full h-full object-cover" alt="" />
+                            ) : (
+                              <User className="w-3 h-3 text-muted-foreground" />
+                            )}
+                          </div>
+                          <span className="text-[11px] font-bold truncate flex-1">{op.name}</span>
+                          {selectedChat.vendedor_id === op.id && (
+                            <span className="text-[9px] font-black text-emerald-500">✓</span>
+                          )}
+                        </button>
+                      ))}
+                      {selectedChat.vendedor_id && (
+                        <button
+                          onClick={() => handleTrocarAtendente(null)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors border-t border-border"
+                        >
+                          <X className="w-3.5 h-3.5 shrink-0" />
+                          <span className="text-[11px] font-bold">Remover atendente</span>
+                        </button>
                       )}
-                    >
-                      <div className="w-6 h-6 rounded-full overflow-hidden border border-border flex items-center justify-center shrink-0 bg-secondary">
-                        {op.avatar ? (
-                          <img src={op.avatar} className="w-full h-full object-cover" alt="" />
-                        ) : (
-                          <User className="w-3 h-3 text-muted-foreground" />
-                        )}
-                      </div>
-                      <span className="text-[11px] font-bold truncate flex-1">{op.name}</span>
-                      {selectedChat.vendedor_id === op.id && (
-                        <span className="text-[9px] font-black text-emerald-500">✓</span>
-                      )}
-                    </button>
-                  ))}
-                  {selectedChat.vendedor_id && (
+                    </>
+                  ) : (
                     <button
-                      onClick={() => handleTrocarAtendente(null)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors border-t border-border"
+                      onClick={() => handleTrocarAtendente(vendedorId || null)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors"
                     >
-                      <X className="w-3.5 h-3.5 shrink-0" />
-                      <span className="text-[11px] font-bold">Remover atendente</span>
+                      <User className="w-3.5 h-3.5 shrink-0" />
+                      <span className="text-[11px] font-bold">Assumir para mim</span>
                     </button>
                   )}
                 </div>

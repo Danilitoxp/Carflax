@@ -462,7 +462,11 @@ export function FunilView({
     for (const c of clientes) {
       if (filtroAtendente) {
         const dono = c.vendedor_id ? String(c.vendedor_id) : SEM_ATENDENTE;
-        if (dono !== filtroAtendente) continue;
+        // Lead sem atendente aparece em QUALQUER filtro (menos no filtro
+        // "Sem atendente" propriamente, que já bate certo por igualdade):
+        // ele é de todo mundo até alguém pegar, e escondê-lo atrás do filtro
+        // de "meus atendimentos" faria o time perder lead novo de vista.
+        if (dono !== filtroAtendente && dono !== SEM_ATENDENTE) continue;
       }
       if (termo) {
         const alvo = `${c.nome || ""} ${c.push_name || ""} ${c.remote_jid}`.toLowerCase();
