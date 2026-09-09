@@ -1,10 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Crown, TrendingUp, TrendingDown, Minus, Flame, X, Volume2 } from "lucide-react";
+import { Crown, TrendingUp, TrendingDown, Minus, Flame, Volume2, ArrowUp, ArrowDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import "./ranking-animations.css";
 import { BeamsBackground } from "@/components/ui/beams-background";
 import { RANKING_COUNT_DURATION_MS, useAnimatedRanking } from "./use-animated-ranking";
+import { RankingCelebration } from "./RankingCelebration";
+import { createRankingEventTracker, type RankingSeller } from "./ranking-events";
+import { useRankingCelebrations } from "./use-ranking-celebrations";
 import { hasOvertake } from "./ranking-overtake";
+import { useRankingMovement } from "./use-ranking-movement";
 import {
   apiRankingDia,
   apiDashboardGeral,
@@ -33,17 +37,7 @@ import { calcMetaDiaria } from "@/lib/dias-uteis";
 // servidor. Cada ciclo cai numa entrada nova de cache, então a tela acompanha a
 // venda quase ao vivo sem repetir consulta pesada no ERP.
 const INTERVALO_MS = 15 * 1000;
-const SOM_COMEMORACAO = "/sounds/ranking-goal.mp3";
-
-interface Linha {
-  cod: string;
-  nome: string;
-  vendidoHoje: number;
-  metaDiaria: number;
-  percentual: number;
-  variacao: number | null; // pontos percentuais vs ontem
-  avatar?: string;
-}
+type Linha = RankingSeller;
 
 const num = (v: unknown) => (typeof v === "string" ? parseFloat(v) : Number(v)) || 0;
 
@@ -82,51 +76,48 @@ function Variacao({ v }: { v: number | null }) {
   );
 }
 
+function MovementBadge({ change }: { change?: number }) {
+  const Icon = change && change > 0 ? ArrowUp : ArrowDown;
+  const label = change ? `${change > 0 ? "Subiu" : "Desceu"} ${Math.abs(change)} ${Math.abs(change) === 1 ? "posição" : "posições"}` : "";
+  return <AnimatePresence>
+    {!!change && <motion.span
+      key={change > 0 ? "up" : "down"}
+      initial={{ opacity: 0, y: change > 0 ? 6 : -6, scale: 0.8 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8 }}
+      title={label} aria-label={label}
+      className={cn("inline-flex shrink-0 items-center gap-0.5 rounded-md px-1 py-0.5 text-[10px] font-black tabular-nums",
+        change > 0 ? "bg-emerald-400/20 text-emerald-300" : "bg-rose-400/20 text-rose-300")}>
+      <Icon aria-hidden="true" className="h-3 w-3" />{Math.abs(change)}
+    </motion.span>}
+  </AnimatePresence>;
+}
+
 export function RankingView() {
   const [linhasRecebidas, setLinhas] = useState<Linha[]>([]);
   const linhas = useAnimatedRanking(linhasRecebidas);
-  const [comemorando, setComemorando] = useState<Linha | null>(null);
+  const { active, enqueue, close, clear, play } = useRankingCelebrations();
+  const movements = useRankingMovement(linhas.map((row) => row.cod), !!active);
+  const trackerRef = useRef(createRankingEventTracker());
+  const dayRef = useRef("");
+  const loadingRef = useRef(false);
+  const mountedRef = useRef(false);
 
   const resolverRef = useRef<AvatarResolver | null>(null);
-  // Quem já bateu a meta numa leitura anterior: sem isso a festa se repetiria a
-  // cada atualização enquanto o vendedor seguisse acima de 100%.
-  const jaBateuRef = useRef<Set<string>>(new Set());
   const ontemRef = useRef<Map<string, number>>(new Map());
-  const primeiraCargaRef = useRef(true);
-  const comemoracaoPendenteRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rankingExibidoRef = useRef<Linha[]>([]);
   const ultrapassagemTocouRef = useRef(false);
-  const somUltrapassagemRef = useRef<HTMLAudioElement | null>(null);
-
-  const tocarUltrapassagem = useCallback(() => {
-    const audio = somUltrapassagemRef.current ?? new Audio("/sounds/ranking-overtake.wav");
-    somUltrapassagemRef.current = audio;
-    audio.volume = 0.35;
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
-  }, []);
-
   useEffect(() => {
-    if (!ultrapassagemTocouRef.current && hasOvertake(rankingExibidoRef.current, linhas)) {
+    if (!active && !ultrapassagemTocouRef.current && hasOvertake(rankingExibidoRef.current, linhas)) {
       ultrapassagemTocouRef.current = true;
-      tocarUltrapassagem();
+      play("overtake");
     }
     rankingExibidoRef.current = linhas;
-  }, [linhas, tocarUltrapassagem]);
-
-  useEffect(() => () => { somUltrapassagemRef.current?.pause(); }, []);
-
-  const tocarSom = () => {
-    try {
-      const audio = new Audio(SOM_COMEMORACAO);
-      audio.volume = 0.6;
-      audio.play().catch(() => {});
-    } catch {
-      /* navegador bloqueia áudio sem interação — a comemoração visual continua */
-    }
-  };
+  }, [linhas, active, play]);
 
   const carregar = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       if (!resolverRef.current) {
         const { data } = await supabase.from("usuarios").select("operator_code, avatar");
@@ -134,6 +125,7 @@ export function RankingView() {
       }
 
       const linhasApi = await apiRankingDia();
+      if (!mountedRef.current) return;
       const ontem = ontemRef.current;
 
       const lista = (linhasApi || [])
@@ -155,33 +147,24 @@ export function RankingView() {
           } as Linha;
         })
         .filter((l) => l.vendidoHoje > 0 || l.metaDiaria > 0)
-        .sort((a, b) => b.percentual - a.percentual)
-        .slice(0, 10);
+        .sort((a, b) => b.percentual - a.percentual);
 
-      const novos = lista.filter((l) => l.percentual >= 100 && !jaBateuRef.current.has(l.cod));
-      lista.forEach((l) => {
-        if (l.percentual >= 100) jaBateuRef.current.add(l.cod);
-      });
-
-      ultrapassagemTocouRef.current = false;
-      setLinhas(lista);
-
-      // Na primeira carga metade do time já pode ter batido: comemorar tudo de
-      // uma vez seria ruído. A festa é só para quem virar a chave com a tela aberta.
-      if (!primeiraCargaRef.current && novos.length > 0) {
-        if (comemoracaoPendenteRef.current) clearTimeout(comemoracaoPendenteRef.current);
-        // Let the count and overtaking finish before covering the ranking.
-        comemoracaoPendenteRef.current = setTimeout(() => {
-          setComemorando(novos[0]);
-          tocarSom();
-          comemoracaoPendenteRef.current = null;
-        }, RANKING_COUNT_DURATION_MS + 500);
+      const day = diaIso(new Date());
+      if (dayRef.current !== day) {
+        dayRef.current = day;
+        clear();
+        rankingExibidoRef.current = [];
       }
-      primeiraCargaRef.current = false;
+      const events = trackerRef.current(lista, day, Date.now() + RANKING_COUNT_DURATION_MS + 500);
+      ultrapassagemTocouRef.current = events.some((event) => event.kind === "leader");
+      setLinhas(lista.slice(0, 10));
+      enqueue(events);
     } catch {
       /* mantém a lista anterior em caso de falha de rede */
+    } finally {
+      loadingRef.current = false;
     }
-  }, []);
+  }, [clear, enqueue]);
 
   // Ontem é base fixa da variação: buscar a cada ciclo era desperdício, o dia já
   // fechou. Uma vez na montagem basta.
@@ -198,19 +181,14 @@ export function RankingView() {
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     carregar();
     const id = setInterval(carregar, INTERVALO_MS);
     return () => {
       clearInterval(id);
-      if (comemoracaoPendenteRef.current) clearTimeout(comemoracaoPendenteRef.current);
+      mountedRef.current = false;
     };
   }, [carregar]);
-
-  useEffect(() => {
-    if (!comemorando) return;
-    const id = setTimeout(() => setComemorando(null), 9000);
-    return () => clearTimeout(id);
-  }, [comemorando]);
 
   const podio = linhas.slice(0, 3);
   const resto = linhas.slice(3);
@@ -230,14 +208,17 @@ export function RankingView() {
         </button>
         <div className="invisible absolute right-0 top-full w-56 pt-2 opacity-0 transition-opacity duration-200 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
           <div role="group" aria-label="Testar sons do ranking" className="rounded-xl border border-white/15 bg-slate-950/95 p-2 shadow-xl">
-            <button type="button" onClick={tocarSom} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-300">
+            <button type="button" onClick={() => play("goal")} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-300">
               <Crown aria-hidden="true" className="h-4 w-4 text-amber-400" />
               Testar meta batida
             </button>
-            <button type="button" onClick={tocarUltrapassagem} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-300">
+            <button type="button" onClick={() => play("overtake")} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-300">
               <TrendingUp aria-hidden="true" className="h-4 w-4 text-blue-400" />
               Testar ultrapassagem
             </button>
+            {([['leader', '👑 Testar novo líder'], ['double', '🔥 Testar 200% da meta'], ['team', '🏆 Testar meta coletiva']] as const).map(([kind, label]) => (
+              <button key={kind} type="button" onClick={() => play(kind)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10 focus-visible:bg-white/10">{label}</button>
+            ))}
           </div>
         </div>
       </div>
@@ -260,6 +241,7 @@ export function RankingView() {
                     transition={{ duration: 0.45, delay: (pos - 1) * 0.1, layout: { duration: 0.45, delay: 0 } }}
                     className={cn(
                       "relative rounded-2xl border p-4 text-center overflow-hidden",
+                      primeiro && "ranking-sphere-card",
                       primeiro
                         ? "ranking-leader bg-gradient-to-b from-amber-500/20 to-transparent border-amber-400/50 pb-6"
                         : pos === 2
@@ -272,11 +254,12 @@ export function RankingView() {
                     )}
                     <span
                       className={cn(
-                        "absolute top-3 left-4 text-2xl font-black",
+                        "absolute top-3 left-4 flex items-center gap-1.5 text-2xl font-black",
                         primeiro ? "text-amber-400" : pos === 2 ? "text-blue-300" : "text-orange-400",
                       )}
                     >
                       {pos}
+                      <MovementBadge change={movements[l.cod]} />
                     </span>
 
                     {l.avatar ? (
@@ -359,11 +342,11 @@ export function RankingView() {
                       transition={{ duration: 0.4, delay: (pos - 1) * 0.07, layout: { duration: 0.45, delay: 0 } }}
                       key={l.cod}
                       className={cn(
-                        "grid grid-cols-[70px_minmax(180px,1fr)_minmax(0,2.5fr)_90px_80px] gap-3 items-center px-4 border-b border-white/5 transition-colors flex-1 min-h-0",
+                        "relative isolate overflow-hidden grid grid-cols-[70px_minmax(180px,1fr)_minmax(0,2.5fr)_90px_80px] gap-3 items-center px-4 border-b border-white/5 transition-colors flex-1 min-h-0",
                         bateu && "bg-emerald-400/[0.06]",
                       )}
                     >
-                      <span className="text-lg font-black text-white/70">{pos}</span>
+                      <span className="flex items-center gap-1.5 text-lg font-black text-white/70">{pos}<MovementBadge change={movements[l.cod]} /></span>
                       <div className="flex items-center gap-2 min-w-0">
                         {l.avatar ? (
                           <img
@@ -377,7 +360,7 @@ export function RankingView() {
                           </div>
                         )}
                         <span className="text-[11px] font-black uppercase truncate">{l.nome}</span>
-                        {bateu && <Flame className="w-3 h-3 text-amber-400 shrink-0" />}
+                        {bateu && <Flame aria-label={l.percentual >= 200 ? "200% da meta" : "Meta batida"} className={cn("w-3 h-3 text-amber-400 shrink-0", l.percentual >= 200 && "ranking-crown")} />}
                       </div>
                       <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                         <div
@@ -408,58 +391,8 @@ export function RankingView() {
       </div>
 
 
-      {/* Comemoração da meta diária */}
       <AnimatePresence>
-        {comemorando && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={() => setComemorando(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.8, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className="relative w-full max-w-md bg-[#0b1224] border border-emerald-400/40 rounded-3xl p-10 text-center shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setComemorando(null)}
-                className="absolute top-4 right-4 p-1.5 text-white/40 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <p className="text-5xl mb-3">🎉</p>
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400 mb-5">
-                Meta diária batida
-              </p>
-
-              {comemorando.avatar ? (
-                <img
-                  src={comemorando.avatar}
-                  alt=""
-                  className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-emerald-400/50"
-                />
-              ) : (
-                <div className="w-32 h-32 rounded-full bg-white/10 mx-auto flex items-center justify-center text-3xl font-black">
-                  {comemorando.nome.slice(0, 2).toUpperCase()}
-                </div>
-              )}
-
-              <h2 className="text-2xl font-black uppercase tracking-tight mt-5">{comemorando.nome}</h2>
-              <p className="text-5xl font-black text-emerald-400 tabular-nums mt-3">
-                {comemorando.percentual.toFixed(0)}%
-              </p>
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mt-1">
-                da meta do dia
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
+        {active && <RankingCelebration key={active.id} event={active} onClose={close} />}
       </AnimatePresence>
     </div>
   );
