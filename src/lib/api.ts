@@ -759,6 +759,15 @@ export const apiAdsSpend = (start: string, end: string) =>
 export const apiAdsSendReport = (body: { phone: string; image: string; caption?: string }) =>
   post<{ success: boolean; message: string }>("/api/marketing/ads/send-report", body);
 
+// Mesma imagem do relatório diário automático, mas sob demanda para o período
+// selecionado na tela — envia só para o WhatsApp de quem pediu (telefone/nome
+// do próprio perfil), nunca para a lista de destinatários da automação.
+export const apiEnviarRelatorioTrafegoPeriodo = (body: { inicio: string; fim: string; telefone: string; nome?: string }) =>
+  post<{ success: boolean; enviados: string[]; falhas: string[]; error?: string }>(
+    "/api/marketing/ads/relatorio-trafego/enviar-periodo",
+    body
+  );
+
 export interface RentabilidadeCanal {
   canal: string;
   vendas: number;

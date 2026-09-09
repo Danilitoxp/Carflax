@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
-  Plus, Trash2, Lock, Star, X, Check, FileDown, Globe, Copy, ExternalLink, Phone,
-  Inbox, Eye, CheckCircle2, XCircle, Search, Sparkles, Building2, User, Gift, Wrench
+  Trash2, Lock, Star, X, Check, Pencil, Phone,
+  Inbox, Eye, CheckCircle2, XCircle, Sparkles, Building2, User, Gift, Wrench
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -9,7 +9,6 @@ import {
   type Evento, type EventoFornecedor, type FornecedorStatus, type Segmento,
   FORNECEDOR_STATUS_LABEL, FORNECEDOR_STATUS_COLOR, formatBRL,
 } from "./types";
-import { gerarConviteFornecedor } from "./convite-pdf";
 
 const STATUS_ORDER: FornecedorStatus[] = ["nao_contatado", "media_kit_enviado", "follow_up", "inscricao_recebida", "confirmado", "recusado"];
 
@@ -34,20 +33,22 @@ function parseObservacoes(obsRaw?: string | null) {
   return parsed;
 }
 
+// Inverso do parseObservacoes: substitui (ou adiciona) uma chave no texto livre
+// sem perder as demais — a edição de "Brindes Kit" não pode apagar Empresa,
+// Cargo, etc. que vieram do formulário público.
+function setObservacaoChave(obsRaw: string | null | undefined, chave: string, valor: string) {
+  const parsed = parseObservacoes(obsRaw) || {};
+  if (valor.trim()) parsed[chave] = valor.trim();
+  else delete parsed[chave];
+  return Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join(" | ");
+}
+
 export function FornecedoresTab({ evento, fornecedores, onChange }: {
   evento: Evento;
   fornecedores: EventoFornecedor[];
   onChange: () => void;
 }) {
-  const [novaMarca, setNovaMarca] = useState("");
-  const [novoSegmento, setNovoSegmento] = useState<Segmento>("hidraulico");
-  const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [copiado, setCopiado] = useState(false);
-
-  // Filters & Search
-  const [filtroStatus, setFiltroStatus] = useState<"todos" | "pendentes" | "confirmados" | "recusados">("todos");
-  const [busca, setBusca] = useState("");
 
   // Modal State for viewing full registration details
   const [fornecedorDetalhe, setFornecedorDetalhe] = useState<EventoFornecedor | null>(null);
@@ -56,12 +57,43 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
   const [fornecedorParaAprovar, setFornecedorParaAprovar] = useState<EventoFornecedor | null>(null);
   const [cotaInput, setCotaInput] = useState("1000");
 
-  const urlConvite = `${window.location.origin}/convite-fornecedor`;
+  // Edit Modal State
+  const [fornecedorEditar, setFornecedorEditar] = useState<EventoFornecedor | null>(null);
+  const [editForm, setEditForm] = useState({
+    marca: "", segmento: "hidraulico" as Segmento, contato_nome: "", contato_telefone: "",
+    brindesKit: "", premio_descricao: "", premio_valor: "", cota_valor: "",
+  });
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
-  const copiarLink = () => {
-    navigator.clipboard.writeText(urlConvite);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2500);
+  const abrirEdicao = (f: EventoFornecedor) => {
+    setEditForm({
+      marca: f.marca,
+      segmento: f.segmento || "hidraulico",
+      contato_nome: f.contato_nome || "",
+      contato_telefone: f.contato_telefone || "",
+      brindesKit: parseObservacoes(f.observacoes)?.["Brindes Kit"] || "",
+      premio_descricao: f.premio_descricao || "",
+      premio_valor: f.premio_valor ? String(f.premio_valor) : "",
+      cota_valor: f.cota_valor ? String(f.cota_valor) : "",
+    });
+    setFornecedorEditar(f);
+  };
+
+  const salvarEdicao = async () => {
+    if (!fornecedorEditar) return;
+    setSalvandoEdicao(true);
+    await patch(fornecedorEditar.id, {
+      marca: editForm.marca.trim(),
+      segmento: editForm.segmento,
+      contato_nome: editForm.contato_nome.trim() || null,
+      contato_telefone: editForm.contato_telefone.trim() || null,
+      observacoes: setObservacaoChave(fornecedorEditar.observacoes, "Brindes Kit", editForm.brindesKit),
+      premio_descricao: editForm.premio_descricao.trim() || null,
+      premio_valor: editForm.premio_valor ? parseFloat(editForm.premio_valor) : null,
+      cota_valor: editForm.cota_valor ? parseFloat(editForm.cota_valor) : 0,
+    });
+    setSalvandoEdicao(false);
+    setFornecedorEditar(null);
   };
 
   const patch = async (id: string, campos: Partial<EventoFornecedor>) => {
@@ -90,23 +122,6 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
     if (fornecedorDetalhe?.id === f.id) setFornecedorDetalhe(null);
   };
 
-  const adicionar = async () => {
-    const marca = novaMarca.trim();
-    if (!marca) return;
-    setSalvando(true);
-    setErro(null);
-    const { error } = await supabase.from("evento_fornecedores").insert([{
-      evento_id: evento.id, marca, segmento: novoSegmento, status: "nao_contatado",
-    }]);
-    setSalvando(false);
-    if (error) {
-      setErro(error.code === "23505" ? `"${marca}" já está na lista.` : error.message);
-      return;
-    }
-    setNovaMarca("");
-    onChange();
-  };
-
   const remover = async (f: EventoFornecedor) => {
     if (!confirm(`Remover "${f.marca}" da lista de fornecedores?`)) return;
     const { error } = await supabase.from("evento_fornecedores").delete().eq("id", f.id);
@@ -117,7 +132,6 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
   // Metrics
   const confirmados = fornecedores.filter(f => f.status === "confirmado");
   const pendentesInscricao = fornecedores.filter(f => f.status === "inscricao_recebida");
-  const recusados = fornecedores.filter(f => f.status === "recusado");
 
   const verbaConfirmada = confirmados.reduce((a, f) => a + Number(f.cota_valor || 0), 0);
   const verbaPaga = confirmados.filter(f => f.cota_paga).reduce((a, f) => a + Number(f.cota_valor || 0), 0);
@@ -127,24 +141,6 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
 
   const hidraulicas = fornecedores.filter(f => f.segmento === "hidraulico").length;
   const eletricas = fornecedores.filter(f => f.segmento === "eletrico").length;
-
-  // Filtered List
-  const fornecedoresFiltrados = useMemo(() => {
-    return fornecedores.filter((f) => {
-      if (filtroStatus === "pendentes" && f.status !== "inscricao_recebida") return false;
-      if (filtroStatus === "confirmados" && f.status !== "confirmado") return false;
-      if (filtroStatus === "recusados" && f.status !== "recusado") return false;
-
-      if (busca.trim()) {
-        const q = busca.toLowerCase();
-        const m = f.marca.toLowerCase().includes(q);
-        const c = f.contato_nome?.toLowerCase().includes(q) || false;
-        const p = f.contato_telefone?.includes(q) || false;
-        return m || c || p;
-      }
-      return true;
-    });
-  }, [fornecedores, filtroStatus, busca]);
 
   return (
     <div className="space-y-5">
@@ -168,9 +164,6 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
                 </p>
               </div>
             </div>
-            <button onClick={() => setFiltroStatus("pendentes")} className="text-xs font-bold text-amber-500 hover:underline">
-              Ver na tabela →
-            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -273,66 +266,6 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
         </div>
       </div>
 
-      {/* ── 3. Barra de ações: Página pública + Filtros + Busca + Adicionar ── */}
-      <div className="bg-card border border-border rounded-xl p-3 space-y-3">
-        {/* Linha 1: Página pública compacta */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/50">
-          <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
-            <Globe className="w-4 h-4 text-blue-500" />
-            <span>Página Pública de Convite</span>
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-500 text-[8px] font-bold">Ativa</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button onClick={copiarLink} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-xs transition-all flex items-center gap-1.5">
-              {copiado ? (<><Check className="w-3.5 h-3.5 text-emerald-300" /><span>Copiado!</span></>) : (<><Copy className="w-3.5 h-3.5" /><span>Copiar Link</span></>)}
-            </button>
-            <a href="/convite-fornecedor" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-secondary text-foreground text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1">
-              <ExternalLink className="w-3.5 h-3.5 text-blue-500" />
-              <span>Abrir</span>
-            </a>
-          </div>
-        </div>
-
-        {/* Linha 2: Filtros + Busca */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-secondary/50 border border-border text-xs font-bold">
-            <button onClick={() => setFiltroStatus("todos")} className={cn("px-3 py-1.5 rounded-lg transition-all", filtroStatus === "todos" ? "bg-blue-600 text-white shadow-xs" : "text-muted-foreground hover:text-foreground")}>
-              Todos ({fornecedores.length})
-            </button>
-            <button onClick={() => setFiltroStatus("pendentes")} className={cn("px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5", filtroStatus === "pendentes" ? "bg-amber-500 text-slate-950 shadow-xs" : "text-muted-foreground hover:text-foreground")}>
-              <span>Pendentes</span>
-              {pendentesInscricao.length > 0 && <span className="px-1.5 rounded-full bg-amber-600 text-white text-[9px] font-black">{pendentesInscricao.length}</span>}
-            </button>
-            <button onClick={() => setFiltroStatus("confirmados")} className={cn("px-3 py-1.5 rounded-lg transition-all", filtroStatus === "confirmados" ? "bg-emerald-600 text-white shadow-xs" : "text-muted-foreground hover:text-foreground")}>
-              Confirmados ({confirmados.length})
-            </button>
-            <button onClick={() => setFiltroStatus("recusados")} className={cn("px-3 py-1.5 rounded-lg transition-all", filtroStatus === "recusados" ? "bg-rose-600 text-white shadow-xs" : "text-muted-foreground hover:text-foreground")}>
-              Recusados ({recusados.length})
-            </button>
-          </div>
-
-          <div className="relative flex-1 max-w-xs">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-muted-foreground" />
-            <input type="text" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar marca ou contato..." className="w-full pl-8 pr-3 py-1.5 text-xs font-medium bg-background border border-border rounded-xl focus:outline-none focus:border-blue-500" />
-          </div>
-        </div>
-
-        {/* Linha 3: Adicionar marca */}
-        <div className="flex flex-wrap items-end gap-2 pt-2 border-t border-border/50">
-          <div className="flex-1 min-w-[160px]">
-            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Adicionar marca</label>
-            <input value={novaMarca} onChange={e => setNovaMarca(e.target.value)} onKeyDown={e => { if (e.key === "Enter") adicionar(); }} placeholder="Nome da marca" className="w-full px-3 py-2 text-xs font-bold bg-background border border-border rounded-lg focus:outline-none focus:border-blue-500" />
-          </div>
-          <select value={novoSegmento} onChange={e => setNovoSegmento(e.target.value as Segmento)} className="px-3 py-2 text-xs font-bold bg-background border border-border rounded-lg focus:outline-none focus:border-blue-500">
-            <option value="hidraulico">Hidráulico</option>
-            <option value="eletrico">Elétrico</option>
-          </select>
-          <button onClick={adicionar} disabled={salvando || !novaMarca.trim()} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-40 transition-colors flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5" /> Adicionar
-          </button>
-        </div>
-      </div>
-
       {erro && (
         <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/50 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
           <span className="text-xs font-bold text-rose-700 dark:text-rose-300">{erro}</span>
@@ -346,21 +279,21 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-border bg-secondary/40">
-                {["Marca / Contato", "Segmento", "Status", "Prêmio Sorteio", "Ações", ""].map(h => (
+                {["Marca / Contato", "Segmento", "Status", "Brindes", "Prêmio Sorteio", "Ações", ""].map(h => (
                   <th key={h} className="px-3 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {fornecedoresFiltrados.length === 0 ? (
+              {fornecedores.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-12 text-center">
+                  <td colSpan={7} className="px-3 py-12 text-center">
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                      Nenhum fornecedor encontrado no filtro atual.
+                      Nenhum fornecedor cadastrado ainda.
                     </span>
                   </td>
                 </tr>
-              ) : fornecedoresFiltrados.map(f => (
+              ) : fornecedores.map(f => (
                 <tr key={f.id} className="border-b border-border/50 hover:bg-secondary/20 transition-colors">
                   {/* Marca / Contato */}
                   <td className="px-3 py-3">
@@ -410,6 +343,13 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
                     </select>
                   </td>
 
+                  {/* Brindes */}
+                  <td className="px-3 py-3">
+                    <span className="text-[11px] font-bold text-foreground">
+                      {parseObservacoes(f.observacoes)?.["Brindes Kit"] || <span className="text-muted-foreground">—</span>}
+                    </span>
+                  </td>
+
                   {/* Prêmio Sorteio */}
                   <td className="px-3 py-3">
                     <span className="text-[11px] font-bold text-foreground">
@@ -423,8 +363,8 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
                       <button onClick={() => setFornecedorDetalhe(f)} className="p-1.5 rounded-md border border-border bg-background hover:bg-secondary text-muted-foreground hover:text-blue-500 transition-colors" title="Ver Ficha Completa">
                         <Eye className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => gerarConviteFornecedor(evento, f)} title="Baixar convite em PDF" className="p-1.5 rounded-md border border-border text-muted-foreground hover:border-blue-500 hover:text-blue-600 transition-all">
-                        <FileDown className="w-3.5 h-3.5" />
+                      <button onClick={() => abrirEdicao(f)} title="Editar informações" className="p-1.5 rounded-md border border-border text-muted-foreground hover:border-blue-500 hover:text-blue-600 transition-all">
+                        <Pencil className="w-3.5 h-3.5" />
                       </button>
                       {(f.status === "follow_up" || f.status === "media_kit_enviado") && (
                         <button onClick={() => { setCotaInput(f.cota_valor ? String(f.cota_valor) : "1000"); setFornecedorParaAprovar(f); }} className="px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-black flex items-center gap-1 shadow-xs transition-colors">
@@ -610,6 +550,75 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
               <button onClick={() => aprovarInscricao(fornecedorParaAprovar, parseFloat(cotaInput) || 0)} className="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md">
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Confirmar Marca</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Edição ── */}
+      {fornecedorEditar && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-card border border-border rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative my-8">
+            <button onClick={() => setFornecedorEditar(null)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-secondary text-muted-foreground">
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="space-y-1">
+              <span className="text-xs font-black text-blue-500 uppercase tracking-wider">Editar Fornecedor</span>
+              <h3 className="text-lg font-black text-foreground">{fornecedorEditar.marca}</h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 space-y-1">
+                <label className="block text-xs font-bold text-foreground">Marca</label>
+                <input value={editForm.marca} onChange={(e) => setEditForm({ ...editForm, marca: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-sm font-semibold focus:outline-none focus:border-blue-500" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-foreground">Segmento</label>
+                <select value={editForm.segmento} onChange={(e) => setEditForm({ ...editForm, segmento: e.target.value as Segmento })} className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-sm font-semibold focus:outline-none focus:border-blue-500">
+                  <option value="hidraulico">Hidráulico</option>
+                  <option value="eletrico">Elétrico</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-foreground">Cota (R$)</label>
+                <input type="number" value={editForm.cota_valor} onChange={(e) => setEditForm({ ...editForm, cota_valor: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-sm font-semibold focus:outline-none focus:border-blue-500" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-foreground">Contato</label>
+                <input value={editForm.contato_nome} onChange={(e) => setEditForm({ ...editForm, contato_nome: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-sm font-semibold focus:outline-none focus:border-blue-500" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-foreground">WhatsApp</label>
+                <input value={editForm.contato_telefone} onChange={(e) => setEditForm({ ...editForm, contato_telefone: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-sm font-semibold focus:outline-none focus:border-blue-500" />
+              </div>
+
+              <div className="col-span-2 space-y-1">
+                <label className="block text-xs font-bold text-foreground">Brindes (Kit)</label>
+                <input value={editForm.brindesKit} onChange={(e) => setEditForm({ ...editForm, brindesKit: e.target.value })} placeholder="Ex: Boné + chaveiro" className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-sm font-semibold focus:outline-none focus:border-blue-500" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-foreground">Prêmio para Sorteio</label>
+                <input value={editForm.premio_descricao} onChange={(e) => setEditForm({ ...editForm, premio_descricao: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-sm font-semibold focus:outline-none focus:border-blue-500" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-foreground">Valor do Prêmio (R$)</label>
+                <input type="number" value={editForm.premio_valor} onChange={(e) => setEditForm({ ...editForm, premio_valor: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-sm font-semibold focus:outline-none focus:border-blue-500" />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-border flex items-center justify-end gap-3">
+              <button onClick={() => setFornecedorEditar(null)} className="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:bg-secondary">Cancelar</button>
+              <button onClick={salvarEdicao} disabled={salvandoEdicao || !editForm.marca.trim()} className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-black flex items-center gap-1.5 shadow-md">
+                <Check className="w-4 h-4" />
+                <span>{salvandoEdicao ? "Salvando..." : "Salvar Alterações"}</span>
               </button>
             </div>
           </div>

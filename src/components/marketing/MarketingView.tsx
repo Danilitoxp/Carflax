@@ -73,7 +73,7 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
   }
 
   if (activeTab.includes("Relatórios")) {
-    return <ReportsView />;
+    return <ReportsView userProfile={userProfile} />;
   }
 
   return (

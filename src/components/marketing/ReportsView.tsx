@@ -24,9 +24,10 @@ import {
   Phone,
   Building2,
   Search,
+  MessageCircle,
 } from "lucide-react";
 import { marketingService, type ReportsAnalytics, type EvolutionData, type EvolutionClient, type VerbasData, type PesquisasData } from "@/lib/marketing-service";
-import { apiAdsSpend, apiAdsSendReport, apiCustosFixos, apiRentabilidade, type AdsSpendResponse, type CustosFixosPeriodo, type RentabilidadeResponse } from "@/lib/api";
+import { apiAdsSpend, apiAdsSendReport, apiEnviarRelatorioTrafegoPeriodo, apiCustosFixos, apiRentabilidade, type AdsSpendResponse, type CustosFixosPeriodo, type RentabilidadeResponse } from "@/lib/api";
 import { CustosFixosSection } from "./CustosFixosSection";
 import { RentabilidadeSection } from "./RentabilidadeSection";
 import { cn } from "@/lib/utils";
@@ -90,7 +91,13 @@ const slaColor = (minutes: number | null) =>
     : minutes < 5 ? "text-amber-500"
     : "text-rose-500";
 
-export function ReportsView() {
+interface UserProfile {
+  name?: string;
+  phone?: string;
+  whatsapp?: string;
+}
+
+export function ReportsView({ userProfile }: { userProfile?: UserProfile | null } = {}) {
   const [loading, setLoading] = useState(true);
   // Filtro inicia no mês atual: do dia 1 até hoje.
   const [startDate, setStartDate] = useState(() => {
@@ -100,6 +107,7 @@ export function ReportsView() {
   const [endDate, setEndDate] = useState<Date | null>(new Date());
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [enviandoWhats, setEnviandoWhats] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [pesquisas, setPesquisas] = useState<PesquisasData | null>(null);
   const [pesquisasLoading, setPesquisasLoading] = useState(false);
@@ -320,6 +328,45 @@ export function ReportsView() {
                 <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Download className="w-4 h-4 group-hover:text-blue-600 transition-colors" />
+              )}
+            </button>
+
+            <button
+              onClick={async () => {
+                if (enviandoWhats || !startDate || !endDate) return;
+                const telefone = userProfile?.whatsapp || userProfile?.phone;
+                if (!telefone) {
+                  alert("Seu WhatsApp não está cadastrado no perfil. Atualize em Configurações > Meu Perfil.");
+                  return;
+                }
+                setEnviandoWhats(true);
+                try {
+                  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+                  const result = await apiEnviarRelatorioTrafegoPeriodo({
+                    inicio: fmt(startDate),
+                    fim: fmt(endDate),
+                    telefone,
+                    nome: userProfile?.name,
+                  });
+                  if (!result.success) alert(result.error || "Não foi possível enviar o relatório.");
+                } catch (err) {
+                  console.error("Erro ao enviar relatório por WhatsApp:", err);
+                  alert("Não foi possível enviar o relatório. Tente novamente.");
+                } finally {
+                  setEnviandoWhats(false);
+                }
+              }}
+              disabled={enviandoWhats}
+              className={cn(
+                "w-10 h-10 border rounded-xl transition-all active:scale-95 shadow-sm flex items-center justify-center group",
+                enviandoWhats ? "bg-emerald-600/10 border-emerald-600/20 cursor-wait" : "bg-card border-border hover:bg-secondary text-muted-foreground"
+              )}
+              title="Enviar relatório do período pelo meu WhatsApp"
+            >
+              {enviandoWhats ? (
+                <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <MessageCircle className="w-4 h-4 group-hover:text-emerald-600 transition-colors" />
               )}
             </button>
           </div>
