@@ -33,7 +33,7 @@ import { calcMetaDiaria } from "@/lib/dias-uteis";
 // servidor. Cada ciclo cai numa entrada nova de cache, então a tela acompanha a
 // venda quase ao vivo sem repetir consulta pesada no ERP.
 const INTERVALO_MS = 15 * 1000;
-const SOM_COMEMORACAO = "https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3";
+const SOM_COMEMORACAO = "/sounds/ranking-goal.mp3";
 
 interface Linha {
   cod: string;
@@ -98,17 +98,21 @@ export function RankingView() {
   const ultrapassagemTocouRef = useRef(false);
   const somUltrapassagemRef = useRef<HTMLAudioElement | null>(null);
 
+  const tocarUltrapassagem = useCallback(() => {
+    const audio = somUltrapassagemRef.current ?? new Audio("/sounds/ranking-overtake.wav");
+    somUltrapassagemRef.current = audio;
+    audio.volume = 0.35;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!ultrapassagemTocouRef.current && hasOvertake(rankingExibidoRef.current, linhas)) {
       ultrapassagemTocouRef.current = true;
-      const audio = somUltrapassagemRef.current ?? new Audio("/sounds/ranking-overtake.wav");
-      somUltrapassagemRef.current = audio;
-      audio.volume = 0.35;
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
+      tocarUltrapassagem();
     }
     rankingExibidoRef.current = linhas;
-  }, [linhas]);
+  }, [linhas, tocarUltrapassagem]);
 
   useEffect(() => () => { somUltrapassagemRef.current?.pause(); }, []);
 
@@ -216,15 +220,27 @@ export function RankingView() {
   return (
     <div className="ranking-screen h-screen w-full overflow-hidden bg-[#060b1a] text-white relative">
       <BeamsBackground className="absolute inset-0" intensity="strong" />
-      <button
-        type="button"
-        onClick={tocarSom}
-        aria-label="Testar som do ranking"
-        title="Testar som do ranking"
-        className="absolute right-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-slate-950/80 text-white opacity-0 transition-opacity duration-200 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-amber-300"
-      >
-        <Volume2 aria-hidden="true" className="h-5 w-5" />
-      </button>
+      <div className="group absolute right-2 top-2 z-20">
+        <button
+          type="button"
+          aria-label="Opções de teste de som"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-slate-950/80 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:outline-2 focus-visible:outline-amber-300"
+        >
+          <Volume2 aria-hidden="true" className="h-5 w-5" />
+        </button>
+        <div className="invisible absolute right-0 top-full w-56 pt-2 opacity-0 transition-opacity duration-200 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+          <div role="group" aria-label="Testar sons do ranking" className="rounded-xl border border-white/15 bg-slate-950/95 p-2 shadow-xl">
+            <button type="button" onClick={tocarSom} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-300">
+              <Crown aria-hidden="true" className="h-4 w-4 text-amber-400" />
+              Testar meta batida
+            </button>
+            <button type="button" onClick={tocarUltrapassagem} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-300">
+              <TrendingUp aria-hidden="true" className="h-4 w-4 text-blue-400" />
+              Testar ultrapassagem
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Sem cabeçalho: num telão o título ocupa altura e não informa nada que
           o pódio já não diga. A atualização segue automática a cada 15s. */}
@@ -448,4 +464,5 @@ export function RankingView() {
     </div>
   );
 }
+
 
