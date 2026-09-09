@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Crown, TrendingUp, TrendingDown, Minus, Flame, X } from "lucide-react";
+import { Crown, TrendingUp, TrendingDown, Minus, Flame, X, Volume2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import "./ranking-animations.css";
+import { BeamsBackground } from "@/components/ui/beams-background";
+import { RANKING_COUNT_DURATION_MS, useAnimatedRanking } from "./use-animated-ranking";
+import { hasOvertake } from "./ranking-overtake";
 import {
   apiRankingDia,
   apiDashboardGeral,
@@ -79,7 +83,8 @@ function Variacao({ v }: { v: number | null }) {
 }
 
 export function RankingView() {
-  const [linhas, setLinhas] = useState<Linha[]>([]);
+  const [linhasRecebidas, setLinhas] = useState<Linha[]>([]);
+  const linhas = useAnimatedRanking(linhasRecebidas);
   const [comemorando, setComemorando] = useState<Linha | null>(null);
 
   const resolverRef = useRef<AvatarResolver | null>(null);
@@ -88,6 +93,24 @@ export function RankingView() {
   const jaBateuRef = useRef<Set<string>>(new Set());
   const ontemRef = useRef<Map<string, number>>(new Map());
   const primeiraCargaRef = useRef(true);
+  const comemoracaoPendenteRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rankingExibidoRef = useRef<Linha[]>([]);
+  const ultrapassagemTocouRef = useRef(false);
+  const somUltrapassagemRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (!ultrapassagemTocouRef.current && hasOvertake(rankingExibidoRef.current, linhas)) {
+      ultrapassagemTocouRef.current = true;
+      const audio = somUltrapassagemRef.current ?? new Audio("/sounds/ranking-overtake.wav");
+      somUltrapassagemRef.current = audio;
+      audio.volume = 0.35;
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+    rankingExibidoRef.current = linhas;
+  }, [linhas]);
+
+  useEffect(() => () => { somUltrapassagemRef.current?.pause(); }, []);
 
   const tocarSom = () => {
     try {
@@ -136,13 +159,19 @@ export function RankingView() {
         if (l.percentual >= 100) jaBateuRef.current.add(l.cod);
       });
 
+      ultrapassagemTocouRef.current = false;
       setLinhas(lista);
 
       // Na primeira carga metade do time já pode ter batido: comemorar tudo de
       // uma vez seria ruído. A festa é só para quem virar a chave com a tela aberta.
       if (!primeiraCargaRef.current && novos.length > 0) {
-        setComemorando(novos[0]);
-        tocarSom();
+        if (comemoracaoPendenteRef.current) clearTimeout(comemoracaoPendenteRef.current);
+        // Let the count and overtaking finish before covering the ranking.
+        comemoracaoPendenteRef.current = setTimeout(() => {
+          setComemorando(novos[0]);
+          tocarSom();
+          comemoracaoPendenteRef.current = null;
+        }, RANKING_COUNT_DURATION_MS + 500);
       }
       primeiraCargaRef.current = false;
     } catch {
@@ -167,7 +196,10 @@ export function RankingView() {
   useEffect(() => {
     carregar();
     const id = setInterval(carregar, INTERVALO_MS);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      if (comemoracaoPendenteRef.current) clearTimeout(comemoracaoPendenteRef.current);
+    };
   }, [carregar]);
 
   useEffect(() => {
@@ -182,11 +214,20 @@ export function RankingView() {
   const ordemPodio = [podio[1], podio[0], podio[2]].filter(Boolean);
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#060b1a] text-white relative">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.25),transparent_55%),radial-gradient(circle_at_85%_10%,rgba(14,165,233,0.18),transparent_50%)]" />
+    <div className="ranking-screen h-screen w-full overflow-hidden bg-[#060b1a] text-white relative">
+      <BeamsBackground className="absolute inset-0" intensity="strong" />
+      <button
+        type="button"
+        onClick={tocarSom}
+        aria-label="Testar som do ranking"
+        title="Testar som do ranking"
+        className="absolute right-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-slate-950/80 text-white opacity-0 transition-opacity duration-200 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-amber-300"
+      >
+        <Volume2 aria-hidden="true" className="h-5 w-5" />
+      </button>
 
       {/* Sem cabeçalho: num telão o título ocupa altura e não informa nada que
-          o pódio já não diga. A atualização segue automática a cada 30s. */}
+          o pódio já não diga. A atualização segue automática a cada 15s. */}
       <div className="relative h-full flex flex-col p-6 gap-5">
         <div className="flex-1 min-h-0 flex flex-col gap-5">
             {/* Pódio */}
@@ -198,17 +239,20 @@ export function RankingView() {
                   <motion.div
                     key={l.cod}
                     layout
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, delay: (pos - 1) * 0.1, layout: { duration: 0.45, delay: 0 } }}
                     className={cn(
                       "relative rounded-2xl border p-4 text-center overflow-hidden",
                       primeiro
-                        ? "bg-gradient-to-b from-amber-500/20 to-transparent border-amber-400/50 pb-6"
+                        ? "ranking-leader bg-gradient-to-b from-amber-500/20 to-transparent border-amber-400/50 pb-6"
                         : pos === 2
                           ? "bg-gradient-to-b from-blue-500/15 to-transparent border-blue-400/40"
                           : "bg-gradient-to-b from-orange-600/15 to-transparent border-orange-500/40",
                     )}
                   >
                     {primeiro && (
-                      <Crown className="w-7 h-7 text-amber-400 mx-auto mb-1 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)]" />
+                      <Crown className="ranking-crown w-7 h-7 text-amber-400 mx-auto mb-1 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)]" />
                     )}
                     <span
                       className={cn(
@@ -294,6 +338,9 @@ export function RankingView() {
                   return (
                     <motion.div
                       layout
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, delay: (pos - 1) * 0.07, layout: { duration: 0.45, delay: 0 } }}
                       key={l.cod}
                       className={cn(
                         "grid grid-cols-[70px_minmax(180px,1fr)_minmax(0,2.5fr)_90px_80px] gap-3 items-center px-4 border-b border-white/5 transition-colors flex-1 min-h-0",
@@ -319,7 +366,7 @@ export function RankingView() {
                       <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                         <div
                           className={cn(
-                            "h-full rounded-full transition-all duration-700",
+                            "h-full rounded-full",
                             bateu ? "bg-emerald-400" : "bg-blue-500",
                           )}
                           style={{ width: `${Math.min(l.percentual, 100)}%` }}
@@ -343,6 +390,7 @@ export function RankingView() {
             </div>
         </div>
       </div>
+
 
       {/* Comemoração da meta diária */}
       <AnimatePresence>
@@ -400,3 +448,4 @@ export function RankingView() {
     </div>
   );
 }
+

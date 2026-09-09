@@ -1,0 +1,37 @@
+.ranking-leader {
+  box-shadow: 0 0 28px rgb(251 191 36 / 10%);
+}
+
+/* The masked highlight stays on the border, leaving the content unobscured. */
+.ranking-leader::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgb(253 230 138 / 90%) 48%, transparent 66%);
+  background-size: 300% 100%;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: ranking-shimmer 4s ease-in-out infinite;
+}
+
+.ranking-crown {
+  animation: ranking-float 2.8s ease-in-out infinite;
+}
+
+
+
+@keyframes ranking-shimmer {
+  0%, 20% { background-position: 100% 0; opacity: 0; }
+  35%, 65% { opacity: 0.85; }
+  80%, 100% { background-position: 0% 0; opacity: 0; }
+}
+
+@keyframes ranking-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-7px) rotate(5deg); }
+}
+
+
