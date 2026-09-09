@@ -31,6 +31,7 @@ import { apiAdsSpend, apiAdsSendReport, apiEnviarRelatorioTrafegoPeriodo, apiCus
 import { CustosFixosSection } from "./CustosFixosSection";
 import { RentabilidadeSection } from "./RentabilidadeSection";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import { MiniCalendar } from "@/components/ui/MiniCalendar";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
@@ -124,6 +125,9 @@ export function ReportsView({ userProfile }: { userProfile?: UserProfile | null 
   const [adsErro, setAdsErro] = useState<string | null>(null);
   const [verbas, setVerbas] = useState<VerbasData | null>(null);
   const [verbasLoading, setVerbasLoading] = useState(false);
+  // "fornecedor|trimestre" já marcado como utilizado (persistido, não muda com o filtro de data).
+  const [verbasUsadas, setVerbasUsadas] = useState<Set<string>>(new Set());
+  const [marcandoUso, setMarcandoUso] = useState<string | null>(null);
   const [adsData, setAdsData] = useState<AdsSpendResponse | null>(null);
   const [adsLoading, setAdsLoading] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -175,14 +179,66 @@ export function ReportsView({ userProfile }: { userProfile?: UserProfile | null 
   }, [activeTab, startDate, endDate]);
 
   useEffect(() => {
-    if (activeTab !== "verbas" || !startDate || !endDate) return;
+    if (activeTab !== "verbas") return;
     setVerbas(null);
     setVerbasLoading(true);
-    marketingService.getVerbasData(startDate, endDate)
+    // Sem filtro de data de propósito: a verba precisa aparecer de todo
+    // período que já existiu, não só do recorte selecionado no topo da tela
+    // (que é pensado para os outros relatórios, não para isto).
+    marketingService.getVerbasData()
       .then(setVerbas)
       .catch((err) => console.error("Erro ao carregar verbas:", err))
       .finally(() => setVerbasLoading(false));
-  }, [activeTab, startDate, endDate]);
+  }, [activeTab]);
+
+  // Marcações de uso persistidas — independentes do filtro de data.
+  useEffect(() => {
+    if (activeTab !== "verbas") return;
+    supabase
+      .from("marketing_verbas_uso")
+      .select("fornecedor, trimestre")
+      .then(({ data, error }) => {
+        if (error) { console.error("Erro ao carregar verbas usadas:", error); return; }
+        setVerbasUsadas(new Set((data || []).map((r) => `${r.fornecedor}|${r.trimestre}`)));
+      });
+  }, [activeTab]);
+
+  const alternarVerbaUsada = useCallback(async (fornecedor: string, trimestre: string, usado: boolean) => {
+    const chave = `${fornecedor}|${trimestre}`;
+    setMarcandoUso(chave);
+    // Otimista.
+    setVerbasUsadas((prev) => {
+      const next = new Set(prev);
+      if (usado) next.add(chave); else next.delete(chave);
+      return next;
+    });
+    try {
+      if (usado) {
+        const { error } = await supabase
+          .from("marketing_verbas_uso")
+          .upsert({ fornecedor, trimestre }, { onConflict: "fornecedor,trimestre" });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("marketing_verbas_uso")
+          .delete()
+          .eq("fornecedor", fornecedor)
+          .eq("trimestre", trimestre);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error("Erro ao marcar verba usada:", err);
+      alert("Não foi possível salvar essa marcação. Tente novamente.");
+      // Reverte
+      setVerbasUsadas((prev) => {
+        const next = new Set(prev);
+        if (usado) next.delete(chave); else next.add(chave);
+        return next;
+      });
+    } finally {
+      setMarcandoUso(null);
+    }
+  }, []);
 
   // Recarrega os gastos do período. Extraído do efeito para que a edição de um
   // custo fixo possa refazer a consulta sem trocar de aba — o total de
@@ -1083,108 +1139,109 @@ export function ReportsView({ userProfile }: { userProfile?: UserProfile | null 
               </div>
             ) : (
               <div className="space-y-5">
-                {verbas.fornecedores.map((forn) => (
-                  <div key={forn.fornecedor} className="space-y-5">
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                      <KpiCard label="Total Comprado" value={formatCurrency(forn.totalComprado)} icon={<ShoppingBag className="w-5 h-5" />} accent="text-blue-500 bg-blue-500/10" />
-                      <KpiCard label="Base (sem tubos)" value={formatCurrency(forn.totalSemTubo)} icon={<Filter className="w-5 h-5" />} accent="text-violet-500 bg-violet-500/10" />
-                      <KpiCard label="Total Verbas" value={formatCurrency(forn.valorVerba)} hint={`${forn.percentualVerba}% sobre base`} icon={<Percent className="w-5 h-5" />} accent="text-emerald-500 bg-emerald-500/10" />
-                      <KpiCard label="Saldo Disponível" value={formatCurrency(forn.valorRestante)} hint="Não expirado" icon={<DollarSign className="w-5 h-5" />} accent="text-amber-500 bg-amber-500/10" />
-                    </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <KpiCard label="Total Comprado" value={formatCurrency(verbas.fornecedores.reduce((s, f) => s + f.totalComprado, 0))} icon={<ShoppingBag className="w-5 h-5" />} accent="text-blue-500 bg-blue-500/10" />
+                  <KpiCard label="Base (sem tubos)" value={formatCurrency(verbas.fornecedores.reduce((s, f) => s + f.totalSemTubo, 0))} icon={<Filter className="w-5 h-5" />} accent="text-violet-500 bg-violet-500/10" />
+                  <KpiCard label="Total Verbas" value={formatCurrency(verbas.totalVerbas)} icon={<Percent className="w-5 h-5" />} accent="text-emerald-500 bg-emerald-500/10" />
+                  <KpiCard label="Saldo Disponível" value={formatCurrency(verbas.fornecedores.reduce((s, f) => s + f.valorRestante, 0))} hint="Não expirado" icon={<DollarSign className="w-5 h-5" />} accent="text-amber-500 bg-amber-500/10" />
+                </div>
 
-                    {forn.trimestres.map((tri) => {
-                      const gruposSemTubo = tri.grupos.filter((g) => !g.isTubo);
-                      const gruposTubo = tri.grupos.filter((g) => g.isTubo);
-                      const maxGrupo = Math.max(...tri.grupos.map((g) => g.total), 1);
+                {/* Tabela flat: um período de apuração por linha, igual ao extrato
+                    de verba do fornecedor (nota de crédito / saldo trade marketing). */}
+                {(() => {
+                  const linhas = verbas.fornecedores.flatMap((forn) =>
+                    forn.trimestres.map((tri) => ({
+                      fornecedor: forn.fornecedor,
+                      periodo: tri.label,
+                      // Base do cálculo da verba: o comprado do período menos os
+                      // tubos, que o fornecedor não bonifica. Sem esta coluna o
+                      // "Valor" aparecia sem de onde saiu — só o card do topo
+                      // mostrava a base, e somada de todos os períodos.
+                      semTubos: tri.totalSemTubo,
+                      comprado: tri.totalComprado,
+                      valor: tri.valorVerba,
+                      valorRestante: tri.expirado ? 0 : tri.valorVerba,
+                      saldoFornecedor: forn.valorRestante,
+                      expirado: tri.expirado,
+                      expiraEm: tri.expiraEm,
+                    })),
+                  );
+                  const somaSemTubos = linhas.reduce((s, l) => s + l.semTubos, 0);
+                  const somaValor = linhas.reduce((s, l) => s + l.valor, 0);
+                  const somaRestante = linhas.reduce((s, l) => s + l.valorRestante, 0);
+                  const somaSaldo = verbas.fornecedores.reduce((s, f) => s + f.valorRestante, 0);
 
-                      return (
-                        <section key={tri.trimestre} className={cn("bg-card border rounded-3xl p-6 shadow-sm", tri.expirado ? "border-rose-500/30 opacity-60" : tri.expiraEm <= 2 ? "border-amber-500/50" : "border-border")}>
-                          <div className="flex items-center justify-between mb-5">
-                            <div>
-                              <h2 className="text-sm font-black uppercase tracking-tight flex items-center gap-2">
-                                <ShoppingBag className="w-4 h-4 text-primary" /> {forn.fornecedor} — {tri.label}
-                              </h2>
-                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">
-                                {forn.percentualVerba}% sobre compras (exceto tubos) · {tri.trimestre}
-                              </p>
-                            </div>
-                            <div className="text-right flex items-center gap-3">
-                              <span className={cn(
-                                "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase",
-                                tri.expirado ? "bg-rose-500/10 text-rose-500" : tri.expiraEm <= 2 ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500"
-                              )}>
-                                {tri.expirado ? "Expirado" : `Expira em ${tri.expiraEm} ${tri.expiraEm === 1 ? "mês" : "meses"}`}
-                              </span>
-                              <div>
-                                <p className={cn("text-lg font-black tabular-nums", tri.expirado ? "text-rose-500 line-through" : "text-emerald-500")}>{formatCurrency(tri.valorVerba)}</p>
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase">Verba</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-3 mb-5">
-                            <div className="bg-secondary/50 rounded-xl p-3 text-center">
-                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Total Comprado</p>
-                              <p className="text-sm font-black text-foreground tabular-nums mt-0.5">{formatCurrency(tri.totalComprado)}</p>
-                            </div>
-                            <div className="bg-secondary/50 rounded-xl p-3 text-center">
-                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Tubos (excluído)</p>
-                              <p className="text-sm font-black text-rose-500 tabular-nums mt-0.5">{formatCurrency(tri.totalComprado - tri.totalSemTubo)}</p>
-                            </div>
-                            <div className="bg-secondary/50 rounded-xl p-3 text-center">
-                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Base de Cálculo</p>
-                              <p className="text-sm font-black text-emerald-500 tabular-nums mt-0.5">{formatCurrency(tri.totalSemTubo)}</p>
-                            </div>
-                          </div>
-
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="border-b border-border">
-                                  <th className="text-left py-2.5 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Grupo</th>
-                                  <th className="text-right py-2.5 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Total Comprado</th>
-                                  <th className="text-center py-2.5 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground w-24">Status</th>
+                  return (
+                    <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-secondary/60 border-b border-border">
+                              <th className="text-left py-2.5 px-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Fornecedor</th>
+                              <th className="text-left py-2.5 px-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Período de Apuração</th>
+                              <th className="text-right py-2.5 px-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Base (sem tubos)</th>
+                              <th className="text-right py-2.5 px-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Valor</th>
+                              <th className="text-right py-2.5 px-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Valor Restante</th>
+                              <th className="text-right py-2.5 px-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Saldo Trade Marketing</th>
+                              <th className="text-center py-2.5 px-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Expira em</th>
+                              <th className="text-center py-2.5 px-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Utilizado</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {linhas.map((l, idx) => {
+                              const chave = `${l.fornecedor}|${l.periodo}`;
+                              const usado = verbasUsadas.has(chave);
+                              return (
+                                <tr key={`${l.fornecedor}-${l.periodo}-${idx}`} className={cn("border-b border-border/40 hover:bg-secondary/20 transition-colors", usado && "opacity-50")}>
+                                  <td className={cn("py-2.5 px-3 font-bold text-primary", usado && "line-through")}>{l.fornecedor}</td>
+                                  <td className={cn("py-2.5 px-3 font-semibold text-foreground", usado && "line-through")}>{l.periodo}</td>
+                                  <td
+                                    className="py-2.5 px-3 text-right font-bold text-violet-500 tabular-nums"
+                                    title={`Tubos fora da base: ${formatCurrency(l.comprado - l.semTubos)}`}
+                                  >
+                                    {formatCurrency(l.semTubos)}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right font-bold text-foreground tabular-nums">{formatCurrency(l.valor)}</td>
+                                  <td className={cn("py-2.5 px-3 text-right font-bold tabular-nums", l.expirado || usado ? "text-muted-foreground line-through" : "text-emerald-500")}>{formatCurrency(l.valorRestante)}</td>
+                                  <td className="py-2.5 px-3 text-right font-semibold text-muted-foreground tabular-nums">{formatCurrency(l.saldoFornecedor)}</td>
+                                  <td className="py-2.5 px-3 text-center">
+                                    <span className={cn(
+                                      "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase",
+                                      l.expirado ? "bg-rose-500/10 text-rose-500" : l.expiraEm <= 2 ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500",
+                                    )}>
+                                      {l.expirado ? "Expirado" : `${l.expiraEm} ${l.expiraEm === 1 ? "mês" : "meses"}`}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={usado}
+                                      disabled={marcandoUso === chave}
+                                      onChange={(e) => alternarVerbaUsada(l.fornecedor, l.periodo, e.target.checked)}
+                                      className="w-4 h-4 rounded border-border accent-primary cursor-pointer disabled:opacity-40"
+                                      title={usado ? "Marcar como não utilizado" : "Marcar como já utilizado"}
+                                    />
+                                  </td>
                                 </tr>
-                              </thead>
-                              <tbody>
-                                {tri.grupos.map((g, idx) => {
-                                  const barPct = (g.total / maxGrupo) * 100;
-                                  return (
-                                    <tr key={idx} className={cn("border-b border-border/40 transition-colors", g.isTubo ? "opacity-50" : "hover:bg-secondary/30")}>
-                                      <td className="py-2 px-2">
-                                        <span className={cn("font-bold", g.isTubo ? "text-muted-foreground line-through" : "text-foreground")}>{g.grupo}</span>
-                                      </td>
-                                      <td className="py-2 px-2 text-right min-w-[180px]">
-                                        <div className="flex items-center justify-end gap-2">
-                                          <div className="flex-1 max-w-[120px] bg-secondary h-1.5 rounded-full overflow-hidden">
-                                            <div className={cn("h-full rounded-full transition-all", g.isTubo ? "bg-rose-400" : "bg-gradient-to-r from-emerald-600 to-emerald-400")} style={{ width: `${barPct}%` }} />
-                                          </div>
-                                          <span className={cn("font-bold tabular-nums shrink-0", g.isTubo ? "text-rose-500" : "text-emerald-500")}>{formatCurrency(g.total)}</span>
-                                        </div>
-                                      </td>
-                                      <td className="py-2 px-2 text-center">
-                                        <span className={cn(
-                                          "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase",
-                                          g.isTubo ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500"
-                                        )}>
-                                          {g.isTubo ? "Excluído" : "Conta"}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                            <div className="mt-3 pt-3 border-t border-border/40 flex items-center justify-between text-[9px] font-black text-muted-foreground uppercase tracking-widest">
-                              <span>{gruposSemTubo.length} grupos válidos · {gruposTubo.length} excluídos</span>
-                              <span>{forn.percentualVerba}% × {formatCurrency(tri.totalSemTubo)} = {formatCurrency(tri.valorVerba)}</span>
-                            </div>
-                          </div>
-                        </section>
-                      );
-                    })}
-                  </div>
-                ))}
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-primary/5 font-black">
+                              <td className="py-2.5 px-3" colSpan={2} />
+                              <td className="py-2.5 px-3 text-right text-violet-500 tabular-nums">{formatCurrency(somaSemTubos)}</td>
+                              <td className="py-2.5 px-3 text-right text-foreground tabular-nums">{formatCurrency(somaValor)}</td>
+                              <td className="py-2.5 px-3 text-right text-emerald-500 tabular-nums">{formatCurrency(somaRestante)}</td>
+                              <td className="py-2.5 px-3 text-right text-foreground tabular-nums">{formatCurrency(somaSaldo)}</td>
+                              <td className="py-2.5 px-3" />
+                              <td className="py-2.5 px-3" />
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )
           ) : activeTab === "rentabilidade" ? (

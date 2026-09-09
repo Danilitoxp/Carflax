@@ -1935,7 +1935,11 @@ export const marketingService = {
       let sql = `SELECT GRUPO, DATA, TOTAL FROM VW_COMPRAS_PRODUTOS WHERE MARCA = '${cfg.marca}'`;
       if (startDate) sql += ` AND DATA >= '${startDate.toISOString().slice(0, 10)}'`;
       if (endDate) sql += ` AND DATA <= '${endDate.toISOString().slice(0, 10)}'`;
-      sql += ` ORDER BY DATA`;
+      // Sem LIMIT explícito, o executor de SQL aplica 500 automaticamente
+      // (sqlHandler.js) — como a ordenação é por data crescente e a tela
+      // busca todo o histórico, isso cortava exatamente as compras mais
+      // recentes (2025/2026) e sobrava só o ano mais antigo na tela.
+      sql += ` ORDER BY DATA LIMIT 20000`;
 
       const res = await apiAdminSQL(sql);
       if (!res.success || !res.data) continue;
