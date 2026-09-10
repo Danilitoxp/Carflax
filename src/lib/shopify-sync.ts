@@ -173,6 +173,10 @@ export async function getShopifyCatalog(force = false): Promise<Map<string, Shop
       };
     } catch (e) {
       console.error("Erro ao sincronizar catálogo da Shopify:", e);
+    } finally {
+      // Sem isto uma leitura que falhou fica presa na promessa e devolve um
+      // catálogo vazio para sempre, mesmo com force.
+      catalogPromise = null;
     }
     return bySku;
   })();
@@ -275,6 +279,26 @@ export interface ResultadoEnvio {
   /** "criado" quando o produto ainda não existia na loja */
   acao: "criado" | "atualizado";
   erro?: string;
+  /**
+   * Como a variante ficou na loja depois do envio. Vem da própria resposta da
+   * Shopify, então a tela pode se atualizar na hora, sem reler o catálogo — a
+   * listagem de produtos leva alguns segundos para enxergar o que acabou de ser
+   * criado, e era por isso que o ícone só trocava depois do F5.
+   */
+  variante?: ShopifyVariantInfo;
+}
+
+/**
+ * Reflete no cache do catálogo o que já sabemos da loja, sem refazer a leitura
+ * inteira (são milhares de produtos, 250 por página).
+ */
+export function aplicarNoCatalogo(info: ShopifyVariantInfo) {
+  catalogCache?.set(normalizeSku(info.sku), info);
+  if (info.image) {
+    photoCache?.set(info.sku, info.image);
+    photoCache?.set(normalizeSku(info.sku), info.image);
+    photoCache?.set(padSku(info.sku), info.image);
+  }
 }
 
 async function setInventory(inventoryItemId: number, quantidade: number) {
@@ -335,7 +359,14 @@ export async function enviarProdutoParaShopify(
       if (existente.inventoryItemId && existente.gerenciaEstoque) {
         await setInventory(existente.inventoryItemId, p.stock);
       }
-      return { cod: p.cod, ok: true, acao: "atualizado" };
+
+      const atualizada: ShopifyVariantInfo = {
+        ...existente,
+        price: p.price,
+        stock: existente.gerenciaEstoque ? Math.max(0, Math.floor(p.stock)) : existente.stock,
+      };
+      aplicarNoCatalogo(atualizada);
+      return { cod: p.cod, ok: true, acao: "atualizado", variante: atualizada };
     }
 
     const res = await fetch(`${SHOPIFY_PROXY}/admin/api/${API_VERSION}/products.json`, {
@@ -370,7 +401,25 @@ export async function enviarProdutoParaShopify(
     if (criado.product?.id && ia?.colecaoIds.length) {
       await vincularColecoes(criado.product.id, ia.colecaoIds);
     }
-    return { cod: p.cod, ok: true, acao: "criado" };
+
+    let nova: ShopifyVariantInfo | undefined;
+    if (criado.product && variante) {
+      nova = {
+        productId: criado.product.id,
+        productTitle: criado.product.title,
+        status: criado.product.status ?? "draft",
+        handle: criado.product.handle,
+        variantId: variante.id,
+        inventoryItemId: variante.inventory_item_id ?? null,
+        sku: String(variante.sku ?? padSku(p.cod)),
+        price: p.price,
+        stock: Math.max(0, Math.floor(p.stock)),
+        image: criado.product.image?.src || criado.product.images?.[0]?.src,
+        gerenciaEstoque: variante.inventory_management === "shopify",
+      };
+      aplicarNoCatalogo(nova);
+    }
+    return { cod: p.cod, ok: true, acao: "criado", variante: nova };
   } catch (e) {
     return {
       cod: p.cod,

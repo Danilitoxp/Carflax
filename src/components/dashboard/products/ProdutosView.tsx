@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Search,
   ArrowUpDown,
@@ -9,7 +9,8 @@ import {
   Settings2,
   ShoppingBag,
   Upload,
-  Loader2
+  Loader2,
+  RefreshCw
 } from "lucide-react";
 import { SiShopify } from "react-icons/si";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,12 @@ import { TinyLoader } from "@/components/ui/TinyLoader";
 import { apiDashboardProdutos, type ProductInfo } from "@/lib/api";
 import { FornecedoresModal } from "./FornecedoresModal";
 import { ShopifyEnvioModal, type ItemEnvio } from "./ShopifyEnvioModal";
-import { getShopifyCatalog, normalizeSku, type ShopifyVariantInfo } from "@/lib/shopify-sync";
+import {
+  getShopifyCatalog,
+  normalizeSku,
+  type ResultadoEnvio,
+  type ShopifyVariantInfo,
+} from "@/lib/shopify-sync";
 
 /** Situação do vínculo ERP ↔ loja de um produto. */
 type SyncStatus = "sincronizado" | "divergente" | "fora";
@@ -163,6 +169,7 @@ export function ProdutosView() {
   const [shopifyMap, setShopifyMap] = useState<Map<string, ShopifyVariantInfo>>(new Map());
   const [shopifyLoading, setShopifyLoading] = useState(true);
   const [envio, setEnvio] = useState<ItemEnvio[] | null>(null);
+  const [atualizando, setAtualizando] = useState(false);
 
   const requestSort = (key: keyof Product) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -173,12 +180,15 @@ export function ProdutosView() {
     setVisibleCount(50);
   };
 
-  useEffect(() => {
-    async function fetchProducts() {
+  /**
+   * Busca os produtos no ERP. `silencioso` evita o esqueleto de carregamento nas
+   * atualizações automáticas — a tabela só troca de conteúdo quando a resposta chega.
+   */
+  const carregarProdutos = useCallback(async (silencioso = false) => {
       try {
-        setLoading(true);
+        if (!silencioso) setLoading(true);
         const response = await apiDashboardProdutos();
-        
+
         if (response && response.length > 0) {
           const mapped = response.map((p: ProductInfo) => {
             const precoVenda = typeof p.PRECO_VENDA === 'string' ? parseFloat(p.PRECO_VENDA) : Number(p.PRECO_VENDA || 0);
@@ -202,26 +212,74 @@ export function ProdutosView() {
       } catch (error) {
         console.error("[Products] Erro ao carregar:", error);
       } finally {
-        setLoading(false);
+        if (!silencioso) setLoading(false);
       }
-    }
-    fetchProducts();
   }, []);
 
-  const carregarShopify = async (force = false) => {
-    setShopifyLoading(true);
+  const carregarShopify = useCallback(async (force = false, silencioso = false) => {
+    if (!silencioso) setShopifyLoading(true);
     try {
       setShopifyMap(await getShopifyCatalog(force));
     } catch (error) {
       console.error("[Products] Erro ao carregar catálogo Shopify:", error);
     } finally {
-      setShopifyLoading(false);
+      if (!silencioso) setShopifyLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    carregarProdutos();
     carregarShopify();
+  }, [carregarProdutos, carregarShopify]);
+
+  /**
+   * O ERP é MySQL consultado por API — não há realtime. Para que uma alteração
+   * feita no ERP apareça aqui sem F5: recarrega ao voltar para a aba e a cada
+   * 60s enquanto a tela estiver visível. O catálogo da Shopify vem do cache e
+   * só é refeito no botão de atualizar.
+   */
+  useEffect(() => {
+    const recarregar = () => {
+      if (document.visibilityState !== "visible") return;
+      carregarProdutos(true);
+    };
+
+    window.addEventListener("focus", recarregar);
+    document.addEventListener("visibilitychange", recarregar);
+    const timer = window.setInterval(recarregar, 60_000);
+
+    return () => {
+      window.removeEventListener("focus", recarregar);
+      document.removeEventListener("visibilitychange", recarregar);
+      window.clearInterval(timer);
+    };
+  }, [carregarProdutos]);
+
+  /**
+   * Depois de enviar, a resposta da própria Shopify já diz como a variante ficou.
+   * Aplicar isso no mapa local troca o ícone na hora — reler o catálogo inteiro
+   * não resolvia porque a listagem demora alguns segundos para devolver o produto
+   * recém-criado, e o ícone só mudava no F5 seguinte.
+   */
+  const aplicarResultadoEnvio = useCallback((resultados: ResultadoEnvio[]) => {
+    const novas = resultados.filter((r) => r.ok && r.variante).map((r) => r.variante!);
+    if (novas.length === 0) return;
+    setShopifyMap((atual) => {
+      const proximo = new Map(atual);
+      for (const v of novas) proximo.set(normalizeSku(v.sku), v);
+      return proximo;
+    });
   }, []);
+
+  const atualizarTudo = async () => {
+    if (atualizando) return;
+    setAtualizando(true);
+    try {
+      await Promise.all([carregarProdutos(true), carregarShopify(true, true)]);
+    } finally {
+      setAtualizando(false);
+    }
+  };
 
   const brands = useMemo(() => ["Todas as Marcas", ...Array.from(new Set(products.map(p => p.brand))).sort()], [products]);
 
@@ -524,6 +582,15 @@ export function ProdutosView() {
           </button>
 
           <button
+            onClick={atualizarTudo}
+            disabled={atualizando}
+            title="Atualizar produtos e catálogo da loja"
+            className="flex items-center justify-center p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all shadow-sm group shrink-0 disabled:opacity-40"
+          >
+            <RefreshCw className={cn("w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors", atualizando && "animate-spin")} />
+          </button>
+
+          <button
             onClick={handleExportExcel}
             title="Exportar produtos para Excel"
             className="flex items-center justify-center p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all shadow-sm group shrink-0"
@@ -699,7 +766,7 @@ export function ProdutosView() {
         <ShopifyEnvioModal
           itens={envio}
           onClose={() => setEnvio(null)}
-          onConcluido={() => carregarShopify(true)}
+          onConcluido={aplicarResultadoEnvio}
         />
       )}
     </div>

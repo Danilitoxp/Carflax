@@ -22,8 +22,8 @@ export interface ItemEnvio {
 interface Props {
   itens: ItemEnvio[];
   onClose: () => void;
-  /** chamado ao fechar depois de pelo menos um envio bem-sucedido */
-  onConcluido: () => void;
+  /** chamado ao fim de um envio com pelo menos um sucesso, com o resultado de cada item */
+  onConcluido: (resultados: ResultadoEnvio[]) => void;
 }
 
 const LIMITE_LISTA = 200;
@@ -106,7 +106,7 @@ export function ShopifyEnvioModal({ itens, onClose, onConcluido }: Props) {
     }
 
     setFase("fim");
-    if (saida.some((r) => r.ok)) onConcluido();
+    if (saida.some((r) => r.ok)) onConcluido(saida);
   };
 
   const fechar = () => {
