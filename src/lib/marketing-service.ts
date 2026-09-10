@@ -893,6 +893,36 @@ export const marketingService = {
     return true;
   },
 
+  /**
+   * Solta a conversa do cadastro amarrado na mão.
+   *
+   * Existe porque o vínculo era só de mão única: uma vez gravado (ou casado pelo
+   * telefone de um cadastro antigo), a tela não oferecia jeito de corrigir. O
+   * caso real: cliente com cadastro velho na Citel manda um cadastro novo, e o
+   * telefone continuava puxando o velho.
+   *
+   * Atenção: limpar não é o mesmo que "nunca mais achar". Sem `cod_cliente_erp`
+   * gravado, o backend volta a casar pelo telefone — e pode reencontrar o mesmo
+   * cadastro antigo. Para trocar de cliente, vincule o certo em vez de soltar.
+   */
+  async desvincularClienteErp(remoteJid: string) {
+    const { error } = await supabase
+      .from("marketing_clientes")
+      .update({
+        cod_cliente_erp: null,
+        vinculo_origem: null,
+        vinculado_em: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("remote_jid", remoteJid);
+
+    if (error) {
+      console.error("[MarketingService] Erro ao desvincular cliente do ERP:", error.message);
+      return false;
+    }
+    return true;
+  },
+
   // Marca no lead que houve orçamento e guarda o valor total (à vista/PIX),
   // espelhando registerSale/valor_venda.
   async registerOrcamento(remoteJid: string, value: number, when?: string) {

@@ -2344,6 +2344,106 @@ export function WhatsappView({
     }
   };
 
+  /**
+   * Solta a conversa do cadastro amarrado. Só faz sentido para vínculo gravado
+   * (manual/orçamento): quando o cliente veio do casamento por telefone não há
+   * o que limpar, e por isso o botão nem aparece nesse caso.
+   */
+  const desvincularCadastroErp = async () => {
+    if (!selectedChat) return;
+    try {
+      await marketingService.desvincularClienteErp(selectedChat.id);
+      setVinculoAberto(false);
+      setVinculoBusca("");
+      setVinculoResultados([]);
+      await abrirCadastroErp();
+      await loadChats();
+      showNotification(
+        "info",
+        "Cadastro desvinculado",
+        "A conversa não está mais amarrada a nenhum cliente da Citel. Se o telefone existir em algum cadastro, ele volta a ser encontrado sozinho.",
+        true,
+        `vinculo-erp-${selectedChat.id}`,
+      );
+    } catch (err) {
+      console.error("Erro ao desvincular cadastro do ERP:", err);
+      showNotification("error", "Não foi possível desvincular", "Tente novamente.");
+    }
+  };
+
+  /**
+   * Busca + escolha do cadastro do ERP. Serve tanto para amarrar a conversa que
+   * não achou ninguém quanto para trocar o cliente errado — era só o primeiro
+   * caso que existia na tela, e cadastro antigo achado pelo telefone ficava sem
+   * saída.
+   */
+  const renderVinculoErp = (rotulo: string) =>
+    !vinculoAberto ? (
+      <button
+        onClick={() => setVinculoAberto(true)}
+        className="w-full px-4 py-2.5 rounded-xl border border-primary/30 text-primary text-[11px] font-black uppercase tracking-widest hover:bg-primary/10 transition-all"
+      >
+        {rotulo}
+      </button>
+    ) : (
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <input
+            value={vinculoBusca}
+            onChange={(e) => setVinculoBusca(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") buscarCadastroErp();
+            }}
+            autoFocus
+            placeholder="Nome, CNPJ/CPF ou código"
+            className="flex-1 min-w-0 bg-secondary/50 border border-border rounded-xl px-3 py-2 text-[11px] font-bold text-foreground outline-none focus:border-primary/50"
+          />
+          <button
+            onClick={buscarCadastroErp}
+            disabled={vinculoBusca.trim().length < 3 || vinculoBuscando}
+            className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-[10px] font-black uppercase disabled:opacity-50"
+          >
+            {vinculoBuscando ? "..." : "Buscar"}
+          </button>
+        </div>
+
+        {vinculoResultados.length === 0 && !vinculoBuscando && (
+          <p className="text-[10px] text-muted-foreground">
+            Busque pelo nome do cadastro na Citel — costuma ser a razão social da
+            empresa, não o nome de quem conversa.
+          </p>
+        )}
+
+        <div className="space-y-1.5 max-h-52 overflow-y-auto">
+          {vinculoResultados.map((c) => (
+            <button
+              key={c.codigo}
+              onClick={() => vincularCadastroErp(c.codigo, c.nome)}
+              className="w-full text-left px-3 py-2 rounded-xl border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all"
+            >
+              <p className="text-[11px] font-black text-card-foreground truncate">{c.nome}</p>
+              <p className="text-[10px] text-muted-foreground truncate">
+                {[c.codigo, c.documento, c.cidade && `${c.cidade}/${c.uf || ""}`, c.telefone]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={() => {
+            setVinculoAberto(false);
+            setVinculoBusca("");
+            setVinculoResultados([]);
+          }}
+          className="w-full px-4 py-2 rounded-xl border border-border/60 text-muted-foreground text-[10px] font-black uppercase tracking-widest hover:bg-secondary transition-all"
+        >
+          Cancelar
+        </button>
+      </div>
+    );
+
   const handleCloseArchiveModal = () => {
     setShowArchiveModal(false);
     setIsEnteringMaterial(false);
@@ -5156,62 +5256,7 @@ export function WhatsappView({
                       cadastro no CNPJ da empresa fica para sempre sem orçamento e
                       sem venda no HUB — e some dos relatórios de conversão. */}
                   <div className="mt-5 pt-4 border-t border-border/50 text-left">
-                    {!vinculoAberto ? (
-                      <button
-                        onClick={() => setVinculoAberto(true)}
-                        className="w-full px-4 py-2.5 rounded-xl border border-primary/30 text-primary text-[11px] font-black uppercase tracking-widest hover:bg-primary/10 transition-all"
-                      >
-                        Vincular cadastro manualmente
-                      </button>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex gap-2">
-                          <input
-                            value={vinculoBusca}
-                            onChange={(e) => setVinculoBusca(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") buscarCadastroErp();
-                            }}
-                            autoFocus
-                            placeholder="Nome, CNPJ/CPF ou código"
-                            className="flex-1 min-w-0 bg-secondary/50 border border-border rounded-xl px-3 py-2 text-[11px] font-bold text-foreground outline-none focus:border-primary/50"
-                          />
-                          <button
-                            onClick={buscarCadastroErp}
-                            disabled={vinculoBusca.trim().length < 3 || vinculoBuscando}
-                            className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-[10px] font-black uppercase disabled:opacity-50"
-                          >
-                            {vinculoBuscando ? "..." : "Buscar"}
-                          </button>
-                        </div>
-
-                        {vinculoResultados.length === 0 && !vinculoBuscando && (
-                          <p className="text-[10px] text-muted-foreground">
-                            Busque pelo nome do cadastro na Citel — costuma ser a
-                            razão social da empresa, não o nome de quem conversa.
-                          </p>
-                        )}
-
-                        <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                          {vinculoResultados.map((c) => (
-                            <button
-                              key={c.codigo}
-                              onClick={() => vincularCadastroErp(c.codigo, c.nome)}
-                              className="w-full text-left px-3 py-2 rounded-xl border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all"
-                            >
-                              <p className="text-[11px] font-black text-card-foreground truncate">
-                                {c.nome}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground truncate">
-                                {[c.codigo, c.documento, c.cidade && `${c.cidade}/${c.uf || ""}`, c.telefone]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </p>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {renderVinculoErp("Vincular cadastro manualmente")}
                   </div>
                 </div>
               ) : (
@@ -5227,23 +5272,31 @@ export function WhatsappView({
                       <span className="text-[10px] text-muted-foreground">
                         {cadastroErp.cliente.tipo}
                       </span>
-                      {/* Vínculo por documento é exato; por telefone é inferido.
-                          Quem lê precisa saber a diferença antes de confiar. */}
+                      {/* Vínculo por documento e manual são exatos; por telefone é
+                          inferido. Quem lê precisa saber a diferença antes de
+                          confiar — e o manual aparecia como "Telefone", mentindo
+                          justamente sobre o vínculo que alguém amarrou na mão. */}
                       {cadastroErp.vinculo && (
                         <span
                           className={cn(
                             "px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider leading-none border",
-                            cadastroErp.vinculo === "documento"
-                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                              : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400",
+                            cadastroErp.vinculo === "telefone"
+                              ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                              : "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400",
                           )}
                           title={
-                            cadastroErp.vinculo === "documento"
-                              ? "Identificado pelo número do orçamento enviado na conversa"
-                              : "Identificado pelo telefone da conversa — confira se é o cliente certo"
+                            cadastroErp.vinculo === "telefone"
+                              ? "Identificado pelo telefone da conversa — confira se é o cliente certo"
+                              : cadastroErp.vinculo === "manual"
+                                ? "Amarrado na mão por alguém do time nesta tela"
+                                : "Identificado pelo número do orçamento enviado na conversa"
                           }
                         >
-                          {cadastroErp.vinculo === "documento" ? "Orçamento" : "Telefone"}
+                          {cadastroErp.vinculo === "telefone"
+                            ? "Telefone"
+                            : cadastroErp.vinculo === "manual"
+                              ? "Manual"
+                              : "Orçamento"}
                         </span>
                       )}
                     </div>
@@ -5386,6 +5439,34 @@ export function WhatsappView({
                       mesmo telefone no ERP.
                     </p>
                   )}
+
+                  {/* Saída para o cadastro errado. O caso que motivou: cliente
+                      com cadastro antigo na Citel manda um cadastro novo, e o
+                      telefone continua achando o antigo — antes daqui não havia
+                      como trocar nem soltar. */}
+                  <div className="pt-4 border-t border-border/50 space-y-2">
+                    {renderVinculoErp("Trocar cadastro")}
+
+                    {/* Desvincular só existe quando há vínculo gravado. No
+                        casamento por telefone não há nada para limpar: soltar
+                        reencontraria o mesmo cadastro no ciclo seguinte. */}
+                    {!vinculoAberto && cadastroErp.vinculo && cadastroErp.vinculo !== "telefone" && (
+                      <button
+                        onClick={desvincularCadastroErp}
+                        className="w-full px-4 py-2 rounded-xl border border-border/60 text-muted-foreground text-[10px] font-black uppercase tracking-widest hover:border-red-500/40 hover:text-red-500 transition-all"
+                      >
+                        Desvincular
+                      </button>
+                    )}
+
+                    {!vinculoAberto && cadastroErp.vinculo === "telefone" && (
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        Este cliente foi achado pelo telefone da conversa, não
+                        amarrado na mão. Se for o cadastro errado, escolha o certo
+                        acima — o vínculo manual passa na frente do telefone.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
