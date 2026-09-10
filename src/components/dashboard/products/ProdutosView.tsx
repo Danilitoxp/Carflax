@@ -6,13 +6,136 @@ import {
   ChevronUp,
   ChevronDown,
   FileSpreadsheet,
-  Settings2
+  Settings2,
+  ShoppingBag,
+  Upload,
+  Loader2
 } from "lucide-react";
+import { SiShopify } from "react-icons/si";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 import { TinyLoader } from "@/components/ui/TinyLoader";
 import { apiDashboardProdutos, type ProductInfo } from "@/lib/api";
 import { FornecedoresModal } from "./FornecedoresModal";
+import { ShopifyEnvioModal, type ItemEnvio } from "./ShopifyEnvioModal";
+import { getShopifyCatalog, normalizeSku, type ShopifyVariantInfo } from "@/lib/shopify-sync";
+
+/** Situação do vínculo ERP ↔ loja de um produto. */
+type SyncStatus = "sincronizado" | "divergente" | "fora";
+
+const SHOPIFY_FILTROS = [
+  "Shopify: Todos",
+  "Sincronizados",
+  "Divergentes",
+  "Fora da loja",
+] as const;
+
+const SHOPIFY_ADMIN = "https://admin.shopify.com/store/gfpdzv-y0/products";
+
+/**
+ * O vínculo existe quando o SKU da variante bate com o código do item.
+ * "Funcionando" exige, além do vínculo, preço igual (tolerância de 5 centavos,
+ * a mesma do sinc.js) e estoque igual quando a loja gerencia estoque.
+ */
+function avaliarSync(
+  cod: string,
+  stock: number,
+  price: number,
+  catalogo: Map<string, ShopifyVariantInfo>,
+): { status: SyncStatus; loja?: ShopifyVariantInfo } {
+  const loja = catalogo.get(normalizeSku(cod));
+  if (!loja) return { status: "fora" };
+
+  const precoOk = Math.abs(loja.price - price) <= 0.05;
+  const estoqueOk = !loja.gerenciaEstoque || loja.stock === Math.max(0, Math.floor(stock));
+
+  return { status: precoOk && estoqueOk ? "sincronizado" : "divergente", loja };
+}
+
+interface SyncBadgeProps {
+  status?: SyncStatus;
+  loja?: ShopifyVariantInfo;
+  carregando: boolean;
+  erpPrice: number;
+  erpStock: number;
+  onEnviar: () => void;
+}
+
+/**
+ * Três estados, sem texto na linha:
+ * · nunca enviado  → ícone de envio (a ação disponível é criar na loja)
+ * · na loja, desatualizado → logo da Shopify apagado
+ * · na loja e em dia       → logo da Shopify em cor cheia
+ * O porquê fica no title, sem poluir a linha.
+ */
+function SyncBadge({ status, loja, carregando, erpPrice, erpStock, onEnviar }: SyncBadgeProps) {
+  if (carregando) {
+    return <div className="h-4 w-4 bg-secondary/50 rounded mx-auto animate-pulse" />;
+  }
+
+  // Nunca foi enviado: não faz sentido mostrar o logo da loja, e sim a ação.
+  if (!loja) {
+    return (
+      <button
+        onClick={onEnviar}
+        title="Não está na loja — clique para enviar como rascunho"
+        className="inline-flex items-center justify-center text-muted-foreground/40 hover:text-emerald-500 transition-colors"
+      >
+        <Upload className="w-4 h-4" />
+      </button>
+    );
+  }
+
+  const sincronizado = status === "sincronizado";
+
+  const divergencias = [
+    Math.abs(loja.price - erpPrice) > 0.05
+      ? `preço loja R$ ${loja.price.toFixed(2)} × ERP R$ ${erpPrice.toFixed(2)}`
+      : "",
+    loja.gerenciaEstoque && loja.stock !== Math.max(0, Math.floor(erpStock))
+      ? `estoque loja ${loja.stock} × ERP ${Math.max(0, Math.floor(erpStock))}`
+      : "",
+  ].filter(Boolean).join(" · ");
+
+  const rascunho = loja.status !== "active";
+
+  const titulo = sincronizado
+    ? `SKU ${loja.sku} sincronizado${rascunho ? " (rascunho na loja)" : ""} — abrir na Shopify`
+    : `SKU ${loja.sku} desatualizado: ${divergencias} — clique para reenviar`;
+
+  const icone = (
+    <SiShopify
+      className={cn(
+        "w-4 h-4 transition-all",
+        sincronizado
+          ? "text-[#95BF47]"
+          : "text-muted-foreground/30 group-hover/shopify:text-muted-foreground/60",
+      )}
+    />
+  );
+
+  // Em dia, o clique leva ao produto na loja; desatualizado, o clique é a ação
+  // que resolve — reenviar preço e estoque.
+  return sincronizado ? (
+    <a
+      href={`${SHOPIFY_ADMIN}/${loja.productId}`}
+      target="_blank"
+      rel="noreferrer"
+      title={titulo}
+      className="group/shopify inline-flex items-center justify-center"
+    >
+      {icone}
+    </a>
+  ) : (
+    <button
+      onClick={onEnviar}
+      title={titulo}
+      className="group/shopify inline-flex items-center justify-center"
+    >
+      {icone}
+    </button>
+  );
+}
 
 interface Product {
   cod: string;
@@ -36,6 +159,10 @@ export function ProdutosView() {
   const [loading, setLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState<{ key: keyof Product; direction: 'asc' | 'desc' } | null>({ key: 'cod', direction: 'asc' });
   const [fornecedoresAberto, setFornecedoresAberto] = useState(false);
+  const [filterShopify, setFilterShopify] = useState<string>(SHOPIFY_FILTROS[0]);
+  const [shopifyMap, setShopifyMap] = useState<Map<string, ShopifyVariantInfo>>(new Map());
+  const [shopifyLoading, setShopifyLoading] = useState(true);
+  const [envio, setEnvio] = useState<ItemEnvio[] | null>(null);
 
   const requestSort = (key: keyof Product) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -81,7 +208,41 @@ export function ProdutosView() {
     fetchProducts();
   }, []);
 
+  const carregarShopify = async (force = false) => {
+    setShopifyLoading(true);
+    try {
+      setShopifyMap(await getShopifyCatalog(force));
+    } catch (error) {
+      console.error("[Products] Erro ao carregar catálogo Shopify:", error);
+    } finally {
+      setShopifyLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarShopify();
+  }, []);
+
   const brands = useMemo(() => ["Todas as Marcas", ...Array.from(new Set(products.map(p => p.brand))).sort()], [products]);
+
+  /** Status de cada produto por código — recalculado quando a loja ou o ERP muda. */
+  const syncPorCod = useMemo(() => {
+    const m = new Map<string, { status: SyncStatus; loja?: ShopifyVariantInfo }>();
+    for (const p of products) {
+      m.set(p.cod, avaliarSync(p.cod, p.stock, p.debit, shopifyMap));
+    }
+    return m;
+  }, [products, shopifyMap]);
+
+  const totaisShopify = useMemo(() => {
+    let sincronizado = 0, divergente = 0, fora = 0;
+    for (const s of syncPorCod.values()) {
+      if (s.status === "sincronizado") sincronizado++;
+      else if (s.status === "divergente") divergente++;
+      else fora++;
+    }
+    return { sincronizado, divergente, fora };
+  }, [syncPorCod]);
 
   const [visibleCount, setVisibleCount] = useState(50);
 
@@ -99,7 +260,14 @@ export function ProdutosView() {
         (filterStock === "COM ESTOQUE" && p.stock > 0) ||
         (filterStock === "SEM ESTOQUE" && p.stock <= 0);
 
-      return matchesSearch && matchesBrand && matchesStock;
+      const status = syncPorCod.get(p.cod)?.status;
+      const matchesShopify =
+        filterShopify === SHOPIFY_FILTROS[0] ||
+        (filterShopify === "Sincronizados" && status === "sincronizado") ||
+        (filterShopify === "Divergentes" && status === "divergente") ||
+        (filterShopify === "Fora da loja" && status === "fora");
+
+      return matchesSearch && matchesBrand && matchesStock && matchesShopify;
     });
 
     if (sortConfig !== null) {
@@ -127,7 +295,7 @@ export function ProdutosView() {
     }
 
     return filtered;
-  }, [products, searchTerm, filterBrand, filterStock, sortConfig]);
+  }, [products, searchTerm, filterBrand, filterStock, filterShopify, syncPorCod, sortConfig]);
 
   const visibleProducts = filteredProducts.slice(0, visibleCount);
 
@@ -138,6 +306,23 @@ export function ProdutosView() {
         setVisibleCount(prev => prev + 50);
       }
     }
+  };
+
+  const montarItem = (p: Product): ItemEnvio => ({
+    produto: { cod: p.cod, desc: p.desc, brand: p.brand, price: p.debit, stock: p.stock },
+    existente: syncPorCod.get(p.cod)?.loja,
+  });
+
+  /** Envia o recorte atual da tela, pulando o que já está em dia com a loja. */
+  const abrirEnvioLote = () => {
+    const pendentes = filteredProducts.filter(
+      (p) => syncPorCod.get(p.cod)?.status !== "sincronizado",
+    );
+    if (pendentes.length === 0) {
+      alert("Nenhum produto pendente de envio nos filtros atuais.");
+      return;
+    }
+    setEnvio(pendentes.map(montarItem));
   };
 
   const handleExportExcel = async () => {
@@ -312,6 +497,32 @@ export function ProdutosView() {
             ))}
           </div>
 
+          <TinyDropdown
+            value={filterShopify}
+            options={[...SHOPIFY_FILTROS]}
+            onChange={(val) => {
+              setFilterShopify(val);
+              setVisibleCount(50);
+            }}
+            icon={ShoppingBag}
+            variant="blue"
+            placeholder="Shopify: Todos"
+          />
+
+          <button
+            onClick={abrirEnvioLote}
+            disabled={shopifyLoading}
+            title="Enviar para a Shopify os produtos filtrados que ainda não estão em dia"
+            className="flex items-center gap-2 px-3 py-2.5 bg-card border border-border rounded-xl text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/30 transition-all shadow-sm shrink-0 disabled:opacity-40"
+          >
+            {shopifyLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <SiShopify className="w-4 h-4 text-[#95BF47]" />
+            )}
+            Enviar p/ Shopify
+          </button>
+
           <button
             onClick={handleExportExcel}
             title="Exportar produtos para Excel"
@@ -328,6 +539,24 @@ export function ProdutosView() {
             <Settings2 className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
           </button>
         </div>
+
+        {/* RESUMO DO VÍNCULO COM A LOJA */}
+        {!shopifyLoading && products.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              {totaisShopify.sincronizado} sincronizados
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              {totaisShopify.divergente} divergentes
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+              {totaisShopify.fora} fora da loja
+            </span>
+          </div>
+        )}
       </div>
 
       {/* PRODUCTS TABLE CONTAINER */}
@@ -368,6 +597,10 @@ export function ProdutosView() {
                     </div>
                   </th>
                 ))}
+                {/* Sem ordenação: o status vem da loja, não é um campo do produto. */}
+                <th className="py-2.5 px-3 sm:px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">
+                  Shopify
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -381,6 +614,7 @@ export function ProdutosView() {
                     <td className="py-4 px-3 sm:px-6 text-right"><div className="h-2 w-12 bg-secondary rounded ml-auto" /></td>
                     <td className="py-4 px-3 sm:px-6 text-right"><div className="h-2 w-12 bg-secondary rounded ml-auto" /></td>
                     <td className="py-4 px-3 sm:px-6 text-right"><div className="h-2 w-16 bg-secondary/50 rounded ml-auto" /></td>
+                    <td className="py-4 px-3 sm:px-6"><div className="h-5 w-20 bg-secondary/50 rounded-lg mx-auto" /></td>
                   </tr>
                 ))
               ) : (
@@ -424,12 +658,22 @@ export function ProdutosView() {
                           R$ {p.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
+                      <td className="py-3 px-3 sm:px-6 text-center">
+                        <SyncBadge
+                          status={syncPorCod.get(p.cod)?.status}
+                          loja={syncPorCod.get(p.cod)?.loja}
+                          carregando={shopifyLoading}
+                          erpPrice={p.debit}
+                          erpStock={p.stock}
+                          onEnviar={() => setEnvio([montarItem(p)])}
+                        />
+                      </td>
                     </tr>
                   ))}
                   
                   {visibleCount < filteredProducts.length && (
                     <tr>
-                      <td colSpan={7} className="py-6">
+                      <td colSpan={8} className="py-6">
                         <div className="flex justify-center w-full">
                           <TinyLoader size="sm" />
                         </div>
@@ -448,6 +692,14 @@ export function ProdutosView() {
           brands={brands}
           marcaInicial={filterBrand}
           onClose={() => setFornecedoresAberto(false)}
+        />
+      )}
+
+      {envio && (
+        <ShopifyEnvioModal
+          itens={envio}
+          onClose={() => setEnvio(null)}
+          onConcluido={() => carregarShopify(true)}
         />
       )}
     </div>
