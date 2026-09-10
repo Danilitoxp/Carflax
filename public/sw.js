@@ -1,12 +1,16 @@
 // Service Worker — Carflax Hub (PWA: cache + Web Push)
 
-const CACHE = 'carflax-hub-v1';
+const CACHE = 'carflax-hub-v2';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.png'];
 
 // Caminhos dinâmicos (dados ao vivo) que NUNCA devem ser cacheados.
 const NO_CACHE = [
   '/api-marketing',
   '/api-campaign',
+  // Catálogo da loja: é leitura ao vivo e passa por proxy same-origin, então sem
+  // esta linha cai no stale-while-revalidate abaixo e a tela de Produtos passa a
+  // comparar o ERP com um catálogo de meses atrás.
+  '/shopify-api',
   '/secullum-auth',
   '/secullum-api',
   '/supabase',

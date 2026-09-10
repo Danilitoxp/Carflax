@@ -59,7 +59,12 @@ function montarPrompt(itens: ProdutoBruto[], vocab: VocabularioLoja): string {
 Para cada item recebido do ERP, gere o cadastro da loja.
 
 REGRAS:
-1. titulo: a descrição do ERP escrita corretamente — acentuação certa, medidas legíveis (ex.: 2.1/2"), sem código de fornecedor entre parênteses e sem o nome da marca no final. Mantenha em MAIÚSCULAS.
+1. titulo: o nome comercial da peça, em MAIÚSCULAS, a partir da descrição do ERP.
+   - Acentuação correta e medidas legíveis (2.1/2", 3/4", 100MM).
+   - EXPANDA as abreviações do cadastro. Glossário: ADAP=ADAPTADOR, CONEX=CONEXÃO, LUV=LUVA, JOEL=JOELHO, REG=REGISTRO, GAV=GAVETA, ESF=ESFERA, VLV=VÁLVULA, TQ=TANQUE, CX=CAIXA, CX D'AGUA=CAIXA D'ÁGUA, ELET=ELETRODUTO, ESG=ESGOTO, DESC=DESCARGA, AQUEC=AQUECEDOR, SOLD=SOLDÁVEL, ROSC=ROSCÁVEL, RSC=ROSCÁVEL, GALV=GALVANIZADO, CROM=CROMADO, NIQ=NIQUELADO, FF=FÊMEA-FÊMEA, MF=MACHO-FÊMEA, P/=PARA, C/=COM, S/=SEM, UN=UNIDADE. Cores: BR=BRANCO, PT=PRETO, CZ=CINZA, AZ=AZUL, VD=VERDE, VM=VERMELHO, AM=AMARELO, OC=OCRE.
+   - Cuidado com o contexto: em "2,5MM" e "100MM" o MM é milímetro; MM entre conexões é MACHO-MACHO.
+   - Abreviação que você NÃO reconhecer com certeza fica EXATAMENTE como está no ERP. Nunca invente o significado — nome errado no anúncio é pior que nome abreviado.
+   - Tire o código entre parênteses e o nome do fabricante, esteja onde estiver (o fabricante tem campo próprio).
 2. descricao: exatamente 2 parágrafos em português do Brasil, texto puro, sem HTML e sem título dentro do texto.
    - 1º parágrafo (2 a 3 frases): o que é a peça, material, medida/bitola e para que serve.
    - 2º parágrafo (2 a 3 frases): onde se usa na obra ou instalação, com o que se conecta e o que o comprador precisa observar na hora de escolher (medida compatível, tipo de rosca/encaixe, uso interno ou externo).

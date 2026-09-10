@@ -114,7 +114,7 @@ export async function getShopifyCatalog(force = false): Promise<Map<string, Shop
 
       while (url && pages < 100) {
         pages++;
-        const res = await fetch(url, { headers: headers() });
+        const res = await fetch(url, { headers: headers(), cache: "no-store" });
         if (!res.ok) break;
 
         const data = (await res.json()) as { products?: ShopifyProductRaw[] };
@@ -226,7 +226,7 @@ export async function getShopifyCollections(): Promise<ShopifyCollection[]> {
 
     while (url && pages < 10) {
       pages++;
-      const res = await fetch(url, { headers: headers() });
+      const res = await fetch(url, { headers: headers(), cache: "no-store" });
       if (!res.ok) break;
       const data = (await res.json()) as { custom_collections?: ShopifyCollection[] };
       todas.push(...(data.custom_collections ?? []));
@@ -255,6 +255,7 @@ export async function getShopifyLocationId(): Promise<number | null> {
   try {
     const res = await fetch(`${SHOPIFY_PROXY}/admin/api/${API_VERSION}/locations.json`, {
       headers: headers(),
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { locations?: Array<{ id: number; active?: boolean }> };
@@ -273,6 +274,12 @@ export interface ProdutoParaShopify {
   /** preço de venda do ERP */
   price: number;
   stock: number;
+  /**
+   * Foto do produto, quando existe uma fonte confiável para o código. A Shopify
+   * baixa a URL no momento do envio, então ela precisa ser pública. Sem isto o
+   * produto entra sem imagem, que é o comportamento atual.
+   */
+  imagemUrl?: string;
 }
 
 /** Cadastro gerado pela IA para um produto novo (ver produto-ia.ts). */
@@ -417,6 +424,24 @@ export async function enviarProdutoParaShopify(
         if (ia.colecaoIds.length) await vincularColecoes(existente.productId, ia.colecaoIds);
       }
 
+      // Foto só entra quando o produto ainda não tem nenhuma: substituir a
+      // imagem de um anúncio publicado é decisão do e-commerce, não do ERP.
+      if (p.imagemUrl && !existente.image) {
+        try {
+          await fetch(
+            `${SHOPIFY_PROXY}/admin/api/${API_VERSION}/products/${existente.productId}/images.json`,
+            {
+              method: "POST",
+              headers: headers(),
+              body: JSON.stringify({ image: { src: p.imagemUrl } }),
+            },
+          );
+        } catch (e) {
+          // Imagem é acabamento: preço e estoque já foram, não invalida o envio.
+          console.error("Erro ao anexar imagem:", e);
+        }
+      }
+
       const atualizada: ShopifyVariantInfo = {
         ...existente,
         price: p.price,
@@ -437,6 +462,7 @@ export async function enviarProdutoParaShopify(
           product_type: ia?.tipo || undefined,
           vendor: ia?.fabricante || (p.brand && p.brand !== "GERAL" ? p.brand : undefined),
           status: "draft",
+          images: p.imagemUrl ? [{ src: p.imagemUrl }] : undefined,
           tags: ia?.tags?.length ? ia.tags : ["carflax-hub"],
           variants: [
             {
