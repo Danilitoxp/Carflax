@@ -30,6 +30,16 @@ export interface ShopifyVariantInfo {
   image?: string;
   /** true quando a variante controla estoque pela Shopify */
   gerenciaEstoque: boolean;
+  /** tags que o produto já tem na loja — a atualização soma às da IA, não substitui */
+  tags: string[];
+}
+
+/** "a, b , c" → ["a","b","c"] */
+function parseTags(v: string | undefined): string[] {
+  return String(v ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
 }
 
 function headers() {
@@ -59,6 +69,8 @@ interface ShopifyProductRaw {
   status: string;
   vendor?: string;
   product_type?: string;
+  /** a REST devolve as tags como string separada por vírgula */
+  tags?: string;
   image?: { src?: string };
   images?: Array<{ src?: string }>;
   variants?: Array<{
@@ -144,6 +156,7 @@ export async function getShopifyCatalog(force = false): Promise<Map<string, Shop
               stock: Number(v.inventory_quantity ?? 0),
               image: imgSrc,
               gerenciaEstoque: v.inventory_management === "shopify",
+              tags: parseTags(p.tags),
             });
           }
         }
@@ -265,7 +278,8 @@ export interface ProdutoParaShopify {
 /** Cadastro gerado pela IA para um produto novo (ver produto-ia.ts). */
 export interface EnriquecimentoProduto {
   titulo: string;
-  descricaoHtml: string;
+  /** dois parágrafos de texto puro; viram <p>…</p><p>…</p> no body_html */
+  paragrafos: string[];
   tipo: string;
   fabricante: string;
   tags: string[];
@@ -321,6 +335,26 @@ async function setInventory(inventoryItemId: number, quantidade: number) {
  * Já existindo o SKU, só acerta preço e estoque da variante; senão cria o
  * produto como rascunho (draft) — quem publica é o time de e-commerce.
  */
+/** Dois parágrafos viram dois <p> — é o que a Shopify renderiza na página do produto. */
+function montarBodyHtml(paragrafos: string[]): string | undefined {
+  const limpos = paragrafos.map((t) => t.trim()).filter(Boolean);
+  if (limpos.length === 0) return undefined;
+  return limpos.map((t) => `<p>${t}</p>`).join("");
+}
+
+/** União preservando a ordem: o que a loja já tinha vem primeiro. */
+function unirTags(atuais: string[], novas: string[]): string[] {
+  const vistas = new Set(atuais.map((t) => t.toLowerCase()));
+  const saida = [...atuais];
+  for (const t of novas) {
+    const chave = t.toLowerCase();
+    if (vistas.has(chave)) continue;
+    vistas.add(chave);
+    saida.push(t);
+  }
+  return saida;
+}
+
 async function vincularColecoes(productId: number, colecaoIds: number[]) {
   for (const collectionId of colecaoIds) {
     try {
@@ -360,10 +394,34 @@ export async function enviarProdutoParaShopify(
         await setInventory(existente.inventoryItemId, p.stock);
       }
 
+      // Conteúdo do anúncio. O título fica de fora de propósito: quem já está na
+      // loja pode ter tido o nome ajustado à mão, e sobrescrever isso apagaria
+      // trabalho do time de e-commerce. Descrição, tipo e fabricante são
+      // reescritos; as tags são somadas às que já existem.
+      let tags = existente.tags;
+      if (ia) {
+        tags = unirTags(existente.tags, ia.tags);
+        const corpo: Record<string, unknown> = { id: existente.productId, tags: tags.join(", ") };
+
+        const bodyHtml = montarBodyHtml(ia.paragrafos);
+        if (bodyHtml) corpo.body_html = bodyHtml;
+        if (ia.tipo) corpo.product_type = ia.tipo;
+        if (ia.fabricante) corpo.vendor = ia.fabricante;
+
+        const resProd = await fetch(
+          `${SHOPIFY_PROXY}/admin/api/${API_VERSION}/products/${existente.productId}.json`,
+          { method: "PUT", headers: headers(), body: JSON.stringify({ product: corpo }) },
+        );
+        if (!resProd.ok) throw new Error(`descrição: ${resProd.status} ${await resProd.text()}`);
+
+        if (ia.colecaoIds.length) await vincularColecoes(existente.productId, ia.colecaoIds);
+      }
+
       const atualizada: ShopifyVariantInfo = {
         ...existente,
         price: p.price,
         stock: existente.gerenciaEstoque ? Math.max(0, Math.floor(p.stock)) : existente.stock,
+        tags,
       };
       aplicarNoCatalogo(atualizada);
       return { cod: p.cod, ok: true, acao: "atualizado", variante: atualizada };
@@ -375,7 +433,7 @@ export async function enviarProdutoParaShopify(
       body: JSON.stringify({
         product: {
           title: ia?.titulo || p.desc,
-          body_html: ia?.descricaoHtml ? `<p>${ia.descricaoHtml}</p>` : undefined,
+          body_html: ia ? montarBodyHtml(ia.paragrafos) : undefined,
           product_type: ia?.tipo || undefined,
           vendor: ia?.fabricante || (p.brand && p.brand !== "GERAL" ? p.brand : undefined),
           status: "draft",
@@ -416,6 +474,7 @@ export async function enviarProdutoParaShopify(
         stock: Math.max(0, Math.floor(p.stock)),
         image: criado.product.image?.src || criado.product.images?.[0]?.src,
         gerenciaEstoque: variante.inventory_management === "shopify",
+        tags: parseTags(criado.product.tags),
       };
       aplicarNoCatalogo(nova);
     }

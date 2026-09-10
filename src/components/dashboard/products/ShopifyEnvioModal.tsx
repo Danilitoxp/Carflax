@@ -45,9 +45,13 @@ export function ShopifyEnvioModal({ itens, onClose, onConcluido }: Props) {
   const sucessos = resultados.filter((r) => r.ok).length;
   const falhas = resultados.filter((r) => !r.ok).length;
 
-  /** Gera o cadastro completo dos produtos novos. Atualização não precisa de IA. */
+  /**
+   * Gera o cadastro de todos os itens — inclusive os que já estão na loja, que
+   * precisam de descrição, tags de busca e coleção tanto quanto os novos. No
+   * item existente o título não é tocado; só o conteúdo do anúncio.
+   */
   const gerarComIA = async (): Promise<Map<string, ProdutoEnriquecido>> => {
-    if (novos.length === 0) return new Map();
+    if (itens.length === 0) return new Map();
 
     setFase("ia");
     setProgresso(0);
@@ -57,7 +61,7 @@ export function ShopifyEnvioModal({ itens, onClose, onConcluido }: Props) {
 
     const vocab = { ...getShopifyVocabulario(), colecoes: colecoes.map((c) => c.title) };
     const mapa = await enriquecerProdutos(
-      novos.map((i) => i.produto),
+      itens.map((i) => i.produto),
       vocab,
       (prontos) => setProgresso(prontos),
     );
@@ -70,7 +74,7 @@ export function ShopifyEnvioModal({ itens, onClose, onConcluido }: Props) {
   const enviar = async () => {
     // Gera na hora se ainda não houve prévia, para o produto não entrar cru.
     let mapa = enriquecidos;
-    if (usarIA && novos.length > 0 && mapa.size === 0) {
+    if (usarIA && mapa.size === 0) {
       mapa = await gerarComIA();
     }
     const idsPorTitulo =
@@ -85,11 +89,11 @@ export function ShopifyEnvioModal({ itens, onClose, onConcluido }: Props) {
     // Sequencial de propósito: a Admin API da Shopify limita a 2 req/s e o
     // envio em paralelo derruba metade das chamadas com 429.
     for (const item of itens) {
-      const e = item.existente ? undefined : mapa.get(item.produto.cod);
+      const e = mapa.get(item.produto.cod);
       const ia: EnriquecimentoProduto | undefined = e
         ? {
             titulo: e.titulo,
-            descricaoHtml: e.descricaoHtml,
+            paragrafos: e.paragrafos,
             tipo: e.tipo,
             fabricante: e.fabricante,
             tags: e.tags,
@@ -149,11 +153,12 @@ export function ShopifyEnvioModal({ itens, onClose, onConcluido }: Props) {
           <div className="px-6 py-3 border-b border-border bg-amber-500/5 flex flex-wrap items-center justify-between gap-3">
             <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 leading-relaxed flex-1 min-w-[240px]">
               Produtos novos entram como <strong>rascunho</strong> na loja (não ficam visíveis
-              para o cliente até alguém publicar). Itens que já existem têm apenas preço e
-              estoque acertados pelo ERP.
+              para o cliente até alguém publicar). Nos itens que já existem, a IA
+              <strong> reescreve descrição, tipo e fabricante</strong>, soma tags de busca às
+              atuais e encaixa nas coleções — o título da loja é preservado.
             </p>
 
-            {novos.length > 0 && (
+            {itens.length > 0 && (
               <label className="flex items-center gap-2 shrink-0 cursor-pointer">
                 <input
                   type="checkbox"
@@ -189,7 +194,7 @@ export function ShopifyEnvioModal({ itens, onClose, onConcluido }: Props) {
             <tbody className="divide-y divide-border">
               {itens.slice(0, LIMITE_LISTA).map((item) => {
                 const r = resultados.find((x) => x.cod === item.produto.cod);
-                const e = item.existente ? undefined : enriquecidos.get(item.produto.cod);
+                const e = enriquecidos.get(item.produto.cod);
                 return (
                   <tr key={item.produto.cod} className="hover:bg-secondary/20 transition-colors align-top">
                     <td className="py-2.5 px-4 text-[10px] font-bold text-muted-foreground tabular-nums">
@@ -197,15 +202,18 @@ export function ShopifyEnvioModal({ itens, onClose, onConcluido }: Props) {
                     </td>
                     <td className="py-2.5 px-4 max-w-[340px]">
                       <span className="text-[11px] font-black text-foreground uppercase tracking-tight line-clamp-1">
-                        {e?.titulo || item.produto.desc}
+                        {/* No item que já existe o título da loja é preservado. */}
+                        {item.existente
+                          ? item.existente.productTitle || item.produto.desc
+                          : e?.titulo || item.produto.desc}
                       </span>
                       {e && (
                         <div className="mt-1 space-y-1">
-                          {e.descricaoHtml && (
-                            <p className="text-[9px] font-medium text-muted-foreground line-clamp-2">
-                              {e.descricaoHtml}
+                          {e.paragrafos.map((par, i) => (
+                            <p key={i} className="text-[9px] font-medium text-muted-foreground line-clamp-2">
+                              {par}
                             </p>
-                          )}
+                          ))}
                           <p className="text-[9px] font-bold text-muted-foreground">
                             <span className="text-violet-500">{e.fabricante}</span>
                             {e.tipo && ` · ${e.tipo}`}
@@ -285,7 +293,7 @@ export function ShopifyEnvioModal({ itens, onClose, onConcluido }: Props) {
         <div className="flex items-center justify-between gap-4 px-6 py-4 border-t border-border bg-secondary/20">
           <div className="text-[10px] font-bold text-muted-foreground">
             {fase === "ia"
-              ? `IA preenchendo ${progresso} de ${novos.length}...`
+              ? `IA preenchendo ${progresso} de ${itens.length}...`
               : fase === "enviando"
                 ? `Enviando ${progresso} de ${itens.length}...`
                 : finalizado
@@ -302,7 +310,7 @@ export function ShopifyEnvioModal({ itens, onClose, onConcluido }: Props) {
               {finalizado ? "Fechar" : "Cancelar"}
             </button>
 
-            {!finalizado && usarIA && novos.length > 0 && enriquecidos.size === 0 && (
+            {!finalizado && usarIA && itens.length > 0 && enriquecidos.size === 0 && (
               <button
                 onClick={gerarComIA}
                 disabled={ocupado}

@@ -35,7 +35,8 @@ export interface ProdutoBruto {
 export interface ProdutoEnriquecido {
   cod: string;
   titulo: string;
-  descricaoHtml: string;
+  /** dois parágrafos de texto puro — quem monta o HTML é o shopify-sync */
+  paragrafos: string[];
   tipo: string;
   fabricante: string;
   tags: string[];
@@ -59,7 +60,10 @@ Para cada item recebido do ERP, gere o cadastro da loja.
 
 REGRAS:
 1. titulo: a descrição do ERP escrita corretamente — acentuação certa, medidas legíveis (ex.: 2.1/2"), sem código de fornecedor entre parênteses e sem o nome da marca no final. Mantenha em MAIÚSCULAS.
-2. descricao_html: 1 ou 2 frases em português do Brasil dizendo o que é e para que serve. Texto puro, sem HTML, sem inventar garantia, norma ou especificação que não esteja na descrição.
+2. descricao: exatamente 2 parágrafos em português do Brasil, texto puro, sem HTML e sem título dentro do texto.
+   - 1º parágrafo (2 a 3 frases): o que é a peça, material, medida/bitola e para que serve.
+   - 2º parágrafo (2 a 3 frases): onde se usa na obra ou instalação, com o que se conecta e o que o comprador precisa observar na hora de escolher (medida compatível, tipo de rosca/encaixe, uso interno ou externo).
+   - Escreva para quem vai comprar, não para catálogo técnico. NUNCA invente norma, certificação, garantia, pressão de trabalho, temperatura ou qualquer especificação que não esteja na descrição do ERP.
 3. tipo: escolha um da lista de TIPOS EXISTENTES. Só crie um novo se nenhum servir.
 4. fabricante: se a marca do ERP for um fabricante real, repita ela. Se for rótulo interno (VENDA CASADA, INATIVO, GERAL, DIVERSOS) ou vazia, deduza o fabricante pela descrição; não dando para deduzir, use "NACIONAL".
 5. tags: 6 a 8 frases de busca com acentuação correta, cada uma com 2 a 5 palavras, do jeito que o cliente pesquisa — combine nome, material, medida e aplicação (ex.: "tubo roscável PVC", "tubo roscável 2 1/2", "tubo PVC para instalação hidráulica"). NUNCA use palavra solta ("tubo", "pvc") nem repita a mesma frase. Não use marca interna como tag.
@@ -73,12 +77,14 @@ ITENS:
 ${itens.map((i, n) => `${n + 1}. cod=${i.cod} | descricao=${i.desc} | marca=${i.brand} | preco=R$ ${i.price.toFixed(2)}`).join("\n")}
 
 Responda APENAS um array JSON válido, sem markdown, na MESMA ORDEM dos itens:
-[{"cod":"","titulo":"","descricao_html":"","tipo":"","fabricante":"","tags":[],"colecoes":[]}]`;
+[{"cod":"","titulo":"","descricao":["",""],"tipo":"","fabricante":"","tags":[],"colecoes":[]}]`;
 }
 
 interface RespostaIA {
   cod?: string;
   titulo?: string;
+  descricao?: string[];
+  /** formato antigo (parágrafo único) — aceito para não quebrar se a IA regredir */
   descricao_html?: string;
   tipo?: string;
   fabricante?: string;
@@ -86,12 +92,24 @@ interface RespostaIA {
   colecoes?: string[];
 }
 
+/** Dois parágrafos de texto limpo, aceitando também a resposta antiga de campo único. */
+function normalizarParagrafos(r: RespostaIA): string[] {
+  const bruto = Array.isArray(r.descricao)
+    ? r.descricao
+    : String(r.descricao_html ?? "").split(/\n{2,}|<\/p>\s*<p>/i);
+
+  return bruto
+    .map((t) => String(t).replace(/<[^>]+>/g, "").trim())
+    .filter(Boolean)
+    .slice(0, 2);
+}
+
 /** Cadastro mínimo quando a IA falha — melhor enviar cru do que não enviar. */
 function fallback(p: ProdutoBruto): ProdutoEnriquecido {
   return {
     cod: p.cod,
     titulo: p.desc,
-    descricaoHtml: "",
+    paragrafos: [],
     tipo: "",
     fabricante: marcaEhInterna(p.brand) ? "NACIONAL" : p.brand,
     tags: [],
@@ -132,7 +150,7 @@ async function enriquecerLote(
       return {
         cod: p.cod,
         titulo: (r.titulo || p.desc).trim(),
-        descricaoHtml: (r.descricao_html || "").trim(),
+        paragrafos: normalizarParagrafos(r),
         tipo: (r.tipo || "").trim(),
         // A IA às vezes devolve a marca interna mesmo assim — barra aqui.
         fabricante: !fabricante || marcaEhInterna(fabricante) ? "NACIONAL" : fabricante,
