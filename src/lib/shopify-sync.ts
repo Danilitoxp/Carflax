@@ -57,6 +57,8 @@ interface ShopifyProductRaw {
   title: string;
   handle: string;
   status: string;
+  vendor?: string;
+  product_type?: string;
   image?: { src?: string };
   images?: Array<{ src?: string }>;
   variants?: Array<{
@@ -72,6 +74,8 @@ interface ShopifyProductRaw {
 let catalogCache: Map<string, ShopifyVariantInfo> | null = null;
 let catalogPromise: Promise<Map<string, ShopifyVariantInfo>> | null = null;
 let photoCache: Map<string, string> | null = null;
+/** Tipos e fabricantes que a loja já usa — vocabulário para a IA. */
+let vocabCache: { tipos: string[]; fabricantes: string[] } = { tipos: [], fabricantes: [] };
 
 /**
  * Baixa o catálogo inteiro da loja e indexa por SKU normalizado.
@@ -90,6 +94,8 @@ export async function getShopifyCatalog(force = false): Promise<Map<string, Shop
   catalogPromise = (async () => {
     const bySku = new Map<string, ShopifyVariantInfo>();
     const fotos = new Map<string, string>();
+    const tipos = new Map<string, number>();
+    const fabricantes = new Map<string, number>();
     try {
       let url: string | null = `${SHOPIFY_PROXY}/admin/api/${API_VERSION}/products.json?limit=250`;
       let pages = 0;
@@ -104,6 +110,13 @@ export async function getShopifyCatalog(force = false): Promise<Map<string, Shop
 
         for (const p of data.products) {
           const imgSrc = p.image?.src || p.images?.[0]?.src;
+
+          const tipo = (p.product_type ?? "").trim();
+          // "0" aparece em 2.4k produtos por importação antiga — não é tipo.
+          if (tipo && tipo !== "0") tipos.set(tipo, (tipos.get(tipo) ?? 0) + 1);
+          const fab = (p.vendor ?? "").trim();
+          if (fab) fabricantes.set(fab, (fabricantes.get(fab) ?? 0) + 1);
+
           for (const v of p.variants ?? []) {
             const rawSku = String(v.sku ?? "").trim();
             if (!rawSku) continue;
@@ -148,8 +161,16 @@ export async function getShopifyCatalog(force = false): Promise<Map<string, Shop
         }
       }
 
+      // Ordena por uso: o que a loja mais usa é o que a IA deve preferir.
+      const maisUsados = (m: Map<string, number>, limite: number) =>
+        [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, limite).map(([k]) => k);
+
       catalogCache = bySku;
       photoCache = fotos;
+      vocabCache = {
+        tipos: maisUsados(tipos, 40),
+        fabricantes: maisUsados(fabricantes, 120),
+      };
     } catch (e) {
       console.error("Erro ao sincronizar catálogo da Shopify:", e);
     }
@@ -162,6 +183,51 @@ export async function getShopifyCatalog(force = false): Promise<Map<string, Shop
 export async function getShopifyPhotoMap(): Promise<Map<string, string>> {
   await getShopifyCatalog();
   return photoCache ?? new Map();
+}
+
+/** Tipos e fabricantes já em uso na loja (disponível após carregar o catálogo). */
+export function getShopifyVocabulario() {
+  return vocabCache;
+}
+
+export interface ShopifyCollection {
+  id: number;
+  title: string;
+}
+
+let collectionsCache: ShopifyCollection[] | null = null;
+
+/** Coleções manuais da loja — é nelas que os produtos novos são encaixados. */
+export async function getShopifyCollections(): Promise<ShopifyCollection[]> {
+  if (collectionsCache) return collectionsCache;
+
+  const todas: ShopifyCollection[] = [];
+  try {
+    let url: string | null =
+      `${SHOPIFY_PROXY}/admin/api/${API_VERSION}/custom_collections.json?limit=250&fields=id,title`;
+    let pages = 0;
+
+    while (url && pages < 10) {
+      pages++;
+      const res = await fetch(url, { headers: headers() });
+      if (!res.ok) break;
+      const data = (await res.json()) as { custom_collections?: ShopifyCollection[] };
+      todas.push(...(data.custom_collections ?? []));
+
+      const linkHeader = res.headers.get("link");
+      const nextPart = linkHeader?.includes('rel="next"')
+        ? linkHeader.split(",").find((pt) => pt.includes('rel="next"'))
+        : null;
+      const start = nextPart ? nextPart.indexOf("<") + 1 : -1;
+      const end = nextPart ? nextPart.indexOf(">") : -1;
+      const absUrl = nextPart && start > 0 && end > start ? nextPart.substring(start, end) : null;
+      url = absUrl ? absUrl.replace(/^https?:\/\/[^/]+/, SHOPIFY_PROXY) : null;
+    }
+    collectionsCache = todas;
+  } catch (e) {
+    console.error("Erro ao carregar coleções da Shopify:", e);
+  }
+  return todas;
 }
 
 let locationIdCache: number | null = null;
@@ -192,6 +258,17 @@ export interface ProdutoParaShopify {
   stock: number;
 }
 
+/** Cadastro gerado pela IA para um produto novo (ver produto-ia.ts). */
+export interface EnriquecimentoProduto {
+  titulo: string;
+  descricaoHtml: string;
+  tipo: string;
+  fabricante: string;
+  tags: string[];
+  /** ids de coleções existentes onde o produto deve entrar */
+  colecaoIds: number[];
+}
+
 export interface ResultadoEnvio {
   cod: string;
   ok: boolean;
@@ -220,9 +297,26 @@ async function setInventory(inventoryItemId: number, quantidade: number) {
  * Já existindo o SKU, só acerta preço e estoque da variante; senão cria o
  * produto como rascunho (draft) — quem publica é o time de e-commerce.
  */
+async function vincularColecoes(productId: number, colecaoIds: number[]) {
+  for (const collectionId of colecaoIds) {
+    try {
+      await fetch(`${SHOPIFY_PROXY}/admin/api/${API_VERSION}/collects.json`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ collect: { product_id: productId, collection_id: collectionId } }),
+      });
+    } catch (e) {
+      // Coleção é acabamento: se falhar, o produto já está na loja e o envio
+      // não deve ser marcado como erro por causa disso.
+      console.error("Erro ao vincular coleção:", e);
+    }
+  }
+}
+
 export async function enviarProdutoParaShopify(
   p: ProdutoParaShopify,
   existente?: ShopifyVariantInfo,
+  ia?: EnriquecimentoProduto,
 ): Promise<ResultadoEnvio> {
   try {
     if (existente) {
@@ -249,10 +343,12 @@ export async function enviarProdutoParaShopify(
       headers: headers(),
       body: JSON.stringify({
         product: {
-          title: p.desc,
-          vendor: p.brand && p.brand !== "GERAL" ? p.brand : undefined,
+          title: ia?.titulo || p.desc,
+          body_html: ia?.descricaoHtml ? `<p>${ia.descricaoHtml}</p>` : undefined,
+          product_type: ia?.tipo || undefined,
+          vendor: ia?.fabricante || (p.brand && p.brand !== "GERAL" ? p.brand : undefined),
           status: "draft",
-          tags: ["carflax-hub"],
+          tags: ia?.tags?.length ? ia.tags : ["carflax-hub"],
           variants: [
             {
               sku: padSku(p.cod),
@@ -270,6 +366,9 @@ export async function enviarProdutoParaShopify(
     const variante = criado.product?.variants?.[0];
     if (variante?.inventory_item_id) {
       await setInventory(variante.inventory_item_id, p.stock);
+    }
+    if (criado.product?.id && ia?.colecaoIds.length) {
+      await vincularColecoes(criado.product.id, ia.colecaoIds);
     }
     return { cod: p.cod, ok: true, acao: "criado" };
   } catch (e) {
