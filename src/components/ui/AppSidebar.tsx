@@ -53,6 +53,8 @@ import { supabase } from "@/lib/supabase";
 import { getNotifPref } from "@/lib/notif-prefs";
 import { useNotification } from "@/hooks/useNotification";
 import { NAV_SECTIONS, ESTEIRA_SUBQUADRO_PREFIX, canAccessSection } from "@/lib/menu-config";
+import { useLiderDoDia } from "@/hooks/useLiderDoDia";
+import { Crown } from "lucide-react";
 import { abrirConversaWhatsapp, alertarTransferenciaCarlinhos } from "@/lib/isabela";
 
 // Reexporta para não quebrar imports existentes (ex: App.tsx). A fonte da verdade
@@ -199,6 +201,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout, loading, isChatOpen, onToggleChat, chatUnreadCount = 0 }: AppSidebarProps) {
+  // Líder do Ranking do dia: foto com coroa ao lado do item "Ranking".
+  const liderDoDia = useLiderDoDia(canAccessSection(userProfile, "Ranking"));
   const { theme } = useTheme();
 
   // Toggle "SLA do WhatsApp sem resposta" (Configurações > Notificações).
@@ -718,6 +722,25 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                                 )} />
                               )}
                               <span>{sub.label}</span>
+                              {(sub.value || sub.label) === "Ranking" && liderDoDia && (
+                                <span
+                                  className="ml-auto relative shrink-0 pt-1"
+                                  title={`Líder do dia: ${liderDoDia.nome} · ${Math.round(liderDoDia.percentual)}% da meta`}
+                                >
+                                  <Crown className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 w-3 h-3 text-amber-400 fill-amber-400 drop-shadow" />
+                                  {liderDoDia.avatar ? (
+                                    <img
+                                      src={liderDoDia.avatar}
+                                      alt={liderDoDia.nome}
+                                      className="w-5 h-5 rounded-full object-cover ring-2 ring-amber-400/80"
+                                    />
+                                  ) : (
+                                    <span className="w-5 h-5 rounded-full bg-amber-400/20 ring-2 ring-amber-400/80 flex items-center justify-center text-[8px] font-black text-amber-500">
+                                      {liderDoDia.nome.slice(0, 2).toUpperCase()}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
                             </div>
                           ))}
                         </div>
