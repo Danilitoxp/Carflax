@@ -32,7 +32,8 @@ import {
   Loader2,
   FileText,
   Tag as TagIcon,
-  Clock,
+  Eye,
+  ChevronUp,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -352,9 +353,10 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [usersList, setUsersList] = useState<EsteiraUser[]>([]);
   const [isViewOnly, setIsViewOnly] = useState(false);
-  // Card acabou de ser marcado: mostra o check verde um instante antes de ir
-  // para Concluídos, em vez de sumir da coluna no mesmo clique.
-  const [marcandoIds, setMarcandoIds] = useState<Set<string>>(new Set());
+  // Adição rápida estilo Trello: só o título, direto na coluna. O modal fica
+  // para quando a pessoa quer editar o card depois.
+  const [addRapidoCol, setAddRapidoCol] = useState<KanbanCard["column_id"] | null>(null);
+  const [addRapidoTitulo, setAddRapidoTitulo] = useState("");
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>(
     {},
   );
@@ -1051,13 +1053,22 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
     return `${day}/${month}/${year}`;
   };
 
-  const openNewCard = (columnId: KanbanCard["column_id"] = "A FAZER") => {
-    setSelectedCard({
+  const criarRapido = async (columnId: KanbanCard["column_id"]) => {
+    const titulo = addRapidoTitulo.trim();
+    if (!titulo) return;
+    setAddRapidoTitulo("");
+    setAddRapidoCol(null);
+    await saveCard({
+      title: titulo,
+      description: "",
       column_id: columnId,
       owner_id: boardOwnerId || userProfile?.id || null,
     });
-    setIsViewOnly(false);
-    setIsCardModalOpen(true);
+  };
+
+  const abrirAddRapido = (columnId: KanbanCard["column_id"]) => {
+    setAddRapidoCol(columnId);
+    setAddRapidoTitulo("");
   };
 
   // O quadro fica memorizado: sem isto, cada tecla digitada no modal
@@ -1071,6 +1082,13 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
       <div className="flex-1 overflow-x-auto min-h-0 flex gap-5 pb-4 select-none custom-scrollbar">
         {COLUMNS.map((col) => {
           const colCards = cards.filter((c) => c.column_id === col.id);
+          // Concluídos: o último que terminou fica em cima. Card concluído antes
+          // de existir completed_at usa a data de criação como aproximação.
+          if (col.id === "CONCLUIDOS") {
+            const quando = (c: KanbanCard) =>
+              new Date(c.completed_at || c.created_at || 0).getTime();
+            colCards.sort((a, b) => quando(b) - quando(a));
+          }
           const isOver = draggedOverColumn === col.id;
 
           return (
@@ -1093,7 +1111,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
                   </span>
                 </div>
                 <button
-                  onClick={() => openNewCard(col.id)}
+                  onClick={() => abrirAddRapido(col.id)}
                   className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                   title="Nova atividade"
                 >
@@ -1116,18 +1134,16 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
                 ) : colCards.length > 0 ? (
                   colCards.map((card) => {
                     const expired = isOverdue(card.due_date, card.column_id);
+                    const tagStyle =
+                      TAG_OPTIONS.find((t) => t.name === card.tag_name)
+                        ?.color ||
+                      "bg-secondary text-muted-foreground border-border/50";
                     const stats = getChecklistStats(card.description);
                     const subtasks = parseSubtasks(card.description);
                     const visibleSubtasks = subtasks.slice(0, 5);
                     const remainingCount = subtasks.length - 5;
                     const cleanDesc = getCleanDescriptionText(card.description).trim();
                     const isExpanded = expandedCards[card.id] || false;
-                    const concluido = card.column_id === "CONCLUIDOS";
-                    const creatorUser = usersList.find((u) => u.id === card.created_by);
-                    const responsibleUser = usersList.find((u) => u.id === card.owner_id);
-                    const creatorName = toTitleCase(creatorUser?.name) || "Marketing";
-                    const responsibleName = toTitleCase(responsibleUser?.name) || "Marketing";
-                    const selfAssigned = !!card.created_by && card.created_by === card.owner_id;
 
                     return (
                       <div
@@ -1137,7 +1153,8 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
                         onDragOver={(e) => {
                           e.preventDefault();
                           const rect = e.currentTarget.getBoundingClientRect();
-                          const isBottom = e.clientY - rect.top > rect.height / 2;
+                          const relativeY = e.clientY - rect.top;
+                          const isBottom = relativeY > rect.height / 2;
                           setDraggedOverCardId(card.id);
                           setDraggedOverCardPart(isBottom ? "bottom" : "top");
                         }}
@@ -1147,219 +1164,170 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
                         }}
                         onDrop={(e) => {
                           const rect = e.currentTarget.getBoundingClientRect();
-                          const isBottom = e.clientY - rect.top > rect.height / 2;
+                          const relativeY = e.clientY - rect.top;
+                          const isBottom = relativeY > rect.height / 2;
                           setDraggedOverCardId(null);
                           setDraggedOverCardPart(null);
-                          handleCardDrop(e, card.id, isBottom ? "bottom" : "top");
+                          handleCardDrop(
+                            e,
+                            card.id,
+                            isBottom ? "bottom" : "top",
+                          );
                         }}
-                        onClick={() => {
-                          setSelectedCard(card);
-                          setIsViewOnly(!canManageCard(card));
-                          setIsCardModalOpen(true);
-                        }}
-                        className={`group relative shrink-0 bg-card rounded-xl border overflow-hidden cursor-pointer active:cursor-grabbing transition-all duration-150 hover:ring-2 hover:ring-primary/60 ${
-                          "border-border/60"
-                        } ${
-                          draggedOverCardId === card.id && draggedOverCardPart === "top"
-                            ? "border-t-2 border-t-primary"
-                            : draggedOverCardId === card.id && draggedOverCardPart === "bottom"
-                              ? "border-b-2 border-b-primary"
+                        className={`bg-card hover:shadow-md border border-border hover:border-border/80 transition-all duration-150 hover:-translate-y-0.5 rounded-xl p-3.5 flex flex-col gap-2.5 justify-between cursor-grab active:cursor-grabbing relative overflow-hidden group shrink-0 h-auto ${
+                          draggedOverCardId === card.id &&
+                          draggedOverCardPart === "top"
+                            ? "border-t-primary border-t-2 scale-[1.01] shadow-md"
+                            : draggedOverCardId === card.id &&
+                                draggedOverCardPart === "bottom"
+                              ? "border-b-primary border-b-2 scale-[1.01] shadow-md"
                               : ""
                         }`}
                       >
-                        {/* Capa: primeira imagem anexada, na largura toda do card */}
-                        {(() => {
-                          const capa = card.attachments?.find((a) => a.type.startsWith("image/"));
-                          if (!capa) return null;
-                          return (
-                            <div className="h-36 bg-secondary">
-                              <img
-                                src={capa.url}
-                                alt=""
-                                loading="lazy"
-                                draggable={false}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          );
-                        })()}
+                        {/* Card top row */}
+                        <div
+                          className={
+                            card.tag_name || card.due_date || card.recurring || (card.labels?.length ?? 0) > 0
+                              ? "flex items-start justify-between gap-2 mb-0.5 shrink-0"
+                              : "absolute top-2.5 right-2.5 z-10"
+                          }
+                        >
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {card.tag_name ? (
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider ${tagStyle}`}
+                              >
+                                {card.tag_name}
+                              </span>
+                            ) : null}
 
-                        {/* Editar/excluir: só no hover, no canto */}
-                        {canManageCard(card) && (
-                          <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedCard(card);
-                                setIsViewOnly(false);
-                                setIsCardModalOpen(true);
-                              }}
-                              className="p-1.5 rounded-full bg-card/90 backdrop-blur text-muted-foreground hover:text-foreground shadow-sm"
-                              title="Editar"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteCard(card.id);
-                              }}
-                              className="p-1.5 rounded-full bg-card/90 backdrop-blur text-muted-foreground hover:text-red-500 shadow-sm"
-                              title="Excluir"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
+                            {card.labels?.map((l) => (
+                              <span
+                                key={l.name}
+                                className={`px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider ${COR_ETIQUETA[l.color]?.chip ?? COR_ETIQUETA.violet.chip}`}
+                              >
+                                {l.name}
+                              </span>
+                            ))}
 
-                        <div className="px-3 pt-2.5 pb-2.5 flex flex-col gap-2">
-                          {/* Etiquetas e prioridade como barrinhas; o nome aparece no hover */}
-                          {((card.labels?.length ?? 0) > 0 || card.tag_name) && (
-                            <div className="flex flex-wrap gap-1">
-                              {card.tag_name && (
-                                <span
-                                  title={`Prioridade: ${card.tag_name}`}
-                                  className={`h-2 w-10 rounded-full ${COR_TAG[card.tag_name] || "bg-slate-400"}`}
-                                />
-                              )}
-                              {card.labels?.map((l) => (
-                                <span
-                                  key={l.name}
-                                  title={l.name}
-                                  className={`h-2 w-10 rounded-full ${COR_ETIQUETA[l.color]?.ponto ?? COR_ETIQUETA.violet.ponto}`}
-                                />
-                              ))}
-                            </div>
-                          )}
+                            {card.due_date && (
+                              <span
+                                className={`px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0 ${
+                                  expired
+                                    ? "text-red-500 bg-red-500/5 border-red-500/10 animate-pulse"
+                                    : "bg-secondary/80 text-muted-foreground/80 border-border/50"
+                                }`}
+                              >
+                                <Calendar className="w-3 h-3 shrink-0" />
+                                <span>{formatDate(card.due_date)}</span>
+                              </span>
+                            )}
 
-                          {/* Bolinha de concluir + título */}
-                          <div className="flex items-start gap-2 pr-1">
-                            <button
-                              type="button"
-                              disabled={!canManageCard(card)}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (marcandoIds.has(card.id)) return;
-                                // Reaproveita o mesmo caminho do arrastar entre colunas
-                                // (reindexa, grava completed_at e notifica).
-                                const mover = () =>
-                                  handleDrop(
-                                    {
-                                      preventDefault: () => {},
-                                      dataTransfer: { getData: () => card.id },
-                                    } as unknown as React.DragEvent,
-                                    concluido ? "A FAZER" : "CONCLUIDOS",
-                                  );
-                                if (concluido) {
-                                  mover();
-                                  return;
-                                }
-                                setMarcandoIds((prev) => new Set(prev).add(card.id));
-                                setTimeout(() => {
-                                  mover();
-                                  setMarcandoIds((prev) => {
-                                    const n = new Set(prev);
-                                    n.delete(card.id);
-                                    return n;
-                                  });
-                                }, 700);
-                              }}
-                              className={`mt-[1px] w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0 transition-all duration-200 disabled:cursor-default ${
-                                concluido || marcandoIds.has(card.id)
-                                  ? "bg-emerald-500 text-card scale-100"
-                                  : "border-[1.5px] border-muted-foreground/60 text-transparent hover:border-emerald-500"
-                              }`}
-                              title={concluido ? "Voltar para A Fazer" : "Marcar como concluída"}
-                            >
-                              <Check className="w-3 h-3 stroke-[3.5]" />
-                            </button>
-                            <h4
-                              className={`flex-1 text-[14px] leading-snug break-words transition-colors ${
-                                concluido || marcandoIds.has(card.id) ? "text-muted-foreground" : "text-foreground"
-                              }`}
-                              title={card.title}
-                            >
-                              {card.title}
-                            </h4>
+                            {card.recurring && (
+                              <span
+                                className="px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0 bg-primary/5 text-primary border-primary/20"
+                                title="Tarefa recorrente: volta para A Fazer no dia seguinte"
+                              >
+                                <Repeat className="w-3 h-3 shrink-0" />
+                                <span>Diária</span>
+                              </span>
+                            )}
                           </div>
 
-                          {/* Selos: prazo, descrição, checklist, anexos, repetição, pessoas */}
-                          {(card.due_date || cleanDesc || stats.total > 0 || (card.attachments?.length ?? 0) > 0 || card.recurring || card.owner_id) && (
-                            <div className="flex items-center gap-2.5 flex-wrap text-[12px] text-muted-foreground">
-                              {card.due_date && (
-                                <span
-                                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-colors duration-200 ${
-                                    // Concluída: selo verde cheio, como no Trello
-                                    concluido || marcandoIds.has(card.id)
-                                      ? "bg-emerald-500 text-card font-medium"
-                                      : expired
-                                        ? "bg-red-500/20 text-red-400"
-                                        : ""
-                                  }`}
-                                  title="Prazo"
-                                >
-                                  <Clock className="w-3.5 h-3.5" />
-                                  {formatDate(card.due_date)}
-                                </span>
-                              )}
-                              {cleanDesc && (
-                                <span title="Tem descrição">
-                                  <AlignLeft className="w-3.5 h-3.5" />
-                                </span>
-                              )}
-                              {stats.total > 0 && (
+                          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {canManageCard(card) ? (
+                              <>
                                 <button
-                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    toggleCardExpanded(card.id);
+                                    setSelectedCard(card);
+                                    setIsViewOnly(false);
+                                    setIsCardModalOpen(true);
                                   }}
-                                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-secondary ${
-                                    stats.completed === stats.total ? "bg-emerald-500/15 text-emerald-500" : ""
-                                  }`}
-                                  title={isExpanded ? "Esconder checklist" : "Ver checklist"}
+                                  className="p-1 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors"
+                                  title="Editar"
                                 >
-                                  <SquareCheck className="w-3.5 h-3.5" />
-                                  {stats.completed}/{stats.total}
+                                  <Pencil className="w-3.5 h-3.5" />
                                 </button>
-                              )}
-                              {(card.attachments?.length ?? 0) > 0 && (
-                                <span className="flex items-center gap-1" title="Anexos">
-                                  <Paperclip className="w-3.5 h-3.5" />
-                                  {card.attachments!.length}
-                                </span>
-                              )}
-                              {card.recurring && (
-                                <span title="Repete todo dia">
-                                  <Repeat className="w-3.5 h-3.5" />
-                                </span>
-                              )}
-                              <div className="ml-auto flex items-center -space-x-1.5">
-                                {!selfAssigned && <MiniAvatar user={creatorUser} label={`Criado por ${creatorName}`} />}
-                                <MiniAvatar user={responsibleUser} label={`Responsável: ${responsibleName}`} />
-                              </div>
-                            </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteCard(card.id);
+                                  }}
+                                  className="p-1 hover:bg-red-500/10 rounded-md text-muted-foreground hover:text-red-500 transition-colors"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCard(card);
+                                  setIsViewOnly(true);
+                                  setIsCardModalOpen(true);
+                                }}
+                                className="p-1 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors"
+                                title="Visualizar Detalhes"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Title & Description & Checklist */}
+                        <div className="flex-1 flex flex-col gap-1.5">
+                          <h4
+                            className="text-xs font-bold text-foreground leading-snug break-words"
+                            title={card.title}
+                          >
+                            {card.title}
+                          </h4>
+
+                          {cleanDesc && (
+                            <p 
+                              onClick={(e) => { e.stopPropagation(); toggleCardExpanded(card.id); }}
+                              className={`text-[11px] text-muted-foreground/85 leading-relaxed break-words whitespace-pre-line font-medium hover:text-primary cursor-pointer transition-colors ${
+                                isExpanded ? "line-clamp-6" : "line-clamp-1"
+                              }`}
+                              title={isExpanded ? "Clique para recolher a descrição" : "Clique para ver a descrição completa"}
+                            >
+                              {cleanDesc}
+                            </p>
                           )}
 
-                          {/* Checklist aberto pelo selo */}
                           {isExpanded && visibleSubtasks.length > 0 && (
-                            <div className="space-y-1.5 pt-1 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
+                            <div className="mt-0.5 space-y-0.5">
                               {visibleSubtasks.map((task) => (
-                                <div key={task.index} className="flex items-start gap-2 pt-1">
+                                <div
+                                  key={task.index}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex items-start gap-2.5 px-1.5 py-1 -mx-1.5 rounded-lg hover:bg-secondary/40 transition-colors group/subtask cursor-default"
+                                >
                                   <button
                                     type="button"
-                                    onClick={() => handleToggleSubtaskInViewMode(card.id, task.index)}
-                                    className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center mt-0.5 transition-colors shrink-0 ${
+                                    onClick={() =>
+                                      handleToggleSubtaskInViewMode(
+                                        card.id,
+                                        task.index,
+                                      )
+                                    }
+                                    className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 ${
                                       task.completed
-                                        ? "bg-emerald-500 border-emerald-500 text-white"
-                                        : "border-border hover:border-muted-foreground text-transparent"
+                                        ? "bg-emerald-500 text-white"
+                                        : "border-[1.5px] border-muted-foreground/50 text-transparent hover:border-emerald-500 hover:text-emerald-500/60"
                                     }`}
+                                    title={task.completed ? "Desmarcar" : "Marcar como feito"}
                                   >
-                                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                    <Check className="w-2.5 h-2.5 stroke-[3.5]" />
                                   </button>
                                   <span
-                                    className={`text-[12px] leading-tight break-words ${
-                                      task.completed ? "line-through text-muted-foreground/60" : "text-foreground/90"
+                                    className={`text-[12px] leading-snug break-words select-none transition-colors ${
+                                      task.completed
+                                        ? "line-through text-muted-foreground/50"
+                                        : "text-foreground/90"
                                     }`}
                                   >
                                     {task.text}
@@ -1367,27 +1335,140 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
                                 </div>
                               ))}
                               {remainingCount > 0 && (
-                                <div className="text-[11px] text-muted-foreground pl-5.5">
-                                  + {remainingCount} item{remainingCount > 1 ? "s" : ""}
+                                <div className="text-[11px] text-muted-foreground/60 pl-7 pt-0.5">
+                                  + {remainingCount} ite{remainingCount > 1 ? "ns" : "m"}
                                 </div>
                               )}
                             </div>
                           )}
                         </div>
+
+                        {/* Footer: só aparece se tiver algo — checklist, anexo ou
+                            outra pessoa envolvida. Card meu, só para mim, fica sem rodapé. */}
+                        {(() => {
+                          const soEu =
+                            card.created_by === card.owner_id && card.owner_id === userProfile?.id;
+                          const temRodape =
+                            stats.total > 0 || (card.attachments?.length ?? 0) > 0 || !soEu;
+                          if (!temRodape) return null;
+                          return (
+                        <div className="pt-2 border-t border-border/30 flex items-center justify-between gap-2 text-[10px] font-bold text-muted-foreground mt-auto shrink-0">
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {stats.total > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCardExpanded(card.id);
+                                }}
+                                className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-black transition-all shrink-0 ${
+                                  stats.completed === stats.total
+                                    ? "text-emerald-500 bg-emerald-500/5 border-emerald-500/10 hover:bg-emerald-500/15"
+                                    : "text-sky-500 bg-sky-500/5 border-sky-500/10 hover:bg-sky-500/15"
+                                }`}
+                                title={
+                                  isExpanded
+                                    ? "Esconder sub-tarefas"
+                                    : "Mostrar sub-tarefas"
+                                }
+                              >
+                                <Check className="w-3 h-3 text-current" />
+                                <span>
+                                  {stats.completed}/{stats.total}
+                                </span>
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3.5 h-3.5 text-current ml-0.5" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5 text-current ml-0.5" />
+                                )}
+                              </button>
+                            )}
+                            {(card.attachments?.length ?? 0) > 0 && (
+                              <span
+                                className="flex items-center gap-1 text-muted-foreground shrink-0"
+                                title={card.attachments!.map((x) => x.name).join("\n")}
+                              >
+                                <Paperclip className="w-3.5 h-3.5" />
+                                {card.attachments!.length}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Só as fotos: quem criou e o responsável, uma ao lado da outra */}
+                            {(() => {
+                              const creatorUser = usersList.find((u) => u.id === card.created_by);
+                              const responsibleUser = usersList.find((u) => u.id === card.owner_id);
+                              const creatorName = toTitleCase(creatorUser?.name) || "Marketing";
+                              const responsibleName = toTitleCase(responsibleUser?.name) || "Marketing";
+                              const selfAssigned = !!card.created_by && card.created_by === card.owner_id;
+                              if (selfAssigned && card.owner_id === userProfile?.id) return null;
+                              return (
+                                <div className="flex items-center -space-x-2">
+                                  {!selfAssigned && (
+                                    <MiniAvatar user={creatorUser} label={`Criado por ${creatorName}`} />
+                                  )}
+                                  <MiniAvatar user={responsibleUser} label={`Responsável: ${responsibleName}`} />
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                          );
+                        })()}
                       </div>
                     );
                   })
-                ) : (
+                ) : addRapidoCol === col.id ? null : (
                   <div className="py-3 text-center text-[12px] text-muted-foreground/50">Nada por aqui</div>
                 )}
+                {/* Campo do "adicionar cartão": logo abaixo do último card */}
+                {addRapidoCol === col.id && (
+                  <div className="space-y-2 shrink-0">
+                    <textarea
+                      autoFocus
+                      rows={2}
+                      placeholder="Insira um título para este cartão"
+                      value={addRapidoTitulo}
+                      onChange={(e) => setAddRapidoTitulo(e.target.value.replace(/\n/g, ""))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          criarRapido(col.id);
+                        }
+                        if (e.key === "Escape") setAddRapidoCol(null);
+                      }}
+                      className="w-full resize-none rounded-xl bg-card border border-border px-3 py-2.5 text-[13px] text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/60 shadow-sm"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => criarRapido(col.id)}
+                        disabled={!addRapidoTitulo.trim() || saving}
+                        className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[13px] font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                      >
+                        Adicionar cartão
+                      </button>
+                      <button
+                        onClick={() => setAddRapidoCol(null)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                        title="Cancelar (Esc)"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <button
-                onClick={() => openNewCard(col.id)}
-                className="m-2 mt-1 flex items-center gap-2 px-2.5 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                Adicionar um cartão
-              </button>
+              {addRapidoCol !== col.id && (
+                <button
+                  onClick={() => abrirAddRapido(col.id)}
+                  className="m-2 mt-1 flex items-center gap-2 px-2.5 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar um cartão
+                </button>
+              )}
             </div>
           );
         })}
@@ -1395,7 +1476,7 @@ export function EsteiraView({ userProfile, subquadroId }: EsteiraViewProps) {
       </>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cards, loading, draggedOverColumn, draggedOverCardId, draggedOverCardPart, expandedCards, marcandoIds, usersList, userProfile?.id, isManager, boardOwnerId],
+    [cards, loading, draggedOverColumn, draggedOverCardId, draggedOverCardPart, expandedCards, usersList, userProfile?.id, isManager, boardOwnerId, addRapidoCol, addRapidoTitulo, saving],
   );
 
   // ── Render ────────────────────────────────────────────────────────────────

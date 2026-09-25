@@ -25,13 +25,9 @@ interface RomaneioAberto {
 const DIAS_A_FRENTE = 7;
 
 export function ColetasDoDia({
-  motoristaCod,
-  motoristaNome,
   usuarioId,
   modoAba = false,
 }: {
-  motoristaCod?: string;
-  motoristaNome?: string;
   usuarioId?: string;
   /** Na aba Coletas do Romaneio: ocupa a altura toda e avisa quando vazio. */
   modoAba?: boolean;

@@ -504,8 +504,6 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
       <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4">
         {activeTab === "coletas" ? (
           <ColetasDoDia
-            motoristaCod={selectedMotorista || undefined}
-            motoristaNome={motoristas.find(m => m.COD === selectedMotorista)?.NOME}
             usuarioId={userProfile?.id}
             modoAba
           />
