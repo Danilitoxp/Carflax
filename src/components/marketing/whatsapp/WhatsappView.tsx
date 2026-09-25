@@ -54,6 +54,7 @@ import { parseOrcamentoPdf } from "@/lib/pdf-orcamento";
 import { transcribeAudio, classifyByRules } from "@/lib/gemini-service";
 import { Package } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
+import { deveNotificarWhatsapp } from "@/lib/whatsapp-notificacao";
 import { ArchiveApprovalModal } from "./ArchiveApprovalModal";
 import { FunilView } from "./FunilView";
 import { IsabelaConfigView } from "./IsabelaConfigView";
@@ -2802,7 +2803,9 @@ export function WhatsappView({
           if (message.key && !message.key.fromMe) {
             const senderName = message.pushName || remoteJid.split("@")[0];
             const text = "Nova reação recebida";
-            sendBrowserNotification(`Nova reação de ${senderName}`, text);
+            deveNotificarWhatsapp(remoteJid, userProfile?.id).then((sim) => {
+              if (sim) sendBrowserNotification(`Nova reação de ${senderName}`, text);
+            });
           }
           setMessages((prev) =>
             prev.map((m) =>
@@ -3015,7 +3018,10 @@ export function WhatsappView({
 
       if (!message.key?.fromMe) {
         const senderName = message.pushName || remoteJid.split("@")[0];
-        sendBrowserNotification(`Nova mensagem de ${senderName}`, text);
+        // Só avisa o atendente do cliente (ou todos, se ninguém pegou ainda).
+        deveNotificarWhatsapp(remoteJid, userProfile?.id).then((sim) => {
+          if (sim) sendBrowserNotification(`Nova mensagem de ${senderName}`, text);
+        });
       }
 
       const time = formatBrTime(new Date(timestamp));

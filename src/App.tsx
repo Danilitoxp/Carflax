@@ -53,6 +53,7 @@ import { RhView } from "@/components/rh/RhView";
 import { ESTEIRA_SUBQUADRO_PREFIX, canAccessSection } from "@/lib/menu-config";
 import { getNotifPref } from "@/lib/notif-prefs";
 import { useNotification } from "@/hooks/useNotification";
+import { deveNotificarWhatsapp } from "@/lib/whatsapp-notificacao";
 import { usePedidosParadosAlert } from "@/hooks/usePedidosParadosAlert";
 import { useCommunicadoNotifications } from "@/hooks/useCommunicadoNotifications";
 
@@ -460,7 +461,7 @@ function DashboardContent({
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "marketing_whatsapp" },
-        (payload) => {
+        async (payload) => {
           const row = payload.new as {
             remote_jid?: string;
             texto?: string;
@@ -473,6 +474,8 @@ function DashboardContent({
           if (Notification.permission !== "granted") return;
 
           const remoteJid = row.remote_jid || "";
+          // Cliente de outro atendente não é da minha conta.
+          if (!(await deveNotificarWhatsapp(remoteJid, userProfile.id))) return;
           const numero = remoteJid.split("@")[0] || "Contato";
           const notif = new Notification(`💬 ${numero}`, {
             body: row.texto || "Nova mensagem",
