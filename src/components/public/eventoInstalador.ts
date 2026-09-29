@@ -1,0 +1,1 @@
+export const CAPACIDADE_INSTALADOR = 73;

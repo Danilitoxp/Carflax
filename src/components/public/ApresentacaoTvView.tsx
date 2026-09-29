@@ -3,8 +3,9 @@ import { ArrowUpRight, Beer, ChevronLeft, ChevronRight, Gift, Maximize2, Minimiz
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/lib/supabase";
 import "./ApresentacaoTvView.css";
+import { CAPACIDADE_INSTALADOR as CAPACIDADE } from "./eventoInstalador";
 
-const CAPACIDADE = 50;
+
 const SCENES = [
   { label: "O encontro", duration: 12, accent: "#c5f65b" },
   { label: "A experiência", duration: 11, accent: "#ffc875" },
@@ -65,7 +66,21 @@ export function ApresentacaoTvView() {
     let active = true;
     const load = async () => {
       try {
-        const { count, error } = await supabase.from("evento_convidados").select("id", { count: "exact", head: true }).eq("status", "confirmado");
+        const { data: evento, error: eventoError } = await supabase
+          .from("eventos")
+          .select("id")
+          .ilike("nome", "%Instalador%")
+          .order("data_evento", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (eventoError || !evento) {
+          if (active) setConfirmed(null);
+          return;
+        }
+        const { count, error } = await supabase.from("evento_convidados")
+          .select("id", { count: "exact", head: true })
+          .eq("evento_id", evento.id)
+          .eq("status", "confirmado");
         if (active) setConfirmed(!error && count !== null ? count : null);
       } catch { if (active) setConfirmed(null); }
     };
@@ -112,7 +127,7 @@ export function ApresentacaoTvView() {
             <div className="tv-note tv-reveal">Seu voucher vem com um número da sorte.</div>
           </>}
           {slide === 3 && <>
-            <Title lines={["Uma noite.", "50 lugares.", "O seu espera."]} />
+            <Title lines={["Uma noite.", `${CAPACIDADE} lugares.`, "O seu espera."]} />
             <p className="tv-description tv-reveal">Um encontro pensado para receber você bem.<br />Confirmações por ordem de chegada.</p>
             <div className="tv-callout tv-reveal">Fale com seu vendedor <ArrowUpRight /></div>
             <div className="tv-note tv-reveal">Garanta sua presença e receba seu voucher nominal.</div>
@@ -128,7 +143,7 @@ export function ApresentacaoTvView() {
           {slide === 0 && <div className="tv-poster-wrap"><div className="tv-poster-back" /><img className="tv-poster" src="/convite-capa.jpg" alt="Convite do Festival dos Instaladores com as marcas participantes" /><div className="tv-poster-tag"><span>VOCÊ É NOSSO CONVIDADO</span><ArrowUpRight /></div></div>}
           {slide === 1 && <div className="tv-experience"><div className="tv-orbit tv-orbit-one" /><div className="tv-orbit tv-orbit-two" /><Utensils className="tv-floating-icon tv-icon-one" /><Beer className="tv-floating-icon tv-icon-two" /><div className="tv-experience-core"><span>APROVEITE CADA MOMENTO</span><strong>100<span>%</span></strong><em>gratuito.</em><p>Jantar, bebidas e boas histórias.</p></div><div className="tv-small-label">ENTRADA VIP · CONVITE INDIVIDUAL</div></div>}
           {slide === 2 && <div className="tv-ticket-wrap"><div className="tv-ticket"><div className="tv-ticket-top"><span>CARFLAX / FESTIVAL 2026</span><Trophy /></div><div className="tv-ticket-body"><span>UMA NOITE DE POSSIBILIDADES</span><Gift /><strong>Seu número.<br />Sua sorte.</strong><p>Brindes + sorteios de ferramentas</p></div><div className="tv-ticket-stub"><span>VOUCHER INDIVIDUAL</span><div className="tv-ticket-bars" /><b>EDIÇÃO 03</b></div></div><span className="tv-ticket-caption">Prêmios entregues durante o evento</span></div>}
-          {slide === 3 && <div className="tv-availability"><div className="tv-availability-top"><span className="tv-status-dot" /> {remaining === null ? "CAPACIDADE DO EVENTO" : "DISPONIBILIDADE ATUALIZADA"}</div><strong className="tv-big-number">{remaining === null ? CAPACIDADE : remaining.toString().padStart(2, "0")}</strong><h2>{remaining === null ? "lugares no total" : remaining === 0 ? "vagas esgotadas" : "vagas disponíveis"}</h2><div className="tv-seat-grid" aria-hidden="true">{Array.from({ length: CAPACIDADE }, (_, index) => <i key={index} className={confirmed !== null && index < confirmed ? "occupied" : ""} />)}</div><p>{remaining === null ? "Consulte a disponibilidade com seu vendedor." : `${Math.min(confirmed ?? 0, CAPACIDADE)} de ${CAPACIDADE} lugares confirmados`}</p></div>}
+          {slide === 3 && <div className="tv-availability"><div className="tv-availability-top"><span className="tv-status-dot" /> {remaining === null ? "CAPACIDADE DO EVENTO" : "DISPONIBILIDADE ATUALIZADA"}</div><strong className="tv-big-number">{remaining === null ? CAPACIDADE : remaining.toString().padStart(2, "0")}</strong><h2>{remaining === null ? "lugares no total" : remaining === 0 ? "vagas esgotadas" : "vagas disponíveis"}</h2><div className="tv-seat-grid" aria-hidden="true">{Array.from({ length: CAPACIDADE }, (_, index) => <i key={index} className={confirmed !== null && index < confirmed ? "occupied" : ""} />)}</div><p>{remaining === null ? "Consulte a disponibilidade com seu vendedor." : `${(confirmed ?? 0)} de ${CAPACIDADE} lugares confirmados`}</p></div>}
           {slide === 4 && <div className="tv-qr-panel"><div className="tv-qr-heading"><QrCode /><span>APONTE. CONFIRME. PARTICIPE.</span></div><div className="tv-qr-paper"><QRCodeSVG value={conviteUrl} size={330} level="M" marginSize={4} title="Abra o convite do Festival dos Instaladores" /></div><strong>Esperamos por você.</strong><p>15 de outubro · A partir das 17h30</p><div className="tv-qr-badge">ENTRADA GRATUITA <span>↗</span></div></div>}
         </aside>
       </main>

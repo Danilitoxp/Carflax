@@ -21,6 +21,7 @@ import {
   MessageCircle
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { CAPACIDADE_INSTALADOR } from "./eventoInstalador";
 
 interface EventoRef {
   id: string;
@@ -43,7 +44,7 @@ const LOCAL_PADRAO = "Galpão da Carflax — Av. Américo Bruno, 125, Pte. São 
 const LOCAL_MAPS_URL = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("Av. Américo Bruno, 125, Ponte São João, Jundiaí - SP");
 const WHATSAPP_GRUPO_URL = "https://chat.whatsapp.com/HXkQff0Rr0W2v1milT7lMF";
 
-const CAPACIDADE_MAXIMA = 50;
+
 
 export function ConviteClientePublicView() {
   const [evento, setEvento] = useState<EventoRef | null>(null);
@@ -71,7 +72,7 @@ export function ConviteClientePublicView() {
 
   // Vagas restantes
   const [vagasOcupadas, setVagasOcupadas] = useState<number>(0);
-  const vagasRestantes = Math.max(0, CAPACIDADE_MAXIMA - vagasOcupadas);
+  const vagasRestantes = Math.max(0, CAPACIDADE_INSTALADOR - vagasOcupadas);
 
   // Dados do voucher gerado
   const [voucherData, setVoucherData] = useState<{
