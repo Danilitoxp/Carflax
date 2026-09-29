@@ -64,6 +64,8 @@ export const NAV_SECTIONS: NavSection[] = [
     subItems: [
       { label: "Whatsapp API", value: "Whatsapp API" },
       { label: "Leads" },
+      // Disparos pelo WhatsApp de automação (avaliações, café da manhã).
+      { label: "Automação" },
       // Campanhas do Google Ads e do Meta Ads direto pelas APIs, com trava do teto mensal.
       { label: "Gestão de Tráfego", value: "Gestao Trafego" },
       // Chave própria em vez de "Eventos": 9 usuários ainda têm "Eventos" salvo
@@ -229,7 +231,7 @@ const VENDEDOR_SECTIONS = [
 ];
 
 const MARKETING_SECTIONS = [
-  "Marketing", "Whatsapp API", "Leads", "Gestao Trafego", "Eventos Marketing", "Relatórios Mkt",
+  "Marketing", "Whatsapp API", "Automação", "Leads", "Gestao Trafego", "Eventos Marketing", "Relatórios Mkt",
 ];
 
 const VENDAS_SECTIONS = [

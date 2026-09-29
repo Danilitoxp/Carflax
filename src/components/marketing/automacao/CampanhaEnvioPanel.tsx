@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Play, Pause, Square, RefreshCw, ShieldCheck, Clock, Send, AlertTriangle, Save, ListPlus, Coffee, Megaphone,
-  ImagePlus, Film, X, Loader2, Bold, Italic, Strikethrough, Code,
+  ImagePlus, Film, X, Loader2, Bold, Italic, Strikethrough, Code, Users, Search, UserPlus, Trash2,
 } from "lucide-react";
 import {
   apiCampanhaStatus, apiCampanhaSaveConfig, apiCampanhaBuild, apiCampanhaControl, apiCampanhaTest,
   type CampanhaEnvioStatus, type CampanhaEnvioConfig,
 } from "@/lib/api";
 import { uploadImage } from "@/lib/uploadImage";
+import { supabase } from "@/lib/supabase";
 
 const DIAS = [
   { v: 1, l: "Seg" }, { v: 2, l: "Ter" }, { v: 3, l: "Qua" }, { v: 4, l: "Qui" },
@@ -236,7 +237,8 @@ export function CampanhaEnvioPanel({ tipo }: { tipo: string }) {
   const publicoLbl = PUBLICO_LABEL[cfg?.publico || ""] || cfg?.publico || "";
 
   return (
-    <div className="max-w-5xl w-full mx-auto px-6 md:px-8 pb-8 space-y-6">
+    <div className="max-w-7xl w-full mx-auto px-6 md:px-8 pb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] items-start">
+    <div className="space-y-6 min-w-0">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
@@ -275,7 +277,7 @@ export function CampanhaEnvioPanel({ tipo }: { tipo: string }) {
       <div className="flex flex-wrap gap-2">
         <button onClick={montarFila} disabled={!!busy}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary border border-border font-bold text-xs hover:border-primary/40 transition-all disabled:opacity-50">
-          <ListPlus className="w-4 h-4" /> Montar fila (tráfego pago)
+          <ListPlus className="w-4 h-4" /> Montar fila
         </button>
 
         {status !== "running" ? (
@@ -444,37 +446,189 @@ export function CampanhaEnvioPanel({ tipo }: { tipo: string }) {
         </div>
       </div>
 
-      {/* Últimos envios */}
-      <div className="rounded-2xl border border-border bg-card p-5">
-        <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground mb-3">Últimos envios</h2>
-        {data && data.recentes.length > 0 ? (
-          <div className="divide-y divide-border/50">
-            {data.recentes.map((r, i) => (
-              <div key={i} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                <div className="min-w-0">
-                  <p className="font-bold truncate">{r.nome || r.remote_jid.split("@")[0]}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">
-                    {r.remote_jid.split("@")[0]}{r.error ? ` · ${r.error}` : ""}
-                  </p>
-                </div>
-                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 ${
-                  r.status === "sent" ? "bg-emerald-500/10 text-emerald-500"
-                    : r.status === "failed" ? "bg-rose-500/10 text-rose-500"
-                    : r.status === "opted_out" ? "bg-slate-500/10 text-slate-400"
-                    : "bg-sky-500/10 text-sky-500"
-                }`}>
-                  {r.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground font-medium py-4 text-center">
-            Nenhum envio ainda. Monte a fila e inicie o envio.
+    </div>
+      <PublicoLista tipo={tipo} total={c.sent + c.pending} onChange={load} />
+    </div>
+  );
+}
+
+const SITUACAO: Record<string, { label: string; cls: string }> = {
+  sent: { label: "Enviado", cls: "bg-emerald-500/10 text-emerald-500" },
+  pending: { label: "Na fila", cls: "bg-sky-500/10 text-sky-500" },
+  failed: { label: "Falhou", cls: "bg-rose-500/10 text-rose-500" },
+  opted_out: { label: "Saiu", cls: "bg-slate-500/10 text-slate-400" },
+};
+
+function fmtTel(t: string) {
+  const d = t.replace(/^55/, "");
+  return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : t;
+}
+
+interface Convidado {
+  id: string;
+  nome: string | null;
+  telefone: string;
+  status: string | null;
+}
+
+// Lista de convidados = a fila da campanha no Supabase (campanha_envio_fila).
+// A tela lê e grava direto nela: adicionar = entra na fila como pendente.
+// `total` muda a cada envio/fila montada e dispara o recarregamento.
+function PublicoLista({ tipo, total, onChange }: { tipo: string; total: number; onChange: () => void }) {
+  const [lista, setLista] = useState<Convidado[] | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [busca, setBusca] = useState("");
+  const [novoNome, setNovoNome] = useState("");
+  const [novoTel, setNovoTel] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [versao, setVersao] = useState(0);
+
+  useEffect(() => {
+    let vivo = true;
+    supabase
+      .from("campanha_envio_fila")
+      .select("id, nome, remote_jid, status")
+      .eq("tipo", tipo)
+      .order("nome", { ascending: true })
+      .limit(5000)
+      .then(({ data, error }) => {
+        if (!vivo) return;
+        if (error) setErro(error.message);
+        else {
+          setErro(null);
+          setLista(
+            (data || []).map((r) => ({
+              id: String(r.id),
+              nome: r.nome,
+              telefone: String(r.remote_jid || "").split("@")[0],
+              status: r.status,
+            })),
+          );
+        }
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [tipo, total, versao]);
+
+  async function adicionar(e: React.FormEvent) {
+    e.preventDefault();
+    const d = novoTel.replace(/\D/g, "");
+    if (d.length !== 11 || d[2] !== "9") {
+      setErro("Celular inválido. Use DDD + número com 9 (ex.: 11 99999-9999).");
+      return;
+    }
+    setSalvando(true);
+    const { error } = await supabase
+      .from("campanha_envio_fila")
+      .upsert(
+        [{ tipo, remote_jid: `55${d}@s.whatsapp.net`, nome: novoNome.trim(), status: "pending" }],
+        { onConflict: "tipo,remote_jid", ignoreDuplicates: true },
+      );
+    setSalvando(false);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setNovoNome("");
+    setNovoTel("");
+    setErro(null);
+    setVersao((v) => v + 1);
+    onChange();
+  }
+
+  async function remover(p: Convidado) {
+    if (!confirm(`Tirar ${p.nome || fmtTel(p.telefone)} da lista?`)) return;
+    const { error } = await supabase.from("campanha_envio_fila").delete().eq("id", p.id).eq("status", "pending");
+    if (error) setErro(error.message);
+    else {
+      setVersao((v) => v + 1);
+      onChange();
+    }
+  }
+
+  const q = busca.trim().toLowerCase();
+  const visiveis = (lista || []).filter(
+    (p) => !q || (p.nome || "").toLowerCase().includes(q) || p.telefone.includes(q.replace(/\D/g, "") || "~"),
+  );
+  const enviados = (lista || []).filter((p) => p.status === "sent").length;
+
+  return (
+    <aside className="rounded-2xl border border-border bg-card lg:sticky lg:top-4 flex flex-col lg:max-h-[calc(100vh-2rem)]">
+      <div className="p-4 border-b border-border space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+            <Users className="w-4 h-4" /> Convidados
+          </h2>
+          {lista && (
+            <span className="text-xs font-bold text-muted-foreground">
+              {enviados}/{lista.length} enviados
+            </span>
+          )}
+        </div>
+        <form onSubmit={adicionar} className="space-y-2 rounded-xl border border-dashed border-border p-3">
+          <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <UserPlus className="w-3.5 h-3.5" /> Adicionar convidado
           </p>
+          <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="nome" required className={inputCls} />
+          <div className="flex gap-2">
+            <input
+              value={novoTel}
+              onChange={(e) => setNovoTel(formatPhoneBR(e.target.value))}
+              placeholder="(11) 99999-9999"
+              inputMode="tel"
+              required
+              className={inputCls}
+            />
+            <button
+              type="submit"
+              disabled={salvando}
+              className="shrink-0 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground disabled:opacity-50"
+            >
+              {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : "Adicionar"}
+            </button>
+          </div>
+        </form>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="buscar nome ou telefone" className={`${inputCls} pl-9`} />
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto divide-y divide-border/50 min-h-[200px]">
+        {erro ? (
+          <p className="p-4 text-xs text-rose-500">{erro}</p>
+        ) : lista === null ? (
+          <p className="p-4 text-xs text-muted-foreground flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" /> Carregando clientes…
+          </p>
+        ) : visiveis.length === 0 ? (
+          <p className="p-4 text-xs text-muted-foreground">Ninguém encontrado.</p>
+        ) : (
+          visiveis.map((p) => (
+            <div key={p.id} className="flex items-center justify-between gap-2 px-4 py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-bold truncate">{p.nome || "—"}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {fmtTel(p.telefone)}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {p.status && SITUACAO[p.status] && (
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${SITUACAO[p.status].cls}`}>
+                    {SITUACAO[p.status].label}
+                  </span>
+                )}
+                {p.status === "pending" && (
+                  <button onClick={() => remover(p)} title="Tirar da lista" className="p-1 rounded-md text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
         )}
       </div>
-    </div>
+    </aside>
   );
 }
 
