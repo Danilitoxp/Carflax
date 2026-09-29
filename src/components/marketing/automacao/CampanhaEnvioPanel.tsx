@@ -22,6 +22,7 @@ const STATUS_INFO: Record<string, { label: string; cls: string }> = {
 
 const PUBLICO_LABEL: Record<string, string> = {
   trafego_pago: "Leads do tráfego pago (Meta, Google, Instagram…)",
+  clientes_cpf_frequentes: "Clientes CPF com 6+ compras nos últimos 12 meses (ERP), só com celular",
 };
 
 // Máscara de telefone BR: (47) 99999-9999
@@ -72,6 +73,11 @@ const TIPO_UI: Record<string, { icon: React.ElementType; titulo: string; subtitu
     icon: Coffee,
     titulo: "Café da manhã",
     subtitulo: "Convida os leads que vieram do tráfego para um café da manhã na loja.",
+  },
+  cafe_clientes: {
+    icon: Coffee,
+    titulo: "Café da manhã · clientes frequentes",
+    subtitulo: "Convida os clientes pessoa física que mais compram para um café da manhã na loja.",
   },
 };
 

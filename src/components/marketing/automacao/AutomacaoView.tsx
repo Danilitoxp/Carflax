@@ -13,6 +13,7 @@ import {
   Save,
   ListPlus,
   Coffee,
+  Users,
 } from "lucide-react";
 import {
   apiAvaliacaoStatus,
@@ -26,7 +27,7 @@ import { CampanhaEnvioPanel } from "./CampanhaEnvioPanel";
 
 // Automação suporta vários "tipos de envio". Avaliações é o legado dedicado;
 // os demais (café da manhã etc.) usam o motor genérico de campanhas.
-type Aba = "avaliacao" | "cafe_manha";
+type Aba = "avaliacao" | "cafe_manha" | "cafe_clientes";
 
 export function AutomacaoView() {
   const [aba, setAba] = useState<Aba>("avaliacao");
@@ -34,6 +35,7 @@ export function AutomacaoView() {
   const TABS: [Aba, string, React.ElementType][] = [
     ["avaliacao", "Avaliações", Star],
     ["cafe_manha", "Café da manhã", Coffee],
+    ["cafe_clientes", "Café · clientes", Users],
   ];
 
   return (
@@ -54,7 +56,7 @@ export function AutomacaoView() {
         </div>
       </div>
 
-      {aba === "avaliacao" ? <AvaliacaoPanel /> : <CampanhaEnvioPanel tipo="cafe_manha" />}
+      {aba === "avaliacao" ? <AvaliacaoPanel /> : <CampanhaEnvioPanel key={aba} tipo={aba} />}
     </div>
   );
 }
