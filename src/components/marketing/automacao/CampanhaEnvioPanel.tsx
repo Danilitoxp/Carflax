@@ -346,6 +346,17 @@ export function CampanhaEnvioPanel({ tipo }: { tipo: string }) {
             </Field>
           </div>
 
+          <div className="space-y-2">
+            <button type="button" onClick={() => patch({ min_gap_seconds: 30, max_gap_seconds: 45 })}
+              className="px-3 py-2 rounded-lg border border-border text-xs font-bold hover:border-primary/40">
+              Usar intervalo de 30 a 45 segundos
+            </button>
+            <p className="text-[10px] text-muted-foreground">
+              Salve a configuração para aplicar. Nenhum intervalo garante evitar bloqueios;
+              envie apenas para quem autorizou receber estas mensagens.
+            </p>
+          </div>
+
           <Field label="Dias de envio">
             <div className="flex flex-wrap gap-2 pt-1">
               {DIAS.map((d) => {
@@ -447,7 +458,7 @@ export function CampanhaEnvioPanel({ tipo }: { tipo: string }) {
       </div>
 
     </div>
-      <PublicoLista tipo={tipo} total={c.sent + c.pending} onChange={load} />
+      <PublicoLista tipo={tipo} atualizacao={data} onChange={load} />
     </div>
   );
 }
@@ -469,12 +480,17 @@ interface Convidado {
   nome: string | null;
   telefone: string;
   status: string | null;
+  sent_at: string | null;
 }
 
 // Lista de convidados = a fila da campanha no Supabase (campanha_envio_fila).
 // A tela lê e grava direto nela: adicionar = entra na fila como pendente.
-// `total` muda a cada envio/fila montada e dispara o recarregamento.
-function PublicoLista({ tipo, total, onChange }: { tipo: string; total: number; onChange: () => void }) {
+// Cada consulta de status atualiza a lista, mesmo quando o total não muda.
+function PublicoLista({ tipo, atualizacao, onChange }: {
+  tipo: string;
+  atualizacao: CampanhaEnvioStatus | null;
+  onChange: () => void;
+}) {
   const [lista, setLista] = useState<Convidado[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
@@ -487,8 +503,9 @@ function PublicoLista({ tipo, total, onChange }: { tipo: string; total: number; 
     let vivo = true;
     supabase
       .from("campanha_envio_fila")
-      .select("id, nome, remote_jid, status")
+      .select("id, nome, remote_jid, status, sent_at")
       .eq("tipo", tipo)
+      .order("sent_at", { ascending: false, nullsFirst: false })
       .order("nome", { ascending: true })
       .limit(5000)
       .then(({ data, error }) => {
@@ -502,14 +519,23 @@ function PublicoLista({ tipo, total, onChange }: { tipo: string; total: number; 
               nome: r.nome,
               telefone: String(r.remote_jid || "").split("@")[0],
               status: r.status,
-            })),
+              sent_at: r.sent_at,
+            })).sort((a, b) => {
+              const enviadosPrimeiro = Number(b.status === "sent") - Number(a.status === "sent");
+              if (enviadosPrimeiro) return enviadosPrimeiro;
+              if (a.status === "sent" && b.status === "sent") {
+                const maisRecente = (b.sent_at || "").localeCompare(a.sent_at || "");
+                if (maisRecente) return maisRecente;
+              }
+              return (a.nome || "").localeCompare(b.nome || "", "pt-BR") || a.id.localeCompare(b.id);
+            }),
           );
         }
       });
     return () => {
       vivo = false;
     };
-  }, [tipo, total, versao]);
+  }, [tipo, atualizacao, versao]);
 
   async function adicionar(e: React.FormEvent) {
     e.preventDefault();
@@ -614,7 +640,10 @@ function PublicoLista({ tipo, total, onChange }: { tipo: string; total: number; 
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {p.status && SITUACAO[p.status] && (
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${SITUACAO[p.status].cls}`}>
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${SITUACAO[p.status].cls}`}>
+                    {p.status === "sent" && (
+                      <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                    )}
                     {SITUACAO[p.status].label}
                   </span>
                 )}
