@@ -33,7 +33,15 @@ interface Delivery {
   instructions?: string;
   romCode: string;
   romDate?: string;
+  /** Parada do romaneio: entrega (NF) ou coleta em fornecedor. */
+  kind: "entrega" | "coleta";
+  coletaId?: string;
+  pedidoCompra?: string | null;
+  itens?: string[];
+  sortOrder?: number;
 }
+
+const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function MotoristaView() {
   const { theme, setTheme } = useTheme();
@@ -66,21 +74,55 @@ export function MotoristaView() {
         .select("avatar, name")
         .eq("operator_code", driverCode)
         .limit(1);
-      
+
       if (users && users.length > 0) {
         setDriverAvatar(users[0].avatar || null);
       }
- 
+
       const { data: deliveriesData } = await supabase
         .from("entregas")
         .select("*")
         .eq("driver_cod", driverCode)
         .eq("rom_date", hoje)
+        .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
- 
-      if (deliveriesData && deliveriesData.length > 0) {
-        setDriverName(deliveriesData[0].driver_name || "Motorista");
-        setEntregas(deliveriesData.map(d => ({
+
+      // Coletas encaixadas no romaneio de hoje deste motorista, na mesma rota.
+      const { data: coletasData } = await supabase
+        .from("coletas")
+        .select("*")
+        .eq("driver_cod", driverCode)
+        .eq("rom_date", hoje)
+        .in("status", ["programada", "coletada"]);
+
+      const paradasColeta: Delivery[] = (coletasData || []).map((c, i) => ({
+        id: `coleta:${c.id}`,
+        coletaId: c.id,
+        kind: "coleta" as const,
+        nf: "",
+        client: c.fornecedor,
+        address: [c.endereco, c.bairro, c.cidade, c.uf].filter(Boolean).join(" - "),
+        status: c.status === "coletada" ? "completed" as const : "pending" as const,
+        time: c.coletada_em
+          ? new Date(c.coletada_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          : undefined,
+        value: c.valor_compra != null ? brl(Number(c.valor_compra)) : "",
+        image: c.coletada_foto || undefined,
+        instructions: [
+          c.urgencia === "alta" && c.justificativa ? `Urgente: ${c.justificativa}` : null,
+          c.contato ? `Contato: ${c.contato}` : null,
+          c.observacao || null,
+        ].filter(Boolean).join(" · ") || undefined,
+        romCode: c.rom_code,
+        romDate: c.rom_date,
+        pedidoCompra: c.pedido_compra,
+        itens: String(c.itens || "").split("\n").filter((l: string) => l.trim()),
+        sortOrder: typeof c.sort_order === "number" ? c.sort_order : 10000 + i,
+      }));
+
+      if ((deliveriesData && deliveriesData.length > 0) || paradasColeta.length > 0) {
+        setDriverName(deliveriesData?.[0]?.driver_name || coletasData?.[0]?.driver_name || "Motorista");
+        const paradasEntrega: Delivery[] = (deliveriesData || []).map(d => ({
           id: d.id,
           nf: d.nf,
           client: d.client,
@@ -91,8 +133,12 @@ export function MotoristaView() {
           image: d.image,
           instructions: d.instructions,
           romCode: d.rom_code,
-          romDate: d.rom_date
-        })));
+          romDate: d.rom_date,
+          kind: "entrega" as const,
+          sortOrder: typeof d.sort_order === "number" ? d.sort_order : 0,
+        }));
+        // Entregas e coletas numa sequência só: a ordem que o escritório montou.
+        setEntregas([...paradasEntrega, ...paradasColeta].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
       } else {
         setEntregas([]);
       }
@@ -112,6 +158,7 @@ export function MotoristaView() {
         console.log("[Mobile] Mudança detectada:", p);
         fetchData();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'coletas' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [driverCode, fetchData]);
@@ -123,6 +170,17 @@ export function MotoristaView() {
       const publicUrl = await uploadImage(file, "entregas", false, true);
       if (!publicUrl) {
         alert("Erro ao enviar imagem do comprovante.");
+        return;
+      }
+      if (selectedDelivery.kind === "coleta" && selectedDelivery.coletaId) {
+        const { error } = await supabase
+          .from("coletas")
+          .update({ status: "coletada", coletada_em: new Date().toISOString(), coletada_foto: publicUrl })
+          .eq("id", selectedDelivery.coletaId);
+        if (error) throw error;
+        setIsFinishModalOpen(false);
+        setSelectedDelivery(null);
+        fetchData();
         return;
       }
       const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -334,7 +392,7 @@ export function MotoristaView() {
           </div>
         ) : (() => {
           const filtered = entregas.filter(e => activeTab === "pending" ? e.status === "pending" : e.status !== "pending");
-          
+
           if (filtered.length === 0) {
             return (
               <div className="flex flex-col items-center justify-center py-20 text-center px-8">
@@ -368,7 +426,7 @@ export function MotoristaView() {
               {e.status === "completed" && (
                 <div className="absolute top-4 right-6 flex items-center gap-2 px-3 py-1.5 bg-emerald-500 rounded-full text-white text-[9px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20">
                   <CheckCircle2 size={12} />
-                  Entregue às {e.time}
+                  {e.kind === "coleta" ? "Coletado" : "Entregue"}{e.time ? ` às ${e.time}` : ""}
                 </div>
               )}
               {e.status === "failed" && (
@@ -387,8 +445,22 @@ export function MotoristaView() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md uppercase tracking-wider">NF #{e.nf}</span>
-                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md uppercase tracking-wider">{e.value}</span>
+                    {e.kind === "coleta" ? (
+                      <>
+                        <span className="text-[9px] font-black text-pink-600 bg-pink-50 dark:bg-pink-950/40 dark:text-pink-400 px-2 py-0.5 rounded-md uppercase tracking-wider">Coleta</span>
+                        {e.pedidoCompra && (
+                          <span className="text-[9px] font-black text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md uppercase tracking-wider">PC #{e.pedidoCompra}</span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md uppercase tracking-wider">Entrega</span>
+                        <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md uppercase tracking-wider">NF #{e.nf}</span>
+                      </>
+                    )}
+                    {e.value && (
+                      <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md uppercase tracking-wider">{e.value}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -399,6 +471,18 @@ export function MotoristaView() {
                   <MapPin size={14} className="shrink-0 mt-0.5" />
                   <p className="text-[10px] font-bold uppercase tracking-tight leading-normal">{e.address}</p>
                 </div>
+                {e.kind === "coleta" && e.itens && e.itens.length > 0 && (
+                  <div className="mt-3 bg-pink-50/60 dark:bg-pink-950/20 border border-pink-100 dark:border-pink-900/40 rounded-2xl px-3 py-2.5">
+                    <p className="text-[9px] font-black text-pink-600 dark:text-pink-400 uppercase tracking-widest mb-1.5">
+                      Buscar {e.itens.length} {e.itens.length === 1 ? "item" : "itens"}
+                    </p>
+                    <ul className="space-y-0.5">
+                      {e.itens.map((it, i) => (
+                        <li key={i} className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-tight leading-snug">{it}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {e.instructions && (
                   <div className="flex items-start gap-2 text-blue-500 mt-2 bg-blue-50 px-3 py-2 rounded-2xl border border-blue-100">
                     <AlertCircle size={14} className="shrink-0 mt-0.5" />
@@ -431,6 +515,7 @@ export function MotoristaView() {
                             Finalizar
                         </motion.button>
                     </div>
+                    {e.kind !== "coleta" && (
                     <motion.button
                       whileTap={{ scale: 0.98 }}
                       onClick={() => abrirOcorrencia(e)}
@@ -439,6 +524,7 @@ export function MotoristaView() {
                       <AlertTriangle size={16} />
                       Registrar Ocorrência
                     </motion.button>
+                    )}
                   </div>
                 ) : e.status === "failed" ? (
                   <motion.button
@@ -510,14 +596,14 @@ export function MotoristaView() {
                 >
                   <Camera size={38} className="text-blue-600" />
                 </motion.div>
-                
+
                 <div className="space-y-2">
                    <p className="text-sm font-black text-blue-900 dark:text-blue-200 uppercase tracking-tight">Comprovante de Entrega</p>
                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest leading-relaxed">
                      Capture uma foto legível do canhoto<br/>para confirmar a entrega.
                    </p>
                 </div>
-                
+
                 <label className="w-full h-18 bg-blue-600 text-white rounded-[28px] flex items-center justify-center gap-4 font-black text-sm uppercase tracking-widest shadow-2xl shadow-blue-500/40 cursor-pointer active:scale-[0.98] transition-all overflow-hidden relative group">
                   {uploading ? (
                     <div className="flex items-center gap-3">

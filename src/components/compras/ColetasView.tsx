@@ -54,6 +54,11 @@ export interface Coleta {
   rom_date: string | null;
   driver_name: string | null;
   motivo_cancelamento: string | null;
+  rom_code?: string | null;
+  pedido_compra?: string | null;
+  pedido_empresa?: string | null;
+  valor_compra?: number | null;
+  sort_order?: number | null;
 }
 
 const DIAS_SEMANA = ["SEG", "TER", "QUA", "QUI", "SEX"] as const;
@@ -270,12 +275,22 @@ export function ColetasView({ userProfile }: { userProfile?: UserProfile }) {
       justificativa: form.justificativa.trim() || null,
       observacao: form.observacao.trim() || null,
     };
+    // Pedido de compra de origem: número e valor do que falta chegar. Na edição
+    // sem trocar de pedido, o que já está gravado fica como está.
+    const doPedido = pedidoSel
+      ? {
+          pedido_compra: String(Number(pedidoSel.pedido)),
+          pedido_empresa: pedidoSel.empresa,
+          valor_compra: pedidoSel.valor_pendente ?? null,
+        }
+      : {};
     const { error } = editandoId
-      ? await supabase.from("coletas").update(dados).eq("id", editandoId)
+      ? await supabase.from("coletas").update({ ...dados, ...doPedido }).eq("id", editandoId)
       : await supabase.from("coletas").insert([{
           criado_por: userProfile?.id ?? null,
           criado_por_nome: userProfile?.name ?? null,
           ...dados,
+          ...doPedido,
         }]);
     setSalvando(false);
     if (error) {

@@ -24,6 +24,9 @@ import { supabase } from "@/lib/supabase";
 
 import type { UserProfile } from "@/App";
 import { ColetasDoDia } from "./ColetasDoDia";
+import { CelulasColeta, SeloTipo } from "./ColetasDoRomaneio";
+import type { Coleta } from "@/components/compras/ColetasView";
+import { apiComprasPedidosAbertos } from "@/lib/api";
 
 export interface Delivery {
   id: string;
@@ -42,6 +45,11 @@ export interface Delivery {
   romStatus?: string;
   romDate?: string;
   veiculoId?: string | null;
+  /** Linha do romaneio: entrega (NF) ou coleta em fornecedor. */
+  kind?: "entrega" | "coleta";
+  coleta?: Coleta;
+  /** Posição na rota — entregas e coletas dividem a mesma sequência. */
+  sortOrder?: number;
 }
 
 interface VeiculoOpc {
@@ -62,6 +70,29 @@ interface MovGerRecord {
   EMPRESA?: string;
 }
 
+/**
+ * Coleta criada antes de existir `valor_compra` fica sem valor. Se o pedido de
+ * compra ainda está em aberto no ERP, calcula pelo que falta chegar e grava,
+ * para a próxima carga já vir pronta.
+ */
+async function completarValorDeCompra(coletas: Coleta[]) {
+  const faltando = coletas.filter(c => c.valor_compra == null && c.pedido_compra && c.status !== "coletada");
+  if (!faltando.length) return;
+  try {
+    const { data: pedidos } = await apiComprasPedidosAbertos();
+    for (const c of faltando) {
+      const p = (pedidos || []).find(
+        x => Number(x.pedido) === Number(c.pedido_compra) && (!c.pedido_empresa || x.empresa === c.pedido_empresa),
+      );
+      if (p?.valor_pendente == null) continue;
+      c.valor_compra = p.valor_pendente;
+      await supabase.from("coletas").update({ valor_compra: p.valor_pendente }).eq("id", c.id);
+    }
+  } catch {
+    // ERP fora do ar: a linha mostra a quantidade de itens no lugar do valor.
+  }
+}
+
 export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
   const canLancar = userProfile?.permissions?.includes("Lançar Entrega") || userProfile?.role === "admin";
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -77,6 +108,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
   const isReordering = useRef(false);
   const reorderDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingOrder = useRef<Delivery[] | null>(null);
+  const [coletasAbertas, setColetasAbertas] = useState<Set<string>>(new Set());
   
   const hoje = new Date().toISOString().split('T')[0];
 
@@ -129,10 +161,49 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
           romCode: d.rom_code,
           romStatus: d.rom_status,
           romDate: d.rom_date,
-          veiculoId: d.veiculo_id
+          veiculoId: d.veiculo_id,
+          kind: "entrega" as const,
+          sortOrder: typeof d.sort_order === "number" ? d.sort_order : 0,
         }));
-        
-        setDeliveries(mapped);
+
+        // Coletas encaixadas nesses romaneios entram na MESMA lista, com os
+        // dados do romaneio (motorista, status, carro) copiados da 1ª entrega
+        // para o cabeçalho e os filtros tratarem as duas iguais.
+        const codigos = Array.from(new Set(mapped.map(m => m.romCode).filter(Boolean))) as string[];
+        let linhasColeta: Delivery[] = [];
+        if (codigos.length) {
+          const { data: cols } = await supabase
+            .from("coletas")
+            .select("*")
+            .in("rom_code", codigos)
+            .in("status", ["programada", "coletada"]);
+          const lista = (cols || []) as Coleta[];
+          await completarValorDeCompra(lista);
+          linhasColeta = lista.map((c, i) => {
+            const base = mapped.find(m => m.romCode === c.rom_code);
+            return {
+              id: `coleta:${c.id}`,
+              nf: "",
+              client: c.fornecedor,
+              address: "",
+              status: c.status === "coletada" ? "completed" : "pending",
+              value: "",
+              driverName: base?.driverName,
+              driverCode: base?.driverCode,
+              romCode: c.rom_code || undefined,
+              romStatus: base?.romStatus,
+              romDate: base?.romDate,
+              veiculoId: base?.veiculoId,
+              kind: "coleta" as const,
+              coleta: c,
+              // Sem posição salva ainda: vai para o fim do romaneio.
+              sortOrder: typeof c.sort_order === "number" ? c.sort_order : 10000 + i,
+            } as Delivery;
+          });
+        }
+        const juntas = [...mapped, ...linhasColeta];
+        if (activeTab !== "completed") juntas.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+        setDeliveries(juntas);
 
         // Auto-finalização: Se todas as entregas de um rom_code estão prontas, marcar rom_status como concluído
         if (activeTab === "pending") {
@@ -173,6 +244,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
     const channel = supabase
       .channel('admin_full_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'entregas' }, () => fetchData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'coletas' }, () => fetchData(true))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
@@ -212,10 +284,12 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
     try {
       // Salva a posição de cada entrega como 0, 1, 2, 3...
       for (let i = 0; i < newOrder.length; i++) {
-        await supabase
-          .from("entregas")
-          .update({ sort_order: i })
-          .eq("id", newOrder[i].id);
+        const linha = newOrder[i];
+        if (linha.kind === "coleta" && linha.coleta) {
+          await supabase.from("coletas").update({ sort_order: i }).eq("id", linha.coleta.id);
+        } else {
+          await supabase.from("entregas").update({ sort_order: i }).eq("id", linha.id);
+        }
       }
     } catch (err) {
       console.error("Erro ao persistir nova ordem:", err);
@@ -573,7 +647,9 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
                               ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
                               : "bg-blue-50 text-blue-600 border-blue-100"
                           )}>
-                            {items.length} ENTREGAS {activeTab === "completed" ? "FINALIZADAS" : ""}
+                            {items.filter(i => i.kind !== "coleta").length} ENTREGAS
+                            {items.some(i => i.kind === "coleta") ? ` · ${items.filter(i => i.kind === "coleta").length} COLETAS` : ""}
+                            {activeTab === "completed" ? " FINALIZADAS" : ""}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -646,6 +722,25 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
                               activeTab === "pending" ? "cursor-grab active:cursor-grabbing" : "cursor-default"
                             )}
                           >
+                            {delivery.kind === "coleta" && delivery.coleta ? (
+                              <CelulasColeta
+                                coleta={delivery.coleta}
+                                arrastavel={activeTab === "pending"}
+                                podeEditar={activeTab === "pending"}
+                                aberta={coletasAbertas.has(delivery.id)}
+                                onAlternarItens={() =>
+                                  setColetasAbertas(prev => {
+                                    const n = new Set(prev);
+                                    if (n.has(delivery.id)) n.delete(delivery.id);
+                                    else n.add(delivery.id);
+                                    return n;
+                                  })
+                                }
+                                onMudou={() => fetchData(true)}
+                                usuarioId={userProfile?.id}
+                              />
+                            ) : (
+                            <>
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-3">
                                 {activeTab === "pending" && <GripVertical className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />}
@@ -669,7 +764,10 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
                               </div>
                             </td>
                             <td className="py-3 px-4">
-                              <span className="text-[11px] font-black text-foreground tracking-tighter">#{delivery.nf}</span>
+                              <div className="flex items-center gap-2">
+                                <SeloTipo tipo="entrega" />
+                                <span className="text-[11px] font-black text-foreground tracking-tighter">#{delivery.nf}</span>
+                              </div>
                             </td>
                             <td className="py-3 px-4 max-w-[400px]">
                               <div className="flex flex-col gap-0.5">
@@ -733,6 +831,8 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
                                 )}
                               </div>
                             </td>
+                            </>
+                            )}
                           </Reorder.Item>
                         ))}
                       </Reorder.Group>

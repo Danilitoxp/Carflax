@@ -1424,7 +1424,9 @@ export interface PedidoCompraAberto {
   bairro: string | null;
   cidade: string | null;
   uf: string | null;
-  itens: { cod: string; descricao: string; pendente: number }[];
+  itens: { cod: string; descricao: string; pendente: number; custo_unit?: number }[];
+  /** Valor de compra dos itens pendentes (custo unitário do pedido × pendente). */
+  valor_pendente?: number;
 }
 export const apiComprasPedidosAbertos = () =>
   get<{ success: boolean; data: PedidoCompraAberto[] }>("/api/compras/pedidos-abertos");
