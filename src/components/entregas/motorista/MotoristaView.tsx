@@ -64,7 +64,7 @@ export function MotoristaView() {
   // O app instalado abre em /motorista, sem o ?v= do link: o código fica
   // guardado no celular na primeira vez que o motorista abre o link dele.
   const searchParams = new URLSearchParams(window.location.search);
-  const driverCode = (() => {
+  const [driverCode, setDriverCode] = useState(() => {
     const doLink = searchParams.get("v");
     try {
       if (doLink) localStorage.setItem("carflax-motorista-cod", doLink);
@@ -72,7 +72,19 @@ export function MotoristaView() {
     } catch {
       return doLink || "geral";
     }
-  })();
+  });
+
+  // Sem código (app aberto sem o ?v= e sem nada guardado): o próprio
+  // motorista escolhe o nome. Fica guardado e o endereço ganha o ?v=.
+  const escolherMotorista = (cod: string) => {
+    try {
+      localStorage.setItem("carflax-motorista-cod", cod);
+    } catch {
+      // sem armazenamento: vale só para esta abertura
+    }
+    window.history.replaceState(null, "", `/motorista?v=${encodeURIComponent(cod)}`);
+    setDriverCode(cod);
+  };
   const hoje = new Date().toISOString().split('T')[0];
 
   const fetchData = useCallback(async () => {
@@ -306,11 +318,15 @@ export function MotoristaView() {
     pendentes: entregas.filter(e => e.status === "pending").length
   };
 
+  if (driverCode === "geral") {
+    return <EscolherMotorista hoje={hoje} onEscolher={escolherMotorista} />;
+  }
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 pb-12 font-sans antialiased text-slate-900 dark:text-slate-100 leading-relaxed transition-colors">
 
       {/* APP BAR - LIMPISSIMA */}
-      <nav className="sticky top-0 z-40 px-4 pt-4 pb-2 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl">
+      <nav style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }} className="sticky top-0 z-40 px-4 pb-2 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl">
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-3 shadow-xl shadow-slate-200/50 dark:shadow-black/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white border-2 border-white shadow-lg overflow-hidden shrink-0">
@@ -805,6 +821,68 @@ export function MotoristaView() {
           </div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** "Quem é você?": motoristas com romaneio hoje (entregas ou coletas). */
+function EscolherMotorista({ hoje, onEscolher }: { hoje: string; onEscolher: (cod: string) => void }) {
+  const [lista, setLista] = useState<{ cod: string; nome: string }[] | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const [{ data: ent }, { data: col }] = await Promise.all([
+        supabase.from("entregas").select("driver_cod, driver_name").eq("rom_date", hoje),
+        supabase.from("coletas").select("driver_cod, driver_name").eq("rom_date", hoje),
+      ]);
+      const mapa = new Map<string, string>();
+      for (const r of [...(ent || []), ...(col || [])]) {
+        if (r.driver_cod && !mapa.has(r.driver_cod)) mapa.set(r.driver_cod, (r.driver_name || r.driver_cod).trim());
+      }
+      if (vivo) setLista([...mapa].map(([cod, nome]) => ({ cod, nome })).sort((a, b) => a.nome.localeCompare(b.nome)));
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [hoje]);
+
+  return (
+    <div
+      className="min-h-screen bg-slate-50 dark:bg-slate-950 px-5 pb-10 font-sans text-slate-900 dark:text-slate-100"
+      style={{ paddingTop: "max(2.5rem, calc(env(safe-area-inset-top) + 1.5rem))" }}
+    >
+      <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg mb-5">
+        <UserIcon size={26} />
+      </div>
+      <h1 className="text-xl font-black uppercase tracking-tight">Quem é você?</h1>
+      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1 mb-6">
+        Escolha seu nome para ver suas entregas e coletas
+      </p>
+      {lista === null ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+          ))}
+        </div>
+      ) : lista.length === 0 ? (
+        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+          Nenhum romaneio lançado hoje ainda. Peça o link para a expedição.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {lista.map((m) => (
+            <button
+              key={m.cod}
+              onClick={() => onEscolher(m.cod)}
+              className="w-full h-16 px-5 rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 flex items-center justify-between text-left active:scale-[0.98] transition-transform"
+            >
+              <span className="text-sm font-black uppercase tracking-tight">{m.nome}</span>
+              <span className="text-[10px] font-bold text-slate-400">cód. {m.cod}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
