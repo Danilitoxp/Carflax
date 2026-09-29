@@ -26,11 +26,13 @@
        instaláveis: o HUB e o Gestor (/gestor). Só a tag certa chega a existir:
        trocar o link depois de criado não basta, porque o iPhone já leu o
        manifest do HUB (start_url "/") e o Gestor instalado abria no HUB.
-       No Gestor também trava o zoom: o iPhone dava zoom ao tocar num campo. -->
+       No Gestor também trava o zoom: o iPhone dava zoom ao tocar num campo.
+       Vendedor (/vendedor) e Motorista (/motorista) seguem o mesmo esquema. -->
   <script>
     (function () {
       var gestor = location.pathname.indexOf('/gestor') === 0;
       var vendedor = location.pathname.indexOf('/vendedor') === 0;
+      var motorista = location.pathname.indexOf('/motorista') === 0;
       var travaZoom = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
       var c = gestor
         ? { manifest: '/gestor.webmanifest', icon: '/gestor/icon-192.png', apple: '/gestor/apple-touch-icon.png',
@@ -39,6 +41,10 @@
         : vendedor
         ? { manifest: '/vendedor.webmanifest', icon: '/vendedor/icon-192.png', apple: '/vendedor/apple-touch-icon.png',
             nome: 'Carflax Vendas', appleTitulo: 'Vendas', tema: '#065f46', titulo: 'Carflax Vendas',
+            viewport: travaZoom }
+        : motorista
+        ? { manifest: '/motorista.webmanifest', icon: '/motorista/icon-192.png', apple: '/motorista/apple-touch-icon.png',
+            nome: 'Carflax Motorista', appleTitulo: 'Motorista', tema: '#1d4ed8', titulo: 'Carflax Motorista',
             viewport: travaZoom }
         : { manifest: '/manifest.webmanifest', icon: '/favicon.png', apple: '/favicon.png',
             nome: 'Carflax Hub', appleTitulo: 'Carflax', tema: '#0f172a', titulo: 'Carflax | Tudo em um só lugar',

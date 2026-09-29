@@ -2114,6 +2114,11 @@ function App() {
       <ThemeProvider defaultTheme="light" storageKey="carflax-theme">
         <NotificationProvider>
           <MotoristaView />
+          <PwaInstallPrompt
+            nome="Carflax Motorista"
+            descricao="Suas entregas e coletas do dia, direto na tela do celular."
+            chaveDispensa="carflax-motorista-pwa-dismissed"
+          />
         </NotificationProvider>
       </ThemeProvider>
     );

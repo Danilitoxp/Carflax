@@ -55,6 +55,7 @@ export interface Coleta {
   driver_name: string | null;
   motivo_cancelamento: string | null;
   rom_code?: string | null;
+  driver_cod?: string | null;
   pedido_compra?: string | null;
   pedido_empresa?: string | null;
   valor_compra?: number | null;

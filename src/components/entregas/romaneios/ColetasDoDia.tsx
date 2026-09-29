@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PackageCheck, AlertTriangle, Loader2, MapPin, CalendarDays, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { apiMotoristas } from "@/lib/api";
 import { TIPOS, URGENCIAS, type Coleta } from "@/components/compras/ColetasView";
 
 const hojeISO = () => new Date().toISOString().split("T")[0];
@@ -19,6 +20,7 @@ interface RomaneioAberto {
   driver_cod: string | null;
   driver_name: string | null;
   entregas: number;
+  coletas?: number;
 }
 
 // Coleta com prazo daqui a mais de uma semana ainda não atrapalha o romaneio de hoje.
@@ -50,7 +52,10 @@ export function ColetasDoDia({
       .in("status", ["solicitada", "programada"])
       .lte("coletar_ate", limite.toISOString().split("T")[0])
       .order("coletar_ate", { ascending: true });
-    setColetas((data || []) as Coleta[]);
+    // Encaixada num romaneio de HOJE já está no romaneio: sai da fila. Encaixada
+    // em dia anterior e ainda não coletada volta, para encaixar de novo.
+    const hoje = hojeISO();
+    setColetas(((data || []) as Coleta[]).filter((c) => !(c.status === "programada" && c.rom_date === hoje)));
     setCarregando(false);
   }, []);
 
@@ -61,6 +66,10 @@ export function ColetasDoDia({
   // Romaneios abertos de hoje, para o líder escolher onde encaixar a coleta.
   const [encaixandoId, setEncaixandoId] = useState<string | null>(null);
   const [romaneios, setRomaneios] = useState<RomaneioAberto[] | null>(null);
+  // Motorista que só vai fazer coleta não tem romaneio de entrega: cria um
+  // romaneio novo para ele, no mesmo padrão de código (ROM-AAAAMMDD-COD).
+  const [motoristas, setMotoristas] = useState<{ COD: string; NOME: string }[]>([]);
+  const [motoristaNovo, setMotoristaNovo] = useState("");
 
   async function abrirEncaixe(c: Coleta) {
     setEncaixandoId((atual) => (atual === c.id ? null : c.id));
@@ -71,6 +80,25 @@ export function ColetasDoDia({
       .eq("rom_date", hojeISO())
       .eq("rom_status", "em_andamento");
     const porCodigo = new Map<string, RomaneioAberto>();
+    // Romaneios só de coleta (sem nenhuma entrega) também contam como abertos.
+    const { data: soColeta } = await supabase
+      .from("coletas")
+      .select("rom_code, driver_cod, driver_name")
+      .eq("rom_date", hojeISO())
+      .in("status", ["programada", "coletada"])
+      .not("rom_code", "is", null);
+    for (const k of soColeta || []) {
+      if (!k.rom_code) continue;
+      const r = porCodigo.get(k.rom_code) ?? {
+        rom_code: k.rom_code,
+        driver_cod: k.driver_cod,
+        driver_name: k.driver_name,
+        entregas: 0,
+        coletas: 0,
+      };
+      r.coletas = (r.coletas ?? 0) + 1;
+      porCodigo.set(k.rom_code, r);
+    }
     for (const e of data || []) {
       if (!e.rom_code) continue;
       const r = porCodigo.get(e.rom_code) ?? {
@@ -83,6 +111,11 @@ export function ColetasDoDia({
       porCodigo.set(e.rom_code, r);
     }
     setRomaneios([...porCodigo.values()]);
+    if (!motoristas.length) {
+      apiMotoristas()
+        .then((res) => res.success && setMotoristas(res.motoristas))
+        .catch(() => {});
+    }
   }
 
   async function encaixar(c: Coleta, r: RomaneioAberto) {
@@ -101,20 +134,12 @@ export function ColetasDoDia({
     carregar();
   }
 
-  // Clique errado no encaixe: volta a coleta para a fila.
-  async function desfazer(c: Coleta) {
-    setSalvandoId(c.id);
-    await supabase.from("coletas").update({
-      status: "solicitada",
-      rom_code: null,
-      rom_date: null,
-      driver_cod: null,
-      driver_name: null,
-      programada_em: null,
-      programada_por: null,
-    }).eq("id", c.id);
-    setSalvandoId(null);
-    carregar();
+  async function criarRomaneioSoColeta(c: Coleta) {
+    const m = motoristas.find((x) => x.COD === motoristaNovo);
+    if (!m) return;
+    const romCode = `ROM-${hojeISO().replace(/-/g, "")}-${m.COD}`;
+    await encaixar(c, { rom_code: romCode, driver_cod: m.COD, driver_name: m.NOME, entregas: 0 });
+    setMotoristaNovo("");
   }
 
   async function concluir(c: Coleta) {
@@ -202,8 +227,8 @@ export function ColetasDoDia({
                     <CalendarDays className="w-3 h-3" /> Até {brData(c.coletar_ate)}
                   </span>
                   {c.status === "programada" && (
-                    <span className="text-blue-500">
-                      Encaixada {brData(c.rom_date)}{c.driver_name ? ` · ${c.driver_name}` : ""}
+                    <span className="text-red-500">
+                      Não coletada em {brData(c.rom_date)}{c.driver_name ? ` · ${c.driver_name}` : ""}
                     </span>
                   )}
                   <button
@@ -225,23 +250,13 @@ export function ColetasDoDia({
               </div>
 
               <div className="flex gap-2 shrink-0">
-                {c.status === "programada" ? (
-                  <button
-                    onClick={() => desfazer(c)}
-                    disabled={salvandoId === c.id}
-                    className="h-7 px-3 rounded-lg border border-border hover:bg-muted disabled:opacity-50 text-[9px] font-black uppercase tracking-widest"
-                  >
-                    Desfazer
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => abrirEncaixe(c)}
-                    disabled={salvandoId === c.id}
-                    className="h-7 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[9px] font-black uppercase tracking-widest"
-                  >
-                    Encaixar
-                  </button>
-                )}
+                <button
+                  onClick={() => abrirEncaixe(c)}
+                  disabled={salvandoId === c.id}
+                  className="h-7 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[9px] font-black uppercase tracking-widest"
+                >
+                  {c.status === "programada" ? "Reencaixar" : "Encaixar"}
+                </button>
                 <button
                   onClick={() => concluir(c)}
                   disabled={salvandoId === c.id}
@@ -261,7 +276,7 @@ export function ColetasDoDia({
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
                 ) : romaneios.length === 0 ? (
                   <p className="text-[10px] font-bold text-slate-400">
-                    Nenhum romaneio aberto hoje. Lance uma NF para o motorista e volte aqui.
+                    Nenhum romaneio aberto hoje. Crie um só de coleta abaixo.
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
@@ -275,9 +290,38 @@ export function ColetasDoDia({
                         <span className="block text-[10px] font-black uppercase">{r.driver_name?.trim() || r.rom_code}</span>
                         <span className="block text-[9px] font-bold text-slate-400">
                           {r.rom_code} · {r.entregas} entrega{r.entregas === 1 ? "" : "s"}
+                          {r.coletas ? ` · ${r.coletas} coleta${r.coletas === 1 ? "" : "s"}` : ""}
                         </span>
                       </button>
                     ))}
+                  </div>
+                )}
+                {romaneios !== null && (
+                  <div className="mt-2.5 pt-2.5 border-t border-blue-500/20 flex flex-wrap items-center gap-2">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      Novo romaneio só de coleta
+                    </span>
+                    <select
+                      value={motoristaNovo}
+                      onChange={(e) => setMotoristaNovo(e.target.value)}
+                      className="h-7 rounded-lg border border-border bg-card px-2 text-[10px] font-black uppercase outline-none"
+                    >
+                      <option value="">Motorista…</option>
+                      {motoristas
+                        .filter((m) => !romaneios.some((r) => r.driver_cod === m.COD))
+                        .map((m) => (
+                          <option key={m.COD} value={m.COD}>
+                            {m.NOME}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      onClick={() => criarRomaneioSoColeta(c)}
+                      disabled={!motoristaNovo || salvandoId === c.id}
+                      className="h-7 px-3 rounded-lg bg-pink-600 hover:bg-pink-700 disabled:opacity-40 text-white text-[9px] font-black uppercase tracking-widest"
+                    >
+                      Criar e encaixar
+                    </button>
                   </div>
                 )}
               </div>

@@ -109,7 +109,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
   const reorderDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingOrder = useRef<Delivery[] | null>(null);
   const [coletasAbertas, setColetasAbertas] = useState<Set<string>>(new Set());
-  
+
   const hoje = new Date().toISOString().split('T')[0];
 
   const fetchData = useCallback(async (isSilent = false) => {
@@ -121,10 +121,10 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
       if (motoristasRes.success) {
         setMotoristas(motoristasRes.motoristas);
       }
-      
+
       // 1. Buscar entregas diretamente (Hoje se pendente, ou Histórico se concluído)
       const query = supabase.from("entregas").select("*");
-      
+
       // A aba Coletas não lista romaneios; carrega os de hoje só para a troca
       // de volta para "Em andamento" não piscar vazia.
       if (activeTab !== "completed") {
@@ -132,7 +132,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
       } else {
         query.eq("rom_status", "concluido");
       }
-      
+
       if (selectedMotorista) {
         query.eq("driver_cod", selectedMotorista);
       }
@@ -171,12 +171,23 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
         // para o cabeçalho e os filtros tratarem as duas iguais.
         const codigos = Array.from(new Set(mapped.map(m => m.romCode).filter(Boolean))) as string[];
         let linhasColeta: Delivery[] = [];
-        if (codigos.length) {
-          const { data: cols } = await supabase
+        // Em andamento também traz os romaneios SÓ de coleta de hoje (motorista
+        // que saiu sem nenhuma entrega); em Concluídos, só as dos romaneios listados.
+        if (codigos.length || activeTab !== "completed") {
+          let q = supabase
             .from("coletas")
             .select("*")
-            .in("rom_code", codigos)
-            .in("status", ["programada", "coletada"]);
+            .in("status", ["programada", "coletada"])
+            .not("rom_code", "is", null);
+          if (activeTab !== "completed") {
+            q = codigos.length
+              ? q.or(`rom_code.in.(${codigos.map(c => `"${c}"`).join(",")}),rom_date.eq.${hoje}`)
+              : q.eq("rom_date", hoje);
+            if (selectedMotorista) q = q.eq("driver_cod", selectedMotorista);
+          } else {
+            q = q.in("rom_code", codigos);
+          }
+          const { data: cols } = await q;
           const lista = (cols || []) as Coleta[];
           await completarValorDeCompra(lista);
           linhasColeta = lista.map((c, i) => {
@@ -188,11 +199,11 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
               address: "",
               status: c.status === "coletada" ? "completed" : "pending",
               value: "",
-              driverName: base?.driverName,
-              driverCode: base?.driverCode,
+              driverName: base?.driverName ?? c.driver_name ?? undefined,
+              driverCode: base?.driverCode ?? c.driver_cod ?? undefined,
               romCode: c.rom_code || undefined,
-              romStatus: base?.romStatus,
-              romDate: base?.romDate,
+              romStatus: base?.romStatus ?? "em_andamento",
+              romDate: base?.romDate ?? c.rom_date ?? undefined,
               veiculoId: base?.veiculoId,
               kind: "coleta" as const,
               coleta: c,
@@ -365,9 +376,9 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
         ORDER BY M.GER_DTENTR DESC, M.GER_NUMDOC DESC
         LIMIT 1
       `;
-      
+
       const res = await apiAdminSQL(sql);
-      
+
       if (res.success && res.data && res.data.length > 0) {
         const e = res.data[0] as MovGerRecord;
         const motorista = motoristas.find(m => m.COD === selectedMotorista);
@@ -396,7 +407,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
           }]);
 
         if (insError) throw insError;
-        
+
         fetchData(true);
         setNfInput("");
       } else {
@@ -414,7 +425,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
       return;
     }
     if (!confirm(`Deseja remover a NF ${nf} do romaneio?`)) return;
-    
+
     try {
       // Remover da tabela entregas
       const { error } = await supabase
@@ -422,9 +433,9 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
         .delete()
         .eq("nf", nf)
         .eq("rom_code", romCodeToDel);
-      
+
       if (error) throw error;
-      
+
       setDeliveries(prev => prev.filter(d => d.nf !== nf));
     } catch (error) {
       console.error("Erro ao remover do banco:", error);
@@ -607,7 +618,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
               const isRomCompleted = d.romStatus === "concluido";
               return activeTab === "completed" ? isRomCompleted : !isRomCompleted;
             });
-            
+
             // Agrupar por rom_code para exibir os cards
             const romGroups = Array.from(new Set(filteredDeliveries.map(d => d.romCode)));
 
@@ -615,7 +626,7 @@ export function RomaneiosView({ userProfile }: { userProfile?: UserProfile }) {
               const items = filteredDeliveries.filter(d => d.romCode === romCode);
               const motoristaNome = items[0]?.driverName || "Motorista";
               const motoristaCod = items[0]?.driverCode || "000";
-              
+
               return (
                 <div key={romCode} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm mb-6">
                   <div className="p-4 border-b border-border bg-secondary/20 flex items-center justify-between">

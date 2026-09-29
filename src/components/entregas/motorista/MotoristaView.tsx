@@ -61,8 +61,18 @@ export function MotoristaView() {
   const [ocorrenciaBloqueia, setOcorrenciaBloqueia] = useState(false);
   const [enviandoOcorrencia, setEnviandoOcorrencia] = useState(false);
 
+  // O app instalado abre em /motorista, sem o ?v= do link: o código fica
+  // guardado no celular na primeira vez que o motorista abre o link dele.
   const searchParams = new URLSearchParams(window.location.search);
-  const driverCode = searchParams.get("v") || "geral";
+  const driverCode = (() => {
+    const doLink = searchParams.get("v");
+    try {
+      if (doLink) localStorage.setItem("carflax-motorista-cod", doLink);
+      return doLink || localStorage.getItem("carflax-motorista-cod") || "geral";
+    } catch {
+      return doLink || "geral";
+    }
+  })();
   const hoje = new Date().toISOString().split('T')[0];
 
   const fetchData = useCallback(async () => {

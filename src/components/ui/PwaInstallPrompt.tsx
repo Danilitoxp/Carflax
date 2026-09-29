@@ -26,13 +26,23 @@ function isIOS() {
  * - Android/Desktop: usa o evento nativo `beforeinstallprompt`.
  * - iOS/Safari: não há API — mostra a instrução manual de compartilhamento.
  */
-export function PwaInstallPrompt() {
+export function PwaInstallPrompt({
+  nome = "Carflax Hub",
+  descricao = "Use como app, em tela cheia e com acesso rápido.",
+  chaveDispensa = DISMISS_KEY,
+}: {
+  /** Nome do app no banner ("Instalar o …"). */
+  nome?: string;
+  descricao?: string;
+  /** Cada app instalável guarda o "Agora não" separado. */
+  chaveDispensa?: string;
+} = {}) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [show, setShow] = useState(false);
   const [iosHint, setIosHint] = useState(false);
 
   useEffect(() => {
-    if (isStandalone() || localStorage.getItem(DISMISS_KEY) === "1") return;
+    if (isStandalone() || localStorage.getItem(chaveDispensa) === "1") return;
 
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
@@ -61,11 +71,11 @@ export function PwaInstallPrompt() {
       window.removeEventListener("appinstalled", onInstalled);
       if (iosTimer) clearTimeout(iosTimer);
     };
-  }, []);
+  }, [chaveDispensa]);
 
   const dismiss = () => {
     setShow(false);
-    localStorage.setItem(DISMISS_KEY, "1");
+    localStorage.setItem(chaveDispensa, "1");
   };
 
   const install = async () => {
@@ -86,13 +96,13 @@ export function PwaInstallPrompt() {
         <Download className="w-5 h-5 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[12px] font-black text-foreground uppercase tracking-tight leading-none">Instalar o Carflax Hub</p>
+        <p className="text-[12px] font-black text-foreground uppercase tracking-tight leading-none">Instalar o {nome}</p>
         {iosHint ? (
           <p className="text-[10px] font-medium text-muted-foreground mt-1 leading-snug flex items-center gap-1">
             Toque em <Share className="w-3 h-3 inline" /> e depois em <span className="font-black">“Adicionar à Tela de Início”</span>.
           </p>
         ) : (
-          <p className="text-[10px] font-medium text-muted-foreground mt-1 leading-snug">Use como app, em tela cheia e com acesso rápido.</p>
+          <p className="text-[10px] font-medium text-muted-foreground mt-1 leading-snug">{descricao}</p>
         )}
       </div>
       {!iosHint && (
