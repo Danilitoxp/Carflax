@@ -5,6 +5,8 @@ import { uploadImage } from "@/lib/uploadImage";
 import { Target, Plus, X, Trophy, ChevronLeft, ChevronRight, Gift, Star, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AmancoModal } from "./AmancoModal";
+import { CasaNovaSecao } from "./CasaNovaSecao";
+import { usePremioTrimestralPendente } from "@/hooks/usePremioTrimestralPendente";
 
 export interface Campaign {
   id: string | number;
@@ -47,6 +49,8 @@ function offsetMes(mes: number, ano: number, delta: number): { mes: number; ano:
 
 export function CampanhasView({ userProfile }: { userProfile?: any }) {
   const canManage = userProfile?.permissions?.includes("Criar Campanha") || userProfile?.role === "admin";
+  // Ganhou o trimestre e ainda não escolheu o prêmio: bolinha no card.
+  const premioPendente = usePremioTrimestralPendente(userProfile?.operator_code);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
@@ -77,6 +81,7 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
 
   // Modal Amanco
   const [isAmancoModalOpen, setIsAmancoModalOpen] = useState(false);
+
 
   useEffect(() => {
     const now = new Date();
@@ -466,6 +471,15 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
             <div className="absolute inset-0 z-0 pointer-events-none">
               <div className="absolute inset-0 border-2 border-blue-500 rounded-[32px] animate-border-trace opacity-40 shadow-[0_0_15px_rgba(59,130,246,0.2)]" />
             </div>
+            {premioPendente > 0 && (
+              <span
+                className="absolute top-4 right-4 z-20 flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest shadow-lg shadow-rose-500/40"
+                title="Você bateu a meta do trimestre e ainda não escolheu seu prêmio"
+              >
+                <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                Escolha seu prêmio
+              </span>
+            )}
             <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 relative z-10">
               {premioCard?.imagem ? (
                 <img src={premioCard.imagem} alt={premioCard.nome} className="w-24 h-24 object-contain group-hover:scale-125 transition-transform duration-700 drop-shadow-[0_10px_20px_rgba(59,130,246,0.3)]" />
@@ -739,6 +753,16 @@ export function CampanhasView({ userProfile }: { userProfile?: any }) {
                       })}
                   </div>
                 ) : null}
+              </div>
+
+              {/* Você de Casa Nova: bônus do trimestre e prêmio do semestre do mês selecionado */}
+              <div className="border-t border-border/60 pt-5 mt-1">
+                <CasaNovaSecao
+                  mes={mesSelecionado.mes}
+                  ano={mesSelecionado.ano}
+                  userProfile={userProfile}
+                  canManage={canManage}
+                />
               </div>
 
               {/* Próximos Prêmios */}

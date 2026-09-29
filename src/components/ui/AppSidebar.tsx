@@ -54,6 +54,7 @@ import { getNotifPref } from "@/lib/notif-prefs";
 import { useNotification } from "@/hooks/useNotification";
 import { NAV_SECTIONS, ESTEIRA_SUBQUADRO_PREFIX, canAccessSection } from "@/lib/menu-config";
 import { useLiderDoDia } from "@/hooks/useLiderDoDia";
+import { usePremioTrimestralPendente } from "@/hooks/usePremioTrimestralPendente";
 import { Crown } from "lucide-react";
 import { abrirConversaWhatsapp, alertarTransferenciaCarlinhos } from "@/lib/isabela";
 
@@ -185,6 +186,7 @@ interface AppSidebarProps {
     permissions?: string[];
     is_leader?: boolean;
     is_admin?: boolean;
+    operator_code?: string;
     notification_prefs?: Record<string, Record<string, boolean>> | null;
   };
   isCollapsed: boolean;
@@ -203,6 +205,10 @@ interface AppSidebarProps {
 export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, onMobileClose, activeItem, onActiveItemChange, onLogout, loading, isChatOpen, onToggleChat, chatUnreadCount = 0 }: AppSidebarProps) {
   // Líder do Ranking do dia: foto com coroa ao lado do item "Ranking".
   const liderDoDia = useLiderDoDia(canAccessSection(userProfile, "Ranking"));
+  // Prêmio trimestral ganho e não escolhido: bolinha em Comercial › Campanhas.
+  const premioPendente = usePremioTrimestralPendente(
+    canAccessSection(userProfile, "Campanhas") ? userProfile?.operator_code : null,
+  );
   const { theme } = useTheme();
 
   // Toggle "SLA do WhatsApp sem resposta" (Configurações > Notificações).
@@ -661,6 +667,9 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                           )}>
                             {item.label}
                           </span>
+                          {item.label === "Comercial" && premioPendente > 0 && (
+                            <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 mr-1.5 animate-pulse" title="Prêmio do trimestre para escolher" />
+                          )}
                           {item.isDropdown && (
                             <ChevronDown
                               className={cn(
@@ -722,6 +731,12 @@ export function AppSidebar({ userProfile, isCollapsed, onToggle, isMobileOpen, o
                                 )} />
                               )}
                               <span>{sub.label}</span>
+                              {(sub.value || sub.label) === "Campanhas" && premioPendente > 0 && (
+                                <span
+                                  className="ml-auto w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-pulse"
+                                  title="Você bateu a meta do trimestre e ainda não escolheu seu prêmio"
+                                />
+                              )}
                               {(sub.value || sub.label) === "Ranking" && liderDoDia && (
                                 <span
                                   className="ml-auto relative shrink-0 pt-1"
