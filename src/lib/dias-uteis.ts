@@ -106,6 +106,13 @@ export const getDiasUteisRestantes = (ref: Date = new Date()) => {
  */
 export const calcMetaDiaria = (faltante: number, ref: Date = new Date()) => {
   const restantes = getDiasUteisRestantes(ref);
-  if (restantes <= 0) return 0;
+  if (restantes <= 0) {
+    // Último dia do mês ainda em andamento: não sobra dia "daqui pra frente",
+    // então tudo o que falta é a meta de hoje. Devolver 0 zerava a meta de
+    // todo mundo e o ranking só mostrava quem já tinha vendido algo.
+    const hoje = new Date();
+    const mesmoMes = ref.getFullYear() === hoje.getFullYear() && ref.getMonth() === hoje.getMonth();
+    return mesmoMes ? Math.max(0, faltante) : 0;
+  }
   return Math.max(0, faltante / restantes);
 };

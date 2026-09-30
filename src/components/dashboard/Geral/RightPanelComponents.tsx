@@ -1,6 +1,6 @@
 // Dashboard Right Panel Components
 import { taxaConversaoValor } from "@/lib/crm-service";
-import { getDiasUteisNoMes, getDiasUteisRestantes } from "@/lib/dias-uteis";
+import { getDiasUteisNoMes, getDiasUteisRestantes, calcMetaDiaria } from "@/lib/dias-uteis";
 import {
   Gift,
   Target,
@@ -206,11 +206,9 @@ const calcEquilibrio = (row?: VendedorResumo | null, ref?: Date) => {
 
 const calcDiarioNecessario = (row?: VendedorResumo | null, ref?: Date) => {
   if (!row) return 0;
-  const restantes = getDiasUteisRestantes(ref);
-  // Mês encerrado: não existe "quanto preciso vender por dia" — nada a recuperar.
-  if (restantes <= 0) return 0;
+  // Mesma conta do Ranking: no último dia do mês o diário é tudo o que falta.
   const faltante = typeof row.FALTANTE === 'string' ? parseFloat(row.FALTANTE) : (row.FALTANTE || 0);
-  return Math.max(0, Number(faltante) / restantes);
+  return calcMetaDiaria(Number(faltante), ref);
 };
 
 const calcDiariaPraticada = (row?: VendedorResumo | null, ref?: Date) => {
