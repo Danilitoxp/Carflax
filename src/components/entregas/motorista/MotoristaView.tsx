@@ -185,6 +185,21 @@ export function MotoristaView() {
     return () => { supabase.removeChannel(channel); };
   }, [driverCode, fetchData]);
 
+  // Coleta não tem canhoto para fotografar: finaliza direto, sem foto.
+  const finalizarColeta = async (e: Delivery) => {
+    if (!e.coletaId) return;
+    if (!confirm(`Confirmar coleta em ${e.client}?`)) return;
+    const { error } = await supabase
+      .from("coletas")
+      .update({ status: "coletada", coletada_em: new Date().toISOString() })
+      .eq("id", e.coletaId);
+    if (error) {
+      alert("Erro ao finalizar coleta.");
+      return;
+    }
+    fetchData();
+  };
+
   const handleFinish = async (file: File) => {
     if (!selectedDelivery) return;
     try {
@@ -532,12 +547,13 @@ export function MotoristaView() {
                         <motion.button 
                           whileTap={{ scale: 0.98 }}
                           onClick={() => {
+                            if (e.kind === "coleta") return finalizarColeta(e);
                             setSelectedDelivery(e);
                             setIsFinishModalOpen(true);
                           }}
                           className="h-14 bg-blue-600 text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-lg shadow-blue-600/20"
                         >
-                            <Camera size={18} />
+                            {e.kind === "coleta" ? <CheckCircle2 size={18} /> : <Camera size={18} />}
                             Finalizar
                         </motion.button>
                     </div>

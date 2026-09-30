@@ -16,6 +16,13 @@ export function extrairProfissao(observacoes?: string | null): string {
   return match ? match[1].trim() : "—";
 }
 
+// "2026-10-15", 7 → "08/10"
+function diaAntes(iso: string, dias: number) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() - dias);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
 export function ConvidadosTab({ evento, convidados, onChange }: {
   evento: Evento;
   convidados: EventoConvidado[];
@@ -368,7 +375,7 @@ export function ConvidadosTab({ evento, convidados, onChange }: {
                     <button
                       onClick={() => patch(c.id, { lembrete_d7: !c.lembrete_d7 })}
                       disabled={c.status !== "confirmado"}
-                      title="Lembrete D-7 (15/10) enviado"
+                      title={`Lembrete D-7 (${diaAntes(evento.data_evento, 7)}) — enviado automático pelo WhatsApp às 10h`}
                       className={cn(
                         "w-5 h-5 rounded-md border flex items-center justify-center transition-all disabled:opacity-30",
                         c.lembrete_d7 ? "bg-blue-600 border-blue-600 text-white" : "border-border hover:border-blue-500 text-transparent"
@@ -379,7 +386,7 @@ export function ConvidadosTab({ evento, convidados, onChange }: {
                     <button
                       onClick={() => patch(c.id, { lembrete_d2: !c.lembrete_d2 })}
                       disabled={c.status !== "confirmado"}
-                      title="Lembrete D-2 (20/10) enviado pelo vendedor"
+                      title={`Lembrete D-2 (${diaAntes(evento.data_evento, 2)}) — enviado automático pelo WhatsApp às 10h`}
                       className={cn(
                         "w-5 h-5 rounded-md border flex items-center justify-center transition-all disabled:opacity-30",
                         c.lembrete_d2 ? "bg-blue-600 border-blue-600 text-white" : "border-border hover:border-blue-500 text-transparent"
