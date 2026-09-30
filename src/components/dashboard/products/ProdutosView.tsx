@@ -8,6 +8,8 @@ import {
   ShoppingBag,
   Upload,
   Printer,
+  FileSpreadsheet,
+  BarChart3,
   Loader2
 } from "lucide-react";
 import { SiShopify } from "react-icons/si";
@@ -143,6 +145,8 @@ function SyncBadge({ status, loja, carregando, erpPrice, erpStock, onEnviar }: S
   );
 }
 
+const CURVA_FILTROS = ["Curva: Todas", "Curva A", "Curva B", "Curva C"] as const;
+
 interface Product {
   cod: string;
   desc: string;
@@ -161,6 +165,7 @@ export function ProdutosView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBrand, setFilterBrand] = useState("Todas as Marcas");
   const [filterStock, setFilterStock] = useState("TODOS");
+  const [filterCurva, setFilterCurva] = useState<string>(CURVA_FILTROS[0]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState<{ key: keyof Product; direction: 'asc' | 'desc' } | null>({ key: 'cod', direction: 'asc' });
@@ -311,6 +316,26 @@ export function ProdutosView() {
 
   const [visibleCount, setVisibleCount] = useState(50);
 
+  // Curva ABC pelo faturamento estimado (média mensal de saída dos últimos 3
+  // meses × preço à vista). O ERP não guarda a classificação. A = itens que
+  // somam os primeiros 80% do faturamento, B = até 95%, C = o resto (inclui
+  // quem não vendeu nada no período).
+  const curvaPorCod = useMemo(() => {
+    const mapa = new Map<string, "A" | "B" | "C">();
+    const comVenda = products
+      .map((p) => ({ cod: p.cod, fat: Math.max(0, p.media) * Math.max(0, p.debit) }))
+      .filter((x) => x.fat > 0)
+      .sort((a, b) => b.fat - a.fat);
+    const total = comVenda.reduce((s, x) => s + x.fat, 0);
+    let acumulado = 0;
+    for (const x of comVenda) {
+      const antes = acumulado / total;
+      acumulado += x.fat;
+      mapa.set(x.cod, antes < 0.8 ? "A" : antes < 0.95 ? "B" : "C");
+    }
+    return mapa;
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     const filtered = products.filter(p => {
       const searchLower = searchTerm.trim().toLowerCase();
@@ -323,7 +348,8 @@ export function ProdutosView() {
       const matchesBrand = filterBrand === "Todas as Marcas" || p.brand === filterBrand;
       const matchesStock = filterStock === "TODOS" ||
         (filterStock === "COM ESTOQUE" && p.stock > 0) ||
-        (filterStock === "SEM ESTOQUE" && p.stock <= 0);
+        (filterStock === "SEM ESTOQUE" && p.stock <= 0) ||
+        (filterStock === "NEGATIVOS" && p.stock <= -1);
 
       const status = syncPorCod.get(p.cod)?.status;
       const matchesShopify =
@@ -332,7 +358,11 @@ export function ProdutosView() {
         (filterShopify === "Divergentes" && status === "divergente") ||
         (filterShopify === "Fora da loja" && status === "fora");
 
-      return matchesSearch && matchesBrand && matchesStock && matchesShopify;
+      const matchesCurva =
+        filterCurva === CURVA_FILTROS[0] ||
+        filterCurva === `Curva ${curvaPorCod.get(p.cod) ?? "C"}`;
+
+      return matchesSearch && matchesBrand && matchesStock && matchesShopify && matchesCurva;
     });
 
     if (sortConfig !== null) {
@@ -360,7 +390,7 @@ export function ProdutosView() {
     }
 
     return filtered;
-  }, [products, searchTerm, filterBrand, filterStock, filterShopify, syncPorCod, sortConfig]);
+  }, [products, searchTerm, filterBrand, filterStock, filterShopify, syncPorCod, sortConfig, filterCurva, curvaPorCod]);
 
   const visibleProducts = filteredProducts.slice(0, visibleCount);
 
@@ -371,6 +401,63 @@ export function ProdutosView() {
         setVisibleCount(prev => prev + 50);
       }
     }
+  };
+
+  // Exporta exatamente o que está na tela (busca, marca, estoque, ordenação).
+  const exportarExcel = async () => {
+    // xlsx-js-style: mesma API do xlsx, mas grava cor, fonte e borda.
+    const XLSX = await import("xlsx-js-style");
+    const borda = { style: "thin", color: { rgb: "D9DEE7" } };
+    const bordas = { top: borda, bottom: borda, left: borda, right: borda };
+    const cab = {
+      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11, name: "Calibri" },
+      fill: { fgColor: { rgb: "1E3A8A" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: bordas,
+    };
+
+    const titulo = `Produtos — ${new Date().toLocaleDateString("pt-BR")} — ${filteredProducts.length} itens`;
+    const aoa: (string | number)[][] = [
+      [titulo, "", "", ""],
+      ["Código", "Descrição", "Marca", "Estoque"],
+      ...filteredProducts.map((p) => [p.cod, p.desc, p.brand, p.stock]),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+    ws["!cols"] = [{ wch: 12 }, { wch: 62 }, { wch: 24 }, { wch: 12 }];
+    ws["!rows"] = [{ hpt: 26 }, { hpt: 20 }];
+    ws["!autofilter"] = { ref: `A2:D${aoa.length}` };
+
+    ws["A1"].s = {
+      font: { bold: true, sz: 14, color: { rgb: "1E3A8A" }, name: "Calibri" },
+      alignment: { vertical: "center" },
+    };
+    for (let c = 0; c < 4; c++) ws[XLSX.utils.encode_cell({ r: 1, c })].s = cab;
+
+    filteredProducts.forEach((p, i) => {
+      const r = i + 2;
+      const zebra = i % 2 === 1 ? { fill: { fgColor: { rgb: "F3F6FB" } } } : {};
+      const base = { font: { sz: 10, name: "Calibri" }, border: bordas, alignment: { vertical: "center" }, ...zebra };
+      ws[XLSX.utils.encode_cell({ r, c: 0 })].s = { ...base, alignment: { horizontal: "center", vertical: "center" } };
+      ws[XLSX.utils.encode_cell({ r, c: 1 })].s = base;
+      ws[XLSX.utils.encode_cell({ r, c: 2 })].s = base;
+      const est = ws[XLSX.utils.encode_cell({ r, c: 3 })];
+      est.z = "#,##0.##;-#,##0.##;0";
+      est.s = {
+        ...base,
+        alignment: { horizontal: "right", vertical: "center" },
+        font: {
+          sz: 10,
+          name: "Calibri",
+          bold: p.stock <= 0,
+          color: { rgb: p.stock < 0 ? "DC2626" : p.stock === 0 ? "9CA3AF" : "111827" },
+        },
+      };
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Produtos");
+    XLSX.writeFile(wb, `produtos-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const montarItem = (p: Product): ItemEnvio => ({
@@ -413,7 +500,7 @@ export function ProdutosView() {
           />
 
           <div className="flex bg-card rounded-xl border border-border p-1 shadow-sm">
-            {["TODOS", "COM ESTOQUE", "SEM ESTOQUE"].map((s) => (
+            {["TODOS", "COM ESTOQUE", "SEM ESTOQUE", "NEGATIVOS"].map((s) => (
               <button
                 key={s}
                 onClick={() => {
@@ -433,6 +520,18 @@ export function ProdutosView() {
           </div>
 
           <TinyDropdown
+            value={filterCurva}
+            options={[...CURVA_FILTROS]}
+            onChange={(val) => {
+              setFilterCurva(val);
+              setVisibleCount(50);
+            }}
+            icon={BarChart3}
+            variant="blue"
+            placeholder="Curva: Todas"
+          />
+
+          <TinyDropdown
             value={filterShopify}
             options={[...SHOPIFY_FILTROS]}
             onChange={(val) => {
@@ -450,6 +549,15 @@ export function ProdutosView() {
             className="flex items-center justify-center p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all shadow-sm group shrink-0"
           >
             <Printer className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
+          </button>
+
+          <button
+            onClick={exportarExcel}
+            disabled={filteredProducts.length === 0}
+            title="Exportar para Excel (código, descrição, marca, estoque)"
+            className="flex items-center justify-center p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all shadow-sm group shrink-0 disabled:opacity-40"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
           </button>
         </div>
 
