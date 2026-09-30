@@ -285,8 +285,9 @@ export function FunilView({
     // com 545 cards que não existem na tela do WhatsApp.
     //
     // As arquivadas entram por exceção, para alimentar a coluna Perdido, e só as
-    // de HOJE: o quadro é a leitura do dia, não o histórico. São 3.320
-    // arquivadas na base — trazer o acervo transformaria a coluna em cemitério.
+    // dos últimos 7 dias (pela data do arquivamento). São 3.320 arquivadas na
+    // base — trazer o acervo transformaria a coluna em cemitério.
+    const seteDias = new Date(inicioDeHoje().getTime() - 7 * 86400000).toISOString();
     const { data, error } = await supabase
       .from("marketing_clientes")
       .select(
@@ -296,12 +297,12 @@ export function FunilView({
         [
           "arquivado.eq.false",
           "arquivado.is.null",
-          `and(arquivado.eq.true,arquivado_em.gte.${inicioDeHoje().toISOString()})`,
+          `and(arquivado.eq.true,arquivado_em.gte.${seteDias})`,
           // Nem todo caminho de arquivamento grava `arquivado_em` — há
           // arquivamento em massa que deixa o campo nulo. Sem esta segunda
           // condição a conversa sumia do quadro em vez de ir para Arquivado.
           // `updated_at` é escrito por qualquer um deles.
-          `and(arquivado.eq.true,arquivado_em.is.null,updated_at.gte.${inicioDeHoje().toISOString()})`,
+          `and(arquivado.eq.true,arquivado_em.is.null,updated_at.gte.${seteDias})`,
         ].join(","),
       )
       .eq("descartado", false)
@@ -528,7 +529,15 @@ export function FunilView({
         const alvo = `${c.nome || ""} ${c.push_name || ""} ${c.remote_jid}`.toLowerCase();
         if (!alvo.includes(termo)) continue;
       }
-      mapa.get(etapaDoCliente(c, statusErp, comIsabela.has(c.remote_jid)))!.push(c);
+      const etapa = etapaDoCliente(c, statusErp, comIsabela.has(c.remote_jid));
+      // Os arquivados já chegam recortados em 7 dias pela data do arquivamento;
+      // os que caem em Arquivado sem estar arquivados (perdido no ERP, arrasto)
+      // seguem a última conversa.
+      if (etapa === "PERDIDO" && !c.arquivado) {
+        const dias = diasAtras(c.ultima_conversa_em);
+        if (dias == null || dias > 7) continue;
+      }
+      mapa.get(etapa)!.push(c);
     }
     return mapa;
   }, [clientes, busca, filtroAtendente, statusErp, donoDe, comIsabela]);
