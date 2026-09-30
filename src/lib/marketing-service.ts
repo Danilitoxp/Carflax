@@ -28,14 +28,21 @@ interface MsgResposta {
  * Conta da primeira mensagem do contato até a primeira resposta nossa depois
  * dela. Espera acima de 24h é descartada como conversa que virou outra coisa.
  *
+ * Só entram clientes NOVOS (cadastro criado no período): o indicador é de
+ * atendimento de lead. Cliente antigo que volta a falar costuma pedir consulta
+ * de estoque/preço antes da resposta, e um único caso desses (35 min em
+ * 30/09) levava a média de quem respondeu os novos em ~1 min para 4 min.
+ *
  * @param msgs mensagens do período, ordenadas por timestamp crescente
+ * @param jidsNovos conversas cujo cadastro foi criado no período
  */
 export function paresPrimeiraResposta(
   msgs: MsgResposta[],
+  jidsNovos: Set<string>,
 ): { vendedorId: string | null; minutos: number }[] {
   const byJid: Record<string, MsgResposta[]> = {};
   for (const m of msgs) {
-    if (!m.remote_jid || !m.sender || !m.timestamp) continue;
+    if (!m.remote_jid || !m.sender || !m.timestamp || !jidsNovos.has(m.remote_jid)) continue;
     (byJid[m.remote_jid] ||= []).push(m);
   }
 
@@ -1223,18 +1230,27 @@ export const marketingService = {
         .eq("role", CARGO_ATENDENTE_TRAFEGO);
       const idsTrafego = new Set((atendentes || []).map((u) => String(u.id)));
 
-      const { data, error } = await supabase
-        .from("marketing_whatsapp")
-        .select("remote_jid, sender, timestamp, vendedor_id")
-        .gte("timestamp", start.toISOString())
-        .lte("timestamp", end.toISOString())
-        .order("timestamp", { ascending: true });
+      const [{ data, error }, { data: novos }] = await Promise.all([
+        supabase
+          .from("marketing_whatsapp")
+          .select("remote_jid, sender, timestamp, vendedor_id")
+          .gte("timestamp", start.toISOString())
+          .lte("timestamp", end.toISOString())
+          .order("timestamp", { ascending: true }),
+        supabase
+          .from("marketing_clientes")
+          .select("remote_jid")
+          .gte("created_at", start.toISOString())
+          .lte("created_at", end.toISOString())
+          .limit(5000),
+      ]);
 
       if (error || !data || data.length === 0) return null;
+      const jidsNovos = new Set((novos || []).map((c) => c.remote_jid as string));
 
       // Resposta de quem não tem o cargo não entra na conta. Sem vendedor_id
       // gravado também fica de fora: não dá para creditar o tempo a ninguém.
-      const deltas = paresPrimeiraResposta(data)
+      const deltas = paresPrimeiraResposta(data, jidsNovos)
         .filter((par) => idsTrafego.size === 0 || idsTrafego.has(String(par.vendedorId || "")))
         .map((par) => par.minutos);
 
@@ -1449,7 +1465,7 @@ export const marketingService = {
     const respBySeller: Record<string, { sum: number; count: number }> = {};
     let respGlobalSum = 0;
     let respGlobalCount = 0;
-    for (const { vendedorId, minutos } of paresPrimeiraResposta(msgs)) {
+    for (const { vendedorId, minutos } of paresPrimeiraResposta(msgs, new Set((leadsRaw || []).map((l) => l.remote_jid as string)))) {
       respGlobalSum += minutos;
       respGlobalCount += 1;
       const sid = vendedorId || "sem_vendedor";
