@@ -5,14 +5,17 @@ import {
   ClipboardList,
   Construction,
   Scissors,
+  FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CortesTab } from "./salacabos/SalaCabosView";
+import { EstoqueNcmTab } from "./EstoqueNcmTab";
 
-type TabId = "cortes" | "giro" | "separacoes" | "furos";
+type TabId = "cortes" | "ncm" | "giro" | "separacoes" | "furos";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "cortes", label: "Cortes de Cabo", icon: Scissors, desc: "Pedido, cliente, quem cortou, quanto, a hora e o cabo — lançados em Estoque › Cabos" },
+  { id: "ncm", label: "NCM", icon: FileSpreadsheet, desc: "Estoque de hoje por empresa com código, descrição, NCM e CMV" },
   { id: "giro", label: "Giro de Estoque", icon: BarChart3, desc: "Curva ABC, itens parados e análise de giro por produto/marca" },
   { id: "separacoes", label: "Histórico Separações", icon: ClipboardList, desc: "Separações realizadas, tempos e volumes por período" },
   { id: "furos", label: "Furos e Divergências", icon: PackageX, desc: "Histórico de furos de estoque, ajustes e divergências" },
@@ -77,6 +80,8 @@ export function RelatoriosEstoqueView() {
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-6">
         {tab === "cortes" ? (
           <CortesTab barraFiltros={barra} />
+        ) : tab === "ncm" ? (
+          <EstoqueNcmTab barraFiltros={barra} />
         ) : (
           <EmDev tab={TABS.find((t) => t.id === tab)!} />
         )}
