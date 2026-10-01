@@ -1420,6 +1420,48 @@ export interface ProdutoFornecedoresResponse {
   fornecedores: ProdutoFornecedor[];
   compras: ProdutoCompra[];
 }
+export interface ReposicaoVendaMes {
+  mes: string;        // "2026-09"
+  qtd: number;
+  clientes: number;   // clientes distintos no mês (kardex)
+  esporadico: boolean; // pico de poucos clientes, fora da média
+}
+
+export interface ReposicaoItem {
+  cod: string;
+  descricao: string;
+  unidade: string | null;
+  cod_fornecedor: string | null;
+  fornecedor: string | null;
+  fornecedor_interno: boolean;
+  venda_mensal: ReposicaoVendaMes[];
+  media_ajustada: number;
+  media_bruta: number;
+  meses_esporadicos: string[];
+  saldo: number;
+  reservado: number;
+  disponivel: number;
+  em_pedido: number;
+  previsao_entrega: string | null;
+  cobertura_meses: number;
+  sugestao_compra: number;
+  em_falta: boolean;
+}
+
+export interface ReposicaoResponse {
+  gerado_em: string;
+  meses_historico: number;
+  meses_estoque: number;
+  rotulos: string[];
+  total_itens: number;
+  em_falta: number;
+  com_pico_ignorado: number;
+  fornecedores: { cod: string; nome: string | null; itens: number }[];
+  itens: ReposicaoItem[];
+}
+
+export const apiComprasReposicao = () => get<ReposicaoResponse>("/api/compras/reposicao");
+
 export const apiComprasBuscarProdutos = (q: string) =>
   get<{ success: boolean; data: ProdutoBusca[] }>("/api/compras/produtos/busca", { q });
 export const apiComprasProdutoFornecedores = (cod: string) =>

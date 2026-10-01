@@ -33,6 +33,7 @@ import { FurosView } from "@/components/estoque/FurosView";
 import { ProdutosComprasView } from "@/components/compras/ProdutosComprasView";
 import { RelatoriosComprasView } from "@/components/compras/RelatoriosComprasView";
 import { ColetasView } from "@/components/compras/ColetasView";
+import { ReposicaoView } from "@/components/compras/ReposicaoView";
 import { RelatoriosEstoqueView } from "@/components/estoque/RelatoriosEstoqueView";
 import { SalaCabosView } from "@/components/estoque/salacabos/SalaCabosView";
 import { RelatoriosScrumView } from "@/components/scrum/RelatoriosScrumView";
@@ -1533,6 +1534,8 @@ function DashboardContent({
             <RhView activeTab={activeItem} userProfile={userProfile || undefined} />
           ) : activeItem === "Compras" ? (
             <ProdutosComprasView />
+          ) : activeItem === "Reposição" ? (
+            <ReposicaoView />
           ) : activeItem === "Coletas" ? (
             <ColetasView userProfile={userProfile || undefined} />
           ) : activeItem === "Relatórios Compras" ? (
