@@ -22,6 +22,7 @@ export interface PropostaItem {
   saldo: number;
   em_pedido: number;
   sugestao: number;
+  preco?: number; // último preço de compra deste fornecedor
 }
 
 export interface Proposta {
@@ -40,6 +41,9 @@ export interface Proposta {
 
 const brNum = (n: number, dec = 0) =>
   n.toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+
+const brMoeda = (n: number) =>
+  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export function PropostasCompraPainel({
   usuario, onVoltar, aoMudar,
@@ -119,9 +123,12 @@ export function PropostasCompraPainel({
     try {
       const r = await apiComprasEnviarProposta(p.id, itens, usuario.operatorCode, usuario.id);
       setSucesso(
-        r.pedido
-          ? `Pedido ${r.pedido} criado na Citel com ${r.itens} item(ns).`
-          : `Pedido criado na Citel com ${r.itens} item(ns).`,
+        [
+          r.pedido ? `Pedido ${r.pedido} criado na Citel` : "Pedido criado na Citel",
+          `${r.itens} item(ns)`,
+          r.condicao ? `condição ${r.condicao}` : "",
+          r.comprador ? `comprador ${r.comprador}` : "",
+        ].filter(Boolean).join(" · ") + ".",
       );
       await carregar();
       aoMudar?.();
@@ -204,6 +211,8 @@ export function PropostasCompraPainel({
             const itens = p.itens || [];
             const aberto = aberta === p.id;
             const unidades = itens.reduce((s, i) => s + qtdDe(p, i), 0);
+            const valor = itens.reduce((s, i) => s + qtdDe(p, i) * (i.preco || 0), 0);
+            const semPreco = itens.filter((i) => !(i.preco && i.preco > 0)).length;
             const semEstoque = itens.filter((i) => i.saldo <= 0).length;
 
             return (
@@ -239,6 +248,7 @@ export function PropostasCompraPainel({
                       </span>
                       <span className="block text-[10px] text-muted-foreground mt-0.5">
                         {itens.length} {itens.length === 1 ? "item" : "itens"} · {brNum(unidades)} unidades
+                        {valor > 0 && ` · ${brMoeda(valor)}`}
                         {semEstoque > 0 && ` · ${semEstoque} sem estoque`}
                         {` · ${new Date(p.criado_em).toLocaleDateString("pt-BR")}`}
                       </span>
@@ -264,6 +274,12 @@ export function PropostasCompraPainel({
                   </div>
                 </header>
 
+                {semPreco > 0 && (
+                  <p className="mx-4 mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                    {semPreco} {semPreco === 1 ? "item sem preço de compra" : "itens sem preço de compra"} — o ERP recusa o pedido sem preço. Tire esses itens ou compre pelo sistema.
+                  </p>
+                )}
+
                 {p.erro && (
                   <p className="mx-4 mb-3 rounded-lg bg-rose-500/10 px-3 py-1.5 text-[10px] font-bold text-rose-500">
                     {p.erro}
@@ -285,7 +301,9 @@ export function PropostasCompraPainel({
                             <th className={TH}>Média/mês</th>
                             <th className={TH}>Saldo</th>
                             <th className={TH}>Pendente</th>
+                            <th className={cn(TH, "text-right")}>Preço</th>
                             <th className={cn(TH, "text-right")}>Comprar</th>
+                            <th className={cn(TH, "text-right")}>Total</th>
                             <th className={cn(TH, "w-10")} />
                           </tr>
                         </thead>
@@ -318,6 +336,12 @@ export function PropostasCompraPainel({
                               <td className="px-3 py-2 text-center text-[11px] tabular-nums text-muted-foreground">
                                 {i.em_pedido ? brNum(i.em_pedido) : "—"}
                               </td>
+                              <td className={cn(
+                                "px-3 py-2 text-right text-[11px] tabular-nums",
+                                i.preco && i.preco > 0 ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400",
+                              )}>
+                                {i.preco && i.preco > 0 ? brMoeda(i.preco) : "sem preço"}
+                              </td>
                               <td className="px-3 py-2">
                                 <div className="flex items-center justify-end gap-1.5">
                                   <input
@@ -333,6 +357,9 @@ export function PropostasCompraPainel({
                                     {i.unidade || ""}
                                   </span>
                                 </div>
+                              </td>
+                              <td className="px-3 py-2 text-right text-[11px] font-bold tabular-nums">
+                                {i.preco && i.preco > 0 ? brMoeda(i.preco * qtdDe(p, i)) : "—"}
                               </td>
                               <td className="px-2 py-2 text-center">
                                 <button

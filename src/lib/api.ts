@@ -1521,17 +1521,30 @@ export const apiComprasExecutarAgenda = (id: string) =>
     "/api/compras/reposicao/agenda/" + id + "/executar", {},
   );
 
-/** Envia a proposta para a Citel (cria o pedido de compra). */
-export const apiComprasEnviarProposta = (
+/**
+ * Envia a proposta para a Citel (cria o pedido de compra).
+ *
+ * Não usa o `post` genérico de propósito: quando o ERP recusa, a mensagem dele
+ * ("condicaoPagamento: deve ser informada") é o que resolve o problema, e o
+ * helper padrão joga fora o corpo da resposta.
+ */
+export async function apiComprasEnviarProposta(
   id: string,
   itens: unknown[],
   comprador?: string,
   usuarioId?: string,
-) =>
-  apiPost<{ success: boolean; pedido: string; itens: number }>(
-    "/api/compras/reposicao/propostas/" + id + "/enviar",
-    { itens, comprador, usuario_id: usuarioId },
-  );
+): Promise<{ success: boolean; pedido: string; itens: number; comprador?: string; condicao?: string }> {
+  const base = API_BASE.startsWith("http") ? API_BASE : window.location.origin + API_BASE;
+  const url = `${base.replace(/\/$/, "")}/api/compras/reposicao/propostas/${id}/enviar`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify({ itens, comprador, usuario_id: usuarioId }),
+  });
+  const corpo = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(corpo?.error || `Falha ao enviar (HTTP ${res.status})`);
+  return corpo;
+}
 
 export const apiComprasKardexMes = (item: string, mes: string) =>
   get<KardexMesResponse>("/api/compras/reposicao/kardex", { item, mes });
