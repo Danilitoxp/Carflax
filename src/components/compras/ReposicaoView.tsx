@@ -7,7 +7,7 @@
 // backend (reposicaoHandler.js) — aqui é só apresentação, filtro e paginação.
 
 import { useEffect, useMemo, useState } from "react";
-import { Boxes, Search, Loader2, Truck, Download, ChevronLeft, ChevronRight, Zap } from "lucide-react";
+import { Boxes, Search, Loader2, Truck, Download, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiComprasReposicao, type ReposicaoItem, type ReposicaoResponse } from "@/lib/api";
 import { anexarGuiaImportacao } from "@/lib/guia-importacao-produtos";
@@ -283,8 +283,8 @@ function Linha({ item: i }: { item: ReposicaoItem }) {
         >
           {m.esporadico ? (
             // Pico que foi para um ou dois clientes: marcado e fora da média.
-            <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[12px] font-bold tabular-nums text-amber-600 dark:text-amber-400">
-              <Zap className="w-3 h-3" />
+            <span className="inline-flex items-center gap-1 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[12px] font-bold tabular-nums text-rose-600 dark:text-rose-400">
+              <AlertCircle className="w-3 h-3" />
               {brNum(m.qtd, m.qtd % 1 ? 1 : 0)}
             </span>
           ) : (
@@ -302,7 +302,7 @@ function Linha({ item: i }: { item: ReposicaoItem }) {
         <div className="flex flex-col items-center gap-0.5">
           <span>{brNum(i.media_ajustada, 1)}</span>
           {i.meses_esporadicos.length > 0 && (
-            <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-px text-[8px] font-black uppercase tracking-wide text-amber-600 dark:text-amber-400">
+            <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-px text-[8px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
               ajustada
             </span>
           )}
