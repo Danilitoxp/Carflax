@@ -24,25 +24,25 @@ interface ClienteFRV {
   cod_vendedor: string;
 }
 
-const soDigitos = (v: string) => v.replace(/D/g, "");
+const soDigitos = (v: string) => v.replace(/\D/g, "");
 
 /** CPF 000.000.000-00 e CNPJ 00.000.000/0000-00. */
 function fmtDocumento(doc: string | null) {
   const d = soDigitos(doc || "");
-  if (d.length === 14) return d.replace(/^(d{2})(d{3})(d{3})(d{4})(d{2})$/, "$1.$2.$3/$4-$5");
-  if (d.length === 11) return d.replace(/^(d{3})(d{3})(d{3})(d{2})$/, "$1.$2.$3-$4");
+  if (d.length === 14) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  if (d.length === 11) return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
   return doc || "";
 }
 
 /** (11) 99999-9999 para celular e (11) 9999-9999 para fixo. */
 function fmtTelefone(tel: string | null) {
-  const d = soDigitos(tel || "").replace(/^55(?=d{10,11}$)/, "");
-  if (d.length === 11) return d.replace(/^(d{2})(d{5})(d{4})$/, "($1) $2-$3");
-  if (d.length === 10) return d.replace(/^(d{2})(d{4})(d{4})$/, "($1) $2-$3");
+  const d = soDigitos(tel || "").replace(/^55(?=\d{10,11}$)/, "");
+  if (d.length === 11) return d.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+  if (d.length === 10) return d.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3");
   return tel || "";
 }
 
-const waLink = (tel: string) => `https://wa.me/55${soDigitos(tel).replace(/^55(?=d{11}$)/, "")}`;
+const waLink = (tel: string) => `https://wa.me/55${soDigitos(tel).replace(/^55(?=\d{10,11}$)/, "")}`;
 
 // Filtro de tempo parado em meses (pedido do Danilo): 1 a 6 meses.
 const MESES_PARADO = [1, 2, 3, 4, 5, 6];
@@ -408,9 +408,36 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
                       <span className="text-[11px] font-black text-foreground uppercase tracking-tight group-hover:text-primary transition-colors">
                         {cliente.nome_cliente}
                       </span>
-                      <span className="text-[9px] font-bold text-muted-foreground">
-                        ID: {cliente.cliente_id}
-                      </span>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="text-[9px] font-bold text-muted-foreground">
+                          ID: {cliente.cliente_id}
+                        </span>
+                        {cliente.documento && (
+                          <span className="text-[9px] font-medium text-muted-foreground">
+                            • {fmtDocumento(cliente.documento)}
+                          </span>
+                        )}
+                        {cliente.telefone && (
+                          cliente.telefone_whatsapp ? (
+                            <a
+                              href={waLink(cliente.telefone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Abrir conversa no WhatsApp"
+                              onClick={e => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-600 dark:text-emerald-400 hover:underline"
+                            >
+                              <MessageCircle className="w-2.5 h-2.5" />
+                              {fmtTelefone(cliente.telefone)}
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-medium text-muted-foreground">
+                              <Phone className="w-2.5 h-2.5 opacity-50" />
+                              {fmtTelefone(cliente.telefone)}
+                            </span>
+                          )
+                        )}
+                      </div>
                     </div>
                   </td>
 
@@ -466,13 +493,26 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => setSchedulingId(cliente.cliente_id)}
-                        className="flex items-center gap-1.5 mx-auto px-3 py-1.5 rounded-lg text-[10px] font-black text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
-                      >
-                        <Phone className="w-3 h-3" />
-                        Prospectar
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        {cliente.telefone && (
+                          <a
+                            href={waLink(cliente.telefone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors border border-emerald-500/20 inline-flex items-center justify-center"
+                            title={`Conversar com ${cliente.nome_cliente} no WhatsApp`}
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => setSchedulingId(cliente.cliente_id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
+                        >
+                          <Phone className="w-3 h-3" />
+                          Prospectar
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
