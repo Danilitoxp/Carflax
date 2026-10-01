@@ -9,6 +9,13 @@ import { supabase } from "@/lib/supabase";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 import { TinyLoader } from "@/components/ui/TinyLoader";
+import {
+  ProspeccaoModal,
+  CONTATOS,
+  MOTIVOS,
+  INTERESSES,
+  type ProspeccaoContato,
+} from "./ProspeccaoModal";
 
 interface ClienteFRV {
   cliente_id: string;
@@ -54,11 +61,13 @@ interface Vendedor {
 }
 
 interface UserProfile {
+  id?: string;
   operator_code?: string;
   operatorCode?: string;
   name?: string;
   role?: string;
   is_admin?: boolean;
+  is_leader?: boolean;
 }
 
 interface ProspeccoesViewProps {
@@ -67,10 +76,21 @@ interface ProspeccoesViewProps {
 
 type SortField = "ultima_compra" | "recencia_dias" | "frequencia" | "valor_total";
 
-function isGerente(role?: string) {
-  if (!role) return false;
-  const r = role.toLowerCase();
-  return r.includes("gerente") || r.includes("diretor") || r.includes("marketing") || r.includes("admin");
+/**
+ * Quem enxerga a carteira inteira, e não só a própria. Supervisor e líder entram
+ * aqui: o supervisor de vendas tem pouquíssimo cliente no próprio código, então
+ * sem isso a tela abria vazia para ele.
+ */
+function isGerente(perfil?: UserProfile) {
+  if (perfil?.is_admin || perfil?.is_leader) return true;
+  const r = (perfil?.role || "").toLowerCase();
+  return (
+    r.includes("gerente") ||
+    r.includes("supervisor") ||
+    r.includes("diretor") ||
+    r.includes("marketing") ||
+    r.includes("admin")
+  );
 }
 
 function fmt(val: number) {
@@ -87,14 +107,14 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
   const minDias = minMeses * 30;
   const [sortField, setSortField] = useState<SortField>("recencia_dias");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [schedulingId, setSchedulingId] = useState<string | null>(null);
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [prospectando, setProspectando] = useState<ClienteFRV | null>(null);
   const [successId, setSuccessId] = useState<string | null>(null);
+  // Última prospecção registrada de cada cliente, para a linha mostrar o que já foi feito.
+  const [ultimoContato, setUltimoContato] = useState<Map<string, ProspeccaoContato>>(new Map());
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [filterVendedor, setFilterVendedor] = useState("Todos");
 
-  const gerente = isGerente(userProfile?.role);
+  const gerente = isGerente(userProfile);
   const operatorCode = userProfile?.operator_code || userProfile?.operatorCode || "";
 
   // Carrega lista de vendedores para o dropdown do gerente
@@ -139,6 +159,22 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
       })
       .finally(() => setLoading(false));
   }, [gerente, operatorCode, filterVendedor]);
+
+  // Última prospecção de cada cliente (o registro mais novo vence).
+  useEffect(() => {
+    supabase
+      .from("prospeccao_contatos")
+      .select("*")
+      .order("criado_em", { ascending: false })
+      .limit(2000)
+      .then(({ data }) => {
+        const mapa = new Map<string, ProspeccaoContato>();
+        for (const r of (data || []) as ProspeccaoContato[]) {
+          if (!mapa.has(r.cliente_id)) mapa.set(r.cliente_id, r);
+        }
+        setUltimoContato(mapa);
+      });
+  }, []);
 
   const filtered = useMemo(() => {
     return clientes
@@ -188,28 +224,10 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
       : <ChevronDown className="w-3 h-3 text-primary" />;
   };
 
-  const handleSchedule = async (cliente: ClienteFRV) => {
-    if (!scheduleDate) return;
-    setSavingId(cliente.cliente_id);
-
-    const [year, month, day] = scheduleDate.split("-").map(Number);
-    const vendorCode = operatorCode || cliente.cod_vendedor || "";
-    const vendorName = userProfile?.name?.split(" ")[0] || "";
-
-    await supabase.from("eventos_calendario").insert([{
-      title: `FOLLOW-UP: ${cliente.nome_cliente.toUpperCase()}${vendorName ? ` - Vendedor: ${vendorName}` : ""}`,
-      description: `Prospecção — cliente sem compra há ${cliente.recencia_dias} dias. Total histórico: ${fmt(cliente.valor_total)}.`,
-      type: "follow-up",
-      vendedor_codigo: vendorCode,
-      day,
-      month,
-      year,
-    }]);
-
-    setSavingId(null);
-    setSuccessId(cliente.cliente_id);
-    setSchedulingId(null);
-    setScheduleDate("");
+  const registrarProspeccao = (registro: ProspeccaoContato) => {
+    setUltimoContato(m => new Map(m).set(registro.cliente_id, registro));
+    setSuccessId(registro.cliente_id);
+    setProspectando(null);
     setTimeout(() => setSuccessId(null), 3000);
   };
 
@@ -438,6 +456,22 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
                           )
                         )}
                       </div>
+                      {ultimoContato.get(cliente.cliente_id) && (() => {
+                        const u = ultimoContato.get(cliente.cliente_id)!;
+                        return (
+                          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                            <span className={cn("rounded border px-1.5 py-0.5 text-[8px] font-black uppercase", CONTATOS[u.contato].cls)}>
+                              {CONTATOS[u.contato].label}
+                            </span>
+                            <span className="text-[9px] text-muted-foreground">
+                              {new Date(u.criado_em).toLocaleDateString("pt-BR")}
+                              {u.motivo ? ` · ${MOTIVOS[u.motivo]}` : ""}
+                              {u.interesse ? ` · ${INTERESSES[u.interesse].label}` : ""}
+                              {u.proximo_contato ? ` · retorno ${u.proximo_contato.split("-").reverse().join("/")}` : ""}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </td>
 
@@ -468,30 +502,7 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
 
                   <td className="px-6 py-3.5 text-center">
                     {successId === cliente.cliente_id ? (
-                      <span className="text-[10px] font-black text-emerald-500">✓ Agendado!</span>
-                    ) : schedulingId === cliente.cliente_id ? (
-                      <div className="flex items-center gap-1.5 justify-center">
-                        <input
-                          type="date"
-                          value={scheduleDate}
-                          onChange={e => setScheduleDate(e.target.value)}
-                          className="text-[10px] font-medium bg-secondary/50 border border-border/60 rounded-md px-2 py-1 outline-none focus:border-primary/50 w-28"
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => handleSchedule(cliente)}
-                          disabled={!scheduleDate || savingId === cliente.cliente_id}
-                          className="px-2 py-1 bg-primary text-primary-foreground rounded-md text-[10px] font-black hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                        >
-                          {savingId === cliente.cliente_id ? "..." : "OK"}
-                        </button>
-                        <button
-                          onClick={() => { setSchedulingId(null); setScheduleDate(""); }}
-                          className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
+                      <span className="text-[10px] font-black text-emerald-500">✓ Registrado!</span>
                     ) : (
                       <div className="flex items-center justify-center gap-1.5">
                         {cliente.telefone && (
@@ -506,7 +517,7 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
                           </a>
                         )}
                         <button
-                          onClick={() => setSchedulingId(cliente.cliente_id)}
+                          onClick={() => setProspectando(cliente)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
                         >
                           <Phone className="w-3 h-3" />
@@ -521,6 +532,15 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
           </tbody>
         </table>
       </div>
+
+      {prospectando && (
+        <ProspeccaoModal
+          cliente={prospectando}
+          usuario={{ id: userProfile?.id, nome: userProfile?.name, operatorCode: operatorCode }}
+          onFechar={() => setProspectando(null)}
+          onSalvo={registrarProspeccao}
+        />
+      )}
     </div>
   );
 }
