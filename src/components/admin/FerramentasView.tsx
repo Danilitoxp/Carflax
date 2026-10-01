@@ -16,10 +16,7 @@ import "./ferramentas.css";
  */
 
 /* Horas estimadas para uma software house construir cada tela (mesma ordem de ITENS) × valor-hora médio 2026 */
-const VALOR_HORA = 120;
 const HORAS = [60,40,30,60,40,30,100,20,20,60,120,40,50,60,60,50,30,40,120,120,140,50,80,50,30,40,60,50,30,30,40,40,30,80,30,80,40,30,100,50,80,30,60,80,50,20,40,30,20,30,60,50,40,60,30,40,20,20,30,20,20,20,30,40,40,60,80,100,30,40,80];
-
-const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 const slug = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -188,14 +185,12 @@ const VAZIA: Avaliacao = { impacto: null, uso: null, obs: "", removido: false };
 
 export function FerramentasView({ userId }: { userId?: string }) {
   const [estado, setEstado] = useState<Record<string, Avaliacao>>({});
-  const [status, setStatus] = useState("Conectando ao armazenamento…");
-  const [filtro, setFiltro] = useState("Todos");
-  const [mostrarValor, setMostrarValor] = useState(false);
+  const [, setStatus] = useState("Conectando ao armazenamento…");
   const [abertas, setAbertas] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ msg: string; desfazer: () => void } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [acessos, setAcessos] = useState<Acesso[] | null>(null);
-  const [periodo, setPeriodo] = useState<Periodo>("7d");
+  const periodo = "7d" as Periodo;
   // Ferramenta que acabou de receber um clique pisca por 2 s.
   const [pulsando, setPulsando] = useState<Set<string>>(new Set());
 
@@ -319,7 +314,6 @@ export function FerramentasView({ userId }: { userId?: string }) {
   }, [aplicarLinhas]);
 
   const av = (id: string) => estado[id] ?? VAZIA;
-  const removida = (i: Item) => av(i.id).removido;
 
   const salvar = useCallback(
     async (id: string, mudanca: Partial<Avaliacao>) => {
@@ -345,83 +339,11 @@ export function FerramentasView({ userId }: { userId?: string }) {
     toastTimer.current = setTimeout(() => setToast(null), 6000);
   };
 
-  const ativos = ITENS.filter((i) => !removida(i));
-  const gruposComItens = GRUPOS.filter((g) => ITENS.some((i) => i.g === g && !removida(i)));
-  const filtroAtual = GRUPOS.includes(filtro) && !gruposComItens.includes(filtro) ? "Todos" : filtro;
-
-  const visivel = (i: Item) => {
-    const s = av(i.id);
-    if (s.removido) return false;
-    if (filtroAtual === "Todos") return true;
-    if (filtroAtual === "Sem acesso") return uso.nivel(i.id) === "nao";
-    if (filtroAtual === "Sem nota") return s.impacto == null;
-    return i.g === filtroAtual;
-  };
-
-  const resumo = useMemo(() => {
-    const c = { sim: 0, pouco: 0, nao: 0, none: 0 };
-    const notas: number[] = [];
-    for (const i of ativos) {
-      const s = estado[i.id] ?? VAZIA;
-      c[uso.nivel(i.id) ?? "none"]++;
-      if (s.impacto != null) notas.push(s.impacto);
-    }
-    const media = notas.length ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1).replace(".", ",") : "—";
-    const horas = ativos.reduce((a, i) => a + i.h, 0);
-    return { c, notas: notas.length, media, horas };
-  }, [ativos, estado, uso]);
+  const visivel = (i: Item) => !av(i.id).removido;
 
   return (
     <div className="ferr">
       <div className="wrap">
-        <header>
-          <h1>Inventário de Ferramentas Carflax</h1>
-          <p className="sub">
-            Todas as ferramentas e telas criadas internamente. O uso de cada uma é medido pelos acessos reais da equipe, em tempo real. Marque o
-            impacto (0 a 10); telas que não fazem mais sentido podem ser removidas da lista.
-          </p>
-          <button className="btn-valor" aria-expanded={mostrarValor} onClick={() => setMostrarValor((v) => !v)}>
-            {mostrarValor ? "Ocultar valor economizado" : "Mostrar valor economizado pela Carflax"}
-          </button>
-          {mostrarValor && (
-            <div className="valor">
-              <span className="lbl">Valor economizado pela Carflax (2026)</span>
-              <strong>{brl(resumo.horas * VALOR_HORA)}</strong>
-              <small>
-                {ativos.length} telas · {resumo.horas.toLocaleString("pt-BR")} horas × {brl(VALOR_HORA)}/h que a Carflax deixou de pagar a uma empresa
-                de fora por ter desenvolvido internamente
-              </small>
-            </div>
-          )}
-          {status.startsWith("Não") && <p className="status">{status}</p>}
-        </header>
-
-        <div className="summary">
-          <span className="chip c-ok">{resumo.c.sim} muito usadas</span>
-          <span className="chip c-warn">{resumo.c.pouco} pouco uso</span>
-          <span className="chip c-bad">{resumo.c.nao} sem acesso</span>
-          <span className="chip c-unk">{resumo.c.none} sem medição</span>
-          <span className="chip c-unk">
-            Impacto médio {resumo.media} · {resumo.notas}/{ativos.length} com nota
-          </span>
-        </div>
-
-        <div className="filters" role="group" aria-label="Período">
-          {PERIODOS.map((p) => (
-            <button key={p.key} aria-pressed={p.key === periodo} onClick={() => setPeriodo(p.key)}>
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="filters" role="group" aria-label="Filtrar">
-          {["Todos", "Sem acesso", "Sem nota", ...gruposComItens].map((k) => (
-            <button key={k} aria-pressed={k === filtroAtual} onClick={() => setFiltro(k)}>
-              {k}
-            </button>
-          ))}
-        </div>
-
         <div className="list">
           {GRUPOS.map((g) => {
             const itens = ITENS.filter((i) => i.g === g && visivel(i));
@@ -448,12 +370,6 @@ export function FerramentasView({ userId }: { userId?: string }) {
                         <div className="name">
                           <b>{i.n}</b>
                           <span>{i.d}</span>
-                          {mostrarValor && (
-                            <div className="preco">
-                              <strong>{brl(i.h * VALOR_HORA)}</strong>
-                              <small>economizados · {i.h} h</small>
-                            </div>
-                          )}
                         </div>
 
                         <div className="ctrls">

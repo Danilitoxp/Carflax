@@ -10,15 +10,17 @@ import {
   Printer,
   FileSpreadsheet,
   BarChart3,
-  Loader2
+  Loader2,
+  Settings
 } from "lucide-react";
 import { SiShopify } from "react-icons/si";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 import { TinyLoader } from "@/components/ui/TinyLoader";
-import { apiDashboardProdutos, type ProductInfo } from "@/lib/api";
+import { apiDashboardProdutos, apiCaditeExportar, type ProductInfo } from "@/lib/api";
 import { ShopifyEnvioModal, type ItemEnvio } from "./ShopifyEnvioModal";
 import { EtiquetaPrecoModal } from "./EtiquetaPrecoModal";
+import { ExportarColunasModal } from "./ExportarColunasModal";
 import { useNotification } from "@/hooks/useNotification";
 import { imprimirEtiquetasPreco } from "@/lib/impressao-local";
 import {
@@ -147,6 +149,37 @@ function SyncBadge({ status, loja, carregando, erpPrice, erpStock, onEnviar }: S
 
 const CURVA_FILTROS = ["Curva: Todas", "Curva A", "Curva B", "Curva C"] as const;
 
+// Campos fiscais da CADITE com nome amigável na lista de colunas.
+const CAMPOS_CADITE_NOMEADOS: Record<string, { campo: string; label: string; formato?: (v: string | number) => string | number }> = {
+  ncm: { campo: "ITE_CLAIPI", label: "NCM" },
+  ativo: { campo: "ITE_ITEATI", label: "Ativo", formato: (v) => (v === "S" ? "Sim" : v === "N" ? "Não" : v) },
+};
+
+// Colunas com código + descrição: a chave da coluna → o campo de código na CADITE.
+const CAMPOS_COM_DESCRICAO: Record<string, string> = { classFiscal: "ITE_CODABF", cest: "ITE_CDCEST" };
+
+const COLUNAS_PADRAO = ["cod", "desc", "brand", "codFornecedor", "stock", "media", "debit", "shopify", "etiqueta"];
+
+const valorCadite = (v: unknown): string | number => {
+  if (v == null) return "";
+  if (typeof v === "number") return v;
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v)) return new Date(v).toLocaleDateString("pt-BR");
+  return String(v).trim();
+};
+
+interface ColunaTabela {
+  key: string;
+  label: string;
+  wch: number;
+  align: "left" | "center" | "right";
+  num?: string;
+  sort?: keyof Product;
+  valor: (p: Product) => string | number;
+  render?: (p: Product) => React.ReactNode;
+  soTela?: boolean;
+  extraPlanilha?: { label: string; wch: number; valor: (p: Product) => string | number };
+}
+
 interface Product {
   cod: string;
   desc: string;
@@ -174,6 +207,16 @@ export function ProdutosView() {
   const [shopifyLoading, setShopifyLoading] = useState(true);
   const [envio, setEnvio] = useState<ItemEnvio[] | null>(null);
   const [etiquetasAberto, setEtiquetasAberto] = useState(false);
+  const [colunasAberto, setColunasAberto] = useState(false);
+  const [colunasTela, setColunasTela] = useState<string[]>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem("produtos-colunas-tela") || "null");
+      if (Array.isArray(v) && v.length) return v as string[];
+    } catch { /* sem storage: usa o padrão */ }
+    return COLUNAS_PADRAO;
+  });
+  // Campos da CADITE escolhidos na engrenagem, por código do produto.
+  const [caditeDados, setCaditeDados] = useState<Map<string, Record<string, unknown>>>(new Map());
   // Ícone da linha imprime 1 etiqueta direto, sem abrir a janela de lote.
   const [imprimindoCod, setImprimindoCod] = useState<string | null>(null);
   const { showNotification } = useNotification();
@@ -403,8 +446,136 @@ export function ProdutosView() {
     }
   };
 
-  // Exporta exatamente o que está na tela (busca, marca, estoque, ordenação).
+  // Busca na CADITE só os campos marcados, para todos os produtos carregados.
+  const camposCadite = colunasTela
+    .map((k) => (k.startsWith("cadite:") ? k.slice(7) : CAMPOS_COM_DESCRICAO[k] ?? CAMPOS_CADITE_NOMEADOS[k]?.campo))
+    .filter(Boolean)
+    .join(",");
+  useEffect(() => {
+    if (!camposCadite || products.length === 0) return;
+    let vivo = true;
+    apiCaditeExportar(products.map((p) => p.cod), camposCadite.split(",")).then(
+      (rows) => {
+        if (!vivo) return;
+        const mapa = new Map<string, Record<string, unknown>>();
+        // CADITE tem uma linha por empresa: fica a primeira com o campo preenchido.
+        for (const r of rows) {
+          const cod = String(r.ITE_CODITE).trim();
+          const atual = mapa.get(cod);
+          if (!atual) mapa.set(cod, { ...r });
+          else for (const [k, v] of Object.entries(r)) if ((atual[k] == null || String(atual[k]).trim() === "") && v != null) atual[k] = v;
+        }
+        setCaditeDados(mapa);
+      },
+      () => vivo && showNotification("error", "Colunas da CADITE", "Não foi possível buscar os campos da CADITE."),
+    );
+    return () => { vivo = false; };
+  }, [camposCadite, products, showNotification]);
+
+  // Colunas da tabela. A engrenagem escolhe quais aparecem (fica salvo neste
+  // navegador) e a planilha baixa exatamente as colunas que estão na tela.
+  const fmtNum = (v: number, casas = 2) => v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+  const colunaCodigoDescricao = (key: string, label: string, campo: string, campoDesc: string): ColunaTabela => ({
+    key, label, wch: 12, align: "left",
+    valor: (p) => valorCadite(caditeDados.get(p.cod)?.[campo]),
+    render: (p) => {
+      const cod = valorCadite(caditeDados.get(p.cod)?.[campo]);
+      const desc = valorCadite(caditeDados.get(p.cod)?.[campoDesc]);
+      return (
+        // Descrição longa (CEST) corta com "…"; o texto inteiro fica no hover.
+        <span
+          title={desc ? `${cod} - ${desc}` : undefined}
+          className="block max-w-[220px] truncate text-[10px] font-bold text-muted-foreground"
+        >
+          {cod ? (desc ? `${cod} - ${desc}` : cod) : "—"}
+        </span>
+      );
+    },
+    extraPlanilha: { label: `Descrição ${label}`, wch: 40, valor: (p) => valorCadite(caditeDados.get(p.cod)?.[campoDesc]) },
+  });
+  const COLUNAS: ColunaTabela[] = [
+    { key: "cod", label: "Código", wch: 12, align: "left", sort: "cod", valor: (p) => p.cod,
+      render: (p) => <span className="text-[10px] font-bold text-muted-foreground">{p.cod}</span> },
+    { key: "desc", label: "Descrição", wch: 62, align: "left", sort: "desc", valor: (p) => p.desc,
+      render: (p) => <span className="text-[11px] font-black text-foreground uppercase tracking-tight line-clamp-1">{p.desc}</span> },
+    { key: "brand", label: "Marca", wch: 24, align: "center", sort: "brand", valor: (p) => p.brand,
+      render: (p) => (
+        <span className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 uppercase tracking-tight">
+          {p.brand}
+        </span>
+      ) },
+    { key: "codFornecedor", label: "Cód. forn.", wch: 14, align: "center", sort: "codFornecedor", valor: (p) => p.codFornecedor,
+      render: (p) => (
+        <span title={p.fornecedor || undefined} className="text-[10px] font-bold text-muted-foreground tabular-nums">
+          {p.codFornecedor || "—"}
+        </span>
+      ) },
+    { key: "fornecedor", label: "Fornecedor", wch: 36, align: "left", sort: "fornecedor", valor: (p) => p.fornecedor },
+    { key: "stock", label: "Estoque gerencial", wch: 12, align: "right", sort: "stock", num: "#,##0.##;-#,##0.##;0", valor: (p) => p.stock,
+      render: (p) => (
+        <span className={cn("text-[11px] font-black tracking-tighter", p.stock > 10 ? "text-foreground" : p.stock > 0 ? "text-amber-500" : "text-rose-500")}>
+          {p.stock.toFixed(3)}
+        </span>
+      ) },
+    { key: "media", label: "Média 3M", wch: 12, align: "right", sort: "media", num: "#,##0.00", valor: (p) => p.media,
+      render: (p) => <span className="text-[11px] font-black text-blue-600 dark:text-blue-400 tracking-tighter tabular-nums">{fmtNum(p.media)}</span> },
+    { key: "sales", label: "Total vendido", wch: 14, align: "right", sort: "sales", num: "#,##0.##", valor: (p) => p.sales },
+    { key: "debit", label: "Débito", wch: 14, align: "right", sort: "debit", num: '"R$" #,##0.00', valor: (p) => p.debit,
+      render: (p) => <span className="text-[11px] font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">R$ {fmtNum(p.debit)}</span> },
+    { key: "credit", label: "Crédito", wch: 14, align: "right", sort: "credit", num: '"R$" #,##0.00', valor: (p) => p.credit,
+      render: (p) => <span className="text-[11px] font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">R$ {fmtNum(p.credit)}</span> },
+    ...Object.entries(CAMPOS_CADITE_NOMEADOS).map(([key, { campo, label, formato }]): ColunaTabela => ({
+      key, label, wch: 14, align: "center",
+      valor: (p) => {
+        const v = valorCadite(caditeDados.get(p.cod)?.[campo]);
+        return formato ? formato(v) : v;
+      },
+    })),
+    // Na tela: "002 - SUBST TRIBUT - CST 060". Na planilha: código e descrição em colunas separadas.
+    colunaCodigoDescricao("classFiscal", "Classificação fiscal", "ITE_CODABF", "ABF_DESABF"),
+    colunaCodigoDescricao("cest", "CEST", "ITE_CDCEST", "CES_DESCRI"),
+    { key: "curva", label: "Curva ABC", wch: 10, align: "center", valor: (p) => curvaPorCod.get(p.cod) ?? "—" },
+    { key: "shopify", label: "Shopify", wch: 16, align: "center", valor: (p) => syncPorCod.get(p.cod)?.status ?? "",
+      render: (p) => (
+        <SyncBadge
+          status={syncPorCod.get(p.cod)?.status}
+          loja={syncPorCod.get(p.cod)?.loja}
+          carregando={shopifyLoading}
+          erpPrice={p.debit}
+          erpStock={p.stock}
+          onEnviar={() => setEnvio([montarItem(p)])}
+        />
+      ) },
+    // Só na tela: botão de imprimir a etiqueta de preço (não vai para a planilha).
+    { key: "etiqueta", label: "Imprimir preço", wch: 0, align: "center", soTela: true, valor: () => "",
+      render: (p) => (
+        <button
+          onClick={() => imprimirEtiqueta(p)}
+          disabled={imprimindoCod !== null}
+          title="Imprimir etiqueta de preço"
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+        >
+          {imprimindoCod === p.cod ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+        </button>
+      ) },
+  ];
+  const colunaDe = (k: string): ColunaTabela | undefined => {
+    if (!k.startsWith("cadite:")) return COLUNAS.find((c) => c.key === k);
+    const campo = k.slice(7);
+    return { key: k, label: campo, wch: 16, align: "left", valor: (p) => valorCadite(caditeDados.get(p.cod)?.[campo]) };
+  };
+  const colunasVisiveis = colunasTela.map(colunaDe).filter((c): c is ColunaTabela => !!c);
+
+  // Baixa o que está na tela: filtros, ordenação e as colunas escolhidas.
   const exportarExcel = async () => {
+    const cols = colunasVisiveis
+      .filter((c) => !c.soTela)
+      .flatMap((c): ColunaTabela[] =>
+        c.extraPlanilha
+          ? [c, { key: `${c.key}-extra`, align: "left", ...c.extraPlanilha }]
+          : [c],
+      );
+    if (!cols.length) return;
     // xlsx-js-style: mesma API do xlsx, mas grava cor, fonte e borda.
     const XLSX = await import("xlsx-js-style");
     const borda = { style: "thin", color: { rgb: "D9DEE7" } };
@@ -418,41 +589,41 @@ export function ProdutosView() {
 
     const titulo = `Produtos — ${new Date().toLocaleDateString("pt-BR")} — ${filteredProducts.length} itens`;
     const aoa: (string | number)[][] = [
-      [titulo, "", "", ""],
-      ["Código", "Descrição", "Marca", "Estoque"],
-      ...filteredProducts.map((p) => [p.cod, p.desc, p.brand, p.stock]),
+      [titulo, ...cols.slice(1).map(() => "")],
+      cols.map((c) => c.label),
+      ...filteredProducts.map((p) => cols.map((c) => c.valor(p))),
     ];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
-    ws["!cols"] = [{ wch: 12 }, { wch: 62 }, { wch: 24 }, { wch: 12 }];
+    const ultima = XLSX.utils.encode_col(cols.length - 1);
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: cols.length - 1 } }];
+    ws["!cols"] = cols.map((c) => ({ wch: c.wch }));
     ws["!rows"] = [{ hpt: 26 }, { hpt: 20 }];
-    ws["!autofilter"] = { ref: `A2:D${aoa.length}` };
+    ws["!autofilter"] = { ref: `A2:${ultima}${aoa.length}` };
 
     ws["A1"].s = {
       font: { bold: true, sz: 14, color: { rgb: "1E3A8A" }, name: "Calibri" },
       alignment: { vertical: "center" },
     };
-    for (let c = 0; c < 4; c++) ws[XLSX.utils.encode_cell({ r: 1, c })].s = cab;
+    cols.forEach((_, c) => (ws[XLSX.utils.encode_cell({ r: 1, c })].s = cab));
 
     filteredProducts.forEach((p, i) => {
       const r = i + 2;
       const zebra = i % 2 === 1 ? { fill: { fgColor: { rgb: "F3F6FB" } } } : {};
       const base = { font: { sz: 10, name: "Calibri" }, border: bordas, alignment: { vertical: "center" }, ...zebra };
-      ws[XLSX.utils.encode_cell({ r, c: 0 })].s = { ...base, alignment: { horizontal: "center", vertical: "center" } };
-      ws[XLSX.utils.encode_cell({ r, c: 1 })].s = base;
-      ws[XLSX.utils.encode_cell({ r, c: 2 })].s = base;
-      const est = ws[XLSX.utils.encode_cell({ r, c: 3 })];
-      est.z = "#,##0.##;-#,##0.##;0";
-      est.s = {
-        ...base,
-        alignment: { horizontal: "right", vertical: "center" },
-        font: {
-          sz: 10,
-          name: "Calibri",
-          bold: p.stock <= 0,
-          color: { rgb: p.stock < 0 ? "DC2626" : p.stock === 0 ? "9CA3AF" : "111827" },
-        },
-      };
+      cols.forEach((col, c) => {
+        const cel = ws[XLSX.utils.encode_cell({ r, c })];
+        if (!cel) return;
+        if (col.num) cel.z = col.num;
+        cel.s = { ...base, alignment: { horizontal: col.align, vertical: "center" } };
+        if (col.key === "stock") {
+          cel.s.font = {
+            sz: 10,
+            name: "Calibri",
+            bold: p.stock <= 0,
+            color: { rgb: p.stock < 0 ? "DC2626" : p.stock === 0 ? "9CA3AF" : "111827" },
+          };
+        }
+      });
     });
 
     const wb = XLSX.utils.book_new();
@@ -554,10 +725,18 @@ export function ProdutosView() {
           <button
             onClick={exportarExcel}
             disabled={filteredProducts.length === 0}
-            title="Exportar para Excel (código, descrição, marca, estoque)"
+            title="Baixar planilha com as colunas da tabela"
             className="flex items-center justify-center p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all shadow-sm group shrink-0 disabled:opacity-40"
           >
             <FileSpreadsheet className="w-4 h-4 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
+          </button>
+
+          <button
+            onClick={() => setColunasAberto(true)}
+            title="Escolher colunas da tabela"
+            className="flex items-center justify-center p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all shadow-sm group shrink-0"
+          >
+            <Settings className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
           </button>
         </div>
 
@@ -589,124 +768,66 @@ export function ProdutosView() {
           <table className="w-full text-left border-collapse min-w-[640px]">
             <thead className="sticky top-0 z-10 bg-secondary/50 backdrop-blur-md border-b border-border">
               <tr>
-                {[
-                  { id: "cod", label: "CÓDIGO", align: "left" },
-                  { id: "desc", label: "DESCRIÇÃO", align: "left" },
-                  { id: "brand", label: "MARCA", align: "center" },
-                  { id: "codFornecedor", label: "CÓD. FORN.", align: "center" },
-                  { id: "stock", label: "ESTOQUE", align: "right" },
-                  { id: "media", label: "MÉDIA 3M", align: "right" },
-                  { id: "debit", label: "DÉBITO", align: "right" },
-                ].map((col) => (
+                {colunasVisiveis.map((col) => (
                   <th
-                    key={col.id}
-                    onClick={() => requestSort(col.id as keyof Product)}
+                    key={col.key}
+                    onClick={col.sort ? () => requestSort(col.sort!) : undefined}
                     className={cn(
-                       "py-2.5 px-3 sm:px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors",
+                       "py-2.5 px-3 sm:px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest transition-colors whitespace-nowrap",
+                       col.sort && "cursor-pointer hover:bg-secondary/60",
                        col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
                     )}
                   >
                     <div className={cn("flex items-center gap-1.5", col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start")}>
                       <span className="truncate">{col.label}</span>
-                      <div className="shrink-0">
-                        {sortConfig?.key === col.id ? (
-                          sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 text-blue-500" /> : <ChevronDown className="w-3 h-3 text-blue-500" />
-                        ) : (
-                          <ArrowUpDown className="w-3 h-3 opacity-20 group-hover:opacity-40 transition-opacity" />
-                        )}
-                      </div>
+                      {col.sort && (
+                        <div className="shrink-0">
+                          {sortConfig?.key === col.sort ? (
+                            sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 text-blue-500" /> : <ChevronDown className="w-3 h-3 text-blue-500" />
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 opacity-20 group-hover:opacity-40 transition-opacity" />
+                          )}
+                        </div>
+                      )}
                     </div>
                   </th>
                 ))}
-                {/* Sem ordenação: o status vem da loja, não é um campo do produto. */}
-                <th className="py-2.5 px-3 sm:px-6 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">
-                  Shopify
-                </th>
-                <th className="py-2.5 px-2 w-10" aria-label="Etiqueta" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
                 Array.from({ length: 15 }).map((_, i) => (
                   <tr key={`skeleton-${i}`} className="animate-pulse">
-                    <td className="py-4 px-3 sm:px-6"><div className="h-2 w-10 bg-secondary rounded" /></td>
-                    <td className="py-4 px-3 sm:px-6"><div className="h-2 w-full max-w-[250px] bg-secondary rounded" /></td>
-                    <td className="py-4 px-3 sm:px-6"><div className="h-5 w-16 bg-secondary/50 rounded-lg mx-auto" /></td>
-                    <td className="py-4 px-3 sm:px-6"><div className="h-2 w-14 bg-secondary rounded mx-auto" /></td>
-                    <td className="py-4 px-3 sm:px-6 text-right"><div className="h-2 w-12 bg-secondary rounded ml-auto" /></td>
-                    <td className="py-4 px-3 sm:px-6 text-right"><div className="h-2 w-12 bg-secondary rounded ml-auto" /></td>
-                    <td className="py-4 px-3 sm:px-6 text-right"><div className="h-2 w-16 bg-secondary/50 rounded ml-auto" /></td>
-                    <td className="py-4 px-3 sm:px-6"><div className="h-5 w-20 bg-secondary/50 rounded-lg mx-auto" /></td>
-                    <td className="py-4 px-2" />
+                    {colunasVisiveis.map((c) => (
+                      <td key={c.key} className="py-4 px-3 sm:px-6"><div className="h-2 w-12 bg-secondary rounded" /></td>
+                    ))}
                   </tr>
                 ))
               ) : (
                 <>
                   {visibleProducts.map((p: Product, i) => (
                     <tr key={i} className="hover:bg-secondary/20 transition-colors group">
-                      <td className="py-3 px-3 sm:px-6 text-[10px] font-bold text-muted-foreground">{p.cod}</td>
-                      <td className="py-3 px-3 sm:px-6">
-                        <span className="text-[11px] font-black text-foreground uppercase tracking-tight line-clamp-1">{p.desc}</span>
-                      </td>
-                      <td className="py-3 px-3 sm:px-6 text-center">
-                        <span className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 uppercase tracking-tight">
-                          {p.brand}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 sm:px-6 text-center">
-                        {/* Nome do fornecedor no hover: o código sozinho não diz nada,
-                            mas alargar a tabela com mais uma coluna de texto sim. */}
-                        <span
-                          title={p.fornecedor || undefined}
-                          className="text-[10px] font-bold text-muted-foreground tabular-nums"
-                        >
-                          {p.codFornecedor || "—"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 sm:px-6 text-right">
-                        <span className={cn(
-                          "text-[11px] font-black tracking-tighter",
-                          p.stock > 10 ? "text-foreground" : p.stock > 0 ? "text-amber-500" : "text-rose-500"
-                        )}>
-                          {p.stock.toFixed(3)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 sm:px-6 text-right">
-                        <span className="text-[11px] font-black text-blue-600 dark:text-blue-400 tracking-tighter tabular-nums">
-                          {p.media.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 sm:px-6 text-right">
-                        <span className="text-[11px] font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">
-                          R$ {p.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 sm:px-6 text-center">
-                        <SyncBadge
-                          status={syncPorCod.get(p.cod)?.status}
-                          loja={syncPorCod.get(p.cod)?.loja}
-                          carregando={shopifyLoading}
-                          erpPrice={p.debit}
-                          erpStock={p.stock}
-                          onEnviar={() => setEnvio([montarItem(p)])}
-                        />
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <button
-                          onClick={() => imprimirEtiqueta(p)}
-                          disabled={imprimindoCod !== null}
-                          title="Imprimir etiqueta de preço"
-                          className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                        >
-                          {imprimindoCod === p.cod ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-                        </button>
-                      </td>
+                      {colunasVisiveis.map((col) => {
+                        const v = col.render ? null : col.valor(p);
+                        return (
+                          <td
+                            key={col.key}
+                            className={cn("py-3 px-3 sm:px-6", col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left")}
+                          >
+                            {col.render ? col.render(p) : (
+                              <span className="text-[10px] font-bold text-muted-foreground tabular-nums whitespace-nowrap">
+                                {typeof v === "number" ? v.toLocaleString("pt-BR") : v || "—"}
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                   
                   {visibleCount < filteredProducts.length && (
                     <tr>
-                      <td colSpan={9} className="py-6">
+                      <td colSpan={colunasVisiveis.length} className="py-6">
                         <div className="flex justify-center w-full">
                           <TinyLoader size="sm" />
                         </div>
@@ -720,6 +841,18 @@ export function ProdutosView() {
         </div>
       </div>
 
+      {colunasAberto && (
+        <ExportarColunasModal
+          colunas={COLUNAS}
+          inicial={colunasTela}
+          onFechar={() => setColunasAberto(false)}
+          onSalvar={(keys) => {
+            setColunasTela(keys);
+            try { localStorage.setItem("produtos-colunas-tela", JSON.stringify(keys)); } catch { /* opcional */ }
+            setColunasAberto(false);
+          }}
+        />
+      )}
       {etiquetasAberto && (
         <EtiquetaPrecoModal
           produtos={products}

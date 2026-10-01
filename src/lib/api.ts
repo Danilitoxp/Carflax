@@ -741,6 +741,15 @@ export const apiDashboardProdutos = (codigo?: string) =>
     ...(codigo ? { codigo } : {})
   });
 
+export const apiCaditeColunas = () => get<string[]>("/api/dashboard/produtos/cadite/colunas");
+export const apiCaditeExportar = (codigos: string[], colunas: string[]) =>
+  post<Record<string, unknown>[]>("/api/dashboard/produtos/cadite", {
+    codigos,
+    colunas,
+    descClassFiscal: colunas.includes("ITE_CODABF"),
+    descCest: colunas.includes("ITE_CDCEST"),
+  });
+
 export interface ProdutoFornecedor {
   COD_ITEM: string;
   DESCRICAO: string;
