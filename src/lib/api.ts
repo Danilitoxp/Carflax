@@ -1496,6 +1496,43 @@ export interface KardexMesResponse {
 }
 
 /** Quem comprou o item naquele mês — detalhe do modal da Reposição. */
+export interface CurvaFornecedor {
+  cod: string;
+  nome: string;
+  valor_12m: number;
+  pedidos: number;
+  ultima_compra: string | null;
+  participacao_acumulada: number;
+  curva: "A" | "B" | "C";
+}
+
+export interface CurvasResponse {
+  meses: number;
+  resumo: { curva: string; fornecedores: number; valor: number }[];
+  fornecedores: CurvaFornecedor[];
+}
+
+/** Curva ABC dos fornecedores pelo valor comprado nos ultimos 12 meses. */
+export const apiComprasCurvas = () => get<CurvasResponse>("/api/compras/reposicao/curvas");
+
+/** Monta agora as propostas de pedido daquele agendamento. */
+export const apiComprasExecutarAgenda = (id: string) =>
+  apiPost<{ success: boolean; propostas: number; itens: number }>(
+    "/api/compras/reposicao/agenda/" + id + "/executar", {},
+  );
+
+/** Envia a proposta para a Citel (cria o pedido de compra). */
+export const apiComprasEnviarProposta = (
+  id: string,
+  itens: unknown[],
+  comprador?: string,
+  usuarioId?: string,
+) =>
+  apiPost<{ success: boolean; pedido: string; itens: number }>(
+    "/api/compras/reposicao/propostas/" + id + "/enviar",
+    { itens, comprador, usuario_id: usuarioId },
+  );
+
 export const apiComprasKardexMes = (item: string, mes: string) =>
   get<KardexMesResponse>("/api/compras/reposicao/kardex", { item, mes });
 

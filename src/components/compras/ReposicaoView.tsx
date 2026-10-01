@@ -6,12 +6,15 @@
 // venda); o pedido de compra em aberto abate a sugestão. Quem calcula é o
 // backend (reposicaoHandler.js) — aqui é só apresentação, filtro e paginação.
 
-import { useEffect, useMemo, useState } from "react";
-import { Boxes, Search, Loader2, Truck, Download, ChevronLeft, ChevronRight, AlertCircle, FileText } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Boxes, Search, Loader2, Truck, Download, ChevronLeft, ChevronRight, AlertCircle, FileText, CalendarClock, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import { apiComprasReposicao, type ReposicaoItem, type ReposicaoResponse } from "@/lib/api";
 import { anexarGuiaImportacao } from "@/lib/guia-importacao-produtos";
 import { KardexMesModal } from "./KardexMesModal";
+import { AgendaReposicaoModal } from "./AgendaReposicaoModal";
+import { PropostasCompraPainel } from "./PropostasCompraPainel";
 
 /** Mês aberto no modal de detalhe das vendas. */
 interface MesAberto {
@@ -36,7 +39,7 @@ function rotuloMes(mes: string) {
   return `${MESES_CURTOS[Number(m) - 1]}/${ano.slice(2)}`;
 }
 
-export function ReposicaoView() {
+export function ReposicaoView({ userProfile }: { userProfile?: { id?: string; name?: string; operator_code?: string } } = {}) {
   const [dados, setDados] = useState<ReposicaoResponse | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -44,6 +47,23 @@ export function ReposicaoView() {
   const [fornecedor, setFornecedor] = useState("");
   const [porPagina, setPorPagina] = useState(15);
   const [mesAberto, setMesAberto] = useState<MesAberto | null>(null);
+  const [agendaAberta, setAgendaAberta] = useState(false);
+  // "lista" = tabela de reposição · "propostas" = conferência dos pedidos montados
+  const [aba, setAba] = useState<"lista" | "propostas">("lista");
+  const [pendentes, setPendentes] = useState(0);
+
+  // Propostas aguardando conferência, para o botão mostrar o contador.
+  const contarPendentes = useCallback(() => {
+    supabase
+      .from("reposicao_propostas")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pendente")
+      .then(({ count }) => setPendentes(count || 0));
+  }, []);
+
+  useEffect(() => {
+    contarPendentes();
+  }, [contarPendentes]);
   const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
@@ -135,6 +155,32 @@ export function ReposicaoView() {
           </select>
         </div>
 
+        {/* Propostas montadas pela agenda, esperando conferência. */}
+        {pendentes > 0 && (
+          <button
+            onClick={() => setAba("propostas")}
+            title="Propostas de compra para conferir"
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-[11px] font-bold transition-colors",
+              aba === "propostas"
+                ? "bg-blue-600 border-blue-600 text-white"
+                : "bg-card border-blue-500/40 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10",
+            )}
+          >
+            <ClipboardList className="w-4 h-4" />
+            {pendentes} {pendentes === 1 ? "proposta" : "propostas"}
+          </button>
+        )}
+
+        {/* Agenda de reposição: compra recorrente por curva de fornecedor. */}
+        <button
+          onClick={() => setAgendaAberta(true)}
+          title="Agenda de reposição"
+          className="inline-flex items-center justify-center p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:text-blue-500 hover:border-blue-500/40 transition-colors"
+        >
+          <CalendarClock className="w-4 h-4" />
+        </button>
+
         <button
           onClick={exportar}
           disabled={!itens.length}
@@ -143,6 +189,16 @@ export function ReposicaoView() {
           <Download className="w-4 h-4" /> Exportar Excel
         </button>
       </div>
+
+      {agendaAberta && (
+        <AgendaReposicaoModal
+          usuario={{ id: userProfile?.id, nome: userProfile?.name }}
+          onFechar={() => {
+            setAgendaAberta(false);
+            contarPendentes();
+          }}
+        />
+      )}
 
       {mesAberto && (
         <KardexMesModal
@@ -155,6 +211,16 @@ export function ReposicaoView() {
       )}
 
       <div className="flex-1 min-h-0 flex px-4 sm:px-6 pb-6">
+        {aba === "propostas" ? (
+          <PropostasCompraPainel
+            usuario={{ id: userProfile?.id, operatorCode: userProfile?.operator_code }}
+            onVoltar={() => {
+              setAba("lista");
+              contarPendentes();
+            }}
+            aoMudar={contarPendentes}
+          />
+        ) : (
         <div className="flex-1 min-h-0 flex flex-col rounded-2xl border border-border bg-card overflow-hidden">
           {carregando ? (
             <div className="flex-1 flex items-center justify-center gap-2 text-[12px] font-bold text-muted-foreground">
@@ -253,6 +319,7 @@ export function ReposicaoView() {
             </>
           )}
         </div>
+        )}
       </div>
     </div>
   );

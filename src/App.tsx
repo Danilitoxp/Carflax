@@ -1535,7 +1535,7 @@ function DashboardContent({
           ) : activeItem === "Compras" ? (
             <ProdutosComprasView />
           ) : activeItem === "Reposição" ? (
-            <ReposicaoView />
+            <ReposicaoView userProfile={userProfile || undefined} />
           ) : activeItem === "Coletas" ? (
             <ColetasView userProfile={userProfile || undefined} />
           ) : activeItem === "Relatórios Compras" ? (
