@@ -103,7 +103,85 @@ const ITENS: Item[] = ([
 const GRUPOS = [...new Set(ITENS.map((i) => i.g))];
 
 type Uso = "sim" | "pouco" | "nao";
-const USO: [Uso, string][] = [["sim", "Usam"], ["pouco", "Pouco"], ["nao", "Não usam"]];
+
+/**
+ * Que "seção" do HUB (o que fica gravado em hub_acessos quando alguém abre a
+ * tela) corresponde a cada ferramenta. Ferramenta fora daqui não tem medição
+ * de cliques: app do Coletor, páginas externas, servidores e janelas que não
+ * trocam de tela (Chat, Organograma).
+ */
+const SECOES: Record<string, string[]> = {
+  // Coletor (app): gravado pelo próprio app (origem 'coletor').
+  [slug("Coletor (app)-Separação")]: ["Coletor › Separação"],
+  [slug("Coletor (app)-Conferência de entrada")]: ["Coletor › Conferência de entrada"],
+  [slug("Coletor (app)-Conferência de saída")]: ["Coletor › Conferência de saída"],
+  [slug("Coletor (app)-Inventário")]: ["Coletor › Inventário"],
+  [slug("Coletor (app)-Consulta de estoque")]: ["Coletor › Consulta de estoque"],
+  [slug("Coletor (app)-Armazenamento")]: ["Coletor › Armazenamento"],
+  [slug("Coletor (app)-Localização")]: ["Coletor › Localização"],
+  [slug("Coletor (app)-Cadastro de código de barras")]: ["Coletor › Cadastro de código de barras"],
+  [slug("Coletor (app)-Impressão de etiqueta")]: ["Coletor › Impressão de etiqueta"],
+  [slug("Coletor (app)-Faturamento")]: ["Coletor › Faturamento"],
+  [slug("Coletor (app)-Ranking")]: ["Coletor › Ranking"],
+  [slug("Coletor (app)-Comunicados e mensagens")]: ["Coletor › Mensagens"],
+  [slug("Coletor (app)-Painel administrativo")]: ["Coletor › Painel administrativo"],
+  "hub-dashboard-geral": ["Geral"],
+  "hub-dashboard-produtos": ["Produtos"],
+  "hub-dashboard-ranking-do-dia-tv": ["Ranking"],
+  "hub-essencial-esteira": ["Esteira", "Minha Esteira"],
+  "hub-essencial-agenda": ["Agenda"],
+  "hub-essencial-ferias": ["Férias"],
+  "hub-essencial-sugestoes": ["Sugestões"],
+  "hub-comercial-minha-carteira": ["Carteira"],
+  "hub-comercial-orcamentos": ["Orçamentos"],
+  "hub-comercial-meus-pedidos": ["Meus Pedidos"],
+  "hub-comercial-prospeccoes": ["Prospecções"],
+  "hub-comercial-campanhas": ["Campanhas"],
+  "hub-comercial-alugueis": ["Alugueis"],
+  "hub-comercial-pos-venda": ["Pós-Venda"],
+  "hub-comercial-pesquisa-do-cliente": ["Pesquisa Cliente"],
+  "hub-comercial-relatorios-comerciais": ["Relatórios"],
+  "hub-comercial-vendedor-no-celular-vendedor": ["Vendedor no celular"],
+  "hub-marketing-whatsapp-api": ["Whatsapp API"],
+  "hub-marketing-leads": ["Leads"],
+  "hub-marketing-gestao-de-trafego": ["Gestao Trafego"],
+  "hub-marketing-eventos": ["Eventos Marketing"],
+  "hub-marketing-relatorios-de-marketing": ["Relatórios Mkt"],
+  "hub-estoque-separacao": ["Separação"],
+  "hub-estoque-conferencia": ["Conferência"],
+  "hub-estoque-retirada": ["Retirada"],
+  "hub-estoque-furos": ["Furos"],
+  "hub-estoque-cabos": ["Cabos"],
+  "hub-estoque-relatorios-de-estoque": ["Relatórios Estoque"],
+  "hub-compras-produtos-a-comprar": ["Compras"],
+  "hub-compras-relatorios-de-compras": ["Relatórios Compras"],
+  "hub-entregas-romaneios": ["Romaneios"],
+  "hub-entregas-coletas": ["Coletas"],
+  "hub-entregas-ocorrencias": ["Ocorrências Entregas"],
+  "hub-entregas-mapa-ao-vivo": ["Mapa Entregas"],
+  "hub-entregas-relatorios-de-entregas": ["Relatórios Entregas"],
+  "hub-rh-triagem-de-curriculos": ["Triagem"],
+  "hub-gestao-painel-do-gestor-gestor": ["Painel do Gestor"],
+  "hub-gestao-scrum-board": ["Scrum"],
+  "hub-gestao-relatorios-scrum": ["Relatórios Scrum"],
+  "hub-gestao-usuarios-e-permissoes": ["Usuários"],
+  "hub-gestao-db-admin": ["DB Admin"],
+};
+
+type Periodo = "hoje" | "7d" | "30d";
+const PERIODOS: { key: Periodo; label: string; dias: number }[] = [
+  { key: "hoje", label: "Hoje", dias: 1 },
+  { key: "7d", label: "7 dias", dias: 7 },
+  { key: "30d", label: "30 dias", dias: 30 },
+];
+
+interface Acesso { secao: string; user_id: string | null; created_at: string }
+
+const inicioDoDia = (d: Date) => {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+};
 
 interface Avaliacao { impacto: number | null; uso: Uso | null; obs: string; removido: boolean }
 const VAZIA: Avaliacao = { impacto: null, uso: null, obs: "", removido: false };
@@ -116,6 +194,88 @@ export function FerramentasView({ userId }: { userId?: string }) {
   const [abertas, setAbertas] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ msg: string; desfazer: () => void } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [acessos, setAcessos] = useState<Acesso[] | null>(null);
+  const [periodo, setPeriodo] = useState<Periodo>("7d");
+  // Ferramenta que acabou de receber um clique pisca por 2 s.
+  const [pulsando, setPulsando] = useState<Set<string>>(new Set());
+
+  // Cliques em cada tela: 30 dias de histórico + cada novo acesso ao vivo.
+  useEffect(() => {
+    let vivo = true;
+    const desde = inicioDoDia(new Date(Date.now() - 29 * 864e5)).toISOString();
+    supabase
+      .from("hub_acessos")
+      .select("secao, user_id, created_at")
+      .gte("created_at", desde)
+      .order("created_at", { ascending: false })
+      .limit(50000)
+      .then(({ data }) => vivo && setAcessos((data || []) as Acesso[]));
+    const canal = supabase
+      .channel("ferramentas-acessos")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "hub_acessos" }, (p) => {
+        const a = p.new as Acesso;
+        setAcessos((prev) => [a, ...(prev || [])]);
+        const item = Object.entries(SECOES).find(([, secs]) => secs.includes(a.secao));
+        if (item) {
+          setPulsando((prev) => new Set(prev).add(item[0]));
+          setTimeout(() => setPulsando((prev) => {
+            const n = new Set(prev);
+            n.delete(item[0]);
+            return n;
+          }), 2000);
+        }
+      })
+      .subscribe();
+    return () => {
+      vivo = false;
+      supabase.removeChannel(canal);
+    };
+  }, []);
+
+  /** Por ferramenta: total no período, pessoas diferentes e série por dia. */
+  const uso = useMemo(() => {
+    const dias = PERIODOS.find((p) => p.key === periodo)!.dias;
+    const hoje0 = inicioDoDia(new Date()).getTime();
+    const inicio = hoje0 - (dias - 1) * 864e5;
+    // Série: hoje = 24 barras por hora; 7 e 30 dias = 1 barra por dia.
+    const nBarras = periodo === "hoje" ? 24 : dias;
+    const porSecao = new Map<string, { total: number; pessoas: Set<string>; serie: number[] }>();
+    for (const a of acessos || []) {
+      const t = new Date(a.created_at).getTime();
+      if (t < inicio) continue;
+      const cur = porSecao.get(a.secao) ?? { total: 0, pessoas: new Set<string>(), serie: Array(nBarras).fill(0) };
+      cur.total++;
+      if (a.user_id) cur.pessoas.add(a.user_id);
+      const idx = periodo === "hoje" ? new Date(t).getHours() : Math.floor((t - inicio) / 864e5);
+      if (idx >= 0 && idx < nBarras) cur.serie[idx]++;
+      porSecao.set(a.secao, cur);
+    }
+    const porItem = new Map<string, { total: number; pessoas: number; serie: number[] }>();
+    for (const [id, secs] of Object.entries(SECOES)) {
+      const serie = Array(nBarras).fill(0);
+      const pessoas = new Set<string>();
+      let total = 0;
+      for (const sec of secs) {
+        const c = porSecao.get(sec);
+        if (!c) continue;
+        total += c.total;
+        c.pessoas.forEach((p) => pessoas.add(p));
+        c.serie.forEach((v, k) => (serie[k] += v));
+      }
+      porItem.set(id, { total, pessoas: pessoas.size, serie });
+    }
+    // Faixa de uso pela própria distribuição: zero = sem acesso; abaixo da
+    // mediana das que têm uso = pouco; acima = usam.
+    const positivos = [...porItem.values()].map((v) => v.total).filter((v) => v > 0).sort((a, b) => a - b);
+    const mediana = positivos.length ? positivos[Math.floor(positivos.length / 2)] : 0;
+    const nivel = (id: string): Uso | null => {
+      const v = porItem.get(id);
+      if (!v) return null; // sem medição
+      if (v.total === 0) return "nao";
+      return v.total >= mediana ? "sim" : "pouco";
+    };
+    return { porItem, nivel };
+  }, [acessos, periodo]);
 
   const aplicarLinhas = useCallback((linhas: Array<Record<string, unknown>>) => {
     setEstado((prev) => {
@@ -193,7 +353,7 @@ export function FerramentasView({ userId }: { userId?: string }) {
     const s = av(i.id);
     if (s.removido) return false;
     if (filtroAtual === "Todos") return true;
-    if (filtroAtual === "Não usam") return s.uso === "nao";
+    if (filtroAtual === "Sem acesso") return uso.nivel(i.id) === "nao";
     if (filtroAtual === "Sem nota") return s.impacto == null;
     return i.g === filtroAtual;
   };
@@ -203,13 +363,13 @@ export function FerramentasView({ userId }: { userId?: string }) {
     const notas: number[] = [];
     for (const i of ativos) {
       const s = estado[i.id] ?? VAZIA;
-      c[s.uso ?? "none"]++;
+      c[uso.nivel(i.id) ?? "none"]++;
       if (s.impacto != null) notas.push(s.impacto);
     }
     const media = notas.length ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1).replace(".", ",") : "—";
     const horas = ativos.reduce((a, i) => a + i.h, 0);
     return { c, notas: notas.length, media, horas };
-  }, [ativos, estado]);
+  }, [ativos, estado, uso]);
 
   return (
     <div className="ferr">
@@ -217,8 +377,8 @@ export function FerramentasView({ userId }: { userId?: string }) {
         <header>
           <h1>Inventário de Ferramentas Carflax</h1>
           <p className="sub">
-            Todas as ferramentas e telas criadas internamente. Para cada uma, marque o impacto (0 a 10) e se as pessoas estão usando. Telas que não
-            fazem mais sentido podem ser removidas da lista. Tudo é salvo na hora e fica visível para quem abrir esta página.
+            Todas as ferramentas e telas criadas internamente. O uso de cada uma é medido pelos acessos reais da equipe, em tempo real. Marque o
+            impacto (0 a 10); telas que não fazem mais sentido podem ser removidas da lista.
           </p>
           <button className="btn-valor" aria-expanded={mostrarValor} onClick={() => setMostrarValor((v) => !v)}>
             {mostrarValor ? "Ocultar valor economizado" : "Mostrar valor economizado pela Carflax"}
@@ -233,21 +393,29 @@ export function FerramentasView({ userId }: { userId?: string }) {
               </small>
             </div>
           )}
-          <p className="status">{status}</p>
+          {status.startsWith("Não") && <p className="status">{status}</p>}
         </header>
 
         <div className="summary">
-          <span className="chip c-ok">{resumo.c.sim} usam</span>
+          <span className="chip c-ok">{resumo.c.sim} muito usadas</span>
           <span className="chip c-warn">{resumo.c.pouco} pouco uso</span>
-          <span className="chip c-bad">{resumo.c.nao} não usam</span>
-          <span className="chip c-unk">{resumo.c.none} sem avaliação</span>
+          <span className="chip c-bad">{resumo.c.nao} sem acesso</span>
+          <span className="chip c-unk">{resumo.c.none} sem medição</span>
           <span className="chip c-unk">
             Impacto médio {resumo.media} · {resumo.notas}/{ativos.length} com nota
           </span>
         </div>
 
+        <div className="filters" role="group" aria-label="Período">
+          {PERIODOS.map((p) => (
+            <button key={p.key} aria-pressed={p.key === periodo} onClick={() => setPeriodo(p.key)}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+
         <div className="filters" role="group" aria-label="Filtrar">
-          {["Todos", "Não usam", "Sem nota", ...gruposComItens].map((k) => (
+          {["Todos", "Sem acesso", "Sem nota", ...gruposComItens].map((k) => (
             <button key={k} aria-pressed={k === filtroAtual} onClick={() => setFiltro(k)}>
               {k}
             </button>
@@ -270,10 +438,12 @@ export function FerramentasView({ userId }: { userId?: string }) {
                   {itens.map((i) => {
                     const s = av(i.id);
                     const aberta = abertas.has(i.id) || !!s.obs;
+                    const nivel = uso.nivel(i.id);
+                    const u = uso.porItem.get(i.id);
                     return (
                       <div
                         key={i.id}
-                        className={["row", aberta && "open", s.removido && "removed", s.uso && `u-${s.uso}-card`].filter(Boolean).join(" ")}
+                        className={["row", aberta && "open", s.removido && "removed", nivel && `u-${nivel}-card`, pulsando.has(i.id) && "pulse"].filter(Boolean).join(" ")}
                       >
                         <div className="name">
                           <b>{i.n}</b>
@@ -301,19 +471,34 @@ export function FerramentasView({ userId }: { userId?: string }) {
                             </select>
                           </div>
                           <div>
-                            <span className="lbl">Estão usando?</span>
-                            <div className="seg">
-                              {USO.map(([v, t]) => (
-                                <button
-                                  key={v}
-                                  className={`u-${v}`}
-                                  aria-pressed={s.uso === v}
-                                  onClick={() => salvar(i.id, { uso: s.uso === v ? null : v })}
-                                >
-                                  {t}
-                                </button>
-                              ))}
-                            </div>
+                            <span className="lbl">Acessos · {PERIODOS.find((p) => p.key === periodo)!.label.toLowerCase()}</span>
+                            {!u ? (
+                              <p className="sem-medicao">Sem medição de cliques (fora do HUB)</p>
+                            ) : acessos === null ? (
+                              <p className="sem-medicao">Carregando…</p>
+                            ) : (
+                              <div className="uso">
+                                <div className="uso-num">
+                                  <strong className={nivel ? `t-${nivel}` : undefined}>{u.total.toLocaleString("pt-BR")}</strong>
+                                  <small>
+                                    {u.total === 1 ? "acesso" : "acessos"} · {u.pessoas} {u.pessoas === 1 ? "pessoa" : "pessoas"}
+                                  </small>
+                                </div>
+                                <div className="barras" aria-label={`Acessos por ${periodo === "hoje" ? "hora" : "dia"}`}>
+                                  {(() => {
+                                    const max = Math.max(1, ...u.serie);
+                                    return u.serie.map((v, k) => (
+                                      <span
+                                        key={k}
+                                        title={`${periodo === "hoje" ? `${k}h` : `dia ${k + 1}`}: ${v}`}
+                                        className={nivel ? `b-${nivel}` : undefined}
+                                        style={{ height: `${v ? Math.max(8, (v / max) * 100) : 4}%`, opacity: v ? 1 : 0.35 }}
+                                      />
+                                    ));
+                                  })()}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
 
