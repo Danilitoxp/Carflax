@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+import { anexarGuiaImportacao } from "@/lib/guia-importacao-produtos";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { authHeaders } from "@/lib/api";
 import { BarraFiltros, Carregando, Filtro, Vazio } from "./salacabos/ui";
@@ -71,6 +72,7 @@ export function EstoqueNcmTab({ barraFiltros }: { barraFiltros?: HTMLElement | n
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Estoque NCM");
+    anexarGuiaImportacao(XLSX, wb);
     XLSX.writeFile(wb, `Estoque por NCM ${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 

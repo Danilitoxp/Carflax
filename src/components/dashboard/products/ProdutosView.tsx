@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 import { TinyLoader } from "@/components/ui/TinyLoader";
 import { apiDashboardProdutos, apiCaditeExportar, type ProductInfo } from "@/lib/api";
+import { anexarGuiaImportacao } from "@/lib/guia-importacao-produtos";
 import { ShopifyEnvioModal, type ItemEnvio } from "./ShopifyEnvioModal";
 import { EtiquetaPrecoModal } from "./EtiquetaPrecoModal";
 import { ExportarColunasModal } from "./ExportarColunasModal";
@@ -396,6 +397,7 @@ export function ProdutosView() {
 
       const status = syncPorCod.get(p.cod)?.status;
       const matchesShopify =
+        !colunasTela.includes("shopify") ||
         filterShopify === SHOPIFY_FILTROS[0] ||
         (filterShopify === "Sincronizados" && status === "sincronizado") ||
         (filterShopify === "Divergentes" && status === "divergente") ||
@@ -433,7 +435,7 @@ export function ProdutosView() {
     }
 
     return filtered;
-  }, [products, searchTerm, filterBrand, filterStock, filterShopify, syncPorCod, sortConfig, filterCurva, curvaPorCod]);
+  }, [products, searchTerm, filterBrand, filterStock, filterShopify, colunasTela, syncPorCod, sortConfig, filterCurva, curvaPorCod]);
 
   const visibleProducts = filteredProducts.slice(0, visibleCount);
 
@@ -565,6 +567,8 @@ export function ProdutosView() {
     return { key: k, label: campo, wch: 16, align: "left", valor: (p) => valorCadite(caditeDados.get(p.cod)?.[campo]) };
   };
   const colunasVisiveis = colunasTela.map(colunaDe).filter((c): c is ColunaTabela => !!c);
+  // Tirou a coluna Shopify da tela: o filtro e o resumo do vínculo com a loja somem junto.
+  const mostrarShopify = colunasTela.includes("shopify");
 
   // Baixa o que está na tela: filtros, ordenação e as colunas escolhidas.
   const exportarExcel = async () => {
@@ -628,6 +632,7 @@ export function ProdutosView() {
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Produtos");
+    anexarGuiaImportacao(XLSX, wb);
     XLSX.writeFile(wb, `produtos-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
@@ -702,17 +707,19 @@ export function ProdutosView() {
             placeholder="Curva: Todas"
           />
 
-          <TinyDropdown
-            value={filterShopify}
-            options={[...SHOPIFY_FILTROS]}
-            onChange={(val) => {
-              setFilterShopify(val);
-              setVisibleCount(50);
-            }}
-            icon={ShoppingBag}
-            variant="blue"
-            placeholder="Shopify: Todos"
-          />
+          {mostrarShopify && (
+            <TinyDropdown
+              value={filterShopify}
+              options={[...SHOPIFY_FILTROS]}
+              onChange={(val) => {
+                setFilterShopify(val);
+                setVisibleCount(50);
+              }}
+              icon={ShoppingBag}
+              variant="blue"
+              placeholder="Shopify: Todos"
+            />
+          )}
 
           <button
             onClick={() => setEtiquetasAberto(true)}
@@ -741,7 +748,7 @@ export function ProdutosView() {
         </div>
 
         {/* RESUMO DO VÍNCULO COM A LOJA */}
-        {!shopifyLoading && products.length > 0 && (
+        {mostrarShopify && !shopifyLoading && products.length > 0 && (
           <div className="flex flex-wrap items-center gap-3 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
