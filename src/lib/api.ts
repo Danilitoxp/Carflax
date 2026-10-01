@@ -1048,6 +1048,10 @@ export interface FrvSeriePonto {
 export interface FrvCliente {
   cliente_id: string;
   nome_cliente: string;
+  documento: string | null;
+  tipo_pessoa: "PJ" | "PF" | null;
+  telefone: string | null;
+  telefone_whatsapp: boolean;
   cod_vendedor: string;
   nome_vendedor: string;
   empresa: string;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Search, Target, Clock, TrendingUp, Phone,
-  ChevronUp, ChevronDown, ChevronsUpDown, Users,
+  ChevronUp, ChevronDown, ChevronsUpDown, Users, IdCard, MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiAnaliseFrv } from "@/lib/api";
@@ -13,12 +13,40 @@ import { TinyLoader } from "@/components/ui/TinyLoader";
 interface ClienteFRV {
   cliente_id: string;
   nome_cliente: string;
+  documento: string | null;
+  tipo_pessoa: "PJ" | "PF" | null;
+  telefone: string | null;
+  telefone_whatsapp: boolean;
   ultima_compra: string;
   recencia_dias: number;
   frequencia: number;
   valor_total: number;
   cod_vendedor: string;
 }
+
+const soDigitos = (v: string) => v.replace(/D/g, "");
+
+/** CPF 000.000.000-00 e CNPJ 00.000.000/0000-00. */
+function fmtDocumento(doc: string | null) {
+  const d = soDigitos(doc || "");
+  if (d.length === 14) return d.replace(/^(d{2})(d{3})(d{3})(d{4})(d{2})$/, "$1.$2.$3/$4-$5");
+  if (d.length === 11) return d.replace(/^(d{3})(d{3})(d{3})(d{2})$/, "$1.$2.$3-$4");
+  return doc || "";
+}
+
+/** (11) 99999-9999 para celular e (11) 9999-9999 para fixo. */
+function fmtTelefone(tel: string | null) {
+  const d = soDigitos(tel || "").replace(/^55(?=d{10,11}$)/, "");
+  if (d.length === 11) return d.replace(/^(d{2})(d{5})(d{4})$/, "($1) $2-$3");
+  if (d.length === 10) return d.replace(/^(d{2})(d{4})(d{4})$/, "($1) $2-$3");
+  return tel || "";
+}
+
+const waLink = (tel: string) => `https://wa.me/55${soDigitos(tel).replace(/^55(?=d{11}$)/, "")}`;
+
+// Filtro de tempo parado em meses (pedido do Danilo): 1 a 6 meses.
+const MESES_PARADO = [1, 2, 3, 4, 5, 6];
+const DOC_FILTROS = ["Todos", "CNPJ", "CPF", "Sem documento"] as const;
 
 interface Vendedor {
   label: string;
@@ -54,7 +82,9 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [minValor, setMinValor] = useState(8000);
-  const [minDias, setMinDias] = useState(90);
+  const [minMeses, setMinMeses] = useState(3);
+  const [filterDoc, setFilterDoc] = useState<(typeof DOC_FILTROS)[number]>("Todos");
+  const minDias = minMeses * 30;
   const [sortField, setSortField] = useState<SortField>("recencia_dias");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [schedulingId, setSchedulingId] = useState<string | null>(null);
@@ -112,11 +142,24 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
 
   const filtered = useMemo(() => {
     return clientes
-      .filter(c =>
-        c.valor_total >= minValor &&
-        c.recencia_dias >= minDias &&
-        c.nome_cliente.toLowerCase().includes(search.toLowerCase())
-      )
+      .filter(c => {
+        const busca = search.trim().toLowerCase();
+        const digitosBusca = soDigitos(busca);
+        // A busca aceita nome, código do cliente e CPF/CNPJ (com ou sem máscara).
+        const casaBusca =
+          !busca ||
+          c.nome_cliente.toLowerCase().includes(busca) ||
+          c.cliente_id.includes(digitosBusca && digitosBusca.length >= 3 ? digitosBusca : busca) ||
+          (digitosBusca.length >= 3 && soDigitos(c.documento || "").includes(digitosBusca));
+
+        const casaDoc =
+          filterDoc === "Todos" ||
+          (filterDoc === "CNPJ" && c.tipo_pessoa === "PJ") ||
+          (filterDoc === "CPF" && c.tipo_pessoa === "PF") ||
+          (filterDoc === "Sem documento" && !c.tipo_pessoa);
+
+        return c.valor_total >= minValor && c.recencia_dias >= minDias && casaBusca && casaDoc;
+      })
       .sort((a, b) => {
         const va = a[sortField] as number | string;
         const vb = b[sortField] as number | string;
@@ -127,7 +170,7 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
           ? String(va).localeCompare(String(vb))
           : String(vb).localeCompare(String(va));
       });
-  }, [clientes, search, minValor, minDias, sortField, sortDir]);
+  }, [clientes, search, minValor, minDias, filterDoc, sortField, sortDir]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -189,7 +232,7 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
                 Prospecções
               </h1>
               <p className="text-[10px] font-medium text-muted-foreground mt-0.5">
-                Clientes com alto potencial parados há mais de {minDias} dias
+                Clientes com alto potencial parados há mais de {minMeses} {minMeses === 1 ? "mês" : "meses"}
               </p>
             </div>
           </div>
@@ -260,17 +303,30 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-2 bg-secondary/50 border border-border/60 rounded-lg">
+            <IdCard className="w-3 h-3 text-muted-foreground" />
+            <span className="text-[10px] font-bold text-muted-foreground">Documento</span>
+            <select
+              value={filterDoc}
+              onChange={e => setFilterDoc(e.target.value as (typeof DOC_FILTROS)[number])}
+              className="text-[10px] font-black bg-transparent outline-none cursor-pointer text-foreground"
+            >
+              {DOC_FILTROS.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-secondary/50 border border-border/60 rounded-lg">
             <Clock className="w-3 h-3 text-muted-foreground" />
             <span className="text-[10px] font-bold text-muted-foreground">Sem comprar há</span>
             <select
-              value={minDias}
-              onChange={e => setMinDias(Number(e.target.value))}
+              value={minMeses}
+              onChange={e => setMinMeses(Number(e.target.value))}
               className="text-[10px] font-black bg-transparent outline-none cursor-pointer text-foreground"
             >
-              <option value={60}>60 dias</option>
-              <option value={90}>90 dias</option>
-              <option value={120}>120 dias</option>
-              <option value={180}>180 dias</option>
+              {MESES_PARADO.map(m => (
+                <option key={m} value={m}>{m} {m === 1 ? "mês" : "meses"}</option>
+              ))}
             </select>
           </div>
         </div>
