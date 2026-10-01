@@ -5,6 +5,8 @@ import "./ranking-animations.css";
 import { BeamsBackground } from "@/components/ui/beams-background";
 import { RANKING_COUNT_DURATION_MS, useAnimatedRanking } from "./use-animated-ranking";
 import { RankingCelebration } from "./RankingCelebration";
+import { RankingCorrida } from "./RankingCorrida";
+import { liberarAudioMotor, tocarAceleracao } from "./som-motor";
 import { createRankingEventTracker, type RankingSeller } from "./ranking-events";
 import { useRankingCelebrations } from "./use-ranking-celebrations";
 import { hasOvertake } from "./ranking-overtake";
@@ -95,6 +97,30 @@ function MovementBadge({ change }: { change?: number }) {
 
 export function RankingView() {
   const [linhasRecebidas, setLinhas] = useState<Linha[]>([]);
+  // Meta do dia da LOJA = soma das metas diárias; vendido = soma das vendas de
+  // hoje. Conta todos os vendedores, não só os 10 que aparecem na tela.
+  const [loja, setLoja] = useState<{ vendido: number; meta: number }>({ vendido: 0, meta: 0 });
+  // Modo corrida: pista com um carro por vendedor no lugar do pódio/tabela.
+  // Usa todos os vendedores (não só os 10 da tabela) e fica lembrado no telão.
+  const [todas, setTodas] = useState<Linha[]>([]);
+  const [modoCorrida, setModoCorrida] = useState(() => {
+    try {
+      return localStorage.getItem("ranking-modo-corrida") === "1";
+    } catch {
+      return false;
+    }
+  });
+  // O navegador só deixa tocar som depois de um clique: libera no primeiro.
+  useEffect(() => liberarAudioMotor(), []);
+  const alternarCorrida = () =>
+    setModoCorrida((v) => {
+      try {
+        localStorage.setItem("ranking-modo-corrida", v ? "0" : "1");
+      } catch {
+        /* sem armazenamento: vale até recarregar */
+      }
+      return !v;
+    });
   const linhas = useAnimatedRanking(linhasRecebidas);
   const { active, enqueue, close, clear, play } = useRankingCelebrations();
   const movements = useRankingMovement(linhas.map((row) => row.cod), !!active);
@@ -104,6 +130,13 @@ export function RankingView() {
   const mountedRef = useRef(false);
 
   const resolverRef = useRef<AvatarResolver | null>(null);
+  // Códigos de vendedor com cadastro ATIVO em Usuários. O ranking vem das metas
+  // do ERP, que ainda lista quem saiu; só aparece quem está cadastrado e ativo
+  // no HUB (excluído ou inativado em Usuários sai do telão).
+  const ativosRef = useRef<Set<string> | null>(null);
+  // Releitura dos usuários (fotos e inativos) a cada 5 min: quem é inativado
+  // em Usuários sai do telão sem precisar recarregar a página.
+  const usuariosLidosEmRef = useRef(0);
   const ontemRef = useRef<Map<string, number>>(new Map());
   const rankingExibidoRef = useRef<Linha[]>([]);
   const ultrapassagemTocouRef = useRef(false);
@@ -119,9 +152,13 @@ export function RankingView() {
     if (loadingRef.current) return;
     loadingRef.current = true;
     try {
-      if (!resolverRef.current) {
-        const { data } = await supabase.from("usuarios").select("operator_code, avatar");
+      if (!resolverRef.current || Date.now() - usuariosLidosEmRef.current > 5 * 60 * 1000) {
+        usuariosLidosEmRef.current = Date.now();
+        const { data } = await supabase.from("usuarios").select("operator_code, avatar, status");
         resolverRef.current = buildAvatarResolver(data || []);
+        ativosRef.current = new Set(
+          (data || []).filter((u) => (!u.status || u.status === "ativo") && u.operator_code).map((u) => String(u.operator_code).trim()),
+        );
       }
 
       const linhasApi = await apiRankingDia();
@@ -146,6 +183,7 @@ export function RankingView() {
             avatar: resolverRef.current?.(cod),
           } as Linha;
         })
+        .filter((l) => !ativosRef.current || ativosRef.current.has(l.cod.trim()))
         .filter((l) => l.vendidoHoje > 0 || l.metaDiaria > 0)
         .sort((a, b) => b.percentual - a.percentual);
 
@@ -158,6 +196,11 @@ export function RankingView() {
       const events = trackerRef.current(lista, day, Date.now() + RANKING_COUNT_DURATION_MS + 500);
       ultrapassagemTocouRef.current = events.some((event) => event.kind === "leader");
       setLinhas(lista.slice(0, 10));
+      setTodas(lista);
+      setLoja({
+        vendido: lista.reduce((s, l) => s + l.vendidoHoje, 0),
+        meta: lista.reduce((s, l) => s + Math.max(0, l.metaDiaria), 0),
+      });
       enqueue(events);
     } catch {
       /* mantém a lista anterior em caso de falha de rede */
@@ -216,6 +259,12 @@ export function RankingView() {
               <TrendingUp aria-hidden="true" className="h-4 w-4 text-blue-400" />
               Testar ultrapassagem
             </button>
+            <button type="button" onClick={() => tocarAceleracao(1)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10 focus-visible:bg-white/10">
+              🏎️ Testar acelerada
+            </button>
+            <button type="button" onClick={alternarCorrida} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-amber-300 hover:bg-white/10 focus-visible:bg-white/10">
+              🏁 {modoCorrida ? "Voltar ao ranking" : "Modo corrida"}
+            </button>
             {([['leader', '👑 Testar novo líder'], ['double', '🔥 Testar 200% da meta'], ['team', '🏆 Testar meta coletiva']] as const).map(([kind, label]) => (
               <button key={kind} type="button" onClick={() => play(kind)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10 focus-visible:bg-white/10">{label}</button>
             ))}
@@ -226,6 +275,37 @@ export function RankingView() {
       {/* Sem cabeçalho: num telão o título ocupa altura e não informa nada que
           o pódio já não diga. A atualização segue automática a cada 15s. */}
       <div className="relative h-full flex flex-col p-6 gap-5">
+        {/* Barra da loja: o objetivo do dia de todo mundo junto */}
+        {/* No modo corrida a pista já é o placar: sem a barra da loja. */}
+        {!modoCorrida && loja.meta > 0 && (() => {
+          const pct = (loja.vendido / loja.meta) * 100;
+          const bateu = pct >= 100;
+          return (
+            <div className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className={cn("text-xs font-black uppercase tracking-[0.25em]", bateu ? "text-sky-300" : "text-white/70")}>
+                  {bateu ? "🏆 Meta do dia da loja batida!" : "Meta do dia da loja"}
+                </span>
+                <span className={cn("text-2xl font-black tabular-nums", bateu ? "text-sky-300" : "text-white")}>
+                  {pct.toFixed(0)}%
+                </span>
+              </div>
+              <div className="relative h-4 rounded-full bg-white/10 overflow-hidden">
+                <motion.div
+                  className={cn("absolute inset-y-0 left-0 rounded-full", bateu ? "bg-gradient-to-r from-sky-400 via-emerald-300 to-amber-300" : "bg-gradient-to-r from-blue-600 to-sky-400")}
+                  initial={false}
+                  animate={{ width: `${Math.min(pct, 100)}%` }}
+                  transition={{ type: "spring", stiffness: 60, damping: 18 }}
+                />
+                {/* marcas de 25/50/75% */}
+                {[25, 50, 75].map((m) => (
+                  <span key={m} className="absolute inset-y-0 w-px bg-white/20" style={{ left: `${m}%` }} />
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+        {modoCorrida ? <RankingCorrida linhas={todas} /> : (
         <div className="flex-1 min-h-0 flex flex-col gap-5">
             {/* Pódio */}
             <div className="grid grid-cols-3 gap-4 shrink-0 items-end">
@@ -388,6 +468,7 @@ export function RankingView() {
               </div>
             </div>
         </div>
+        )}
       </div>
 
 

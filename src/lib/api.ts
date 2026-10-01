@@ -161,6 +161,8 @@ export interface RankingDiaRow {
   VENDIDO_HOJE: number | string;
   /** Meta do mês menos (faturado + em aberto). A meta DIÁRIA sai daqui, no front. */
   FALTANTE: number | string;
+  /** 1 = meta do mês ainda não cadastrada; usando a do mês anterior. */
+  META_PROVISORIA?: number | string;
 }
 
 /**

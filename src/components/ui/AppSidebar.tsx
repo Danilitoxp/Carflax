@@ -45,6 +45,9 @@ import {
   HeartHandshake,
   ScanSearch,
   Cable,
+  Activity,
+  Wrench,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -125,6 +128,9 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "Relatórios Scrum": FileBarChart,
   Usuários: Users,
   "DB Admin": Database,
+  Ferramentas: Wrench,
+  "Uso do HUB": Activity,
+  "Inventário Ferramentas": ClipboardList,
   Sugestões: Lightbulb,
 };
 

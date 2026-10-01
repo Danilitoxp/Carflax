@@ -26,7 +26,15 @@ export function useRankingCelebrations() {
     audio.play().catch(() => {});
   }, [stop]);
   const enqueue = useCallback((events: RankingCelebration[]) => {
-    if (events.length) setQueue((current) => [...current, ...events]);
+    // A meta da loja é a maior comemoração do dia: entra na frente da fila.
+    if (events.length) {
+      setQueue((current) => {
+        const [ativa, ...resto] = current;
+        const loja = events.filter((e) => e.kind === "team");
+        const outros = events.filter((e) => e.kind !== "team");
+        return ativa ? [ativa, ...loja, ...resto, ...outros] : [...loja, ...resto, ...outros];
+      });
+    }
   }, []);
   const close = useCallback(() => {
     stop();
@@ -46,7 +54,7 @@ export function useRankingCelebrations() {
     const start = setTimeout(() => {
       setActive(head);
       play(head.kind);
-      end = setTimeout(close, head.kind === "goal" ? 9000 : 6500);
+      end = setTimeout(close, head.kind === "team" ? 20000 : head.kind === "goal" ? 9000 : 6500);
     }, Math.max(300, head.readyAt - Date.now()));
     return () => {
       clearTimeout(start);

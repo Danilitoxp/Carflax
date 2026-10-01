@@ -370,6 +370,19 @@ export function UsersView() {
     }
   };
 
+  // Ativo/Inativo: quem saiu da loja fica inativo (some do Ranking do dia),
+  // sem apagar o cadastro nem o histórico. No banco o valor é "suspenso".
+  const alternarStatus = async (user: User) => {
+    const novo = user.status === "ativo" ? "suspenso" : "ativo";
+    if (novo === "suspenso" && !window.confirm(`Marcar ${user.name} como inativo? Ele deixa de aparecer no Ranking do dia. (Prefira inativar a excluir: o histórico continua.)`)) return;
+    const { error } = await supabase.from("usuarios").update({ status: novo }).eq("id", user.id);
+    if (error) {
+      alert(`Não foi possível mudar o status: ${error.message}`);
+      return;
+    }
+    setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, status: novo } : u)));
+  };
+
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
 
@@ -680,12 +693,20 @@ export function UsersView() {
                     )}
                   </td>
                   <td className="py-3 px-6">
-                    <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => alternarStatus(user)}
+                      title={user.status === "ativo" ? "Clique para marcar como inativo (saiu da loja)" : "Clique para reativar"}
+                      className={cn(
+                        "flex items-center gap-2 px-2 py-1 -mx-2 rounded-lg border border-transparent transition-all",
+                        user.status === "ativo" ? "hover:border-emerald-500/30 hover:bg-emerald-500/5" : "hover:border-rose-500/30 hover:bg-rose-500/5",
+                      )}
+                    >
                       <div className={cn("w-1.5 h-1.5 rounded-full", user.status === "ativo" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-rose-500")} />
                       <span className={cn("text-[9px] font-black uppercase tracking-widest", user.status === "ativo" ? "text-emerald-500" : "text-rose-500")}>
-                        {user.status}
+                        {user.status === "ativo" ? "Ativo" : "Inativo"}
                       </span>
-                    </div>
+                    </button>
                   </td>
                   <td className="py-3 px-6 text-right">
                     <div className="flex items-center justify-end gap-1">

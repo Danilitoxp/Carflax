@@ -128,6 +128,9 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   { label: "Usuários", permGroup: "GESTÃO & ADMIN", leaderOnly: true },
   { label: "DB Admin", permGroup: "GESTÃO & ADMIN", leaderOnly: true },
+  // Ferramentas: inventário de todas as telas internas (impacto, uso e
+  // observação de cada uma). Página única, sem subcategorias.
+  { label: "Ferramentas", permGroup: "GESTÃO & ADMIN", leaderOnly: true },
   { label: "Sugestões", permGroup: "ESSENCIAL" },
 ];
 
@@ -239,7 +242,7 @@ const VENDAS_SECTIONS = [
 ];
 
 // Módulos de Gestão & Admin liberados automaticamente para líderes
-const LEADER_SECTIONS = ["Scrum", "Relatórios Scrum", "Usuários", "DB Admin"];
+const LEADER_SECTIONS = ["Scrum", "Relatórios Scrum", "Usuários", "DB Admin", "Ferramentas", "Uso do HUB", "Inventário Ferramentas"];
 
 // Triagem de currículos: dado pessoal de candidato. Liberado por padrão só para
 // quem conduz o processo seletivo (RH e Diretoria); os demais dependem de

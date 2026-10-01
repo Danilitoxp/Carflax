@@ -47,6 +47,10 @@ import { AvaliarPublicView } from "@/components/avaliacao/AvaliarPublicView";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { OrgChartView } from "@/components/ui/OrgChartModal";
 import { SqlRunnerView } from "@/components/admin/SqlRunnerView";
+import { UsoHubView } from "@/components/admin/UsoHubView";
+import { FerramentasView } from "@/components/admin/FerramentasView";
+import { RegistraAcesso } from "@/components/admin/RegistraAcesso";
+import { registrarAcesso, atualizarPresenca } from "@/lib/acessos";
 import { MarketingView } from "@/components/marketing/MarketingView";
 import { EsteiraView } from "@/components/marketing/EsteiraView";
 import { RhView } from "@/components/rh/RhView";
@@ -193,6 +197,16 @@ function DashboardContent({
       localStorage.setItem("carflax-active-section", "Geral");
     }
   }, [activeItem, userProfile, geralLoading]);
+
+  // Acessos em tempo real: grava cada tela aberta (hub_acessos) e atualiza a
+  // presença (quem está online e onde). Alimenta Ferramentas > Uso do HUB.
+  useEffect(() => {
+    if (!userProfile?.id || geralLoading) return;
+    if (activeItem !== "Geral" && !canAccessSection(userProfile, activeItem)) return;
+    registrarAcesso(activeItem, userProfile);
+    atualizarPresenca(userProfile, activeItem);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeItem, userProfile?.id, geralLoading]);
 
   // ── Sincronização Global do Chat (Realtime) ───────────────────────────
   // Chat Multijanelas
@@ -1535,6 +1549,10 @@ function DashboardContent({
             <ScrumView userProfile={userProfile || undefined} />
           ) : activeItem === "Relatórios Scrum" ? (
             <RelatoriosScrumView userProfile={userProfile || undefined} />
+          ) : activeItem === "Ferramentas" ? (
+            <FerramentasView userId={userProfile?.id} />
+          ) : activeItem === "Uso do HUB" ? (
+            <UsoHubView />
           ) : activeItem === "DB Admin" ? (
             <SqlRunnerView />
           ) : activeItem === "Ranking" ? (
@@ -2168,6 +2186,7 @@ function App() {
   if (isGestorRoute && !loading && session) {
     return (
       <ThemeProvider defaultTheme="light" storageKey="carflax-theme">
+        <RegistraAcesso secao="Painel do Gestor" perfil={profile} origem="gestor" />
         <GestorView userProfile={profile} onLogout={() => supabase.auth.signOut()} />
       </ThemeProvider>
     );
@@ -2178,6 +2197,7 @@ function App() {
   if (isVendedorRoute && !loading && session) {
     return (
       <ThemeProvider defaultTheme="light" storageKey="carflax-theme">
+        <RegistraAcesso secao="Vendedor no celular" perfil={profile} origem="vendedor" />
         <VendedorView userProfile={profile} onLogout={() => supabase.auth.signOut()} />
       </ThemeProvider>
     );

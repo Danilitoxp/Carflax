@@ -33,16 +33,22 @@ export function useLiderDoDia(ativo: boolean): LiderDoDia | null {
     if (!ativo) return;
     let vivo = true;
     let resolver: ReturnType<typeof buildAvatarResolver> | null = null;
+    let ativos: Set<string> | null = null;
 
     const carregar = async () => {
       try {
         if (!resolver) {
-          const { data } = await supabase.from("usuarios").select("operator_code, avatar");
+          const { data } = await supabase.from("usuarios").select("operator_code, avatar, status");
           resolver = buildAvatarResolver(data || []);
+          // Mesma regra do telão: só quem tem cadastro ativo em Usuários.
+          ativos = new Set(
+            (data || []).filter((u) => (!u.status || u.status === "ativo") && u.operator_code).map((u) => String(u.operator_code).trim()),
+          );
         }
         const linhas = (await apiRankingDia()) as RankingDiaRow[];
         let melhor: LiderDoDia | null = null;
         for (const r of linhas || []) {
+          if (ativos && !ativos.has(String(r.COD_VENDEDOR).trim())) continue;
           const vendido = num(r.VENDIDO_HOJE);
           // Sem venda hoje ninguém é "líder", nem que tenha meta zerada.
           if (vendido <= 0) continue;
