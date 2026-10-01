@@ -95,6 +95,7 @@ export const NAV_SECTIONS: NavSection[] = [
       // value "Compras" mantido: é a chave de permissão já gravada nos usuários.
       // Reposição abre a seção: é a pergunta do dia do comprador.
       { label: "Reposição" },
+      { label: "Pedidos", value: "Pedidos Compras" },
       { label: "Produtos", value: "Compras" },
       { label: "Relatórios", value: "Relatórios Compras" },
     ],
@@ -281,7 +282,7 @@ export function automaticAccessReason(profile: AccessProfile | null | undefined,
 
   if ((dept === "VENDAS" || dept === "COMERCIAL") && VENDAS_SECTIONS.includes(item)) return "Setor Vendas";
 
-  if (dept === "COMPRAS" && (item === "Compras" || item === "Reposição" || item === "Coletas" || item === "Relatórios Compras")) return "Setor Compras";
+  if (dept === "COMPRAS" && (item === "Compras" || item === "Reposição" || item === "Pedidos Compras" || item === "Coletas" || item === "Relatórios Compras")) return "Setor Compras";
 
   // Quem é da logística precisa ver as coletas que vai encaixar na rota.
   if (item === "Coletas" && (dept === "LOGÍSTICA" || dept === "LOGISTICA" || dept === "EXPEDIÇÃO" || dept === "EXPEDICAO")) return "Setor Logística";

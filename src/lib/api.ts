@@ -2216,3 +2216,19 @@ export const apiVendedorCriarPedido = async (pedido: VendedorNovoPedido) => {
   if (!res.ok) throw new Error(dados?.error || `Erro ${res.status} ao enviar.`);
   return dados as { sucesso: boolean; especie: string; numero: string | null; total: number };
 };
+
+export interface PedidoCompra {
+  empresa: string; pedido: string; cod_fornecedor: string; fornecedor: string | null;
+  data_pedido: string | null; data_entrega: string | null; total: number;
+  status: "nao_recebido" | "parcial" | "baixado"; motivo_baixa: string | null;
+  data_faturamento: string | null; condicao_pagamento: string; cod_comprador: string; comprador: string | null;
+  total_itens: number; total_ipi: number; total_sub: number; total_fcp: number; total_frete: number;
+}
+export interface ItemPedidoCompra {
+  cod: string; descricao: string; unidade: string | null; quantidade: number;
+  quantidade_baixada: number; pendente: number; preco: number; total: number;
+}
+export const apiComprasPedidos = (params: Record<string, string>) =>
+  get<{ success: boolean; data: PedidoCompra[]; total: number; pagina: number; por_pagina: number }>("/api/compras/pedidos", params);
+export const apiComprasItensPedido = (empresa: string, pedido: string) =>
+  get<{ success: boolean; data: ItemPedidoCompra[] }>(`/api/compras/pedidos/${encodeURIComponent(empresa)}/${encodeURIComponent(pedido)}/itens`);
