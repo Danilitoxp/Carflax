@@ -1423,8 +1423,11 @@ export interface ProdutoFornecedoresResponse {
 export interface ReposicaoVendaMes {
   mes: string;        // "2026-09"
   qtd: number;
-  clientes: number;   // clientes distintos no mês (kardex)
-  esporadico: boolean; // pico de poucos clientes, fora da média
+  clientes: number;    // clientes distintos no mês
+  orcamentos: number;     // orçamentos do item no mês (procura, vendendo ou não)
+  orcamento_qtd: number;  // quantidade orçada no mês
+  esporadico: boolean;    // pico de poucos clientes, fora da média
+  ruptura: boolean;       // sem venda, mas com orçamento e sem estoque: fora da média
 }
 
 export interface ReposicaoItem {
@@ -1438,6 +1441,8 @@ export interface ReposicaoItem {
   media_ajustada: number;
   media_bruta: number;
   meses_esporadicos: string[];
+  meses_sem_estoque: string[];
+  orcamentos_periodo: number;
   saldo: number;
   reservado: number;
   disponivel: number;
@@ -1456,11 +1461,43 @@ export interface ReposicaoResponse {
   total_itens: number;
   em_falta: number;
   com_pico_ignorado: number;
+  com_ruptura: number;
   fornecedores: { cod: string; nome: string | null; itens: number }[];
   itens: ReposicaoItem[];
 }
 
 export const apiComprasReposicao = () => get<ReposicaoResponse>("/api/compras/reposicao");
+
+export interface KardexClienteMes {
+  cod_cliente: string;
+  cliente: string;
+  qtd: number;
+  notas: number;
+  valor: number;
+  ultima_compra: string | null;
+}
+
+export interface KardexOrcamentoMes {
+  documento: string;
+  cod_cliente: string;
+  cliente: string;
+  qtd: number;
+  data: string | null;
+  virou_pedido: boolean;
+}
+
+export interface KardexMesResponse {
+  item: string;
+  mes: string;
+  total_qtd: number;
+  total_valor: number;
+  clientes: KardexClienteMes[];
+  orcamentos: KardexOrcamentoMes[];
+}
+
+/** Quem comprou o item naquele mês — detalhe do modal da Reposição. */
+export const apiComprasKardexMes = (item: string, mes: string) =>
+  get<KardexMesResponse>("/api/compras/reposicao/kardex", { item, mes });
 
 export const apiComprasBuscarProdutos = (q: string) =>
   get<{ success: boolean; data: ProdutoBusca[] }>("/api/compras/produtos/busca", { q });

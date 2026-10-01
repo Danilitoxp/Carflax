@@ -7,10 +7,19 @@
 // backend (reposicaoHandler.js) — aqui é só apresentação, filtro e paginação.
 
 import { useEffect, useMemo, useState } from "react";
-import { Boxes, Search, Loader2, Truck, Download, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { Boxes, Search, Loader2, Truck, Download, ChevronLeft, ChevronRight, AlertCircle, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiComprasReposicao, type ReposicaoItem, type ReposicaoResponse } from "@/lib/api";
 import { anexarGuiaImportacao } from "@/lib/guia-importacao-produtos";
+import { KardexMesModal } from "./KardexMesModal";
+
+/** Mês aberto no modal de detalhe das vendas. */
+interface MesAberto {
+  item: string;
+  descricao: string;
+  unidade: string | null;
+  mes: string;
+}
 
 const POR_PAGINA = [15, 25, 50, 100];
 const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -34,6 +43,7 @@ export function ReposicaoView() {
   const [busca, setBusca] = useState("");
   const [fornecedor, setFornecedor] = useState("");
   const [porPagina, setPorPagina] = useState(15);
+  const [mesAberto, setMesAberto] = useState<MesAberto | null>(null);
   const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
@@ -134,6 +144,16 @@ export function ReposicaoView() {
         </button>
       </div>
 
+      {mesAberto && (
+        <KardexMesModal
+          item={mesAberto.item}
+          descricao={mesAberto.descricao}
+          mes={mesAberto.mes}
+          unidade={mesAberto.unidade}
+          onFechar={() => setMesAberto(null)}
+        />
+      )}
+
       <div className="flex-1 min-h-0 flex px-4 sm:px-6 pb-6">
         <div className="flex-1 min-h-0 flex flex-col rounded-2xl border border-border bg-card overflow-hidden">
           {carregando ? (
@@ -178,7 +198,13 @@ export function ReposicaoView() {
                   </thead>
                   <tbody className="divide-y divide-border/60">
                     {visiveis.map((i) => (
-                      <Linha key={i.cod} item={i} />
+                      <Linha
+                        key={i.cod}
+                        item={i}
+                        aoAbrirMes={(mes) =>
+                          setMesAberto({ item: i.cod, descricao: i.descricao, unidade: i.unidade, mes })
+                        }
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -254,7 +280,7 @@ function BotaoPagina({
   );
 }
 
-function Linha({ item: i }: { item: ReposicaoItem }) {
+function Linha({ item: i, aoAbrirMes }: { item: ReposicaoItem; aoAbrirMes: (mes: string) => void }) {
   return (
     <tr className="hover:bg-secondary/30 transition-colors">
       <td className="px-4 py-3 text-center text-[12px] font-bold tabular-nums text-blue-600 dark:text-blue-400">
@@ -272,36 +298,56 @@ function Linha({ item: i }: { item: ReposicaoItem }) {
       </td>
 
       {i.venda_mensal.map((m, idx) => (
-        <td
-          key={m.mes}
-          title={
-            m.esporadico
-              ? `Venda extraordinária: ${brNum(m.qtd)} para ${m.clientes} cliente${m.clientes > 1 ? "s" : ""} — fora da média`
-              : `${brNum(m.qtd)} para ${m.clientes} cliente${m.clientes === 1 ? "" : "s"}`
-          }
-          className={cn("px-4 py-3 text-center", idx === 0 && "border-l border-border/60")}
-        >
-          {m.esporadico ? (
-            // Pico que foi para um ou dois clientes: marcado e fora da média.
-            <span className="inline-flex items-center gap-1 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[12px] font-bold tabular-nums text-rose-600 dark:text-rose-400">
-              <AlertCircle className="w-3 h-3" />
-              {brNum(m.qtd, m.qtd % 1 ? 1 : 0)}
-            </span>
-          ) : (
-            <span className="text-[12px] tabular-nums text-muted-foreground">
-              {brNum(m.qtd, m.qtd % 1 ? 1 : 0)}
-            </span>
-          )}
+        <td key={m.mes} className={cn("px-3 py-3 text-center", idx === 0 && "border-l border-border/60")}>
+          {/* Clique abre quem comprou no mês — o kardex que o comprador olharia. */}
+          <button
+            onClick={() => aoAbrirMes(m.mes)}
+            title={
+              m.esporadico
+                ? `Venda extraordinária: ${brNum(m.qtd)} para ${m.clientes} cliente${m.clientes > 1 ? "s" : ""} — fora da média. Clique para ver os clientes.`
+                : m.ruptura && m.orcamentos > 0
+                  ? `Sem venda, mas ${m.orcamentos} orçamento${m.orcamentos > 1 ? "s" : ""} e sem estoque: ruptura — fora da média. Clique para ver o mês.`
+                  : `${brNum(m.qtd)} para ${m.clientes} cliente${m.clientes === 1 ? "" : "s"}${m.orcamentos ? ` · ${m.orcamentos} orçamento${m.orcamentos > 1 ? "s" : ""}` : ""}. Clique para ver o detalhe.`
+            }
+            className={cn(
+              "inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[12px] font-bold tabular-nums transition-colors",
+              m.esporadico
+                ? "border-rose-500/40 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20"
+                : m.ruptura && m.orcamentos > 0
+                  ? "border-slate-500/40 bg-slate-500/10 text-slate-500 dark:text-slate-400 hover:bg-slate-500/20"
+                  : "border-border bg-secondary/30 text-muted-foreground hover:bg-secondary hover:text-foreground",
+            )}
+          >
+            {m.esporadico && <AlertCircle className="w-3 h-3" />}
+            {m.ruptura && m.orcamentos > 0 ? (
+              <>
+                <FileText className="w-3 h-3" />
+                <span className="text-[11px]">
+                  {m.orcamentos} {m.orcamentos === 1 ? "orçamento" : "orçamentos"}
+                </span>
+              </>
+            ) : (
+              brNum(m.qtd, m.qtd % 1 ? 1 : 0)
+            )}
+          </button>
         </td>
       ))}
 
       <td
         className="px-4 py-3 text-center text-[12px] font-black tabular-nums border-l border-border/60"
-        title={i.meses_esporadicos.length ? `Média sem o pico de ${i.meses_esporadicos.join(", ")} (sem ajuste: ${brNum(i.media_bruta, 1)})` : undefined}
+        title={
+          i.meses_esporadicos.length || i.meses_sem_estoque.length
+            ? [
+                i.meses_esporadicos.length ? `Fora da média (pico): ${i.meses_esporadicos.join(", ")}` : "",
+                i.meses_sem_estoque.length ? `Fora da média (ruptura, só orçamento): ${i.meses_sem_estoque.join(", ")}` : "",
+                `Sem ajuste: ${brNum(i.media_bruta, 1)}`,
+              ].filter(Boolean).join(" · ")
+            : undefined
+        }
       >
         <div className="flex flex-col items-center gap-0.5">
           <span>{brNum(i.media_ajustada, 1)}</span>
-          {i.meses_esporadicos.length > 0 && (
+          {(i.meses_esporadicos.length > 0 || i.meses_sem_estoque.length > 0) && (
             <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-px text-[8px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
               ajustada
             </span>
