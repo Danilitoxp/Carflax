@@ -1393,6 +1393,7 @@ function DashboardContent({
     "Prospecções",
     "Pós-Venda",
     "Pesquisa Cliente",
+    "Comissões",
   ].includes(activeItem);
   const isMarketingView = [
     "Marketing",

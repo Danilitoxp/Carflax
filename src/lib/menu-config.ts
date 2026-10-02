@@ -55,6 +55,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Alugueis" },
       { label: "Pós-Venda" },
       { label: "Pesquisa do Cliente", value: "Pesquisa Cliente" },
+      // Comissões NÃO entra em VENDAS_SECTIONS de propósito: é remuneração, e só
+      // diretoria e supervisor (nos próprios liderados) enxergam.
+      { label: "Comissões" },
       { label: "Relatórios" },
     ],
   },
@@ -274,6 +277,16 @@ export function automaticAccessReason(profile: AccessProfile | null | undefined,
   if (PUBLIC_SECTIONS.includes(item)) return "Todos";
 
   if (profile.is_leader && LEADER_SECTIONS.includes(item)) return "Líder";
+
+  // Comissões: supervisor do comercial vê a dos próprios liderados (a tela
+  // filtra por responsavel_id). Líder de outro setor não entra — a liderança
+  // sozinha não dá acesso à remuneração do time de vendas.
+  if (item === "Comissões") {
+    const deptVendas = profile.department?.toUpperCase();
+    const ehComercial = deptVendas === "VENDAS" || deptVendas === "COMERCIAL";
+    if ((profile.is_leader || role.includes("SUPERVISOR")) && ehComercial) return "Supervisor de vendas";
+    return null;
+  }
 
   if (role.includes("VENDEDOR") && VENDEDOR_SECTIONS.includes(item)) return "Cargo vendedor";
 

@@ -10,6 +10,7 @@ import { ProspeccoesView } from "./prospeccoes/ProspeccoesView";
 import { MeusPedidosView } from "./pedidos/MeusPedidosView";
 import { PosVendaView } from "./posvenda/PosVendaView";
 import { PesquisaClienteView } from "./pesquisa/PesquisaClienteView";
+import { ComissoesView } from "./comissoes/ComissoesView";
 import { cn } from "@/lib/utils";
 
 interface UserProfile {
@@ -66,6 +67,8 @@ export function CrmSection({ activeTab, userProfile }: CrmSectionProps) {
             <PosVendaView userProfile={userProfile} />
           ) : activeTab === "Pesquisa Cliente" ? (
             <PesquisaClienteView />
+          ) : activeTab === "Comissões" ? (
+            <ComissoesView userProfile={userProfile} />
           ) : (
             <OrcamentosView userProfile={userProfile} />
           )}
