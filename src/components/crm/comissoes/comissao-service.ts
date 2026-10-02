@@ -17,6 +17,7 @@ import { apiDashboardGeral, apiDashboardMetas, type VendedorResumo } from "@/lib
 import { taxaConversaoValor } from "@/lib/crm-service";
 import { buildPerdidoMap } from "@/lib/perdido-map";
 import { montarTotalETimes, type OrgUser } from "@/lib/times-diretoria";
+import { buildAvatarResolver } from "@/lib/avatar-by-code";
 
 export interface ComissaoUserProfile {
   id?: string;
@@ -126,13 +127,28 @@ export interface EntradaComissao {
   metaLoja: number;
 }
 
+/**
+ * Como a cascata deixou cada etapa:
+ * - `alcancada`: bateu;
+ * - `pendente`: é a etapa que travou — ela mesma não bateu, mas tudo antes bateu;
+ * - `bloqueada`: veio depois do ponto onde travou, então nem chegou a ser avaliada.
+ *
+ * A diferença importa para o vendedor: "pendente" é no que ele tem de mexer
+ * agora; "bloqueada" ele só destrava resolvendo a anterior.
+ */
+export type StatusBonus = "alcancada" | "pendente" | "bloqueada";
+
 export interface BonusComissao {
   label: string;
   atingido: boolean;
+  status: StatusBonus;
   valor: number;
   /** O que foi comparado, para a tela explicar por que não bateu. */
   realizado: string;
   alvo: string;
+  /** Números crus do mesmo par, para as barras de progresso. */
+  realizadoNum: number;
+  alvoNum: number;
 }
 
 export interface ResultadoComissao {
@@ -167,13 +183,24 @@ export function calcularComissao(e: EntradaComissao, p: ComissaoParametros): Res
   const brl = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-  const bonus: BonusComissao[] = [
-    { label: "Meta Faturamento", atingido: bateuFaturamento, valor: bateuFaturamento ? p.bonus_valor : 0, realizado: brl(e.faturado), alvo: brl(e.metaVendedor) },
-    { label: "Meta Margem Bruta", atingido: bateuMargem, valor: bateuMargem ? p.bonus_valor : 0, realizado: pct(e.margemPct), alvo: pct(p.meta_margem_bruta_pct) },
-    { label: "Conversão de Orçamentos", atingido: bateuConversao, valor: bateuConversao ? p.bonus_valor : 0, realizado: pct(e.conversaoPct), alvo: pct(p.meta_conversao_pct) },
-    { label: "Meta Equipe", atingido: bateuLoja, valor: bateuLoja ? p.bonus_valor : 0, realizado: brl(e.faturamentoLoja), alvo: brl(e.metaLoja) },
-    { label: "Meta Margem Bruta Equipe", atingido: bateuMargemLoja, valor: bateuMargemLoja ? p.bonus_valor : 0, realizado: pct(e.margemLojaPct), alvo: pct(p.meta_margem_loja_pct) },
+  const etapas: Omit<BonusComissao, "status" | "valor">[] = [
+    { label: "Faturamento", atingido: bateuFaturamento, realizado: brl(e.faturado), alvo: brl(e.metaVendedor), realizadoNum: e.faturado, alvoNum: e.metaVendedor },
+    { label: "Margem bruta", atingido: bateuMargem, realizado: pct(e.margemPct), alvo: pct(p.meta_margem_bruta_pct), realizadoNum: e.margemPct, alvoNum: p.meta_margem_bruta_pct },
+    { label: "Conversão de orçamentos", atingido: bateuConversao, realizado: pct(e.conversaoPct), alvo: pct(p.meta_conversao_pct), realizadoNum: e.conversaoPct, alvoNum: p.meta_conversao_pct },
+    { label: "Faturamento da equipe", atingido: bateuLoja, realizado: brl(e.faturamentoLoja), alvo: brl(e.metaLoja), realizadoNum: e.faturamentoLoja, alvoNum: e.metaLoja },
+    { label: "Margem da equipe", atingido: bateuMargemLoja, realizado: pct(e.margemLojaPct), alvo: pct(p.meta_margem_loja_pct), realizadoNum: e.margemLojaPct, alvoNum: p.meta_margem_loja_pct },
   ];
+
+  // A primeira etapa que não bateu é a "pendente"; as seguintes ficam bloqueadas
+  // por ela, não por mérito próprio.
+  let travou = false;
+  const bonus: BonusComissao[] = etapas.map((et) => {
+    let status: StatusBonus;
+    if (et.atingido) status = "alcancada";
+    else if (!travou) { status = "pendente"; travou = true; }
+    else status = "bloqueada";
+    return { ...et, status, valor: et.atingido ? p.bonus_valor : 0 };
+  });
 
   const totalBonus = bonus.reduce((acc, b) => acc + b.valor, 0);
   return { indicePct, valorComissao, bonus, totalBonus, total: valorComissao + totalBonus };
@@ -337,13 +364,18 @@ export async function carregarComissoes(
     apiDashboardGeral(undefined, dataRef).catch(() => [] as VendedorResumo[]),
     apiDashboardMetas(dataRef).catch(() => [] as { COD_VENDEDOR: string; META: number | string }[]),
     carregarParametros(mesRef),
-    supabase.from("usuarios").select("id, operator_code, name, role, responsavel_id, is_leader"),
+    supabase.from("usuarios").select("id, operator_code, name, role, responsavel_id, is_leader, avatar"),
   ]);
 
   const perdidoMap = await buildPerdidoMap(inicio, fim).catch(() => null);
 
   const usuarios = (usuariosRes.data || []) as OrgUser[];
   const escopo = codigosDoEscopo(perfil, usuarios);
+  // Avatar pelo código exato: "050" (vendedor) e "00050" (motorista) colidem ao
+  // tirar os zeros e trocariam de foto.
+  const avatarDe = buildAvatarResolver(
+    (usuariosRes.data || []) as { operator_code?: string | null; avatar?: string | null }[],
+  );
 
   const metaMap = new Map<string, number>(
     (metas || []).map((m) => [String(m.COD_VENDEDOR).trim(), num(m.META)]),
@@ -397,7 +429,7 @@ export async function carregarComissoes(
       return {
         codVendedor: cod,
         nome: r.NOME_VENDEDOR || cod,
-        avatar: r.avatar,
+        avatar: avatarDe(cod) ?? r.avatar ?? null,
         equipeId,
         entrada,
         resultado: calcularComissao(entrada, parametros),
