@@ -415,7 +415,9 @@ export function CalendarSection({ activeTab, userProfile }: CalendarSectionProps
         onClose={() => setIsModalOpen(false)} 
         onSave={handleSaveEvent} 
         onDelete={handleDeleteEvent}
-        selectedDay={selectedDay} 
+        selectedDay={selectedDay}
+        month={month}
+        year={year}
         editingEventId={editingEventId} 
         newEvent={newEvent}
         setNewEvent={setNewEvent}

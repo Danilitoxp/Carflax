@@ -15,6 +15,8 @@ interface EventModalProps {
   onSave: () => void;
   onDelete: (id: number) => void;
   selectedDay: number | null;
+  month: number;
+  year: number;
   editingEventId: number | null;
   newEvent: {
     title: string;
@@ -33,6 +35,8 @@ export function EventModal({
   onSave,
   onDelete,
   selectedDay,
+  month,
+  year,
   editingEventId,
   newEvent,
   setNewEvent,
@@ -76,7 +80,7 @@ export function EventModal({
                         {editingEventId ? "Editar Evento" : "Novo Evento"}
                     </h2>
                     <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mt-0.5">
-                        {selectedDay} de Abril, 2026
+                        {selectedDay} de {new Date(year, month, 1).toLocaleDateString("pt-BR", { month: "long" })}, {year}
                     </p>
                   </div>
               </div>
