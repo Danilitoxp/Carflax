@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, BarChart3, Calendar, Check, ChevronDown, DollarSign, Download,
-  Gift, Loader2, Lock, Percent, Search, Settings, SlidersHorizontal, TrendingUp, User, Users,
+  Eye, EyeOff, Gift, Loader2, Lock, Percent, Search, Settings, SlidersHorizontal, TrendingUp, User, Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +17,15 @@ const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
 
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
+
+/**
+ * Comissão é salário: a tela abre com os valores escondidos para o supervisor
+ * poder consultar a conversão de alguém com o vendedor do lado sem expor quanto
+ * cada um recebe. O olho revela, e some de novo a cada carregamento da tela —
+ * não guardamos a escolha de propósito.
+ */
+const OCULTO = "****";
+const dinheiro = (v: number, revelado: boolean) => (revelado ? brl(v) : OCULTO);
 const pct = (v: number) => `${v.toFixed(1).replace(".", ",")}%`;
 
 /** Atingimento em %, limitado para a barra não estourar o container. */
@@ -49,6 +58,7 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
   const [filtro, setFiltro] = useState<FiltroPagamento>("todos");
   const [busca, setBusca] = useState("");
   const [equipeAtiva, setEquipeAtiva] = useState<string | null>(null);
+  const [revelado, setRevelado] = useState(false);
   const [recarga, setRecarga] = useState(0);
 
   const permitido = podeVerComissoes(userProfile);
@@ -164,6 +174,19 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
             </select>
           )}
 
+          <button
+            type="button"
+            onClick={() => setRevelado((v) => !v)}
+            aria-pressed={revelado}
+            title={revelado ? "Ocultar valores de comissão" : "Revelar valores de comissão"}
+            className={cn(
+              "flex items-center justify-center bg-card border rounded-lg px-3 py-2.5 hover:border-blue-500/50",
+              revelado ? "border-blue-500/60 text-blue-600" : "border-border text-muted-foreground",
+            )}
+          >
+            {revelado ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </button>
+
           <div className="relative">
             <button
               type="button"
@@ -248,7 +271,7 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
           <CardKpi
             icon={DollarSign}
             label="Total a pagar"
-            valor={brl(totalPagar)}
+            valor={dinheiro(totalPagar, revelado)}
             nota="Comissões + bônus"
             destaque
           />
@@ -381,11 +404,11 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
                         <td className="px-3 py-2.5 text-right">{pct(l.entrada.margemPct)}</td>
                         <td className="px-3 py-2.5 text-right">{pct(l.entrada.conversaoPct)}</td>
                         <td className="px-3 py-2.5 text-right">{pct(l.resultado.indicePct)}</td>
-                        <td className="px-3 py-2.5 text-right">{brl(l.resultado.valorComissao)}</td>
-                        <td className="px-3 py-2.5 text-right">{brl(l.resultado.totalBonus)}</td>
+                        <td className="px-3 py-2.5 text-right">{dinheiro(l.resultado.valorComissao, revelado)}</td>
+                        <td className="px-3 py-2.5 text-right">{dinheiro(l.resultado.totalBonus, revelado)}</td>
                         <td className={cn("px-4 py-2.5 text-right font-black",
                           l.resultado.total > 0 ? "text-emerald-600" : "text-muted-foreground")}>
-                          {brl(l.resultado.total)}
+                          {dinheiro(l.resultado.total, revelado)}
                         </td>
                       </tr>
                     );
@@ -402,7 +425,7 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
 
           {linha && (
             <div className="min-h-0 overflow-y-auto scrollbar-hide">
-              <Detalhe linha={linha} />
+              <Detalhe linha={linha} revelado={revelado} />
             </div>
           )}
         </div>
@@ -531,7 +554,7 @@ const CHIP: Record<StatusBonus, { label: string; classe: string }> = {
 };
 
 /** Painel do vendedor selecionado: o que ele recebe e por quê. */
-function Detalhe({ linha }: { linha: LinhaComissao }) {
+function Detalhe({ linha, revelado }: { linha: LinhaComissao; revelado: boolean }) {
   const { resultado: r } = linha;
   // As três primeiras etapas são as que dependem só dele — o resto é da equipe.
   const individuais = r.bonus.slice(0, 3);
@@ -551,7 +574,7 @@ function Detalhe({ linha }: { linha: LinhaComissao }) {
           <div className="text-[11px] text-muted-foreground">Total a receber</div>
           <div className={cn("text-3xl font-black tracking-tight",
             r.total > 0 ? "text-emerald-600" : "text-muted-foreground")}>
-            {brl(r.total)}
+            {dinheiro(r.total, revelado)}
           </div>
         </div>
 
@@ -560,14 +583,14 @@ function Detalhe({ linha }: { linha: LinhaComissao }) {
             <DollarSign className="w-4 h-4 text-blue-600 shrink-0" />
             <div className="min-w-0">
               <div className="text-[10px] text-muted-foreground">Comissão</div>
-              <div className="text-xs font-black truncate">{brl(r.valorComissao)}</div>
+              <div className="text-xs font-black truncate">{dinheiro(r.valorComissao, revelado)}</div>
             </div>
           </div>
           <div className="bg-secondary/50 border border-border rounded-lg p-2.5 flex items-center gap-2">
             <Gift className="w-4 h-4 text-blue-600 shrink-0" />
             <div className="min-w-0">
               <div className="text-[10px] text-muted-foreground">Bônus</div>
-              <div className="text-xs font-black truncate">{brl(r.totalBonus)}</div>
+              <div className="text-xs font-black truncate">{dinheiro(r.totalBonus, revelado)}</div>
             </div>
           </div>
         </div>
@@ -610,7 +633,7 @@ function Detalhe({ linha }: { linha: LinhaComissao }) {
             {r.bonus.map((b) => (
               <div key={b.label} className="flex items-center justify-between gap-2">
                 <span className="text-[11px] text-muted-foreground truncate flex-1">{b.label}</span>
-                <span className="text-[11px] font-bold whitespace-nowrap">{brl(b.valor)}</span>
+                <span className="text-[11px] font-bold whitespace-nowrap">{dinheiro(b.valor, revelado)}</span>
                 <span
                   className={cn("text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0",
                     CHIP[b.status].classe)}

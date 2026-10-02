@@ -137,10 +137,9 @@ export async function exportarComissoes({ linhas, equipes, parametros, mesRef, e
   ws["!cols"] = colunas.map((c) => ({ wch: c.wch }));
   ws["!rows"] = [{ hpt: 28 }, { hpt: 16 }, { hpt: 24 }];
   ws["!autofilter"] = { ref: `A${linhaCab + 1}:${ultimaCol}${ultimaLinha + 1}` };
-  // Congela título + cabeçalho e a coluna do nome: rolando, ainda se sabe quem é
-  // a linha e o que é a coluna.
-  ws["!freeze"] = { xSplit: 1, ySplit: linhaCab + 1 };
-  ws["!view"] = [{ showGridLines: false }];
+  // Sem congelar painel nem esconder gridline: o xlsx-js-style aceita as duas
+  // chaves e NÃO as grava no arquivo (conferido no XML gerado). Deixá-las aqui
+  // só daria a impressão de que a planilha sai com painel congelado.
 
   ws["A1"].s = {
     font: { bold: true, sz: 14, color: { rgb: AZUL }, name: "Calibri" },
@@ -227,7 +226,6 @@ export async function exportarComissoes({ linhas, equipes, parametros, mesRef, e
   const wsRegra = XLSX.utils.aoa_to_sheet(regra);
   wsRegra["!cols"] = [{ wch: 34 }, { wch: 68 }];
   wsRegra["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
-  wsRegra["!view"] = [{ showGridLines: false }];
   wsRegra["A1"].s = {
     font: { bold: true, sz: 13, color: { rgb: AZUL }, name: "Calibri" },
     alignment: { vertical: "center" },
