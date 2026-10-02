@@ -265,11 +265,15 @@ export interface ReportsAnalytics {
     convByQuote: number;
     avgResponseMinutes: number | null;
   };
-  /** Mesmo intervalo imediatamente anterior, para deltas. */
+  /** Mesmos dias do mês anterior (1º a 2/09 contra 1º a 2/10), para deltas. */
   previous: {
     leads: number;
+    quotesCount: number;
+    quotesValue: number;
     salesCount: number;
     salesValue: number;
+    avgTicket: number;
+    avgResponseMinutes: number | null;
   };
   bySeller: SellerReport[];
   /** Vendas individuais do período, da maior para a menor. */
@@ -1305,7 +1309,7 @@ export const marketingService = {
    * quantidade, por valor e por orçamento), desempenho por vendedor (incluindo
    * tempo médio de 1ª resposta) e leads por origem. Todos os números vêm do banco.
    */
-  async getReportsAnalytics(startDate: Date, endDate?: Date): Promise<ReportsAnalytics> {
+  async getReportsAnalytics(startDate: Date, endDate?: Date, opts: { semComparativo?: boolean } = {}): Promise<ReportsAnalytics> {
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
     const end = endDate ? new Date(endDate) : new Date(startDate);
@@ -1618,29 +1622,17 @@ export const marketingService = {
     });
     const dailySeries: DailyPoint[] = [...dayMap.entries()].map(([date, v]) => ({ date, ...v }));
 
-    // --- Comparativo com período anterior (mesma duração imediatamente antes) ---
-    const rangeMs = end.getTime() - start.getTime();
-    const prevEnd = new Date(start.getTime() - 1);
-    const prevStart = new Date(start.getTime() - 1 - rangeMs);
-    const [{ data: prevLeadsRaw }, { data: prevSales }] = await Promise.all([
-      supabase
-        .from("marketing_clientes")
-        .select("remote_jid, temperatura, status, created_at, valor_venda, valor_orcamento")
-        .gte("created_at", prevStart.toISOString())
-        .lte("created_at", prevEnd.toISOString())
-        .limit(5000),
-      supabase
-        .from("marketing_clientes")
-        .select("remote_jid, valor_venda, data_venda, temperatura, status, created_at, valor_orcamento")
-        .gt("valor_venda", 0)
-        .not("data_venda", "is", null)
-        .gte("data_venda", prevStart.toISOString())
-        .lte("data_venda", prevEnd.toISOString())
-        .limit(5000),
-    ]);
-    const prevLeadsFiltered = (prevLeadsRaw || []).filter(l => !isDescartado(l));
-    const prevSalesFiltered = (prevSales || []).filter(l => !isDescartado(l));
-    const prevSalesValue = prevSalesFiltered.reduce((acc, s) => acc + (Number(s.valor_venda) || 0), 0);
+    // --- Comparativo: os MESMOS dias do mês anterior (1º a 2/09 contra 1º a 2/10),
+    // calculados pela mesma função, para leads, orçamentos, vendas, ticket e
+    // 1ª resposta seguirem exatamente as mesmas regras. O dia é limitado ao fim
+    // do mês anterior (31/03 → 28/02 ou 29/02).
+    const mesAntes = (d: Date) => {
+      const ultimo = new Date(d.getFullYear(), d.getMonth(), 0).getDate();
+      return new Date(d.getFullYear(), d.getMonth() - 1, Math.min(d.getDate(), ultimo));
+    };
+    const anterior = opts.semComparativo
+      ? null
+      : await marketingService.getReportsAnalytics(mesAntes(start), mesAntes(end), { semComparativo: true }).catch(() => null);
 
     // --- Totais e conversões ---
     const leadsCount = leads.length;
@@ -1666,9 +1658,13 @@ export const marketingService = {
         avgResponseMinutes: respGlobalCount > 0 ? respGlobalSum / respGlobalCount : null,
       },
       previous: {
-        leads: prevLeadsFiltered.length,
-        salesCount: prevSalesFiltered.length,
-        salesValue: prevSalesValue,
+        leads: anterior?.totals.leads ?? 0,
+        quotesCount: anterior?.totals.quotesCount ?? 0,
+        quotesValue: anterior?.totals.quotesValue ?? 0,
+        salesCount: anterior?.totals.salesCount ?? 0,
+        salesValue: anterior?.totals.salesValue ?? 0,
+        avgTicket: anterior?.totals.avgTicket ?? 0,
+        avgResponseMinutes: anterior?.totals.avgResponseMinutes ?? null,
       },
       bySeller,
       salesList,

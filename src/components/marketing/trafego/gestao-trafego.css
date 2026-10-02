@@ -286,3 +286,78 @@
   .gt-form { grid-template-columns: 1fr; }
   .gt-log-row { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* Modo apresentação do Fechamento: tela cheia, um slide 16:9 que escala com a
+   janela (tamanhos em cqi = % da largura do slide), mesmas cores do tema. */
+.gt .ap { position: fixed; inset: 0; z-index: 200; background: var(--ground); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; }
+/* Tamanho FIXO pela janela (16:9), nunca pelo conteúdo: o que não couber é cortado. */
+.gt .ap-palco { --ap-w: min(calc(100vw - 32px), calc((100vh - 96px) * 16 / 9)); flex: none; width: var(--ap-w); height: calc(var(--ap-w) * 9 / 16); overflow: hidden; container-type: inline-size; }
+.gt .ap-slide { width: 100%; height: 100%; background: var(--paper); border: 1px solid var(--line); border-radius: 1cqi; padding: 4cqi 5.5cqi 2.6cqi; display: flex; flex-direction: column; gap: 2cqi; overflow: hidden; font-size: 1.55cqi; line-height: 1.45; }
+.gt .ap-topo { display: flex; flex-direction: column; gap: .5cqi; }
+.gt .ap-eyebrow { font: 500 1.2cqi var(--mono); color: var(--destaque); text-transform: uppercase; letter-spacing: .08em; }
+.gt .ap-topo h2 { font: 850 4.2cqi/1 var(--display); font-stretch: 80%; margin: 0; text-wrap: balance; }
+.gt .ap-corpo { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: safe center; }
+.gt .ap-rodape { display: flex; justify-content: space-between; font: 400 1.1cqi var(--mono); color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 1cqi; }
+
+.gt .ap-capa { display: flex; flex-direction: column; gap: 1.6cqi; }
+.gt .ap-capa h1 { font: 850 9cqi/.95 var(--display); font-stretch: 78%; margin: 0; }
+.gt .ap-capa p { font-size: 2cqi; color: var(--ink-2); margin: 0; }
+
+.gt .ap-hero { display: flex; flex-direction: column; gap: 1.2cqi; }
+.gt .ap-l { font-size: 1.3cqi; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; }
+.gt .ap-hero > b { font: 850 13cqi/1 var(--display); font-stretch: 80%; font-variant-numeric: tabular-nums; }
+.gt .ap .pos { color: var(--good); }
+.gt .ap .neg { color: var(--bad); }
+.gt .ap-hero p { font-size: 2.6cqi; margin: 0; }
+.gt .ap-hero .ap-sub { font-size: 1.6cqi; color: var(--ink-2); }
+
+.gt .ap-cascata .gt-wf { font-size: 1.5cqi; gap: .7cqi; margin-top: 0; }
+.gt .ap-cascata .gt-wf-row { grid-template-columns: 26cqi 1fr 13cqi; gap: 1.6cqi; }
+.gt .ap-cascata .gt-wf .trk { height: 1.6cqi; }
+.gt .ap-cascata .gt-wf-row.tot { padding-top: .7cqi; }
+
+.gt .ap-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 2cqi; }
+.gt .ap-kpis > div { display: flex; flex-direction: column; gap: .6cqi; border: 1px solid var(--line); border-radius: .8cqi; padding: 1.6cqi 2.2cqi; }
+.gt .ap-kpis b { font: 850 5cqi/1 var(--display); font-stretch: 80%; font-variant-numeric: tabular-nums; }
+.gt .ap-kpis small { font-size: 1.3cqi; color: var(--ink-2); }
+
+.gt .ap-funil .gt-funil { gap: 1.2cqi; margin-top: 0; }
+.gt .ap-funil .gt-funil-row .top { font-size: 1.6cqi; }
+.gt .ap-funil .gt-funil .trk { height: 1.1cqi; margin: .4cqi 0 .2cqi; }
+.gt .ap-funil .gt-funil-row small { font-size: 1.1cqi; }
+.gt .ap-nota { font-size: 1.2cqi; color: var(--ink-3); margin: 1.4cqi 0 0; }
+
+.gt table.ap-tbl { width: 100%; border-collapse: collapse; font-size: 1.5cqi; }
+.gt .ap-tbl th { text-align: left; font-weight: 600; color: var(--ink-3); font-size: 1.15cqi; text-transform: uppercase; letter-spacing: .05em; padding: .8cqi 1cqi; border-bottom: 1px solid var(--line); }
+.gt .ap-tbl td { padding: .6cqi 1cqi; border-bottom: 1px solid var(--line-2); }
+.gt .ap-tbl .num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.gt .ap-lista { margin: 0; padding-left: 2cqi; display: flex; flex-direction: column; gap: 1.4cqi; font-size: 1.8cqi; max-width: 70cqi; }
+
+.gt .ap-ctrl { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font: 400 13px var(--mono); }
+.gt .ap-ctrl button { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; }
+.gt .ap-ctrl button:disabled { opacity: .4; cursor: default; }
+.gt .ap:fullscreen { padding: 0 0 12px; }
+.gt .ap:fullscreen .ap-palco { --ap-w: min(100vw, calc((100vh - 60px) * 16 / 9)); }
+@media (prefers-reduced-motion: no-preference) { .gt .ap-slide { animation: ap-entra .25s ease-out; } }
+@keyframes ap-entra { from { opacity: .4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Ícones da apresentação: marca do canal na cor dele, demais em tom neutro. */
+.gt .ap { --wpp: #1DA851; }
+.dark .gt .ap { --wpp: #3DDC84; }
+.gt .ap-rot { display: inline-flex; align-items: center; gap: .55em; }
+.gt .ap-rot > svg { flex: none; color: var(--ink-3); }
+.gt .ap-duo { display: inline-flex; gap: .2em; }
+.gt .ap-marcas { display: flex; flex-wrap: wrap; gap: 1cqi 2.4cqi; margin-top: 1.4cqi; font-size: 1.6cqi; color: var(--ink-2); }
+.gt .ap-marcas span { display: inline-flex; align-items: center; gap: .5em; padding: .5cqi 1.1cqi; border: 1px solid var(--line); border-radius: 99px; }
+.gt .ap-kpis .ap-l .ap-rot > svg { color: var(--destaque); }
+
+/* Seletor de mês do cabeçalho (este mês ou um mês fechado). */
+.gt select.gt-mes-sel { width: auto; flex: none; height: 36px; padding: 0 34px 0 14px; border-radius: 99px; border: 1px solid var(--line); background-color: var(--paper); color: var(--ink); font: 600 13px var(--body); cursor: pointer; }
+
+/* Rodapé da apresentação: quem apresenta (foto e nome do usuário logado). */
+.gt .ap-autor { display: inline-flex; align-items: center; gap: .8cqi; font-family: var(--body); }
+.gt .ap-autor img, .gt .ap-autor i { width: 2.6cqi; height: 2.6cqi; border-radius: 50%; object-fit: cover; flex: none; }
+.gt .ap-autor i { display: grid; place-items: center; background: var(--destaque-soft); color: var(--destaque); font: 700 1.2cqi var(--body); font-style: normal; }
+.gt .ap-autor b { font-size: 1.3cqi; color: var(--ink); font-weight: 600; }
+.gt .ap-autor small { font-size: 1.1cqi; color: var(--ink-3); }

@@ -1,41 +1,61 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type ChangeEvent, type ReactElement } from "react";
-import { Plus, ArrowsClockwise, ArrowSquareOut, CalendarBlank } from "@phosphor-icons/react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import {
+  Plus, ArrowsClockwise, ArrowSquareOut, CalendarBlank, Coins, UsersThree, Target, Megaphone,
+  MagnifyingGlass, Funnel, ChartBar, DotsThreeVertical, Warning, CaretDown,
+} from "@phosphor-icons/react";
 import {
   apiTrafegoCampanhas,
-  apiTrafegoHistorico,
   apiTrafegoStatus,
   apiTrafegoOrcamento,
   apiTrafegoCriarGoogle,
   apiTrafegoCriarMeta,
   type TrafegoCampanha,
   type TrafegoListaResponse,
-  type TrafegoAlteracao,
   type TrafegoPlataforma,
 } from "@/lib/api";
-import { FechamentoTrafego } from "./FechamentoTrafego";
-import { GastoDiario, ProgramacaoModal } from "./Programacao";
+import { BotaoApresentar } from "./BotaoApresentar";
+import { ProgramacaoModal } from "./Programacao";
+import { PainelDiario } from "./PainelDiario";
+import { LogoGoogle, LogoMeta } from "./LogosMarca";
 import { ImpactoAjusteModal } from "./ImpactoAjuste";
-import { RecomendacoesTrafego } from "./RecomendacoesTrafego";
-import { resumoProgramacao, diasAtivos, DIAS } from "./programacao-util";
 import "./gestao-trafego.css";
+import "./gestao-trafego-v2.css";
 
 // ── Formatação ──────────────────────────────────────────────────────────────
 const brl = (v: number) => "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const brl0 = (v: number) => "R$ " + Math.round(v).toLocaleString("pt-BR");
 const int = (v: number) => Math.round(v).toLocaleString("pt-BR");
-const pct = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 const DIAS_MES = 30.4;
 
 const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 function periodoDe(p: Periodo) {
   const fim = hojeSP();
   if (p === "mes") return { inicio: `${fim.slice(0, 7)}-01`, fim };
-  const d = new Date(`${fim}T12:00:00`);
-  d.setDate(d.getDate() - (Number(p) - 1));
-  return { inicio: d.toISOString().slice(0, 10), fim };
+  // Mês fechado escolhido no seletor: do dia 1 ao último dia.
+  const ref = p.slice(2);
+  const [a, m] = ref.split("-").map(Number);
+  return { inicio: `${ref}-01`, fim: `${ref}-${String(new Date(a, m, 0).getDate()).padStart(2, "0")}` };
 }
 
-type Periodo = "7" | "30" | "mes";
+// "m:AAAA-MM" = um mês fechado inteiro.
+type Periodo = "mes" | `m:${string}`;
+
+function nomeMesAtual() {
+  const [a, m] = hojeSP().split("-").map(Number);
+  const nome = new Date(a, m - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  return nome.charAt(0).toUpperCase() + nome.slice(1);
+}
+
+/** Os 12 meses anteriores ao atual, do mais recente ao mais antigo. */
+function mesesFechados() {
+  const [a, m] = hojeSP().split("-").map(Number);
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(a, m - 2 - i, 1);
+    const ref = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const nome = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return { ref, nome: nome.charAt(0).toUpperCase() + nome.slice(1) };
+  });
+}
 
 const TIPOS: Record<string, string> = {
   SEARCH: "Pesquisa",
@@ -69,14 +89,17 @@ const LANCES: Record<string, string> = {
   THRUPLAY: "ThruPlay",
   IMPRESSIONS: "Impressões",
 };
-const ACOES: Record<string, string> = {
-  ativar: "Ativou",
-  pausar: "Pausou",
-  orcamento: "Orçamento",
-  "lance-conversoes": "Lance → conversões",
-  presenca: "Local → presença",
-  programacao: "Dias e horários",
-  criar: "Criou",
+// Nome curto da campanha: "[CARFLAX] [PESQUISA] [HIDRAULICA] 07-2025" → "Pesquisa • Hidráulica".
+const ACENTOS: Record<string, string> = {
+  HIDRAULICA: "Hidráulica", CABREUVA: "Cabreúva", ELETRICA: "Elétrica", JUNDIAI: "Jundiaí", MATERIAIS: "Materiais",
+};
+function nomeCurto(nome: string) {
+  const partes = [...nome.matchAll(/\[([^\]]+)\]/g)].map((m) => m[1].trim()).filter((p) => !/^carflax$/i.test(p));
+  if (partes.length < 2) return nome;
+  return partes.map((p) => ACENTOS[p.toUpperCase()] || (p.length <= 4 ? p.toUpperCase() : p.charAt(0) + p.slice(1).toLowerCase())).join(" • ");
+}
+const ESTRATEGIA: Record<string, string> = {
+  MAXIMIZE_CONVERSIONS: "Max. conversões", TARGET_CPA: "CPA desejado", TARGET_SPEND: "Max. cliques",
 };
 
 interface Confirmacao {
@@ -114,8 +137,8 @@ const MODELO_META = {
 };
 
 // ── Tela ────────────────────────────────────────────────────────────────────
-export function GestaoTrafegoView() {
-  const [periodo, setPeriodo] = useState<Periodo>("30");
+export function GestaoTrafegoView({ userProfile }: { userProfile?: { name: string; avatar?: string | null } | null } = {}) {
+  const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [dados, setDados] = useState<TrafegoListaResponse | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erroGeral, setErroGeral] = useState<string | null>(null);
@@ -126,12 +149,11 @@ export function GestaoTrafegoView() {
   const [executando, setExecutando] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "good" | "bad"; texto: string; link?: string } | null>(null);
   const [criar, setCriar] = useState<null | "google" | "meta">(null);
-  const [historico, setHistorico] = useState<TrafegoAlteracao[]>([]);
-  const [avisoHistorico, setAvisoHistorico] = useState<string | null>(null);
-  const [visao, setVisao] = useState<"campanhas" | "recomendacoes" | "fechamento">("campanhas");
   const [programar, setProgramar] = useState<null | { inicial?: TrafegoCampanha }>(null);
   const [ajusteImpacto, setAjusteImpacto] = useState<null | { c: TrafegoCampanha; ajuste: "lance-conversoes" | "presenca" }>(null);
   const [recarregarDiario, setRecarregarDiario] = useState(0);
+  const [busca, setBusca] = useState("");
+  const [filtroAberto, setFiltroAberto] = useState(false);
   const intervalo = useMemo(() => periodoDe(periodo), [periodo]);
 
   const carregar = useCallback(async () => {
@@ -140,16 +162,9 @@ export function GestaoTrafegoView() {
     setRecarregarDiario((n) => n + 1);
     try {
       const { inicio, fim } = periodoDe(periodo);
-      const [lista, hist] = await Promise.all([
-        apiTrafegoCampanhas(inicio, fim),
-        apiTrafegoHistorico().catch(() => null),
-      ]);
+      const lista = await apiTrafegoCampanhas(inicio, fim);
       setDados(lista);
       setEdicoes({});
-      if (hist) {
-        setHistorico(hist.itens);
-        setAvisoHistorico(hist.aviso || null);
-      }
     } catch (e) {
       setErroGeral((e as Error).message);
     } finally {
@@ -165,8 +180,9 @@ export function GestaoTrafegoView() {
       campanhas
         .filter((c) => c.plataforma === aba)
         .filter((c) => mostrarPausadas || c.status === "ENABLED" || c.gasto > 0)
+        .filter((c) => !busca.trim() || c.nome.toLowerCase().includes(busca.trim().toLowerCase()))
         .sort((a, b) => (a.status === b.status ? b.gasto - a.gasto : a.status === "ENABLED" ? -1 : 1)),
-    [campanhas, aba, mostrarPausadas],
+    [campanhas, aba, mostrarPausadas, busca],
   );
   const ocultas = campanhas.filter((c) => c.plataforma === aba).length - daAba.length;
 
@@ -253,39 +269,38 @@ export function GestaoTrafegoView() {
 
   const custoMedio = aba === "google" && tot.contatosG ? tot.gastoG / tot.contatosG : tot.cpl;
 
+  const fimMes = (() => {
+    const [a, m] = intervalo.inicio.split("-").map(Number);
+    return `${intervalo.inicio.slice(0, 8)}${String(new Date(a, m, 0).getDate()).padStart(2, "0")}`;
+  })();
+
   return (
-    <div className="gt">
+    <div className="gt gt2">
       <div className="gt-wrap">
-        <header className="gt-head">
+        <header className="gt2-head">
           <div>
-            <div className="gt-tags"><span className="gt-tag">Marketing</span><span className="gt-tag ok">Google Ads + Meta Ads</span></div>
-            <h1>Gestão de <em>Tráfego</em></h1>
-            <p className="gt-sub">Ative, pause, ajuste orçamento e crie campanhas direto nas plataformas. No fechamento, o investimento do mês contra o que os clientes vindos de anúncio compraram no ERP.</p>
+            <nav className="gt2-trilha" aria-label="Você está em"><span>Marketing</span><i>›</i><span>Gestão de tráfego</span></nav>
+            <h1>Gestão de <em>tráfego</em></h1>
+            <p className="gt2-sub">Acompanhe investimentos, contatos e campanhas em um só lugar.</p>
           </div>
-          {visao === "campanhas" && <div className="gt-actions">
-            <div className="gt-seg" role="group" aria-label="Período">
-              {(["7", "30", "mes"] as Periodo[]).map((p) => (
-                <button key={p} type="button" aria-pressed={periodo === p} onClick={() => setPeriodo(p)}>
-                  {p === "mes" ? "Este mês" : `${p} dias`}
-                </button>
-              ))}
-            </div>
-            <button type="button" className="gt-btn ghost" onClick={carregar} disabled={carregando}>
-              <ArrowsClockwise size={15} weight="bold" /> Atualizar
+          <div className="gt2-acoes">
+            <label className="gt2-mes" htmlFor="gt-mes">
+              <CalendarBlank size={17} />
+              <select id="gt-mes" aria-label="Mês" value={periodo} onChange={(e) => setPeriodo(e.target.value as Periodo)}>
+                <option value="mes">{nomeMesAtual()}</option>
+                {mesesFechados().map((m) => <option key={m.ref} value={`m:${m.ref}`}>{m.nome}</option>)}
+              </select>
+              <CaretDown size={14} />
+            </label>
+            <button type="button" className="gt2-btn" onClick={carregar} disabled={carregando}>
+              <ArrowsClockwise size={17} /> Atualizar
             </button>
-            <button type="button" className="gt-btn" onClick={() => setCriar(aba)}>
-              <Plus size={15} weight="bold" /> Nova campanha
+            <BotaoApresentar apresentador={userProfile} onErro={(texto) => setAviso({ tipo: "bad", texto })} />
+            <button type="button" className="gt2-btn primario" onClick={() => setCriar(aba)}>
+              <Plus size={17} weight="bold" /> Nova campanha
             </button>
-          </div>}
+          </div>
         </header>
-
-        <div className="gt-views" role="group" aria-label="Visão">
-          <button type="button" aria-pressed={visao === "campanhas"} onClick={() => setVisao("campanhas")}>Campanhas</button>
-          <button type="button" aria-pressed={visao === "recomendacoes"} onClick={() => setVisao("recomendacoes")}>Recomendações da IA</button>
-          <button type="button" aria-pressed={visao === "fechamento"} onClick={() => setVisao("fechamento")}>Fechamento e relatório</button>
-        </div>
-
-        {visao === "fechamento" ? <FechamentoTrafego /> : visao === "recomendacoes" ? <RecomendacoesTrafego onMudancaNaConta={carregar} /> : <>
 
         {erroGeral && <div className="gt-banner bad"><b>Não carregou.</b> {erroGeral}</div>}
         {aviso && (
@@ -299,100 +314,102 @@ export function GestaoTrafegoView() {
         {dados?.erros.google && <div className="gt-banner bad"><b>Google Ads:</b> {dados.erros.google}</div>}
         {dados?.erros.meta && <div className="gt-banner bad"><b>Meta Ads:</b> {dados.erros.meta}</div>}
 
-        {/* Teto mensal */}
+        <div className="gt2-kpis">
+          <div className="gt2-kpi"><span className="ico"><Coins size={24} weight="duotone" /></span><div>
+            <p>Investimento no período</p><b>{carregando && !dados ? "…" : brl0(tot.gasto)}</b>
+            <small>{dados ? `${dados.periodo.inicio.split("-").reverse().join("/")} a ${dados.periodo.fim.split("-").reverse().join("/")}` : ""}</small>
+          </div></div>
+          <div className="gt2-kpi"><span className="ico"><UsersThree size={24} weight="duotone" /></span><div>
+            <p>Contatos gerados</p><b>{int(tot.contatos)}</b><small>conversões Google + conversas Meta</small>
+          </div></div>
+          <div className="gt2-kpi"><span className="ico"><Target size={24} weight="duotone" /></span><div>
+            <p>Custo por contato</p><b>{tot.contatos ? brl(tot.cpl) : "—"}</b><small>média das duas plataformas</small>
+          </div></div>
+          <div className="gt2-kpi"><span className="ico"><Megaphone size={24} weight="duotone" /></span><div>
+            <p>Campanhas ativas</p><b>{tot.ativasG + tot.ativasM}</b>
+            <small className="gt2-dots"><span><i style={{ background: "var(--google)" }} />Google {tot.ativasG}</span><span><i style={{ background: "var(--meta)" }} />Meta {tot.ativasM}</span></small>
+          </div></div>
+        </div>
+
         {teto && <TetoPainel teto={teto} />}
 
-        {/* KPIs do período */}
-        <div className="gt-grid4">
-          <div className="gt-kpi"><div className="l">Investido no período</div><div className="v">{carregando && !dados ? "…" : brl0(tot.gasto)}</div><div className="d">{dados ? `${dados.periodo.inicio.split("-").reverse().join("/")} a ${dados.periodo.fim.split("-").reverse().join("/")}` : ""}</div></div>
-          <div className="gt-kpi"><div className="l">Contatos</div><div className="v">{int(tot.contatos)}</div><div className="d">conversões Google + conversas Meta</div></div>
-          <div className="gt-kpi"><div className="l">Custo por contato</div><div className="v">{tot.contatos ? brl(tot.cpl) : "—"}</div><div className="d">média das duas plataformas</div></div>
-          <div className="gt-kpi"><div className="l">Campanhas ativas</div><div className="v">{tot.ativasG + tot.ativasM}</div><div className="d"><span className="gt-dot" style={{ background: "var(--google)" }} />Google {tot.ativasG} · <span className="gt-dot" style={{ background: "var(--meta)" }} />Meta {tot.ativasM}</div></div>
-        </div>
+        <PainelDiario inicio={intervalo.inicio} fim={intervalo.fim} fimMes={fimMes} recarregar={recarregarDiario} />
 
-        <GastoDiario inicio={intervalo.inicio} fim={intervalo.fim} recarregar={recarregarDiario} />
-
-        {/* Abas */}
-        <div className="gt-tabs">
-          <div className="gt-tab-row" role="tablist">
-            {(["google", "meta"] as TrafegoPlataforma[]).map((p) => (
-              <button key={p} type="button" role="tab" className="gt-tab" aria-selected={aba === p} onClick={() => setAba(p)}>
-                <span className="gt-dot" style={{ background: p === "google" ? "var(--google)" : "var(--meta)" }} />
-                {p === "google" ? "Google Ads" : "Meta Ads"}
-                <small>{campanhas.filter((c) => c.plataforma === p && c.status === "ENABLED").length} ativas</small>
-              </button>
-            ))}
-          </div>
-          <div className="gt-actions">
-            {aba === "google" && (
-              <button type="button" className="gt-btn ghost small" onClick={() => setProgramar({})}>
-                <CalendarBlank size={14} weight="bold" /> Dias e horários
-              </button>
-            )}
-            <label className="gt-check">
-              <input type="checkbox" checked={mostrarPausadas} onChange={(e) => setMostrarPausadas(e.target.checked)} />
-              Mostrar pausadas sem gasto{ocultas > 0 && !mostrarPausadas ? ` (${ocultas})` : ""}
-            </label>
-          </div>
-        </div>
-
-        <div className="gt-tbl-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: 54 }}>Ativa</th>
-                <th>Campanha</th>
-                <th>{aba === "google" ? "Lance" : "Otimização"}</th>
-                <th className="num">Orçamento/dia</th>
-                <th className="num">Gasto</th>
-                <th className="num">Cliques</th>
-                <th className="num">Contatos</th>
-                <th className="num">Custo/contato</th>
-                {aba === "google" ? <th className="num">Parcela impr.</th> : <th className="num">Frequência</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {carregando && !dados && [0, 1, 2, 3].map((i) => <tr key={i}><td colSpan={9}><div className="gt-skel" /></td></tr>)}
-              {dados && daAba.length === 0 && (
-                <tr><td colSpan={9} className="gt-empty">Nenhuma campanha ativa ou com gasto no período.</td></tr>
-              )}
-              {daAba.map((c) => (
-                <LinhaCampanha
-                  key={c.plataforma + c.id}
-                  c={c}
-                  valorEdicao={edicoes[c.id]}
-                  custoMedio={custoMedio}
-                  onEditar={(v) => setEdicoes((s) => ({ ...s, [c.id]: v }))}
-                  onSalvar={() => pedirOrcamento(c)}
-                  onStatus={() => pedirStatus(c)}
-                  onAjuste={(a) => pedirAjuste(c, a)}
-                  onProgramar={() => setProgramar({ inicial: c })}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Histórico */}
-        <section className="gt-panel">
-          <h4>Histórico de alterações</h4>
-          {avisoHistorico ? (
-            <p className="gt-hint" style={{ margin: 0 }}>{avisoHistorico}</p>
-          ) : historico.length === 0 ? (
-            <p className="gt-hint" style={{ margin: 0 }}>Nenhuma alteração feita pelo HUB ainda.</p>
-          ) : (
-            <div className="gt-log">
-              {historico.map((h) => (
-                <div className="gt-log-row" key={h.id}>
-                  <time>{new Date(h.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</time>
-                  <span><span className={`gt-pill ${h.plataforma === "google" ? "good" : "info"}`}>{h.plataforma === "google" ? "Google" : "Meta"}</span></span>
-                  <span><b>{ACOES[h.acao] || h.acao}</b> · {h.campanha_nome || "—"} {descreverMudanca(h)} <span className="gt-hint">· {h.usuario_email || "?"}</span></span>
-                </div>
+        <section className="gt2-campanhas">
+          <div className="gt2-camp-head">
+            <h2>Campanhas</h2>
+            <div className="gt2-abas" role="tablist">
+              {(["google", "meta"] as TrafegoPlataforma[]).map((p) => (
+                <button key={p} type="button" role="tab" aria-selected={aba === p} onClick={() => setAba(p)}>
+                  {p === "google" ? <LogoGoogle size="1.15em" /> : <LogoMeta size="1.15em" />}
+                  {p === "google" ? "Google Ads" : "Meta Ads"}
+                  <small>{campanhas.filter((c) => c.plataforma === p && c.status === "ENABLED").length}</small>
+                </button>
               ))}
             </div>
-          )}
+            <div className="gt2-camp-ferr">
+              <label className="gt2-busca" htmlFor="gt-busca">
+                <MagnifyingGlass size={16} />
+                <input id="gt-busca" placeholder="Buscar campanha..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+              </label>
+              <div className="gt2-filtro">
+                <button type="button" className="gt2-btn" aria-expanded={filtroAberto} onClick={() => setFiltroAberto((v) => !v)}>
+                  <Funnel size={16} /> Filtrar{mostrarPausadas ? " (1)" : ""}
+                </button>
+                {filtroAberto && (
+                  <div className="gt2-menu">
+                    <label className="gt-check">
+                      <input type="checkbox" checked={mostrarPausadas} onChange={(e) => setMostrarPausadas(e.target.checked)} />
+                      Mostrar pausadas sem gasto{ocultas > 0 && !mostrarPausadas ? ` (${ocultas})` : ""}
+                    </label>
+                  </div>
+                )}
+              </div>
+              {aba === "google" && (
+                <button type="button" className="gt2-btn" onClick={() => setProgramar({})}>
+                  <CalendarBlank size={16} /> Dias e horários
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="gt2-tbl-wrap">
+            <table className="gt2-tbl gt2-tbl-camp">
+              <thead>
+                <tr>
+                  <th style={{ width: 64 }}>Ativa</th>
+                  <th>Campanha</th>
+                  <th>Estratégia</th>
+                  <th>Orçamento/dia</th>
+                  <th>Investido</th>
+                  <th>Cliques</th>
+                  <th>Contatos</th>
+                  <th>Custo/contato</th>
+                  <th style={{ width: 80 }}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {carregando && !dados && [0, 1, 2, 3].map((i) => <tr key={i}><td colSpan={9}><div className="gt-skel" /></td></tr>)}
+                {dados && daAba.length === 0 && (
+                  <tr><td colSpan={9} className="gt-empty">Nenhuma campanha {busca ? "encontrada" : "ativa ou com gasto no período"}.</td></tr>
+                )}
+                {daAba.map((c) => (
+                  <LinhaCampanha
+                    key={c.plataforma + c.id}
+                    c={c}
+                    valorEdicao={edicoes[c.id]}
+                    custoMedio={custoMedio}
+                    onEditar={(v) => setEdicoes((st) => ({ ...st, [c.id]: v }))}
+                    onSalvar={() => pedirOrcamento(c)}
+                    onStatus={() => pedirStatus(c)}
+                    onAjuste={(a) => pedirAjuste(c, a)}
+                    onProgramar={() => setProgramar({ inicial: c })}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
-        </>}
       </div>
 
       {confirmar && (
@@ -457,42 +474,36 @@ export function GestaoTrafegoView() {
   );
 }
 
-function descreverMudanca(h: TrafegoAlteracao) {
-  const a = h.antes as Record<string, number> | null;
-  const d = h.depois as Record<string, number> | null;
-  if (h.acao === "orcamento" && a && d) return `(${brl(Number(a.diario) || 0)} → ${brl(Number(d.diario) || 0)}/dia)`;
-  if (h.acao === "criar" && d?.orcamentoDiario) return `(${brl(Number(d.orcamentoDiario))}/dia, pausada)`;
-  return "";
-}
-
 // ── Teto ────────────────────────────────────────────────────────────────────
 function TetoPainel({ teto }: { teto: TrafegoListaResponse["teto"] }) {
-  const escala = Math.max(teto.limite, teto.projecaoMes, teto.comprometidoMensal) * 1.05;
-  const pos = (v: number) => `${Math.min(100, (v / escala) * 100)}%`;
+  const usado = Math.min(1, teto.gastoMes / Math.max(1, teto.limite));
+  // Escala da barra: o teto, ou a projeção quando passa dele (aí o teto vira uma marca).
+  const escala = Math.max(teto.limite, teto.projecaoMes, 1);
   const acima = teto.projecaoMes > teto.limite;
   return (
-    <section className="gt-panel gt-teto" aria-label="Teto mensal">
-      <div>
-        <div className="gt-teto-title">
-          <h4 style={{ margin: 0 }}>Teto mensal</h4>
-          <b>{brl0(teto.gastoMes)}</b>
-          <span className="gt-hint">gastos de {brl0(teto.limite)} este mês</span>
-        </div>
+    <section className="gt2-card gt2-teto" aria-label="Teto mensal">
+      <div className="gt2-teto-topo">
+        <h3>Teto mensal <b>{brl0(teto.limite)}</b></h3>
+        <span className={`gt2-selo ${acima ? "alerta" : "ok"}`}>
+          {acima ? <Warning size={16} weight="fill" /> : null}
+          {acima ? "Projeção acima do teto" : "Dentro do teto"}
+        </span>
       </div>
-      <span className={`gt-pill ${acima ? "bad" : teto.dentro ? "good" : "warn"}`}>
-        {acima ? "Ritmo acima do teto" : teto.dentro ? "Dentro do teto" : "Orçamentos acima do teto"}
-      </span>
-      <div className="gt-bar" role="img" aria-label={`Gasto ${brl0(teto.gastoMes)}, projeção ${brl0(teto.projecaoMes)}, teto ${brl0(teto.limite)}`}>
-        <i style={{ width: pos(teto.projecaoMes), background: acima ? "var(--bad-soft)" : "var(--destaque-soft)" }} />
-        <i style={{ width: pos(teto.gastoMes), background: acima ? "var(--bad)" : "var(--destaque)" }} />
-        <span className="cap" style={{ left: pos(teto.limite) }} />
+      <div className="gt2-barra" role="img" aria-label={`Gasto ${Math.round(usado * 100)}% do teto; projeção ${Math.round((teto.projecaoMes / teto.limite) * 100)}% do teto`}>
+        <span>
+          {/* Projeção do mês (laranja transparente) atrás do que já foi gasto (verde). */}
+          <i className="proj" style={{ width: `${(teto.projecaoMes / escala) * 100}%` }} />
+          <i className="gasto" style={{ width: `${(teto.gastoMes / escala) * 100}%` }} />
+          {escala > teto.limite && <em className="limite" style={{ left: `${(teto.limite / escala) * 100}%` }} title="Teto" />}
+        </span>
+        <b>{Math.round(usado * 100)}%</b>
       </div>
-      <div className="gt-teto-nums">
-        <span>Google <b>{teto.gastoMesGoogle == null ? "—" : brl0(teto.gastoMesGoogle)}</b></span>
-        <span>Meta <b>{teto.gastoMesMeta == null ? "—" : brl0(teto.gastoMesMeta)}</b></span>
-        <span>Projeção do mês <b>{brl0(teto.projecaoMes)}</b></span>
-        <span>Orçamentos ativos <b>{brl(teto.diarioTotal)}/dia</b> (= {brl0(teto.comprometidoMensal)}/mês)</span>
-        <span>Diário máximo até o fim do mês <b>{brl(teto.diarioMaximo)}</b> ({teto.diasRestantes} dias)</span>
+      <div className="gt2-barra-leg"><span><i className="gasto" />Gasto</span><span><i className="proj" />Projeção do mês</span></div>
+      <div className="gt2-teto-nums">
+        <div><p>Investido no mês</p><b>{brl0(teto.gastoMes)}</b></div>
+        <div><p>Projeção do mês</p><b className={acima ? "alerta" : ""}>{brl0(teto.projecaoMes)}</b></div>
+        <div><p>Orçamento ativo</p><b>{brl(teto.diarioTotal)}/dia</b></div>
+        <div><p>Máximo recomendado</p><b>{brl(teto.diarioMaximo)}/dia</b></div>
       </div>
     </section>
   );
@@ -509,29 +520,19 @@ function LinhaCampanha({ c, valorEdicao, custoMedio, onEditar, onSalvar, onStatu
   onAjuste: (a: "lance-conversoes" | "presenca") => void;
   onProgramar: () => void;
 }) {
-  const rodaEm = diasAtivos(c.programacao);
+  const [menu, setMenu] = useState(false);
   const ativa = c.status === "ENABLED";
   const cpl = c.contatos > 0 ? c.gasto / c.contatos : null;
   const editavel = c.plataforma === "google" ? !!c.orcamentoId && !c.orcamentoCompartilhado : !!c.orcamento?.alvoId;
   const valor = valorEdicao ?? (c.orcamentoDiario ? String(c.orcamentoDiario) : "");
   const mudou = valorEdicao !== undefined && Number(valorEdicao.replace(",", ".")) !== c.orcamentoDiario && Number(valorEdicao.replace(",", ".")) > 0;
-
-  const flags: ReactElement[] = [];
-  if (c.plataforma === "google") {
-    // "Maximizar cliques" só vira alerta quando está custando caro: com custo por
-    // contato na média, trocar o lance não ganha nada e ainda força 1–2 semanas de
-    // reaprendizado (caso de Vinhedo em set/2026: R$ 19,99 contra R$ 20,18).
-    const lanceCaro = c.lance === "TARGET_SPEND" && c.gasto > 0 && (cpl == null || cpl > custoMedio * 1.15);
-    if (lanceCaro) flags.push(<span key="l" className="gt-pill warn">Contato {cpl == null ? "sem conversão" : "acima da média"} com "max. cliques" · <button type="button" onClick={() => onAjuste("lance-conversoes")}>ver impacto</button></span>);
-    if (c.localizacao === "PRESENCE_OR_INTEREST") flags.push(<span key="g" className="gt-pill info">Presença ou interesse · <button type="button" onClick={() => onAjuste("presenca")}>ver impacto</button></span>);
-    if (ativa && (c.perdidaOrcamento ?? 0) > 0.3) flags.push(<span key="b" className="gt-pill info">Perde {pct(c.perdidaOrcamento)} das buscas por verba</span>);
-    if (c.orcamentoCompartilhado) flags.push(<span key="s" className="gt-pill info">Orçamento compartilhado</span>);
-  } else {
-    if (c.tipo === "OUTCOME_AWARENESS" && c.gasto > 0) flags.push(<span key="a" className="gt-pill info">Marca — não gera contato direto</span>);
-    if ((c.frequencia ?? 0) > 3) flags.push(<span key="f" className="gt-pill warn">Frequência alta: troque o criativo</span>);
-    if (c.orcamento?.nivel === "varios") flags.push(<span key="v" className="gt-pill info">Orçamento em {c.orcamento.conjuntos} conjuntos</span>);
-    if (c.statusEfetivo && !["ACTIVE", "PAUSED", "CAMPAIGN_PAUSED"].includes(c.statusEfetivo)) flags.push(<span key="e" className="gt-pill bad">{c.statusEfetivo.replace(/_/g, " ").toLowerCase()}</span>);
-  }
+  const caro = cpl != null && cpl > custoMedio * 1.15;
+  const estrategia = c.plataforma === "google"
+    ? `${ESTRATEGIA[c.lance || ""] || LANCES[c.lance || ""] || c.lance || "—"}${c.cpaDesejado ? " (CPA)" : ""}`
+    : `${TIPOS[c.tipo] || c.tipo} · ${LANCES[c.lance || ""] || c.lance || "—"}`;
+  // Correção com impacto calculado: o lance quando é "max. cliques", senão a localização.
+  const ajuste: "lance-conversoes" | "presenca" | null = c.plataforma !== "google" ? null
+    : c.lance === "TARGET_SPEND" ? "lance-conversoes" : c.localizacao === "PRESENCE_OR_INTEREST" ? "presenca" : null;
 
   return (
     <tr className={ativa ? "" : "off"}>
@@ -539,32 +540,14 @@ function LinhaCampanha({ c, valorEdicao, custoMedio, onEditar, onSalvar, onStatu
         <button type="button" role="switch" aria-checked={ativa} aria-label={`${ativa ? "Pausar" : "Ativar"} ${c.nome}`} className="gt-switch" onClick={onStatus} />
       </td>
       <td>
-        <div className="gt-name">
-          {c.nome}
-          <small>{TIPOS[c.tipo] || c.tipo}{c.plataforma === "meta" && c.conjuntosAtivos != null ? ` · ${c.conjuntosAtivos} conjunto(s) ativo(s)` : ""}</small>
-        </div>
-        <div className="gt-agenda">
-          <span className="gt-semana-dots" aria-hidden="true">
-            {DIAS.map((d) => <i key={d.id} className={c.plataforma === "meta" || rodaEm.has(d.id) ? "on" : ""}>{d.letra}</i>)}
-          </span>
-          {c.plataforma === "google" ? (
-            <>
-              <span>{resumoProgramacao(c.programacao)}</span>
-              <button type="button" className="gt-link" onClick={onProgramar}>editar</button>
-            </>
-          ) : (
-            <span>Todos os dias (a Meta não programa dias com orçamento diário)</span>
-          )}
-        </div>
-        {flags.length > 0 && <div className="gt-flags">{flags}</div>}
+        <span className="gt2-camp-nome" title={c.nome}><i className={ativa ? "on" : ""} />{nomeCurto(c.nome)}</span>
       </td>
-      <td>{LANCES[c.lance || ""] || c.lance || "—"}{c.cpaDesejado ? <div className="gt-hint">CPA {brl(c.cpaDesejado)}</div> : null}</td>
-      <td className="num">
+      <td className="gt2-estr">{estrategia}</td>
+      <td>
         {editavel ? (
-          <div className="gt-budget">
-            <span>R$</span>
+          <span className="gt2-orc">
+            R$
             <input
-              className="gt-input"
               inputMode="decimal"
               aria-label={`Orçamento diário de ${c.nome}`}
               value={valor}
@@ -572,18 +555,36 @@ function LinhaCampanha({ c, valorEdicao, custoMedio, onEditar, onSalvar, onStatu
               onKeyDown={(e) => { if (e.key === "Enter" && mudou) onSalvar(); }}
             />
             {mudou && <button type="button" className="gt-btn small" onClick={onSalvar}>Salvar</button>}
-          </div>
+          </span>
         ) : (
-          <span title="Ajuste pelo painel da plataforma">{c.orcamentoDiario ? brl(c.orcamentoDiario) : c.orcamento?.total ? `${brl(c.orcamento.total)} total` : "—"}</span>
+          <span title="Ajuste pelo painel da plataforma">{c.orcamentoDiario ? brl0(c.orcamentoDiario) : "—"}</span>
         )}
       </td>
-      <td className="num">{brl(c.gasto)}</td>
-      <td className="num">{int(c.cliques)}</td>
-      <td className="num">{c.contatos ? c.contatos.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}</td>
-      <td className="num" style={{ color: cpl == null ? undefined : cpl <= custoMedio ? "var(--good)" : cpl > custoMedio * 1.4 ? "var(--bad)" : "var(--warn)" }}>
-        {cpl == null ? "—" : brl(cpl)}
+      <td className="mono">{brl(c.gasto)}</td>
+      <td className="mono">{int(c.cliques)}</td>
+      <td className="mono">{c.contatos ? c.contatos.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : 0}</td>
+      <td className="mono">
+        {cpl == null ? "—" : caro
+          ? <span className="gt2-cpl alerta" title="Acima da média"><Warning size={15} weight="fill" /> {cpl.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          : <span className="gt2-cpl ok">{brl(cpl)}</span>}
       </td>
-      <td className="num">{c.plataforma === "google" ? pct(c.parcela) : c.frequencia ? c.frequencia.toFixed(2).replace(".", ",") : "—"}</td>
+      <td>
+        <span className="gt2-acoes-linha">
+          <button type="button" aria-label={ajuste ? "Ver impacto da correção sugerida" : "Sem correção sugerida"} title={ajuste === "lance-conversoes" ? "Ver impacto: lance por conversões" : ajuste === "presenca" ? "Ver impacto: só quem está na cidade" : "Nenhuma correção sugerida"}
+            disabled={!ajuste} onClick={() => ajuste && onAjuste(ajuste)}><ChartBar size={18} /></button>
+          <span className="gt2-kebab">
+            <button type="button" aria-label="Mais ações" aria-expanded={menu} onClick={() => setMenu((v) => !v)}><DotsThreeVertical size={18} weight="bold" /></button>
+            {menu && (
+              <div className="gt2-menu direita" onMouseLeave={() => setMenu(false)}>
+                {c.plataforma === "google" && <button type="button" onClick={() => { setMenu(false); onProgramar(); }}>Dias e horários</button>}
+                {c.plataforma === "google" && c.lance === "TARGET_SPEND" && <button type="button" onClick={() => { setMenu(false); onAjuste("lance-conversoes"); }}>Impacto: lance por conversões</button>}
+                {c.plataforma === "google" && c.localizacao === "PRESENCE_OR_INTEREST" && <button type="button" onClick={() => { setMenu(false); onAjuste("presenca"); }}>Impacto: só quem está na cidade</button>}
+                <button type="button" onClick={() => { setMenu(false); onStatus(); }}>{ativa ? "Pausar campanha" : "Ativar campanha"}</button>
+              </div>
+            )}
+          </span>
+        </span>
+      </td>
     </tr>
   );
 }

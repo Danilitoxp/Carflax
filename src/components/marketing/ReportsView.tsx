@@ -29,6 +29,7 @@ import {
 import { marketingService, type ReportsAnalytics, type EvolutionData, type EvolutionClient, type VerbasData, type PesquisasData } from "@/lib/marketing-service";
 import { apiAdsSpend, apiAdsSendReport, apiEnviarRelatorioTrafegoPeriodo, apiCustosFixos, apiRentabilidade, type AdsSpendResponse, type CustosFixosPeriodo, type RentabilidadeResponse } from "@/lib/api";
 import { CustosFixosSection } from "./CustosFixosSection";
+import { useMetaMes } from "./use-meta-mes";
 import { RentabilidadeSection } from "./RentabilidadeSection";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -40,7 +41,7 @@ const EMPTY_ANALYTICS: ReportsAnalytics = {
     leads: 0, quotesCount: 0, quotesValue: 0, salesCount: 0, salesValue: 0,
     avgTicket: 0, convByCount: 0, convByValue: 0, convByQuote: 0, avgResponseMinutes: null,
   },
-  previous: { leads: 0, salesCount: 0, salesValue: 0 },
+  previous: { leads: 0, quotesCount: 0, quotesValue: 0, salesCount: 0, salesValue: 0, avgTicket: 0, avgResponseMinutes: null },
   bySeller: [],
   salesList: [],
   byOrigin: [],
@@ -297,6 +298,8 @@ export function ReportsView({ userProfile }: { userProfile?: UserProfile | null 
   }, [activeTab, startDate, endDate, adsData]);
 
   const { totals, previous, bySeller, salesList, byOrigin, byCampaign, byTemperature, dailySeries } = analytics;
+  // Meta do mês do início do período (gerada a partir da Gestão de Tráfego).
+  const metaMes = useMetaMes(`${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}`);
   const maxOriginLeads = Math.max(...byOrigin.map((o) => o.leads), 1);
   const maxCampaignLeads = Math.max(...byCampaign.map((c) => c.leads), 1);
   const totalTempLeads = byTemperature.reduce((s, t) => s + t.leads, 0);
@@ -311,7 +314,7 @@ export function ReportsView({ userProfile }: { userProfile?: UserProfile | null 
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-background">
-      <div className="max-w-6xl w-full mx-auto flex flex-col min-h-0 flex-1 px-8 pt-6">
+      <div className="w-full flex flex-col min-h-0 flex-1 px-4 lg:px-6 pt-4">
 
         {/* Header */}
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between shrink-0 px-1">
@@ -466,14 +469,14 @@ export function ReportsView({ userProfile }: { userProfile?: UserProfile | null 
             <div className="space-y-5">
               {/* KPI Row — com comparativo vs período anterior */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                <KpiCard label="Leads" value={totals.leads.toLocaleString("pt-BR")} delta={pctDelta(totals.leads, previous.leads)} icon={<Users className="w-5 h-5" />} accent="text-blue-500 bg-blue-500/10" />
-                <KpiCard label="Orçamentos" value={totals.quotesCount.toLocaleString("pt-BR")} hint={formatCurrency(totals.quotesValue)} icon={<ShoppingBag className="w-5 h-5" />} accent="text-indigo-500 bg-indigo-500/10" />
-                <KpiCard label="Vendas" value={totals.salesCount.toLocaleString("pt-BR")} hint={formatCurrency(totals.salesValue)} delta={pctDelta(totals.salesValue, previous.salesValue)} icon={<DollarSign className="w-5 h-5" />} accent="text-emerald-500 bg-emerald-500/10" />
-                <KpiCard label="Ticket Médio" value={formatCurrency(totals.avgTicket)} icon={<TrendingUp className="w-5 h-5" />} accent="text-rose-500 bg-rose-500/10" />
-                <KpiCard label="1ª Resposta" value={formatResponseTime(totals.avgResponseMinutes)} valueClass={slaColor(totals.avgResponseMinutes)} icon={<Timer className="w-5 h-5" />} accent="text-amber-500 bg-amber-500/10" />
+                <KpiCard label="Leads" value={totals.leads.toLocaleString("pt-BR")} delta={pctDelta(totals.leads, previous.leads)} meta={metaMes && { feito: metaMes.real.leads, alvo: metaMes.meta.metas.leads, decorrido: metaMes.decorrido, cor: "bg-blue-500" }} icon={<Users className="w-5 h-5" />} accent="text-blue-500 bg-blue-500/10" />
+                <KpiCard label="Orçamentos" value={totals.quotesCount.toLocaleString("pt-BR")} hint={formatCurrency(totals.quotesValue)} delta={pctDelta(totals.quotesCount, previous.quotesCount)} meta={metaMes && { feito: metaMes.real.orcamentos, alvo: metaMes.meta.metas.orcamentos, decorrido: metaMes.decorrido, cor: "bg-indigo-500" }} icon={<ShoppingBag className="w-5 h-5" />} accent="text-indigo-500 bg-indigo-500/10" />
+                <KpiCard label="Pedidos fechados" value={totals.salesCount.toLocaleString("pt-BR")} hint={formatCurrency(totals.salesValue)} delta={pctDelta(totals.salesValue, previous.salesValue)} meta={metaMes && { feito: metaMes.real.vendas, alvo: metaMes.meta.metas.vendas, decorrido: metaMes.decorrido, cor: "bg-emerald-500" }} icon={<DollarSign className="w-5 h-5" />} accent="text-emerald-500 bg-emerald-500/10" />
+                <KpiCard label="Ticket Médio" value={formatCurrency(totals.avgTicket)} delta={pctDelta(totals.avgTicket, previous.avgTicket)} icon={<TrendingUp className="w-5 h-5" />} accent="text-rose-500 bg-rose-500/10" />
+                <KpiCard label="1ª Resposta" value={formatResponseTime(totals.avgResponseMinutes)} valueClass={slaColor(totals.avgResponseMinutes)} delta={totals.avgResponseMinutes == null || previous.avgResponseMinutes == null ? null : pctDelta(totals.avgResponseMinutes, previous.avgResponseMinutes)} menorMelhor icon={<Timer className="w-5 h-5" />} accent="text-amber-500 bg-amber-500/10" />
               </div>
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider -mt-3 px-1">
-                Variação comparada ao período anterior de mesma duração
+                Variação comparada aos mesmos dias do mês anterior
               </p>
 
               {/* Conversão */}
@@ -494,7 +497,7 @@ export function ReportsView({ userProfile }: { userProfile?: UserProfile | null 
                   mão. */}
               <section className="space-y-2.5">
                 <h2 className="text-sm font-black uppercase tracking-tight flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-emerald-500" /> Vendas do Período
+                  <DollarSign className="w-4 h-4 text-emerald-500" /> Pedidos fechados no período
                   {salesList.length > 0 && (
                     <span className="text-[10px] font-black text-muted-foreground tracking-widest">
                       {salesList.length} · {formatCurrency(totals.salesValue)}
@@ -1916,11 +1919,34 @@ function SellerAvatar({ name, avatar }: { name: string; avatar?: string | null }
   );
 }
 
-function KpiCard({ label, value, hint, icon, accent, valueClass, delta }: {
+/** Progresso contra a meta do mês, com a marca de onde deveria estar hoje. */
+function MetaBarra({ feito, alvo, decorrido, cor }: { feito: number; alvo: number; decorrido: number; cor: string }) {
+  const prog = alvo > 0 ? feito / alvo : 0;
+  const noRitmo = feito >= alvo * decorrido;
+  return (
+    <div className="mt-2" title={`Meta do mês gerada a partir da Gestão de Tráfego. Esperado até hoje: ${Math.round(alvo * decorrido).toLocaleString("pt-BR")}`}>
+      <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground">
+        <span>Meta do mês: {feito.toLocaleString("pt-BR")} de {alvo.toLocaleString("pt-BR")}</span>
+        <span className={noRitmo ? "text-emerald-500" : "text-amber-500"}>{noRitmo ? "no ritmo" : "abaixo do ritmo"}</span>
+      </div>
+      <div className="relative mt-1 h-1.5 rounded-full bg-secondary overflow-hidden" role="img" aria-label={`${Math.round(prog * 100)}% da meta do mês`}>
+        <div className={cn("h-full rounded-full", cor)} style={{ width: `${Math.min(100, prog * 100)}%` }} />
+        {decorrido > 0 && decorrido < 1 && <span className="absolute top-0 bottom-0 w-0.5 bg-foreground/60" style={{ left: `${decorrido * 100}%` }} />}
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({ label, value, hint, icon, accent, valueClass, delta, menorMelhor = false, meta }: {
   label: string; value: string; hint?: string; icon: React.ReactNode; accent: string; valueClass?: string; delta?: number | null;
+  /** Meta do mês (opcional): barra de progresso no rodapé do cartão. */
+  meta?: { feito: number; alvo: number; decorrido: number; cor: string } | null;
+  /** Para tempo de resposta: cair é bom (verde). */
+  menorMelhor?: boolean;
 }) {
   const showDelta = delta !== undefined && delta !== null;
-  const positive = (delta ?? 0) >= 0;
+  const subiu = (delta ?? 0) >= 0;
+  const positive = menorMelhor ? !subiu : subiu;
   return (
     <div className="bg-card border border-border rounded-2xl p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-center justify-between mb-2">
@@ -1930,7 +1956,7 @@ function KpiCard({ label, value, hint, icon, accent, valueClass, delta }: {
             "px-2 py-0.5 rounded-full text-[10px] font-black uppercase flex items-center gap-0.5",
             positive ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
           )}>
-            {positive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+            {subiu ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
             {Math.abs(delta as number).toFixed(0)}%
           </span>
         )}
@@ -1938,6 +1964,7 @@ function KpiCard({ label, value, hint, icon, accent, valueClass, delta }: {
       <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">{label}</p>
       <p className={cn("text-lg font-black tracking-tight mt-0.5", valueClass)}>{value}</p>
       {hint && <p className="text-[11px] font-bold text-muted-foreground mt-0.5">{hint}</p>}
+      {meta && <MetaBarra {...meta} />}
     </div>
   );
 }

@@ -17,6 +17,7 @@ interface UserProfile {
   name: string;
   email?: string;
   role: string;
+  avatar?: string;
 }
 
 interface MarketingViewProps {
@@ -28,7 +29,7 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
   const firstName = userProfile?.name ? userProfile.name.split(' ')[0] : 'Usuário';
 
   if (activeTab === "Gestao Trafego") {
-    return <GestaoTrafegoView />;
+    return <GestaoTrafegoView userProfile={userProfile} />;
   }
 
   if (activeTab === "Whatsapp API") {

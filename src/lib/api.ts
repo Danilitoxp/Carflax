@@ -1921,6 +1921,10 @@ export interface TrafegoFechamento {
   investimento: {
     google: number; meta: number; midia: number; fixos: number; total: number;
     fixosItens: { descricao: string; categoria: string | null; valor: number }[];
+    /** Cobrança da Meta pelas mensagens do WhatsApp API, em reais (0 sem WABA configurado). */
+    whatsapp?: number;
+    /** Preenchido quando a conta do WhatsApp (WABA) está configurada; null sem ela. */
+    whatsappDetalhe?: { reais: number; moeda: string; valorOriginal: number } | null;
   };
   contatos: { google: number; meta: number; total: number };
   funil: {
@@ -1942,13 +1946,14 @@ export interface TrafegoFechamento {
     roas: number | null; roasTodos: number | null;
   }[];
   clientes: { cod: string; cliente: string; canal: string; campanha: string | null; primeiroContato: string; novo: boolean; pedidos: number; venda: number; custo: number }[];
-  erros: { google: string | null; meta: string | null; leads: string | null; erp: string | null };
+  erros: { google: string | null; meta: string | null; leads: string | null; erp: string | null; whatsapp?: string | null };
   cacheEm?: string;
 }
 
-export const apiTrafegoFechamento = (mes: string, impostos: number, taxas: number, atualizar = false) =>
+/** `ateDia`: corta o mês no dia N (comparar com os mesmos dias do mês anterior). */
+export const apiTrafegoFechamento = (mes: string, impostos: number, taxas: number, atualizar = false, ateDia?: number) =>
   trafegoReq<TrafegoFechamento>("GET", "fechamento", undefined, {
-    mes, impostos: String(impostos), taxas: String(taxas), ...(atualizar ? { atualizar: "1" } : {}),
+    mes, impostos: String(impostos), taxas: String(taxas), ...(atualizar ? { atualizar: "1" } : {}), ...(ateDia ? { ate: String(ateDia) } : {}),
   });
 
 

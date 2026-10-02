@@ -89,13 +89,20 @@ export const STATUS_MAO_DE_OBRA = "MÃO DE OBRA E MATERIAL";
 
 /**
  * Motivos de perda que NÃO são perda comercial e por isso não entram no
- * denominador da taxa de conversão. Vale para os orçamentos antigos e para os
- * novos: "Mão de obra e material" é motivo de perda escolhível de novo, mas
- * continua não sendo venda perdida para concorrente.
+ * denominador da taxa de conversão. São só dois, a pedido do comercial:
+ *
+ * - "Mão de obra e material": é motivo de perda escolhível de novo, mas
+ *   continua não sendo venda perdida para concorrente.
+ * - "Comparativo de linhas": orçamento levantado para comparar linhas de
+ *   produto, não para fechar venda. Está aposentado da lista de escolha
+ *   (MOTIVOS_APOSENTADOS), mas o texto segue nos orçamentos antigos e por isso
+ *   precisa ser filtrado aqui também — sem isto, um único comparativo grande
+ *   derrubava a conversão do vendedor no mês inteiro.
  */
 export const MOTIVOS_NAO_COMERCIAIS = new Set([
   "MÃO DE OBRA E MATERIAL",
   "MAO DE OBRA E MATERIAL",
+  "COMPARATIVO DE LINHAS",
 ]);
 
 export function isPerdaComercial(motivo?: string | null): boolean {
@@ -118,6 +125,10 @@ export function taxaConversaoValor(faturado: number, perdidoComercial: number): 
 /**
  * Motivos aposentados: saíram da lista de perda a pedido do comercial. Hoje só
  * "Comparativo de linhas", descontinuado.
+ *
+ * Aposentado é só sobre a LISTA DE ESCOLHA: "Comparativo de linhas" continua em
+ * MOTIVOS_NAO_COMERCIAIS, porque os orçamentos antigos com esse texto não podem
+ * entrar no denominador da conversão.
  *
  * "Mão de obra e material" já esteve aqui e VOLTOU a ser motivo de perda a
  * pedido do comercial, sem deixar de ser status: são usos diferentes. Como
