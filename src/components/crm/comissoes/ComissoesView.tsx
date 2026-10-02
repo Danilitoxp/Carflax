@@ -57,7 +57,6 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
   const [filtroAberto, setFiltroAberto] = useState(false);
   const [filtro, setFiltro] = useState<FiltroPagamento>("todos");
   const [busca, setBusca] = useState("");
-  const [equipeAtiva, setEquipeAtiva] = useState<string | null>(null);
   const [revelado, setRevelado] = useState(false);
   const [recarga, setRecarga] = useState(0);
 
@@ -80,7 +79,6 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
         if (cancelado) return;
         setDados(d);
         setErro(null);
-        setEquipeAtiva((prev) => (prev && d.equipes.some((e) => e.id === prev) ? prev : d.equipes[0]?.id ?? null));
       } catch (err) {
         if (!cancelado) setErro(err instanceof Error ? err.message : "Erro ao carregar as comissões");
       } finally {
@@ -95,16 +93,33 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
 
   const recarregar = () => { setLoading(true); setRecarga((n) => n + 1); };
 
-  const equipe: EquipeComissao | null = useMemo(
-    () => dados?.equipes.find((e) => e.id === equipeAtiva) ?? dados?.equipes[0] ?? null,
-    [dados, equipeAtiva],
-  );
+  /**
+   * Resumo do topo. O supervisor tem uma equipe só e vê a dela; a diretoria vê
+   * todos os vendedores de uma vez, e aí os cards somam as equipes.
+   *
+   * A margem agregada é PONDERADA pelo faturamento, nunca a média dos
+   * percentuais: como margemPct = margem real ÷ faturado, somar
+   * (margemPct × faturado) e dividir pelo faturado total devolve a margem real
+   * do conjunto. A média simples daria peso igual a uma equipe de 500 mil e a
+   * uma de 10 mil.
+   */
+  const equipe: EquipeComissao | null = useMemo(() => {
+    const eqs = dados?.equipes || [];
+    if (eqs.length === 0) return null;
+    if (eqs.length === 1) return eqs[0];
+    const faturamento = eqs.reduce((acc, e) => acc + e.faturamento, 0);
+    const margemReal = eqs.reduce((acc, e) => acc + (e.margemPct * e.faturamento) / 100, 0);
+    return {
+      id: "TODAS",
+      nome: "Todas as equipes",
+      faturamento,
+      margemPct: faturamento > 0 ? (margemReal / faturamento) * 100 : 0,
+      meta: eqs.reduce((acc, e) => acc + e.meta, 0),
+      metaCadastrada: eqs.every((e) => e.metaCadastrada),
+    };
+  }, [dados]);
 
-  /** Vendedores da equipe em foco — os cards do topo falam dela, não da soma. */
-  const daEquipe = useMemo(
-    () => (dados?.linhas || []).filter((l) => !equipe || l.equipeId === equipe.id),
-    [dados, equipe],
-  );
+  const daEquipe = useMemo(() => dados?.linhas ?? [], [dados]);
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -149,7 +164,7 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
       equipes: dados.equipes,
       parametros: dados.parametros,
       mesRef,
-      equipeFoco: dados.equipes.length > 1 ? equipe : null,
+      equipeFoco: dados.equipes.length === 1 ? dados.equipes[0] : null,
     });
 
   return (
@@ -162,18 +177,6 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {dados && dados.equipes.length > 1 && (
-            <select
-              value={equipe?.id ?? ""}
-              onChange={(ev) => { setEquipeAtiva(ev.target.value); setSelecionado(null); }}
-              className="bg-card border border-border rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:border-blue-500"
-            >
-              {dados.equipes.map((eq) => (
-                <option key={eq.id} value={eq.id}>{eq.nome}</option>
-              ))}
-            </select>
-          )}
-
           <button
             type="button"
             onClick={() => setRevelado((v) => !v)}
@@ -256,7 +259,7 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 shrink-0">
           <CardKpi
             icon={BarChart3}
-            label="Faturamento da equipe"
+            label={dados.equipes.length > 1 ? "Faturamento das equipes" : "Faturamento da equipe"}
             valor={brl(equipe.faturamento)}
             nota={`Meta ${brl(equipe.meta)}${equipe.metaCadastrada ? "" : " (somada)"}`}
             progresso={atingimento(equipe.faturamento, equipe.meta)}
@@ -439,21 +442,23 @@ export function ComissoesView({ userProfile }: ComissoesViewProps) {
               <Users className="w-4 h-4 text-blue-600" />
             </div>
             <div>
-              <div className="text-xs font-black">Resultado da equipe</div>
+              <div className="text-xs font-black">
+                {dados.equipes.length > 1 ? "Resultado das equipes" : "Resultado da equipe"}
+              </div>
               <div className="text-[10px] text-muted-foreground">
-                Visão geral do desempenho da equipe no período
+                Visão geral do desempenho no período
               </div>
             </div>
           </div>
           <RodapeMetrica
             icon={BarChart3}
-            label="Faturamento da equipe"
+            label={dados.equipes.length > 1 ? "Faturamento das equipes" : "Faturamento da equipe"}
             texto={`${brl(equipe.faturamento)} / ${brl(equipe.meta)}`}
             progresso={atingimento(equipe.faturamento, equipe.meta)}
           />
           <RodapeMetrica
             icon={Percent}
-            label="Margem bruta da equipe"
+            label={dados.equipes.length > 1 ? "Margem bruta das equipes" : "Margem bruta da equipe"}
             texto={`${pct(equipe.margemPct)} / ${pct(dados.parametros.meta_margem_loja_pct)}`}
             progresso={atingimento(equipe.margemPct, dados.parametros.meta_margem_loja_pct)}
           />

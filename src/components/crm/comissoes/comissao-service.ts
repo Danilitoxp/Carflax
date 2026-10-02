@@ -168,15 +168,20 @@ export interface ResultadoComissao {
  *
  * A meta de faturamento é a única comparada com ">" (faturar exatamente a meta
  * não paga); as demais são ">=". É o que as fórmulas da planilha fazem.
+ *
+ * META ZERO NÃO BATE. Sem esta guarda, quem não tem meta cadastrada passava em
+ * tudo: faturou R$ 78 > meta 0, margem alta porque a base é minúscula, conversão
+ * 100% por não ter orçamento perdido, e a equipe dele (marketing, administrativo)
+ * também sem meta — resultado, 5 bônus para quem não é comissionado.
  */
 export function calcularComissao(e: EntradaComissao, p: ComissaoParametros): ResultadoComissao {
   const indicePct = indiceDaFaixa(e.faturado, p.faixas);
   const valorComissao = (e.faturado * indicePct) / 100;
 
-  const bateuFaturamento = e.faturado > e.metaVendedor;
+  const bateuFaturamento = e.metaVendedor > 0 && e.faturado > e.metaVendedor;
   const bateuMargem = bateuFaturamento && e.margemPct >= p.meta_margem_bruta_pct;
   const bateuConversao = bateuMargem && e.conversaoPct >= p.meta_conversao_pct;
-  const bateuLoja = bateuConversao && e.faturamentoLoja >= e.metaLoja;
+  const bateuLoja = bateuConversao && e.metaLoja > 0 && e.faturamentoLoja >= e.metaLoja;
   const bateuMargemLoja = bateuLoja && e.margemLojaPct >= p.meta_margem_loja_pct;
 
   const pct = (v: number) => `${v.toFixed(1)}%`;
@@ -392,9 +397,19 @@ export async function carregarComissoes(
     for (const c of t.MEMBER_CODES || []) equipePorCodigo.set(String(c).trim(), t);
   }
 
-  const visiveis = escopo
+  const noEscopo = escopo
     ? todosIndividuais.filter((r) => escopo.includes(String(r.COD_VENDEDOR).trim()))
     : todosIndividuais;
+
+  // Só entra quem tem meta no mês. O /api/dashboard/geral devolve uma linha para
+  // QUALQUER operador que movimentou algo no ERP — inclusive marketing e
+  // administrativo, que às vezes emitem uma nota. Sem meta não há comissão a
+  // calcular, e deixá-los na lista fazia a tela "pagar" bônus a quem não é
+  // comissionado.
+  const visiveis = noEscopo.filter((r) => {
+    const cod = String(r.COD_VENDEDOR).trim();
+    return (metaMap.get(cod) ?? num(r.META)) > 0;
+  });
 
   const equipesUsadas = new Map<string, EquipeComissao>();
 

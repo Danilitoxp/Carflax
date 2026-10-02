@@ -52,6 +52,10 @@ export function shortenName(nome?: string | null, maxPalavras = 2): string {
 export function formatTeamName(supName?: string | null): string {
   if (!supName) return "Time";
   const norm = supName.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  // O time é batizado pelo canal, não pelo supervisor: quando a liderança troca,
+  // o nome na tela continua o mesmo que o comercial usa no dia a dia.
+  // A mesa passou do João para o Arthur — por isso os dois caem no mesmo nome.
+  if (norm.includes("arthur")) return "Time Mesa";
   if (norm.includes("joao")) return "Canal Mesa";
   if (norm.includes("alan")) return "Canal Balcao";
   if (norm.startsWith("canal mesa")) return "Canal Mesa";
