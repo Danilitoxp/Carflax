@@ -2247,5 +2247,14 @@ export interface ItemPedidoCompra {
 }
 export const apiComprasPedidos = (params: Record<string, string>) =>
   get<{ success: boolean; data: PedidoCompra[]; total: number; pagina: number; por_pagina: number }>("/api/compras/pedidos", params);
+/**
+ * Cancela o pedido de compra no ERP (baixa total com motivo, sem recebimento).
+ * O documento continua no histórico — o ERP não apaga pedido.
+ */
+export const apiComprasCancelarPedido = (empresa: string, pedido: string, motivo: string, comprador?: string) =>
+  apiPost<{ success: boolean; pedido: string; empresa: string; motivo: string }>(
+    `/api/compras/pedidos/${empresa}/${pedido}/cancelar`, { motivo, comprador },
+  );
+
 export const apiComprasItensPedido = (empresa: string, pedido: string) =>
   get<{ success: boolean; data: ItemPedidoCompra[] }>(`/api/compras/pedidos/${encodeURIComponent(empresa)}/${encodeURIComponent(pedido)}/itens`);

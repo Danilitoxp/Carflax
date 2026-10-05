@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, RefreshCw, Search } from "lucide-react";
-import { apiComprasPedidos, apiComprasItensPedido, type PedidoCompra, type ItemPedidoCompra } from "@/lib/api";
+import { Ban, ChevronDown, ChevronRight, Loader2, RefreshCw, Search } from "lucide-react";
+import { apiComprasPedidos, apiComprasItensPedido, apiComprasCancelarPedido, type PedidoCompra, type ItemPedidoCompra } from "@/lib/api";
 
 const statusLabel = { nao_recebido: "Não recebido", parcial: "Recebido parcialmente", baixado: "Baixado" };
 const moeda = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -36,6 +36,7 @@ export function PedidosComprasView() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
+  const [cancelando, setCancelando] = useState<PedidoCompra | null>(null);
   useEffect(() => {
     let ativo = true;
     apiComprasPedidos({ busca: filtroBusca, status, empresa, pagina: String(pagina) })
@@ -56,14 +57,14 @@ export function PedidosComprasView() {
       <table className="w-full min-w-[1800px] text-xs text-left">
         <caption className="sr-only">Pedidos de compra do ERP</caption>
         <thead className="sticky top-0 z-10 bg-secondary text-muted-foreground">
-          <tr>{["Itens", "Pedido", "Empresa", "Cód. fornecedor", "Fornecedor", "Data pedido", "Faturamento", "Entrega prevista", "Cond. pagamento", "Status", "Total itens", "IPI", "SUB / ST", "FCP", "Frete", "Total pedido", "Comprador"].map((label, index) => (
-            <th scope="col" key={label} className={`px-3 py-3 whitespace-nowrap font-bold ${index >= 10 && index <= 15 ? "text-right" : ""}`}>{label}</th>
+          <tr>{["Itens", "Pedido", "Empresa", "Cód. fornecedor", "Fornecedor", "Data pedido", "Faturamento", "Entrega prevista", "Cond. pagamento", "Status", "Total itens", "IPI", "SUB / ST", "FCP", "Frete", "Total pedido", "Comprador", ""].map((label, index) => (
+            <th scope="col" key={label || "acoes"} className={`px-3 py-3 whitespace-nowrap font-bold ${index >= 10 && index <= 15 ? "text-right" : ""}`}>{label}</th>
           ))}</tr>
         </thead>
         <tbody>
-          {erro ? <tr><td colSpan={17} role="alert" className="p-6 text-rose-500">{erro}</td></tr>
-            : carregando ? <tr><td colSpan={17} className="p-8"><span className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Carregando pedidos…</span></td></tr>
-            : !pedidos.length ? <tr><td colSpan={17} className="p-6 text-muted-foreground">Nenhum pedido encontrado.</td></tr>
+          {erro ? <tr><td colSpan={18} role="alert" className="p-6 text-rose-500">{erro}</td></tr>
+            : carregando ? <tr><td colSpan={18} className="p-8"><span className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Carregando pedidos…</span></td></tr>
+            : !pedidos.length ? <tr><td colSpan={18} className="p-6 text-muted-foreground">Nenhum pedido encontrado.</td></tr>
             : pedidos.map(p => {
               const key = `${p.empresa}-${p.pedido}`;
               const expandido = aberto === key;
@@ -81,13 +82,96 @@ export function PedidosComprasView() {
                   <td className="px-3 py-2 whitespace-nowrap" title={p.motivo_baixa || undefined}><span className={`font-bold ${p.status === "parcial" ? "text-amber-500" : p.status === "nao_recebido" ? "text-sky-500" : "text-muted-foreground"}`}>{statusLabel[p.status]}</span></td>
                   {[p.total_itens, p.total_ipi, p.total_sub, p.total_fcp, p.total_frete, p.total].map((value, index) => <td key={index} className={`px-3 py-2 text-right whitespace-nowrap tabular-nums ${index === 5 ? "font-bold" : ""}`}>{moeda(value)}</td>)}
                   <td className="px-3 py-2 min-w-56">{[p.cod_comprador, p.comprador].filter(Boolean).join(" · ") || "—"}</td>
+                  <td className="px-3 py-2">
+                    {p.status === "nao_recebido" && (
+                      <button
+                        onClick={() => setCancelando(p)}
+                        title="Cancelar este pedido no ERP"
+                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[10px] font-bold text-rose-500 hover:bg-rose-500/10 whitespace-nowrap"
+                      >
+                        <Ban className="w-3 h-3" /> Cancelar
+                      </button>
+                    )}
+                  </td>
                 </tr>
-                {expandido && <tr id={`itens-${key}`}><td colSpan={17} className="bg-secondary/10"><ItensPedido pedido={p} /></td></tr>}
+                {expandido && <tr id={`itens-${key}`}><td colSpan={18} className="bg-secondary/10"><ItensPedido pedido={p} /></td></tr>}
               </Fragment>;
             })}
         </tbody>
       </table>
     </div>
+    {cancelando && (
+      <CancelarPedidoModal
+        pedido={cancelando}
+        onFechar={() => setCancelando(null)}
+        onCancelado={() => { setCancelando(null); preparar(); setVersao(v => v + 1); }}
+      />
+    )}
     <div className="flex justify-end items-center gap-3 text-xs"><button disabled={pagina <= 1 || carregando} onClick={() => { preparar(); setPagina(p => p - 1); }} className="border border-border rounded-lg px-3 py-2 disabled:opacity-40">Anterior</button><span>Página {pagina} de {paginas}</span><button disabled={pagina >= paginas || carregando} onClick={() => { preparar(); setPagina(p => p + 1); }} className="border border-border rounded-lg px-3 py-2 disabled:opacity-40">Próxima</button></div>
   </div>;
+}
+
+/**
+ * Confirmação do cancelamento. Exige o motivo digitado e repete o valor do
+ * pedido: cancelar é baixa total no ERP e não tem desfazer, então a tela cobra
+ * uma confirmação consciente em vez de um confirm() de uma linha só.
+ */
+function CancelarPedidoModal({ pedido, onFechar, onCancelado }: {
+  pedido: PedidoCompra; onFechar: () => void; onCancelado: () => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const cancelar = async () => {
+    setEnviando(true);
+    setErro(null);
+    try {
+      await apiComprasCancelarPedido(pedido.empresa, pedido.pedido, motivo.trim(), pedido.cod_comprador);
+      onCancelado();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao cancelar");
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={onFechar}>
+      <div className="bg-card border border-border rounded-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-black">Cancelar pedido {pedido.pedido}</h2>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {pedido.fornecedor || pedido.cod_fornecedor} · empresa {pedido.empresa} · {moeda(pedido.total)}
+          </p>
+        </div>
+        <div className="p-4 space-y-3">
+          <p className="text-[11px] text-muted-foreground">
+            O pedido recebe baixa total no ERP, sem recebimento, e sai do "em aberto". Ele continua no
+            histórico — a Citel não apaga pedido — e os itens voltam a contar como necessidade na reposição.
+          </p>
+          <label className="block">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Motivo</span>
+            <input
+              autoFocus
+              value={motivo}
+              onChange={e => setMotivo(e.target.value)}
+              placeholder="Ex.: quantidade errada, comprado em duplicidade"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-xs outline-none focus:border-rose-500/60"
+            />
+          </label>
+          {erro && <p className="text-[11px] text-rose-500">{erro}</p>}
+        </div>
+        <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
+          <button onClick={onFechar} className="text-xs font-bold px-3 py-2 rounded-lg hover:bg-secondary">Voltar</button>
+          <button
+            onClick={cancelar}
+            disabled={enviando || motivo.trim().length < 3}
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50"
+          >
+            {enviando && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Cancelar pedido
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
