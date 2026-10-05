@@ -343,11 +343,34 @@ export function FornecedoresTab({ evento, fornecedores, onChange }: {
                     </select>
                   </td>
 
-                  {/* Brindes */}
+                  {/* Brindes — texto do kit + marcação de entregue (data guardada nas observações) */}
                   <td className="px-3 py-3">
-                    <span className="text-[11px] font-bold text-foreground">
-                      {parseObservacoes(f.observacoes)?.["Brindes Kit"] || <span className="text-muted-foreground">—</span>}
-                    </span>
+                    <div className="flex flex-col items-start gap-1.5">
+                      <span className="text-[11px] font-bold text-foreground">
+                        {parseObservacoes(f.observacoes)?.["Brindes Kit"] || <span className="text-muted-foreground">—</span>}
+                      </span>
+                      {(() => {
+                        const entregueEm = parseObservacoes(f.observacoes)?.["Brindes entregues"];
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => patch(f.id, {
+                              observacoes: setObservacaoChave(f.observacoes, "Brindes entregues", entregueEm ? "" : new Date().toLocaleDateString("pt-BR")),
+                            })}
+                            title={entregueEm ? "Clique para desmarcar" : "Marcar que o fornecedor já entregou os brindes"}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide transition-colors",
+                              entregueEm
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
+                                : "border-border text-muted-foreground hover:border-emerald-500/40 hover:text-emerald-500",
+                            )}
+                          >
+                            {entregueEm ? <CheckCircle2 className="w-3 h-3" /> : <Gift className="w-3 h-3" />}
+                            {entregueEm ? `Entregue em ${entregueEm}` : "Marcar entregue"}
+                          </button>
+                        );
+                      })()}
+                    </div>
                   </td>
 
                   {/* Prêmio Sorteio */}
