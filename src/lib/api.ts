@@ -2250,11 +2250,25 @@ export const apiComprasPedidos = (params: Record<string, string>) =>
 /**
  * Cancela o pedido de compra no ERP (baixa total com motivo, sem recebimento).
  * O documento continua no histórico — o ERP não apaga pedido.
+ *
+ * Usa `fetch` cru pelo mesmo motivo do envio da proposta: quando a Citel recusa,
+ * a mensagem dela é o que resolve o problema, e o helper padrão descarta o corpo
+ * da resposta, deixando só "API 502" na tela.
  */
-export const apiComprasCancelarPedido = (empresa: string, pedido: string, motivo: string, comprador?: string) =>
-  apiPost<{ success: boolean; pedido: string; empresa: string; motivo: string }>(
-    `/api/compras/pedidos/${empresa}/${pedido}/cancelar`, { motivo, comprador },
-  );
+export async function apiComprasCancelarPedido(
+  empresa: string, pedido: string, motivo: string, comprador?: string,
+): Promise<{ success: boolean; pedido: string; empresa: string; motivo: string }> {
+  const base = API_BASE.startsWith("http") ? API_BASE : window.location.origin + API_BASE;
+  const url = `${base.replace(/\/$/, "")}/api/compras/pedidos/${empresa}/${pedido}/cancelar`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify({ motivo, comprador }),
+  });
+  const corpo = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(corpo?.error || `Falha ao cancelar (HTTP ${res.status})`);
+  return corpo;
+}
 
 export const apiComprasItensPedido = (empresa: string, pedido: string) =>
   get<{ success: boolean; data: ItemPedidoCompra[] }>(`/api/compras/pedidos/${encodeURIComponent(empresa)}/${encodeURIComponent(pedido)}/itens`);

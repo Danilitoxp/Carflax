@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, Loader2, Send, Trash2, ChevronDown, ChevronRight,
-  CheckCircle2, PackageSearch, Building2, AlertCircle, X,
+  CheckCircle2, PackageSearch, Building2, AlertCircle, X, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -60,6 +60,7 @@ export function PropostasCompraPainel({
   const [sucesso, setSucesso] = useState<string | null>(null);
   // Quantidades editadas na tela, por proposta e item.
   const [ajustes, setAjustes] = useState<Record<string, Record<string, number>>>({});
+  const [busca, setBusca] = useState("");
 
   const carregar = useCallback(async () => {
     const { data, error } = await supabase
@@ -83,11 +84,32 @@ export function PropostasCompraPainel({
 
   const qtdDe = (p: Proposta, i: PropostaItem) => ajustes[p.id]?.[i.cod] ?? i.sugestao;
 
+  const termo = busca.trim().toLowerCase();
+
+  /**
+   * Busca por fornecedor OU item, numa caixa só.
+   *
+   * Quando o termo casa com o fornecedor, a proposta aparece inteira — é a
+   * pergunta "o que estou comprando da Tramontina?". Quando casa só com itens, a
+   * proposta aparece com os itens que casaram, que responde a outra pergunta:
+   * "quem está comprando este produto, e quanto?". Filtrar os itens nos dois
+   * casos esconderia o resto do pedido do fornecedor procurado.
+   */
+  const filtradas = useMemo(() => {
+    if (!termo) return propostas;
+    const casa = (t?: string | null) => String(t || "").toLowerCase().includes(termo);
+    return propostas.flatMap((p) => {
+      if (casa(p.fornecedor) || casa(p.cod_fornecedor)) return [p];
+      const itens = (p.itens || []).filter((i) => casa(i.cod) || casa(i.descricao));
+      return itens.length ? [{ ...p, itens }] : [];
+    });
+  }, [propostas, termo]);
+
   const totais = useMemo(() => ({
-    propostas: propostas.length,
-    itens: propostas.reduce((s, p) => s + (p.itens?.length || 0), 0),
-    fornecedores: new Set(propostas.map((p) => p.cod_fornecedor)).size,
-  }), [propostas]);
+    propostas: filtradas.length,
+    itens: filtradas.reduce((s, p) => s + (p.itens?.length || 0), 0),
+    fornecedores: new Set(filtradas.map((p) => p.cod_fornecedor)).size,
+  }), [filtradas]);
 
   function ajustar(p: Proposta, cod: string, valor: number) {
     setAjustes((a) => ({ ...a, [p.id]: { ...(a[p.id] || {}), [cod]: Math.max(0, valor) } }));
@@ -179,7 +201,25 @@ export function PropostasCompraPainel({
         </div>
 
         {!carregando && propostas.length > 0 && (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Fornecedor, código ou produto…"
+                className="w-56 rounded-lg border border-border bg-background pl-8 pr-7 py-1.5 text-[11px] outline-none focus:border-blue-500/60"
+              />
+              {busca && (
+                <button
+                  onClick={() => setBusca("")}
+                  title="Limpar busca"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
             <Resumo titulo="Fornecedores" valor={brNum(totais.fornecedores)} />
             <Resumo titulo="Itens" valor={brNum(totais.itens)} />
           </div>
@@ -208,16 +248,20 @@ export function PropostasCompraPainel({
           <div className="flex items-center justify-center gap-2 py-16 text-[12px] font-bold text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" /> Carregando…
           </div>
-        ) : propostas.length === 0 ? (
+        ) : filtradas.length === 0 ? (
           <div className="py-16 text-center">
             <PackageSearch className="w-9 h-9 text-muted-foreground/20 mx-auto mb-2" />
-            <p className="text-[12px] font-black text-muted-foreground">Nenhuma proposta pendente</p>
+            <p className="text-[12px] font-black text-muted-foreground">
+              {termo ? "Nada encontrado para esta busca" : "Nenhuma proposta pendente"}
+            </p>
             <p className="text-[10px] text-muted-foreground/70 mt-1">
-              Use "Gerar agora" na agenda para montar as propostas da curva.
+              {termo
+                ? "Procure pelo nome ou código do fornecedor, ou pelo código ou descrição do item."
+                : 'Use "Gerar agora" na agenda para montar as propostas da curva.'}
             </p>
           </div>
         ) : (
-          propostas.map((p) => {
+          filtradas.map((p) => {
             const itens = p.itens || [];
             const aberto = aberta === p.id;
             const unidades = itens.reduce((s, i) => s + qtdDe(p, i), 0);
