@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Bot, Check, Loader2, Plus, Save, X } from "lucide-react";
+import { Check, Loader2, Plus, Save, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useNotification } from "@/hooks/useNotification";
 import { carregarConfigIsabela, listarVendedoresWhatsapp, salvarConfigIsabela, type IsabelaConfig, type IsabelaConversa, type VendedorWhatsapp } from "@/lib/isabela";
 import { formatBrDate, formatBrTime } from "@/lib/utils";
 import { IsabelaAprendizadoCard } from "./IsabelaAprendizadoCard";
+import { CarlinhosAvatar } from "./CarlinhosAvatar";
 
 // Configuração da Isabela (atendente virtual) e as últimas conversas dela.
 // Lançamento em duas fases: "teste" responde só aos números cadastrados; "todos"
@@ -118,7 +119,7 @@ export function IsabelaConfigView({ autor, onAbrirConversa }: Props) {
       <div className="max-w-5xl mx-auto p-4 sm:p-6 grid gap-6 lg:grid-cols-[1fr_340px]">
         <section className="space-y-5">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-violet-500/15 text-violet-500 flex items-center justify-center"><Bot className="w-5 h-5" /></div>
+            <div className="w-11 h-11 rounded-2xl bg-violet-500/15 flex items-center justify-center"><CarlinhosAvatar className="w-9 h-9" /></div>
             <div className="flex-1">
               <h2 className="text-base font-black tracking-tight">Carlinhos · atendente virtual</h2>
               <p className="text-xs text-muted-foreground">Atende o lead novo, consulta preço e estoque no ERP, monta o pré-orçamento e passa para o vendedor.</p>

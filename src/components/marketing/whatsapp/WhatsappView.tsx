@@ -19,7 +19,6 @@ import {
   Flame,
   Archive,
   Filter,
-  Bot,
   Ban,
   ChevronDown,
   DollarSign,
@@ -58,6 +57,7 @@ import { deveNotificarWhatsapp } from "@/lib/whatsapp-notificacao";
 import { ArchiveApprovalModal } from "./ArchiveApprovalModal";
 import { FunilView } from "./FunilView";
 import { IsabelaConfigView } from "./IsabelaConfigView";
+import { CarlinhosAvatar, CARLINHOS_AVATAR } from "./CarlinhosAvatar";
 import { IsabelaConversaStatus } from "./IsabelaConversaStatus";
 import { CadastroIaModal } from "./CadastroIaModal";
 import { GravadorAudio } from "./GravadorAudio";
@@ -121,7 +121,7 @@ interface LinkPreview {
 }
 
 /** Autora das mensagens enviadas pela atendente virtual (marketing_whatsapp.autor). */
-const AUTORA_ISABELA = { id: "isabela", name: "Carlinhos", avatar: undefined as string | undefined };
+const AUTORA_ISABELA = { id: "isabela", name: "Carlinhos", avatar: CARLINHOS_AVATAR as string | undefined };
 
 interface Message {
   id: string;
@@ -6162,7 +6162,7 @@ export function WhatsappView({
                   className="p-2 hover:bg-secondary rounded-xl transition-colors relative"
                   title="Carlinhos (atendente virtual)"
                 >
-                  <Bot className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
+                  <CarlinhosAvatar className="w-5 h-5" />
                 </button>
               )}
               <button
@@ -6271,7 +6271,7 @@ export function WhatsappView({
                           className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tight shrink-0 border flex items-center gap-1 bg-violet-500/10 text-violet-500 border-violet-500/20"
                           title="Atendido pelo Carlinhos (IA)"
                         >
-                          <Bot className="w-3 h-3 shrink-0" />
+                          <CarlinhosAvatar className="w-4 h-4" />
                           <span>Carlinhos</span>
                         </span>
                       )}
@@ -6968,7 +6968,7 @@ export function WhatsappView({
                               title={`Enviado por ${autorMsg.name}`}
                             >
                               {autorMsg.id === AUTORA_ISABELA.id ? (
-                                <Bot className="w-3 h-3 text-violet-500" />
+                                <CarlinhosAvatar className="w-4 h-4" />
                               ) : autorMsg.avatar ? (
                                 <img
                                   src={autorMsg.avatar}

@@ -10,12 +10,12 @@ import {
   Thermometer,
   User,
   ChevronDown,
-  Bot,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { apiCrmOrcamentos } from "@/lib/api";
 import { getCrmStatusMap } from "@/lib/crm-service";
 import { cn } from "@/lib/utils";
+import { CarlinhosAvatar } from "./CarlinhosAvatar";
 
 /**
  * Funil de vendas do WhatsApp — quadro estilo Trello.
@@ -899,7 +899,7 @@ export function FunilView({
                                     className="flex items-center gap-1 min-w-0 pl-1 pr-1.5 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20"
                                     title="Atendido pelo Carlinhos (IA)"
                                   >
-                                    <Bot className="w-3 h-3 text-violet-500 shrink-0" />
+                                    <CarlinhosAvatar className="w-4 h-4" />
                                     <span className="text-[8px] font-black uppercase tracking-wide text-violet-600 dark:text-violet-400 truncate">
                                       Carlinhos
                                     </span>

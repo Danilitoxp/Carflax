@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Bot, Loader2, Pause, Play } from "lucide-react";
+import { Loader2, Pause, Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useNotification } from "@/hooks/useNotification";
 import { ativarIsabela, carregarConversaIsabela, mudarStatusIsabela, type IsabelaConversa } from "@/lib/isabela";
+import { CarlinhosAvatar } from "./CarlinhosAvatar";
 
 // Faixa no topo da conversa quando a Isabela participou dela: mostra se ela está
 // atendendo, se transferiu (e por quê) ou se foi pausada, e deixa pausar/reativar.
@@ -81,7 +82,7 @@ export function IsabelaConversaStatus({ remoteJid }: { remoteJid: string }) {
           className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-muted-foreground hover:text-violet-500 hover:bg-violet-500/10 font-bold whitespace-nowrap disabled:opacity-50 transition-colors"
           title="O Carlinhos passa a responder esta conversa"
         >
-          {salvando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bot className="w-3 h-3" />}
+          {salvando ? <Loader2 className="w-3 h-3 animate-spin" /> : <CarlinhosAvatar className="w-4 h-4" />}
           Ativar Carlinhos
         </button>
       </div>
@@ -109,7 +110,7 @@ export function IsabelaConversaStatus({ remoteJid }: { remoteJid: string }) {
         atendendo ? "bg-violet-500/10 border-violet-500/20" : "bg-secondary/60 border-border"
       }`}
     >
-      <Bot className={`w-4 h-4 shrink-0 ${atendendo ? "text-violet-500" : "text-muted-foreground"}`} />
+      <CarlinhosAvatar className={`w-7 h-7 ${atendendo ? "" : "grayscale opacity-60"}`} />
       <div className="min-w-0 flex-1">
         <p className="font-bold truncate">
           {TEXTOS[conversa.status]}

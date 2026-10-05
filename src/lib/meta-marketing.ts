@@ -46,6 +46,23 @@ async function gastoDoMes(mes: string) {
   return r.dias.reduce((s, d) => s + d.google + d.meta, 0);
 }
 
+/**
+ * Meta de VALOR definida na mão para o mês (crm_config
+ * `meta_marketing_valor_AAAA-MM`). Quando existe, ela manda na meta de
+ * faturamento: o número derivado do histórico de tráfego vira estimativa, e a
+ * diretoria passa a mandar no alvo. As metas de leads, orçamentos e quantidade
+ * de vendas seguem derivadas, porque é delas que sai a leitura de funil.
+ */
+async function lerValorDefinido(mes: string): Promise<number | null> {
+  const { data } = await supabase
+    .from("crm_config")
+    .select("value")
+    .eq("key", `meta_marketing_valor_${mes}`)
+    .maybeSingle();
+  const n = Number(data?.value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 async function lerGuardada(mes: string): Promise<MetaMarketing | null> {
   const { data } = await supabase.from("crm_config").select("value").eq("key", chave(mes)).maybeSingle();
   if (!data?.value) return null;
@@ -97,11 +114,18 @@ export async function calcularMeta(mes: string): Promise<MetaMarketing> {
  * e grava. `recalcular` refaz e sobrescreve (ex.: mudança grande de verba).
  */
 export async function metaDoMes(mes: string, recalcular = false): Promise<MetaMarketing> {
+  const comValorDefinido = async (meta: MetaMarketing) => {
+    const definido = await lerValorDefinido(mes);
+    return definido ? { ...meta, metas: { ...meta.metas, valorVendas: definido } } : meta;
+  };
+
   if (!recalcular) {
     const guardada = await lerGuardada(mes);
-    if (guardada) return guardada;
+    if (guardada) return comValorDefinido(guardada);
   }
   const meta = await calcularMeta(mes);
+  // Grava a meta DERIVADA; o valor definido na mão mora em chave própria e por
+  // isso sobrevive a um recálculo.
   await supabase.from("crm_config").upsert({ key: chave(mes), value: JSON.stringify(meta) }, { onConflict: "key" });
-  return meta;
+  return comValorDefinido(meta);
 }

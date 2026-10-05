@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { marketingService } from "@/lib/marketing-service";
 import { metaDoMes, type MetaMarketing } from "@/lib/meta-marketing";
+import { calcMetaDiaria } from "@/lib/dias-uteis";
 
 const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 
@@ -10,6 +11,12 @@ export interface MetaMesEstado {
   real: { leads: number; orcamentos: number; vendas: number; valor: number };
   /** Fração do mês já passada (0–1): onde o resultado deveria estar hoje. */
   decorrido: number;
+  /**
+   * Quanto ainda precisa vender por dia útil para fechar a meta de valor.
+   * Recalculado a cada carregamento: cai quando se vende e sobe quando o dia
+   * passa sem venda. Mês fechado = 0.
+   */
+  diariaValor: number;
 }
 
 /**
@@ -35,7 +42,16 @@ export function useMetaMes(mes: string): MetaMesEstado | null {
         if (!vivo) return;
         setEstado({
           mes,
-          valor: { meta, decorrido, real: { leads: an.totals.leads, orcamentos: an.totals.quotesCount, vendas: an.totals.salesCount, valor: an.totals.salesValue } },
+          valor: {
+            meta,
+            decorrido,
+            real: { leads: an.totals.leads, orcamentos: an.totals.quotesCount, vendas: an.totals.salesCount, valor: an.totals.salesValue },
+            // Mesma conta do "Diário" do card do vendedor: o que falta dividido
+            // pelos dias úteis que ainda restam no mês.
+            diariaValor: corrente
+              ? calcMetaDiaria(meta.metas.valorVendas - an.totals.salesValue, new Date())
+              : 0,
+          },
         });
       })
       .catch(() => { /* sem meta: os cartões aparecem sem a barra */ });

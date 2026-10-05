@@ -471,7 +471,7 @@ export function ReportsView({ userProfile }: { userProfile?: UserProfile | null 
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <KpiCard label="Leads" value={totals.leads.toLocaleString("pt-BR")} delta={pctDelta(totals.leads, previous.leads)} meta={metaMes && { feito: metaMes.real.leads, alvo: metaMes.meta.metas.leads, decorrido: metaMes.decorrido, cor: "bg-blue-500" }} icon={<Users className="w-5 h-5" />} accent="text-blue-500 bg-blue-500/10" />
                 <KpiCard label="Orçamentos" value={totals.quotesCount.toLocaleString("pt-BR")} hint={formatCurrency(totals.quotesValue)} delta={pctDelta(totals.quotesCount, previous.quotesCount)} meta={metaMes && { feito: metaMes.real.orcamentos, alvo: metaMes.meta.metas.orcamentos, decorrido: metaMes.decorrido, cor: "bg-indigo-500" }} icon={<ShoppingBag className="w-5 h-5" />} accent="text-indigo-500 bg-indigo-500/10" />
-                <KpiCard label="Pedidos fechados" value={totals.salesCount.toLocaleString("pt-BR")} hint={formatCurrency(totals.salesValue)} delta={pctDelta(totals.salesValue, previous.salesValue)} meta={metaMes && { feito: metaMes.real.vendas, alvo: metaMes.meta.metas.vendas, decorrido: metaMes.decorrido, cor: "bg-emerald-500" }} icon={<DollarSign className="w-5 h-5" />} accent="text-emerald-500 bg-emerald-500/10" />
+                <KpiCard label="Pedidos fechados" value={totals.salesCount.toLocaleString("pt-BR")} hint={formatCurrency(totals.salesValue)} delta={pctDelta(totals.salesValue, previous.salesValue)} meta={metaMes && { feito: metaMes.real.valor, alvo: metaMes.meta.metas.valorVendas, decorrido: metaMes.decorrido, cor: "bg-emerald-500", formato: "moeda", diaria: metaMes.diariaValor }} icon={<DollarSign className="w-5 h-5" />} accent="text-emerald-500 bg-emerald-500/10" />
                 <KpiCard label="Ticket Médio" value={formatCurrency(totals.avgTicket)} delta={pctDelta(totals.avgTicket, previous.avgTicket)} icon={<TrendingUp className="w-5 h-5" />} accent="text-rose-500 bg-rose-500/10" />
                 <KpiCard label="1ª Resposta" value={formatResponseTime(totals.avgResponseMinutes)} valueClass={slaColor(totals.avgResponseMinutes)} delta={totals.avgResponseMinutes == null || previous.avgResponseMinutes == null ? null : pctDelta(totals.avgResponseMinutes, previous.avgResponseMinutes)} menorMelhor icon={<Timer className="w-5 h-5" />} accent="text-amber-500 bg-amber-500/10" />
               </div>
@@ -1920,19 +1920,35 @@ function SellerAvatar({ name, avatar }: { name: string; avatar?: string | null }
 }
 
 /** Progresso contra a meta do mês, com a marca de onde deveria estar hoje. */
-function MetaBarra({ feito, alvo, decorrido, cor }: { feito: number; alvo: number; decorrido: number; cor: string }) {
+function MetaBarra({ feito, alvo, decorrido, cor, formato = "numero", diaria }: {
+  feito: number; alvo: number; decorrido: number; cor: string;
+  /** "moeda" para metas em R$ (vendas); "numero" para contagens (leads, orçamentos). */
+  formato?: "numero" | "moeda";
+  /** Ritmo necessário por dia útil restante. Omitido = não mostra a linha. */
+  diaria?: number;
+}) {
   const prog = alvo > 0 ? feito / alvo : 0;
   const noRitmo = feito >= alvo * decorrido;
+  const fmt = (v: number) => (formato === "moeda" ? formatCurrency(v) : Math.round(v).toLocaleString("pt-BR"));
   return (
-    <div className="mt-2" title={`Meta do mês gerada a partir da Gestão de Tráfego. Esperado até hoje: ${Math.round(alvo * decorrido).toLocaleString("pt-BR")}`}>
+    <div className="mt-2" title={`Meta do mês gerada a partir da Gestão de Tráfego. Esperado até hoje: ${fmt(alvo * decorrido)}`}>
       <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground">
-        <span>Meta do mês: {feito.toLocaleString("pt-BR")} de {alvo.toLocaleString("pt-BR")}</span>
+        <span>Meta do mês: {fmt(feito)} de {fmt(alvo)}</span>
         <span className={noRitmo ? "text-emerald-500" : "text-amber-500"}>{noRitmo ? "no ritmo" : "abaixo do ritmo"}</span>
       </div>
       <div className="relative mt-1 h-1.5 rounded-full bg-secondary overflow-hidden" role="img" aria-label={`${Math.round(prog * 100)}% da meta do mês`}>
         <div className={cn("h-full rounded-full", cor)} style={{ width: `${Math.min(100, prog * 100)}%` }} />
         {decorrido > 0 && decorrido < 1 && <span className="absolute top-0 bottom-0 w-0.5 bg-foreground/60" style={{ left: `${decorrido * 100}%` }} />}
       </div>
+      {diaria !== undefined && diaria > 0 && (
+        <div
+          className="flex items-center justify-between text-[10px] font-bold mt-1"
+          title="O que falta da meta dividido pelos dias úteis que ainda restam no mês. Cai quando se vende e sobe quando o dia passa sem venda."
+        >
+          <span className="text-muted-foreground">Diária necessária</span>
+          <span className="text-foreground">{fmt(diaria)}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1940,7 +1956,7 @@ function MetaBarra({ feito, alvo, decorrido, cor }: { feito: number; alvo: numbe
 function KpiCard({ label, value, hint, icon, accent, valueClass, delta, menorMelhor = false, meta }: {
   label: string; value: string; hint?: string; icon: React.ReactNode; accent: string; valueClass?: string; delta?: number | null;
   /** Meta do mês (opcional): barra de progresso no rodapé do cartão. */
-  meta?: { feito: number; alvo: number; decorrido: number; cor: string } | null;
+  meta?: { feito: number; alvo: number; decorrido: number; cor: string; formato?: "numero" | "moeda"; diaria?: number } | null;
   /** Para tempo de resposta: cair é bom (verde). */
   menorMelhor?: boolean;
 }) {
