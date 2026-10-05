@@ -90,18 +90,36 @@ export async function carregarContatosDoDia(dataVenda: string): Promise<PosVenda
  * Idempotente: quem já foi gravado (e possivelmente mexido pelo gestor) não é
  * sobrescrito.
  */
+/**
+ * Quantos clientes entram por dia na fila de ligação.
+ *
+ * O pós-venda é uma pessoa ligando entre outras tarefas: lista maior que isso
+ * não é trabalhada, só acumula e vira ruído. Quando a venda do dia rende mais
+ * candidatos que o limite, entram os de maior prioridade (primeira compra antes
+ * de pouco histórico) e, dentro dela, as compras de maior valor.
+ */
+export const CONTATOS_POR_DIA = 10;
+
+/**
+ * Quantos dias depois da venda a gente liga.
+ *
+ * Ligar no dia seguinte pega o cliente antes de ele usar o material; uma semana
+ * depois ele já instalou, já sabe se deu problema e a conversa tem conteúdo.
+ */
+export const DIAS_APOS_VENDA = 7;
+
 export async function sincronizarDia(
   dataVenda: string,
   config: PosVendaConfig,
   usuarios: HubUser[],
-): Promise<{ novos: number; totalVendas: number }> {
+): Promise<{ novos: number; totalVendas: number; limitados: number }> {
   const resp = await apiPosVendaVendas(dataVenda, {
     recorrencia_pedidos: config.recorrencia_pedidos,
     recorrencia_dias: config.recorrencia_dias,
     pouco_historico: config.pouco_historico_pedidos,
   });
   const clientes = resp.clientes;
-  if (!clientes.length) return { novos: 0, totalVendas: 0 };
+  if (!clientes.length) return { novos: 0, totalVendas: 0, limitados: 0 };
 
   const codigos = clientes.map((c) => c.cod_cliente);
   const [{ data: existentesDia }, { data: historico }] = await Promise.all([
@@ -119,9 +137,24 @@ export async function sincronizarDia(
   for (const h of historico || []) historicoPorCliente.set(h.cod_cliente, h);
 
   const resolver = criarResolverVendedor(usuarios);
-  const linhas = clientes
+  const todas = clientes
     .filter((c) => !jaGravados.has(c.cod_cliente))
     .map((c) => montarLinha(c, dataVenda, resolver, historicoPorCliente.get(c.cod_cliente)));
+
+  // O limite vale só para quem vai mesmo virar ligação. Quem já saiu como "fora"
+  // (recorrente, ativo, contatado há pouco) continua sendo gravado: é o registro
+  // de que o cliente foi avaliado naquele dia e por que não entrou.
+  const sugeridas = todas.filter((l) => l.status === "a_ligar");
+  const fora = todas.filter((l) => l.status !== "a_ligar");
+  const escolhidas = [...sugeridas]
+    .sort((a, b) => (a.prioridade ?? 9) - (b.prioridade ?? 9) || b.valor_total - a.valor_total)
+    .slice(0, CONTATOS_POR_DIA);
+  const escolhidasIds = new Set(escolhidas.map((l) => l.cod_cliente));
+  const sobraram = sugeridas
+    .filter((l) => !escolhidasIds.has(l.cod_cliente))
+    .map((l) => ({ ...l, status: "fora" as const, motivo_fora: `Acima do limite de ${CONTATOS_POR_DIA} por dia` }));
+
+  const linhas = [...escolhidas, ...sobraram, ...fora];
 
   if (linhas.length) {
     const { error } = await supabase
@@ -129,7 +162,7 @@ export async function sincronizarDia(
       .upsert(linhas, { onConflict: "data_venda,cod_cliente", ignoreDuplicates: true });
     if (error) throw error;
   }
-  return { novos: linhas.length, totalVendas: clientes.length };
+  return { novos: escolhidas.length, totalVendas: clientes.length, limitados: sobraram.length };
 }
 
 function montarLinha(
@@ -141,7 +174,10 @@ function montarLinha(
   const vendedor = resolver(c.cod_vendedor);
   const sugerido = c.categoria === "primeira_compra" || c.categoria === "pouco_historico";
 
-  let status: PosVendaContato["status"] = sugerido ? "pendente" : "fora";
+  // Entra direto como "a_ligar": a etapa de aprovação só segurava a lista — 34
+  // clientes ficaram parados esperando alguém aprovar um a um. Quem não deve ser
+  // ligado sai pelo X na tela, que é mais barato que aprovar todo o resto.
+  let status: PosVendaContato["status"] = sugerido ? "a_ligar" : "fora";
   let motivo: string | null = sugerido ? null : c.categoria === "recorrente" ? "Compra com frequência" : "Cliente ativo";
 
   // Evita ligar duas vezes para o mesmo cliente.
@@ -210,6 +246,16 @@ export async function aprovarLista(dataVenda: string, segmento: Segmento, userId
 }
 
 // ── Consultas das abas ──────────────────────────────────────────────────────
+
+/** Já existe lista montada para essa data de venda? Evita refazer a cada abertura. */
+export async function diaJaMontado(dataVenda: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from("pos_venda_contatos")
+    .select("id", { count: "exact", head: true })
+    .eq("data_venda", dataVenda);
+  if (error) throw error;
+  return (count || 0) > 0;
+}
 
 export async function carregarFila(): Promise<PosVendaContato[]> {
   const { data, error } = await supabase
