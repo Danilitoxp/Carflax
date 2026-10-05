@@ -52,7 +52,8 @@ function fmtTelefone(tel: string | null) {
 const waLink = (tel: string) => `https://wa.me/55${soDigitos(tel).replace(/^55(?=\d{10,11}$)/, "")}`;
 
 // Filtro de tempo parado em meses (pedido do Danilo): 1 a 6 meses.
-const MESES_PARADO = [1, 2, 3, 4, 5, 6];
+// 0 = todos os clientes, inclusive quem comprou recentemente.
+const MESES_PARADO = [0, 1, 2, 3, 4, 5, 6];
 const DOC_FILTROS = ["Todos", "CNPJ", "CPF", "Sem documento"] as const;
 
 interface Vendedor {
@@ -101,8 +102,9 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
   const [clientes, setClientes] = useState<ClienteFRV[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [minValor, setMinValor] = useState(8000);
-  const [minMeses, setMinMeses] = useState(3);
+  // Abre com a carteira inteira; os filtros afinam para reativação.
+  const [minValor, setMinValor] = useState(0);
+  const [minMeses, setMinMeses] = useState(0);
   const [filterDoc, setFilterDoc] = useState<(typeof DOC_FILTROS)[number]>("Todos");
   const minDias = minMeses * 30;
   const [sortField, setSortField] = useState<SortField>("recencia_dias");
@@ -250,7 +252,7 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
                 Prospecções
               </h1>
               <p className="text-[10px] font-medium text-muted-foreground mt-0.5">
-                Clientes com alto potencial parados há mais de {minMeses} {minMeses === 1 ? "mês" : "meses"}
+                {minMeses === 0 ? "Todos os clientes da carteira" : `Clientes parados há mais de ${minMeses} ${minMeses === 1 ? "mês" : "meses"}`}
               </p>
             </div>
           </div>
@@ -313,6 +315,7 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
               onChange={e => setMinValor(Number(e.target.value))}
               className="text-[10px] font-black bg-transparent outline-none cursor-pointer text-foreground"
             >
+              <option value={0}>Qualquer</option>
               <option value={5000}>R$ 5.000</option>
               <option value={8000}>R$ 8.000</option>
               <option value={15000}>R$ 15.000</option>
@@ -343,7 +346,7 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
               className="text-[10px] font-black bg-transparent outline-none cursor-pointer text-foreground"
             >
               {MESES_PARADO.map(m => (
-                <option key={m} value={m}>{m} {m === 1 ? "mês" : "meses"}</option>
+                <option key={m} value={m}>{m === 0 ? "Todos" : `${m} ${m === 1 ? "mês" : "meses"}`}</option>
               ))}
             </select>
           </div>
