@@ -1466,7 +1466,9 @@ export interface ReposicaoResponse {
   itens: ReposicaoItem[];
 }
 
-export const apiComprasReposicao = () => get<ReposicaoResponse>("/api/compras/reposicao");
+/** `meses` = cobertura desejada (1, 2 ou 3). Sem ele, o backend usa o padrão de 3. */
+export const apiComprasReposicao = (meses?: number) =>
+  get<ReposicaoResponse>("/api/compras/reposicao", meses ? { meses: String(meses) } : undefined);
 
 export interface KardexClienteMes {
   cod_cliente: string;
@@ -1516,9 +1518,19 @@ export interface CurvasResponse {
 export const apiComprasCurvas = () => get<CurvasResponse>("/api/compras/reposicao/curvas");
 
 /** Monta agora as propostas de pedido daquele agendamento. */
-export const apiComprasExecutarAgenda = (id: string) =>
+export const apiComprasExecutarAgenda = (id: string, meses?: number) =>
   apiPost<{ success: boolean; propostas: number; itens: number }>(
-    "/api/compras/reposicao/agenda/" + id + "/executar", {},
+    "/api/compras/reposicao/agenda/" + id + "/executar", meses ? { meses } : {},
+  );
+
+/**
+ * Descarta a proposta. Passa pelo backend porque, ao descartar, a necessidade
+ * que ela reservava precisa voltar para as propostas que continuam pendentes —
+ * e esse recálculo depende do estoque do ERP.
+ */
+export const apiComprasDescartarProposta = (id: string, usuarioId?: string) =>
+  apiPost<{ success: boolean; redistribuidas: number; aviso?: string }>(
+    "/api/compras/reposicao/propostas/" + id + "/descartar", { usuarioId },
   );
 
 /**

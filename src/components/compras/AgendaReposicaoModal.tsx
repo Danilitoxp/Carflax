@@ -19,6 +19,8 @@ const DIAS = [
 ];
 
 const CURVAS = ["A", "B", "C"] as const;
+// Cobertura da compra: quantos meses de venda média o pedido deve cobrir.
+const MESES_COBERTURA = [1, 2, 3] as const;
 
 export interface Agendamento {
   id: string;
@@ -26,6 +28,8 @@ export interface Agendamento {
   dia_semana: number;
   hora: string;
   curva: "A" | "B" | "C";
+  /** Meses de cobertura usados ao gerar as propostas. Antigas vêm sem, e valem 3. */
+  meses_estoque?: number | null;
   ativo: boolean;
   ultima_execucao: string | null;
   ultimo_erro: string | null;
@@ -51,6 +55,7 @@ export function AgendaReposicaoModal({
   const [dia, setDia] = useState(1);
   const [hora, setHora] = useState("08:00");
   const [curva, setCurva] = useState<"A" | "B" | "C">("A");
+  const [meses, setMeses] = useState<number>(3);
   const [salvando, setSalvando] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -78,6 +83,7 @@ export function AgendaReposicaoModal({
       dia_semana: dia,
       hora,
       curva,
+      meses_estoque: meses,
       criado_por: usuario.id ?? null,
       criado_por_nome: usuario.nome ?? null,
     }]);
@@ -106,7 +112,7 @@ export function AgendaReposicaoModal({
     setResultado(null);
     setErro(null);
     try {
-      const r = await apiComprasExecutarAgenda(a.id);
+      const r = await apiComprasExecutarAgenda(a.id, a.meses_estoque ?? undefined);
       setResultado(
         r.propostas
           ? `${r.propostas} proposta(s) montada(s) com ${r.itens} item(ns). Confira antes de enviar ao ERP.`
@@ -190,6 +196,7 @@ export function AgendaReposicaoModal({
                     </div>
                     <span className="text-[10px] text-muted-foreground">
                       {DIAS.find((d) => d.valor === a.dia_semana)?.label} às {a.hora.slice(0, 5)} · curva {a.curva}
+                      {" · "}{a.meses_estoque ?? 3} {(a.meses_estoque ?? 3) === 1 ? "mês" : "meses"} de cobertura
                       {a.ultima_execucao
                         ? ` · último: ${new Date(a.ultima_execucao).toLocaleDateString("pt-BR")}`
                         : " · nunca executou"}
@@ -257,6 +264,20 @@ export function AgendaReposicaoModal({
             >
               {CURVAS.map((c) => (
                 <option key={c} value={c} className="bg-card text-foreground">Curva {c}</option>
+              ))}
+            </select>
+          </label>
+          <label title="Quantos meses de venda média o pedido deve cobrir. Menos meses = compra mais curta.">
+            <span className={ROTULO}>Cobertura</span>
+            <select
+              value={meses}
+              onChange={(e) => setMeses(Number(e.target.value))}
+              className={ENTRADA}
+            >
+              {MESES_COBERTURA.map((m) => (
+                <option key={m} value={m} className="bg-card text-foreground">
+                  {m} {m === 1 ? "mês" : "meses"}
+                </option>
               ))}
             </select>
           </label>

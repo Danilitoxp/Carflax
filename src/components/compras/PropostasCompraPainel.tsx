@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { apiComprasEnviarProposta } from "@/lib/api";
+import { apiComprasEnviarProposta, apiComprasDescartarProposta } from "@/lib/api";
 
 export interface PropostaItem {
   cod: string;
@@ -141,10 +141,20 @@ export function PropostasCompraPainel({
 
   async function descartar(p: Proposta) {
     if (!confirm(`Descartar a proposta de ${p.fornecedor || p.cod_fornecedor}?`)) return;
-    await supabase
-      .from("reposicao_propostas")
-      .update({ status: "descartada", descartada_em: new Date().toISOString(), descartada_por: usuario.id ?? null })
-      .eq("id", p.id);
+    setErro(null);
+    setSucesso(null);
+    try {
+      // Pelo backend, não direto no Supabase: ao descartar, o que esta proposta
+      // reservava tem de voltar para as outras pendentes, e esse recálculo
+      // precisa do estoque do ERP.
+      const r = await apiComprasDescartarProposta(p.id, usuario.id);
+      if (r.aviso) setErro(r.aviso);
+      else if (r.redistribuidas > 0) {
+        setSucesso(`Proposta descartada. ${r.redistribuidas} proposta(s) pendente(s) tiveram as quantidades recalculadas.`);
+      }
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao descartar");
+    }
     carregar();
     aoMudar?.();
   }
