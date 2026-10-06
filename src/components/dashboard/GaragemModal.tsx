@@ -121,7 +121,7 @@ export function GaragemModal({
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -145,7 +145,7 @@ export function GaragemModal({
             visual={{ cor: corVis, escura: escuraVis, numero: faixa + 1, avatar: vendedor.avatar, iniciais: vendedor.nome.slice(0, 2).toUpperCase(), pecas: noCarro }}
           />
           {provando.size > 0 && (
-            <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-sky-500/20 px-4 py-1.5 text-xs font-bold text-sky-200 backdrop-blur">
+            <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-sky-950/90 px-4 py-1.5 text-xs font-bold text-sky-200">
               👀 Provando — ainda não comprado
               <button type="button" onClick={() => setProvando(new Set())} className="underline hover:text-white">
                 tirar

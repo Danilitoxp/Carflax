@@ -50,10 +50,20 @@ export function CarroF1({
     <svg viewBox="0 0 220 80" className="w-full h-full overflow-visible" aria-hidden="true">
       {/* neon: brilho ciano no asfalto, pulsando */}
       {tem("neon") && (
-        <ellipse cx="112" cy="40" rx="112" ry="38" fill="#22d3ee" opacity="0.45" style={{ filter: "blur(8px)" }}>
-          <animate attributeName="opacity" values="0.35;0.75;0.35" dur="1.2s" repeatCount="indefinite" />
-          <animate attributeName="fill" values="#22d3ee;#a855f7;#ec4899;#22d3ee" dur="4s" repeatCount="indefinite" />
-        </ellipse>
+        // Gradiente radial no lugar de filter: blur — o blur era refeito a cada quadro.
+        <>
+          <defs>
+            <radialGradient id={`n${id}`}>
+              <stop offset="0" stopColor="#22d3ee" stopOpacity="0.9">
+                <animate attributeName="stop-color" values="#22d3ee;#a855f7;#ec4899;#22d3ee" dur="4s" repeatCount="indefinite" />
+              </stop>
+              <stop offset="1" stopColor="#22d3ee" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <ellipse cx="112" cy="40" rx="118" ry="44" fill={`url(#n${id})`}>
+            <animate attributeName="opacity" values="0.5;1;0.5" dur="1.2s" repeatCount="indefinite" />
+          </ellipse>
+        </>
       )}
       {/* turbo: chamas saindo da traseira */}
       {tem("turbo") && (
@@ -138,7 +148,7 @@ export function CarroF1({
       <circle cx="112" cy="40" r="13" fill="none" stroke={tem("ouro") ? "#fcd34d" : "#fff"} strokeWidth="2" />
       {/* aerofólio: faixa de LED vermelha pulsando */}
       {tem("aerofolio") && (
-        <rect x="19" y="4" width="3" height="72" rx="1.5" fill="#ff1744" style={{ filter: "drop-shadow(0 0 4px #ff1744)" }}>
+        <rect x="19" y="4" width="3" height="72" rx="1.5" fill="#ff1744">
           <animate attributeName="opacity" values="1;0.35;1" dur="0.8s" repeatCount="indefinite" />
         </rect>
       )}
@@ -146,7 +156,7 @@ export function CarroF1({
       {tem("ouro") && (
         <>
           <path d="M18 30 L60 24 L96 20 L150 26 L190 34 L206 37 L206 43 L190 46 L150 54 L96 60 L60 56 L18 50 Z" fill="none" stroke="#fef3c7" strokeWidth="1.5" opacity="0.8" />
-          <rect x="-40" y="0" width="22" height="80" fill="#fff" opacity="0.35" transform="skewX(-20)" style={{ mixBlendMode: "overlay" }}>
+          <rect x="-40" y="0" width="22" height="80" fill="#fff" opacity="0.18" transform="skewX(-20)">
             <animate attributeName="x" values="-40;240" dur="2.2s" repeatCount="indefinite" />
           </rect>
           {[[70, 14, 0], [140, 66, 0.5], [190, 22, 1], [36, 44, 1.5]].map(([x, y, d]) => (
@@ -192,10 +202,12 @@ export function RankingCorrida({
     let maiorAvanco = 0;
     for (const [cod, pct] of atual) {
       const antes = anterior.get(cod);
-      if (antes != null && pct > antes + 0.5) maiorAvanco = Math.max(maiorAvanco, pct - antes);
+      if (antes != null) maiorAvanco = Math.max(maiorAvanco, pct - antes);
     }
-    // Avanço maior = acelerada mais longa e aguda.
-    if (maiorAvanco > 0) tocarAceleracao(Math.min(1, maiorAvanco / 30));
+    // Só acelera em salto de mais de 10% da meta diária de uma vez: venda
+    // pequena (1%, 2%) fazia barulho o dia inteiro. Avanço maior = acelerada
+    // mais longa e aguda.
+    if (maiorAvanco > 10) tocarAceleracao(Math.min(1, maiorAvanco / 30));
   }, [linhas]);
 
   // Faixas em ordem fixa (por nome): o carro não troca de faixa quando a
@@ -280,11 +292,13 @@ export function RankingCorrida({
                   {andando && (
                     <div className="absolute right-full top-1/2 -translate-y-1/2 flex flex-col gap-1.5 mr-1">
                       {[0, 1, 2].map((k) => (
+                        // scaleX em vez de width: só compositor, sem recalcular layout
+                        // (eram ~39 traços animando largura ao mesmo tempo).
                         <motion.span
                           key={k}
-                          className="block h-[3px] rounded-full"
+                          className="block h-[3px] w-[46px] origin-right rounded-full will-change-transform"
                           style={{ background: `linear-gradient(90deg, transparent, ${cor})` }}
-                          animate={{ width: [18, 46, 18], opacity: [0.2, 0.75, 0.2] }}
+                          animate={{ scaleX: [0.4, 1, 0.4], opacity: [0.2, 0.75, 0.2] }}
                           transition={{ duration: 0.7, repeat: Infinity, delay: k * 0.15 }}
                         />
                       ))}

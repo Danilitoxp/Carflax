@@ -305,16 +305,14 @@ function montarF1(v: Visual) {
       carro.add(tubo);
       tubos.push(tubo);
     }
-    const luzes = [new THREE.PointLight("#22d3ee", 10, 3.5), new THREE.PointLight("#22d3ee", 10, 3.5)];
-    luzes[0].position.set(-1, 0.15, 0);
-    luzes[1].position.set(1.2, 0.15, 0);
-    luzes.forEach((l) => carro.add(l));
+    // Sem PointLight: luz dinâmica pesa em todo material da cena. A mancha
+    // aditiva no chão já dá o efeito de luz.
+    const cor = new THREE.Color();
     anim.push((t) => {
-      const cor = new THREE.Color().setHSL((t * 0.08) % 1, 1, 0.55);
+      cor.setHSL((t * 0.08) % 1, 1, 0.55);
       neonMat.color.copy(cor);
       neonMat.opacity = 0.7 + Math.sin(t * 5) * 0.2;
       tubos.forEach((m) => (m.material as THREE.MeshBasicMaterial).color.copy(cor));
-      luzes.forEach((l) => l.color.copy(cor));
     });
   }
 
@@ -401,7 +399,8 @@ export function F1em3D({ visual }: { visual: Visual }) {
     const el = ref.current;
     if (!el) return;
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // 1,5x: em tela 2x/4K renderizar em resolução cheia é o que mais pesa.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(el.clientWidth, el.clientHeight);
     el.appendChild(renderer.domElement);
 
