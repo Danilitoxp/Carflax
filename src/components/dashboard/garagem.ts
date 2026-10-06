@@ -45,6 +45,11 @@ export function coresDoCarro(faixa: number, g?: Garagem): [string, string] {
   return CORES[(g?.cor ?? faixa) % CORES.length];
 }
 
+const EVENTO_GARAGEM = "garagem-alterada";
+
+/** Avisa as telas abertas nesta aba que a garagem mudou — não depende do realtime. */
+export const avisarGaragemAlterada = () => window.dispatchEvent(new Event(EVENTO_GARAGEM));
+
 /**
  * Garagens de todos os vendedores, ao vivo: compra de peça ou troca de cor em
  * qualquer tela chega na pista pelo realtime do Supabase, sem esperar o ciclo
@@ -82,8 +87,10 @@ export function useGaragens(): Map<string, Garagem> {
       });
     // Rede de segurança caso o realtime caia sem avisar.
     const id = setInterval(carregar, 60 * 1000);
+    window.addEventListener(EVENTO_GARAGEM, carregar);
     return () => {
       vivo = false;
+      window.removeEventListener(EVENTO_GARAGEM, carregar);
       clearInterval(id);
       supabase.removeChannel(canal);
     };

@@ -416,14 +416,39 @@ export function F1em3D({ visual }: { visual: Visual }) {
     contra.position.set(-5, 3, -4);
     cena.add(contra);
 
-    // Chão que some nas bordas (alphaMap radial): sem a borda do disco
-    // aparecendo cortada no canto do quadro.
-    const chao = new THREE.Mesh(
-      new THREE.CircleGeometry(5, 64),
-      new THREE.MeshStandardMaterial({ color: 0x2b2f36, roughness: 0.9, transparent: true, alphaMap: texturaBrilho(), depthWrite: false }),
+    // Plataforma giratória de exposição: base metálica, tampo escuro com
+    // anéis e borda de luz, mais um halo suave no "chão" abaixo.
+    const plataforma = new THREE.Group();
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.95, 3.1, 0.28, 96),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.3 }),
     );
-    chao.rotation.x = -Math.PI / 2;
-    cena.add(chao);
+    base.position.y = -0.14;
+    plataforma.add(base);
+    const tampo = new THREE.Mesh(
+      new THREE.CircleGeometry(2.9, 96),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.6, roughness: 0.45 }),
+    );
+    tampo.rotation.x = -Math.PI / 2;
+    tampo.position.y = 0.002;
+    plataforma.add(tampo);
+    for (const r of [1.2, 2.1]) {
+      const anel = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.03, 96), new THREE.MeshBasicMaterial({ color: 0x334155 }));
+      anel.rotation.x = -Math.PI / 2;
+      anel.position.y = 0.004;
+      plataforma.add(anel);
+    }
+    const bordaLuz = new THREE.Mesh(new THREE.TorusGeometry(2.93, 0.035, 12, 128), new THREE.MeshBasicMaterial({ color: 0x67e8f9 }));
+    bordaLuz.rotation.x = -Math.PI / 2;
+    plataforma.add(bordaLuz);
+    const halo = new THREE.Mesh(
+      new THREE.PlaneGeometry(9, 9),
+      new THREE.MeshBasicMaterial({ map: texturaBrilho(), color: 0x22d3ee, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.y = -0.29;
+    plataforma.add(halo);
+    cena.add(plataforma);
 
     const { carro, anim } = montarF1(visualRef.current);
     cena.add(carro);

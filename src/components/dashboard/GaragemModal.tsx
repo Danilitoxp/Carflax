@@ -5,7 +5,7 @@ import { Check, Coins, X as Fechar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import type { RankingSeller } from "./ranking-events";
-import { CORES, PECAS, coresDoCarro, type Garagem, type PecaId } from "./garagem";
+import { CORES, PECAS, avisarGaragemAlterada, coresDoCarro, type Garagem, type PecaId } from "./garagem";
 
 /**
  * Garagem do vendedor — o MESMO carro de F1 da pista do modo corrida (cor,
@@ -102,7 +102,7 @@ export function GaragemModal({
     if (error) {
       setErro("Não foi possível comprar a peça. Tente de novo.");
       setPendentes((p) => ({ ...p, pecas: p.pecas.filter((x) => x !== id) }));
-    }
+    } else avisarGaragemAlterada();
     setOcupado(false);
   };
 
@@ -116,7 +116,7 @@ export function GaragemModal({
     if (error) {
       setErro("Não foi possível trocar a cor.");
       setPendentes((p) => ({ ...p, cor: undefined }));
-    }
+    } else avisarGaragemAlterada();
   };
 
   return (

@@ -316,7 +316,7 @@ export function RankingCorrida({
                         onClick={() => onAbrirGaragem(l.cod)}
                         aria-label="Abrir minha garagem"
                         title="Abrir minha garagem"
-                        className={cn(classe, "cursor-pointer rounded-lg transition-transform hover:scale-110 drop-shadow-[0_0_10px_rgba(251,191,36,0.7)]")}
+                        className={cn(classe, "cursor-pointer rounded-lg transition-transform hover:scale-110")}
                         style={tamanho}
                       >
                         {carro}
