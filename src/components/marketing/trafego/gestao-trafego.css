@@ -317,6 +317,13 @@
 .gt .ap-cascata .gt-wf-row.tot { padding-top: .7cqi; }
 
 .gt .ap-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 2cqi; }
+.gt .ap-ava { width: 1.6em; height: 1.6em; border-radius: 50%; object-fit: cover; display: inline-grid; place-items: center; background: var(--azul-soft, #1e3a8a55); font-weight: 700; flex: none; }
+.gt .ap-evol svg { width: 100%; height: auto; display: block; overflow: visible; }
+.gt .ap-evol-leg { display: flex; gap: 2.4cqi; margin-top: 1.6cqi; font-size: 1.1cqi; color: var(--ink-3); }
+.gt .ap-evol-leg i { display: inline-block; width: .8em; height: .8em; border-radius: 3px; margin-right: .4em; vertical-align: -1px; }
+.gt .ap-tbl-compacta td, .gt .ap-tbl-compacta th { padding-top: .55cqi; padding-bottom: .55cqi; }
+.gt .ap-off { color: var(--warn); font-size: .8em; }
+.gt .ap-kpis.tres { grid-template-columns: 1fr 1fr 1fr; }
 .gt .ap-kpis > div { display: flex; flex-direction: column; gap: .6cqi; border: 1px solid var(--line); border-radius: .8cqi; padding: 1.6cqi 2.2cqi; }
 .gt .ap-kpis b { font: 850 5cqi/1 var(--display); font-stretch: 80%; font-variant-numeric: tabular-nums; }
 .gt .ap-kpis small { font-size: 1.3cqi; color: var(--ink-2); }

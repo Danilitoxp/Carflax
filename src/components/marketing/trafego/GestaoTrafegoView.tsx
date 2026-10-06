@@ -1,10 +1,11 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import {
   Plus, ArrowsClockwise, ArrowSquareOut, CalendarBlank, Coins, UsersThree, Target, Megaphone,
-  MagnifyingGlass, Funnel, ChartBar, DotsThreeVertical, Warning, CaretDown,
+  MagnifyingGlass, Funnel, Storefront, ChartBar, DotsThreeVertical, Warning, CaretDown,
 } from "@phosphor-icons/react";
 import {
   apiTrafegoCampanhas,
+  apiTrafegoFechamento,
   apiTrafegoStatus,
   apiTrafegoOrcamento,
   apiTrafegoCriarGoogle,
@@ -154,6 +155,7 @@ export function GestaoTrafegoView({ userProfile }: { userProfile?: { name: strin
   const [recarregarDiario, setRecarregarDiario] = useState(0);
   const [busca, setBusca] = useState("");
   const [filtroAberto, setFiltroAberto] = useState(false);
+  const [faturamento, setFaturamento] = useState<{ mes: string; valor: number | null; clientes: number; roas: number | null } | null>(null);
   const intervalo = useMemo(() => periodoDe(periodo), [periodo]);
 
   const carregar = useCallback(async () => {
@@ -162,6 +164,11 @@ export function GestaoTrafegoView({ userProfile }: { userProfile?: { name: strin
     setRecarregarDiario((n) => n + 1);
     try {
       const { inicio, fim } = periodoDe(periodo);
+      const mes = inicio.slice(0, 7);
+      // Faturamento é complemento: se o ERP falhar, a tela segue sem ele.
+      apiTrafegoFechamento(mes, 7.2, 3)
+        .then((f) => setFaturamento({ mes, valor: f.resultadoTodos.faturamento, clientes: f.resultadoTodos.clientes, roas: f.resultadoTodos.roas }))
+        .catch(() => setFaturamento({ mes, valor: null, clientes: 0, roas: null }));
       const lista = await apiTrafegoCampanhas(inicio, fim);
       setDados(lista);
       setEdicoes({});
@@ -318,6 +325,11 @@ export function GestaoTrafegoView({ userProfile }: { userProfile?: { name: strin
           <div className="gt2-kpi"><span className="ico"><Coins size={24} weight="duotone" /></span><div>
             <p>Investimento no período</p><b>{carregando && !dados ? "…" : brl0(tot.gasto)}</b>
             <small>{dados ? `${dados.periodo.inicio.split("-").reverse().join("/")} a ${dados.periodo.fim.split("-").reverse().join("/")}` : ""}</small>
+          </div></div>
+          <div className="gt2-kpi"><span className="ico"><Storefront size={24} weight="duotone" /></span><div>
+            <p>Faturamento do tráfego</p>
+            <b>{!faturamento || faturamento.mes !== intervalo.inicio.slice(0, 7) ? "…" : faturamento.valor == null ? "—" : brl0(faturamento.valor)}</b>
+            <small>{faturamento?.valor != null ? `notas emitidas · ${int(faturamento.clientes)} clientes${faturamento.roas ? ` · ROAS ${faturamento.roas.toFixed(1).replace(".", ",")}x` : ""}` : "notas emitidas no mês"}</small>
           </div></div>
           <div className="gt2-kpi"><span className="ico"><UsersThree size={24} weight="duotone" /></span><div>
             <p>Contatos gerados</p><b>{int(tot.contatos)}</b><small>conversões Google + conversas Meta</small>

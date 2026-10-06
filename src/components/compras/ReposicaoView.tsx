@@ -7,7 +7,7 @@
 // backend (reposicaoHandler.js) — aqui é só apresentação, filtro e paginação.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Boxes, Search, Loader2, Truck, Download, ChevronLeft, ChevronRight, AlertCircle, FileText, CalendarClock, ClipboardList } from "lucide-react";
+import { Boxes, Search, Loader2, Truck, Download, ChevronLeft, ChevronRight, AlertCircle, PackageX, CalendarClock, Link2, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { apiComprasReposicao, type ReposicaoItem, type ReposicaoResponse } from "@/lib/api";
@@ -15,6 +15,7 @@ import { anexarGuiaImportacao } from "@/lib/guia-importacao-produtos";
 import { KardexMesModal } from "./KardexMesModal";
 import { AgendaReposicaoModal } from "./AgendaReposicaoModal";
 import { PropostasCompraPainel } from "./PropostasCompraPainel";
+import { SimilaresModal } from "./SimilaresModal";
 
 /** Mês aberto no modal de detalhe das vendas. */
 interface MesAberto {
@@ -65,6 +66,9 @@ export function ReposicaoView({ userProfile }: { userProfile?: { id?: string; na
     contarPendentes();
   }, [contarPendentes]);
   const [pagina, setPagina] = useState(1);
+  const [similaresAberto, setSimilaresAberto] = useState(false);
+  // Muda ao salvar os similares: recalcula a reposição com os grupos novos.
+  const [versao, setVersao] = useState(0);
 
   useEffect(() => {
     setCarregando(true);
@@ -73,7 +77,7 @@ export function ReposicaoView({ userProfile }: { userProfile?: { id?: string; na
       .then(setDados)
       .catch((e) => setErro(e instanceof Error ? e.message : "Falha ao carregar"))
       .finally(() => setCarregando(false));
-  }, []);
+  }, [versao]);
 
   const itens = useMemo(() => {
     const termo = semAcento(busca.trim());
@@ -103,6 +107,7 @@ export function ReposicaoView({ userProfile }: { userProfile?: { id?: string; na
       "Média sem ajuste": i.media_bruta,
       Saldo: i.disponivel,
       "Compra pendente": i.em_pedido,
+      "Lead time (dias)": i.lead_time_dias ?? "",
       Sugestão: i.sugestao_compra,
       Unidade: i.unidade || "",
     }));
@@ -172,6 +177,15 @@ export function ReposicaoView({ userProfile }: { userProfile?: { id?: string; na
           </button>
         )}
 
+        {/* Itens similares: códigos equivalentes somados como um item só. */}
+        <button
+          onClick={() => setSimilaresAberto(true)}
+          title="Itens similares (somar códigos equivalentes)"
+          className="inline-flex items-center justify-center p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:text-blue-500 hover:border-blue-500/40 transition-colors"
+        >
+          <Link2 className="w-4 h-4" />
+        </button>
+
         {/* Agenda de reposição: compra recorrente por curva de fornecedor. */}
         <button
           onClick={() => setAgendaAberta(true)}
@@ -196,6 +210,15 @@ export function ReposicaoView({ userProfile }: { userProfile?: { id?: string; na
           onFechar={() => {
             setAgendaAberta(false);
             contarPendentes();
+          }}
+        />
+      )}
+
+      {similaresAberto && (
+        <SimilaresModal
+          onFechar={(mudou) => {
+            setSimilaresAberto(false);
+            if (mudou) setVersao((v) => v + 1);
           }}
         />
       )}
@@ -247,6 +270,7 @@ export function ReposicaoView({ userProfile }: { userProfile?: { id?: string; na
                       <th rowSpan={2} className={cn(THC, "border-l border-border/60")}>Média mensal</th>
                       <th rowSpan={2} className={THC}>Saldo</th>
                       <th rowSpan={2} className={THC}>Compra pendente</th>
+                      <th rowSpan={2} className={THC}>Lead time</th>
                       <th rowSpan={2} className={cn(THC, "bg-blue-500/5")}>
                         Sugestão
                         <span className="block text-[9px] font-bold normal-case tracking-normal text-muted-foreground/80">
@@ -361,6 +385,15 @@ function Linha({ item: i, aoAbrirMes }: { item: ReposicaoItem; aoAbrirMes: (mes:
             {i.fornecedor || "sem fornecedor definido"}
             {i.fornecedor_interno ? " · empresa do grupo" : ""}
           </span>
+          {!!i.similares?.length && (
+            <span
+              title={i.similares.map((s) => `${s.cod} ${s.descricao} — saldo ${brNum(s.saldo)}`).join("\n")}
+              className="inline-flex w-fit items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/10 px-1.5 py-px text-[9px] font-bold text-blue-600 dark:text-blue-400"
+            >
+              <Link2 className="w-2.5 h-2.5" />
+              + {i.similares.map((s) => s.cod).join(", ")} somado{i.similares.length > 1 ? "s" : ""}
+            </span>
+          )}
         </div>
       </td>
 
@@ -372,30 +405,22 @@ function Linha({ item: i, aoAbrirMes }: { item: ReposicaoItem; aoAbrirMes: (mes:
             title={
               m.esporadico
                 ? `Venda extraordinária: ${brNum(m.qtd)} para ${m.clientes} cliente${m.clientes > 1 ? "s" : ""} — fora da média. Clique para ver os clientes.`
-                : m.ruptura && m.orcamentos > 0
-                  ? `Sem venda, mas ${m.orcamentos} orçamento${m.orcamentos > 1 ? "s" : ""} e sem estoque: ruptura — fora da média. Clique para ver o mês.`
+                : m.ruptura
+                  ? `Ruptura: ${brNum(m.qtd)} vendido e ${brNum(m.perda_qtd ?? 0)} perdido por falta de estoque (marcado pelo vendedor e conferido no kardex) — fora da média. Clique para ver o mês.`
                   : `${brNum(m.qtd)} para ${m.clientes} cliente${m.clientes === 1 ? "" : "s"}${m.orcamentos ? ` · ${m.orcamentos} orçamento${m.orcamentos > 1 ? "s" : ""}` : ""}. Clique para ver o detalhe.`
             }
             className={cn(
               "inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[12px] font-bold tabular-nums transition-colors",
               m.esporadico
                 ? "border-rose-500/40 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20"
-                : m.ruptura && m.orcamentos > 0
+                : m.ruptura
                   ? "border-slate-500/40 bg-slate-500/10 text-slate-500 dark:text-slate-400 hover:bg-slate-500/20"
                   : "border-border bg-secondary/30 text-muted-foreground hover:bg-secondary hover:text-foreground",
             )}
           >
             {m.esporadico && <AlertCircle className="w-3 h-3" />}
-            {m.ruptura && m.orcamentos > 0 ? (
-              <>
-                <FileText className="w-3 h-3" />
-                <span className="text-[11px]">
-                  {m.orcamentos} {m.orcamentos === 1 ? "orçamento" : "orçamentos"}
-                </span>
-              </>
-            ) : (
-              brNum(m.qtd, m.qtd % 1 ? 1 : 0)
-            )}
+            {m.ruptura && <PackageX className="w-3 h-3" />}
+            {brNum(m.qtd, m.qtd % 1 ? 1 : 0)}
           </button>
         </td>
       ))}
@@ -406,7 +431,7 @@ function Linha({ item: i, aoAbrirMes }: { item: ReposicaoItem; aoAbrirMes: (mes:
           i.meses_esporadicos.length || i.meses_sem_estoque.length
             ? [
                 i.meses_esporadicos.length ? `Fora da média (pico): ${i.meses_esporadicos.join(", ")}` : "",
-                i.meses_sem_estoque.length ? `Fora da média (ruptura, só orçamento): ${i.meses_sem_estoque.join(", ")}` : "",
+                i.meses_sem_estoque.length ? `Fora da média (ruptura):${i.meses_sem_estoque.join(", ")}` : "",
                 `Sem ajuste: ${brNum(i.media_bruta, 1)}`,
               ].filter(Boolean).join(" · ")
             : undefined
@@ -445,6 +470,14 @@ function Linha({ item: i, aoAbrirMes }: { item: ReposicaoItem; aoAbrirMes: (mes:
 
       <td className="px-4 py-3 text-center text-[12px] tabular-nums text-muted-foreground">
         {i.em_pedido ? brNum(i.em_pedido) : "—"}
+      </td>
+
+      {/* Média de dias entre pedido e entrega do fornecedor, nos últimos 12 meses. */}
+      <td
+        className="px-4 py-3 text-center text-[12px] tabular-nums text-muted-foreground"
+        title={i.lead_time_dias != null ? `Do pedido à chegada: média de ${i.lead_time_pedidos} pedido${i.lead_time_pedidos === 1 ? "" : "s"} recebido${i.lead_time_pedidos === 1 ? "" : "s"} nos últimos 12 meses` : "Sem pedido recebido deste fornecedor nos últimos 12 meses"}
+      >
+        {i.lead_time_dias != null ? `${i.lead_time_dias} ${i.lead_time_dias === 1 ? "dia" : "dias"}` : "—"}
       </td>
 
       <td className="px-4 py-3 bg-blue-500/5">

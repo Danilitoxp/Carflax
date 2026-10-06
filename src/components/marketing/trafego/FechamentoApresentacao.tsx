@@ -2,16 +2,20 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
   CaretLeft, CaretRight, CornersOut, CornersIn, X,
   Storefront, Package, Bank, CreditCard, ShoppingCart, Megaphone, Wallet, ChartLineUp, Receipt,
+  Timer, FileText, Funnel, Tag,
 } from "@phosphor-icons/react";
 import type { TrafegoFechamento } from "@/lib/api";
+import type { ReportsAnalytics } from "@/lib/marketing-service";
 import { brl, brl0, int, x1, pct, dataBR, nomeMes, CANAL, rotuloComparacao } from "./fechamento-formato";
-import { Delta, Cascata, Funil } from "./fechamento-graficos";
+import { Delta, Cascata, Funil, Evolucao } from "./fechamento-graficos";
 import { LogoGoogle, LogoMeta, LogoWhatsapp } from "./LogosMarca";
 
 // Ícone ao lado do rótulo: marca do canal (na cor dele) ou um ícone discreto.
 function Rot({ icone, children }: { icone: ReactNode; children: ReactNode }) {
   return <span className="ap-rot">{icone}<span>{children}</span></span>;
 }
+const minutos = (v: number | null) =>
+  v == null ? "—" : v < 60 ? `${Math.round(v)} min` : `${Math.floor(v / 60)}h${String(Math.round(v % 60)).padStart(2, "0")}`;
 const ICL = { size: "1.25em", weight: "regular" } as const;
 const iconeCanal = (canal: string) =>
   canal === "google" ? <LogoGoogle /> : canal === "meta" ? <LogoMeta /> : <LogoWhatsapp />;
@@ -20,8 +24,12 @@ const iconeCanal = (canal: string) =>
  * Modo apresentação do Fechamento: os mesmos números da tela, ao vivo, em
  * slides de tela cheia para levar à diretoria. ← → / espaço navegam, Esc sai.
  */
-export function FechamentoApresentacao({ dados, anterior, soNovos, onFechar, apresentador }: {
+export function FechamentoApresentacao({ dados, anterior, soNovos, onFechar, apresentador, marketing, evolucao }: {
   dados: TrafegoFechamento;
+  /** Meses do ano até o atual, para o gráfico de evolução. */
+  evolucao?: { rotulo: string; investimento: number; faturamento: number; resultado: number }[] | null;
+  /** Números da tela Desempenho de Marketing (leads, atendimento, tags) no mesmo período. */
+  marketing?: ReportsAnalytics | null;
   /** Quem está apresentando: foto e nome no rodapé de cada slide. */
   apresentador?: { name: string; avatar?: string | null } | null;
   anterior: TrafegoFechamento | null;
@@ -40,6 +48,9 @@ export function FechamentoApresentacao({ dados, anterior, soNovos, onFechar, apr
   const mes = nomeMes(dados.mes);
   const vs = rotuloComparacao(anterior);
   const campanhas = dados.porCampanha.filter((c) => c.gasto > 0).slice(0, 8);
+  const mk = marketing ?? null;
+  const tags = dados.porTema ?? [];
+  const atendentes = (mk?.bySeller ?? []).filter((s) => s.salesCount > 0).sort((a, b) => b.salesValue - a.salesValue || b.leads - a.leads).slice(0, 8);
   const clientes = dados.clientes.filter((c) => !soNovos || c.novo).sort((a, b) => b.venda - a.venda).slice(0, 8);
 
   const slides: { id: string; titulo: string; corpo: ReactNode }[] = [
@@ -116,26 +127,78 @@ export function FechamentoApresentacao({ dados, anterior, soNovos, onFechar, apr
         </div>
       ),
     },
-    {
-      id: "canais", titulo: "Resultado por canal",
+    ...(mk ? [{
+      id: "atendimento", titulo: "Atendimento e conversão",
+      corpo: (
+        <div className="ap-kpis tres">
+          <div><span className="ap-l"><Rot icone={iconeCanal("whatsapp")}>Leads que chegaram</Rot></span><b>{int(mk.totals.leads)}</b><small>{dataBR(dados.periodo.inicio)} a {dataBR(dados.periodo.fim)}<Delta vs={vs} agora={mk.totals.leads} antes={mk.previous.leads} fmt={int} /></small></div>
+          <div><span className="ap-l"><Rot icone={<Timer {...ICL} />}>Tempo médio de 1ª resposta</Rot></span><b>{minutos(mk.totals.avgResponseMinutes)}</b><small>do primeiro contato à resposta do vendedor<Delta vs={vs} agora={mk.totals.avgResponseMinutes ?? 0} antes={mk.previous.avgResponseMinutes ?? undefined} fmt={minutos} menorMelhor /></small></div>
+          <div><span className="ap-l"><Rot icone={<FileText {...ICL} />}>Orçamentos enviados</Rot></span><b>{int(mk.totals.quotesCount)}</b><small>{brl0(mk.totals.quotesValue)} orçados<Delta vs={vs} agora={mk.totals.quotesCount} antes={mk.previous.quotesCount} fmt={int} /></small></div>
+          <div><span className="ap-l"><Rot icone={<ShoppingCart {...ICL} />}>Pedidos fechados</Rot></span><b>{int(mk.totals.salesCount)}</b><small>{brl0(mk.totals.salesValue)} vendidos<Delta vs={vs} agora={mk.totals.salesCount} antes={mk.previous.salesCount} fmt={int} /></small></div>
+          <div><span className="ap-l"><Rot icone={<Funnel {...ICL} />}>Conversão</Rot></span><b>{pct(mk.totals.convByCount / 100)}</b><small>lead → pedido · {pct(mk.totals.convByQuote / 100)} dos orçamentos viram pedido</small></div>
+          <div><span className="ap-l"><Rot icone={<Receipt {...ICL} />}>Ticket médio do pedido</Rot></span><b>{mk.totals.avgTicket ? brl0(mk.totals.avgTicket) : "—"}</b><small>pedidos registrados no HUB<Delta vs={vs} agora={mk.totals.avgTicket} antes={mk.previous.avgTicket} fmt={brl0} /></small></div>
+        </div>
+      ),
+    }] : []),
+    ...(atendentes.length ? [{
+      id: "atendentes", titulo: "Desempenho por atendente",
       corpo: (
         <table className="ap-tbl">
-          <thead><tr><th>Canal</th><th className="num">Investimento</th><th className="num">Leads</th><th className="num">Clientes</th><th className="num">Faturado</th><th className="num">ROAS</th></tr></thead>
+          <thead><tr><th>Atendente</th><th className="num">Leads</th><th className="num">1ª resposta</th><th className="num">Orçamentos</th><th className="num">Pedidos</th><th className="num">Conversão</th><th className="num">Vendido</th></tr></thead>
           <tbody>
-            {dados.porCanal.map((c) => (
-              <tr key={c.canal}>
-                <td><Rot icone={iconeCanal(c.canal)}>{CANAL[c.canal]}</Rot></td>
-                <td className="num">{brl0(c.investimento)}</td>
-                <td className="num">{int(c.leadsHub)}</td>
-                <td className="num">{int(soNovos ? c.novos : c.clientes)}</td>
-                <td className="num">{brl0(soNovos ? c.faturamentoNovos : c.faturamento)}</td>
-                <td className="num">{c.investimento > 0 ? x1(soNovos ? c.roas : c.roasTodos) : "—"}</td>
+            {atendentes.map((s) => (
+              <tr key={s.id}>
+                <td><span className="ap-rot">{s.avatar ? <img className="ap-ava" src={s.avatar} alt="" /> : <span className="ap-ava">{s.name.slice(0, 1)}</span>}<span>{s.name}</span></span></td>
+                <td className="num">{int(s.leads)}</td>
+                <td className="num">{minutos(s.avgResponseMinutes)}</td>
+                <td className="num">{int(s.quotesCount)}</td>
+                <td className="num">{int(s.salesCount)}</td>
+                <td className="num">{pct(s.convRate / 100)}</td>
+                <td className="num">{brl0(s.salesValue)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       ),
-    },
+    }] : []),
+    ...(dados.topItens?.length ? [{
+      id: "itens", titulo: "Itens mais vendidos do mês",
+      corpo: (
+        <table className="ap-tbl ap-tbl-compacta">
+          <thead><tr><th>#</th><th>Item</th><th className="num">Qtd.</th><th className="num">Vendido</th><th className="num">Margem</th></tr></thead>
+          <tbody>
+            {dados.topItens.map((i, n) => (
+              <tr key={i.item}>
+                <td className="num">{n + 1}º</td>
+                <td>{i.descricao}</td>
+                <td className="num">{i.qtd.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+                <td className="num">{brl0(i.venda)}</td>
+                <td className="num">{i.venda > 0 ? pct(i.margem / i.venda) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ),
+    }] : []),
+    ...(tags.length ? [{
+      id: "tags", titulo: "Resultado por tag",
+      corpo: (
+        <table className="ap-tbl">
+          <thead><tr><th>Tag</th><th className="num">Investido</th><th className="num">Cliques</th><th className="num">Contatos</th><th className="num">Custo/contato</th></tr></thead>
+          <tbody>
+            {tags.map((t) => (
+              <tr key={t.tema}>
+                <td><Rot icone={<Tag {...ICL} />}>{t.tema}{t.gasto === 0 && <small className="ap-off"> · sem cliques no período</small>}</Rot></td>
+                <td className="num">{brl0(t.gasto)}</td>
+                <td className="num">{int(t.cliques)}</td>
+                <td className="num">{int(t.contatos)}</td>
+                <td className="num">{t.contatos > 0 ? brl(t.gasto / t.contatos) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ),
+    }] : []),
     ...(campanhas.length ? [{
       id: "campanhas", titulo: "Resultado por campanha",
       corpo: (
@@ -189,6 +252,10 @@ export function FechamentoApresentacao({ dados, anterior, soNovos, onFechar, apr
         </ul>
       ),
     },
+    ...(evolucao && evolucao.length > 1 ? [{
+      id: "evolucao", titulo: `Evolução em ${dados.mes.slice(0, 4)}`,
+      corpo: <Evolucao meses={evolucao} />,
+    }] : []),
   ];
   const total = slides.length;
 

@@ -742,6 +742,12 @@ export interface ProductInfo {
   FORNECEDOR?: string | null;
 }
 
+/** Desde quando cada item com saldo físico negativo está negativo (reconstruído pelo kardex). */
+export const apiProdutosNegativosDesde = () =>
+  get<{ geradoEm: string; itens: Record<string, { desde: string | null; antesDe?: string | null; saldo: number }> }>(
+    "/api/dashboard/produtos/negativos-desde",
+  );
+
 export const apiDashboardProdutos = (codigo?: string) =>
   get<ProductInfo[]>("/api/dashboard/produtos", {
     ...(codigo ? { codigo } : {})
@@ -1433,7 +1439,8 @@ export interface ReposicaoVendaMes {
   orcamentos: number;     // orçamentos do item no mês (procura, vendendo ou não)
   orcamento_qtd: number;  // quantidade orçada no mês
   esporadico: boolean;    // pico de poucos clientes, fora da média
-  ruptura: boolean;       // sem venda, mas com orçamento e sem estoque: fora da média
+  ruptura: boolean;       // venda perdida por falta/furo de estoque (Citel) confirmada no kardex: fora da média
+  perda_qtd?: number;     // quantidade marcada como perdida por falta de estoque no mês
 }
 
 export interface ReposicaoItem {
@@ -1454,9 +1461,14 @@ export interface ReposicaoItem {
   disponivel: number;
   em_pedido: number;
   previsao_entrega: string | null;
+  /** Média de dias entre pedido e entrega do fornecedor do item (12 meses). */
+  lead_time_dias?: number | null;
+  lead_time_pedidos?: number;
   cobertura_meses: number;
   sugestao_compra: number;
   em_falta: boolean;
+  /** Códigos similares somados nesta linha (vendas, saldo e compra pendente). */
+  similares?: { cod: string; descricao: string; saldo: number }[];
 }
 
 export interface ReposicaoResponse {
@@ -1534,6 +1546,13 @@ export const apiComprasExecutarAgenda = (id: string, meses?: number) =>
  * que ela reservava precisa voltar para as propostas que continuam pendentes —
  * e esse recálculo depende do estoque do ERP.
  */
+/** Compra o item de outro fornecedor: vai para a proposta pendente dele (ou cria uma). */
+export const apiComprasMoverItemProposta = (id: string, cod: string, codFornecedor: string, fornecedor: string, quantidade: number) =>
+  apiPost<{ success: boolean; proposta_id: string; preco: number }>(
+    "/api/compras/reposicao/propostas/" + id + "/mover-item",
+    { cod, cod_fornecedor: codFornecedor, fornecedor, quantidade },
+  );
+
 export const apiComprasDescartarProposta = (id: string, usuarioId?: string) =>
   apiPost<{ success: boolean; redistribuidas: number; aviso?: string }>(
     "/api/compras/reposicao/propostas/" + id + "/descartar", { usuarioId },
@@ -1566,6 +1585,13 @@ export async function apiComprasEnviarProposta(
 
 export const apiComprasKardexMes = (item: string, mes: string) =>
   get<KardexMesResponse>("/api/compras/reposicao/kardex", { item, mes });
+
+/** Grupos de itens similares (somados como um item só na reposição). */
+export interface GrupoSimilares { id: string; nome: string; itens: { cod: string; descricao: string | null }[] }
+export const apiComprasSimilares = () =>
+  get<{ grupos: GrupoSimilares[] }>("/api/compras/reposicao/similares");
+export const apiComprasSalvarSimilares = (grupos: { id: string; nome: string; itens: string[] }[]) =>
+  post<{ success: boolean; grupos: number }>("/api/compras/reposicao/similares", { grupos }, { method: "PUT" });
 
 export const apiComprasBuscarProdutos = (q: string) =>
   get<{ success: boolean; data: ProdutoBusca[] }>("/api/compras/produtos/busca", { q });
@@ -1963,6 +1989,17 @@ export interface TrafegoFechamento {
     clientes: number | null; clientesTodos: number | null; faturamento: number | null; faturamentoTodos: number | null;
     roas: number | null; roasTodos: number | null;
   }[];
+  /** Pedidos fechados no mês com o custo real da nota de cada um. */
+  pedidosMes?: {
+    pedidos: number; valor: number; custoMercadoria: number; impostos: number; taxas: number;
+    contribuicao: number; resultado: number; margemContribuicao: number | null; comNota: number;
+  } | null;
+  /** Itens mais vendidos (notas) aos clientes do tráfego no mês. */
+  topItens?: { item: string; descricao: string; qtd: number; venda: number; margem: number; clientes: number }[];
+  /** Venda e margem por linha de produto (classificada pela descrição do item). */
+  porLinha?: { linha: string; venda: number; margem: number; margemPct: number | null }[];
+  /** Google por tema de produto (PPR, elétrico…). Opcional: backend antigo não manda. */
+  porTema?: { tema: string; gasto: number; cliques: number; contatos: number }[];
   clientes: { cod: string; cliente: string; canal: string; campanha: string | null; primeiroContato: string; novo: boolean; pedidos: number; venda: number; custo: number }[];
   erros: { google: string | null; meta: string | null; leads: string | null; erp: string | null; whatsapp?: string | null };
   cacheEm?: string;

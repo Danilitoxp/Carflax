@@ -14,6 +14,39 @@ export function Delta({ agora, antes, fmt, menorMelhor = false, vs = "mês anter
   return <span style={{ color: bom ? "var(--good)" : "var(--bad)" }}> · {d > 0 ? "+" : "−"}{fmt(Math.abs(d))} vs {vs}</span>;
 }
 
+/** Investimento × faturado × resultado mês a mês (barras lado a lado, resultado embaixo). */
+export function Evolucao({ meses }: { meses: { rotulo: string; investimento: number; faturamento: number; resultado: number }[] }) {
+  const max = Math.max(1, ...meses.flatMap((m) => [m.investimento, m.faturamento]));
+  const W = 1000, H = 330, base = 260, col = W / meses.length, bw = Math.min(46, col * 0.32);
+  const k = (v: number) => (Math.max(0, v) / max) * (base - 30);
+  return (
+    <div className="ap-evol">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Investimento e faturado por mês">
+        {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} x1="0" x2={W} y1={base - f * (base - 30)} y2={base - f * (base - 30)} stroke="var(--line)" strokeDasharray="4 6" />)}
+        {meses.map((m, i) => {
+          const x = i * col + col / 2;
+          return (
+            <g key={m.rotulo}>
+              <rect x={x - bw - 2} y={base - k(m.investimento)} width={bw} height={k(m.investimento)} rx="4" fill="var(--warn)" opacity=".85" />
+              <rect x={x + 2} y={base - k(m.faturamento)} width={bw} height={k(m.faturamento)} rx="4" fill="var(--good)" opacity=".85" />
+              <text x={x} y={base - Math.max(k(m.investimento), k(m.faturamento)) - 8} textAnchor="middle" fontSize="15" fill="var(--ink-2)">{brl0(m.faturamento)}</text>
+              <text x={x} y={base + 22} textAnchor="middle" fontSize="16" fill="var(--ink-2)">{m.rotulo}</text>
+              <text x={x} y={base + 42} textAnchor="middle" fontSize="14" fill="var(--warn)">{brl0(m.investimento)}</text>
+              <text x={x} y={base + 62} textAnchor="middle" fontSize="14" fontWeight="700" fill={m.resultado >= 0 ? "var(--good)" : "var(--bad)"}>{brl0(m.resultado)}</text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="ap-evol-leg">
+        <span><i style={{ background: "var(--warn)" }} /> Investimento</span>
+        <span><i style={{ background: "var(--good)" }} /> Faturado (notas emitidas)</span>
+        <span>Embaixo do mês: investimento e, em negrito, o resultado depois de todos os custos</span>
+        <span>Antes de maio/26 as vendas do tráfego não eram registradas no HUB.</span>
+      </div>
+    </div>
+  );
+}
+
 export function Cascata({ linhas }: { linhas: [ReactNode, number, string, boolean][] }) {
   const max = Math.max(1, ...linhas.map(([, v]) => Math.abs(v)));
   // Cada barra começa onde a anterior terminou (as deduções descem a partir do

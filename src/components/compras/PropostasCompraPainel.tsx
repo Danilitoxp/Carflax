@@ -12,7 +12,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { apiComprasEnviarProposta, apiComprasDescartarProposta } from "@/lib/api";
+import {
+  apiComprasEnviarProposta, apiComprasDescartarProposta, apiComprasMoverItemProposta,
+  apiComprasProdutoFornecedores, type ProdutoFornecedor,
+} from "@/lib/api";
 
 export interface PropostaItem {
   cod: string;
@@ -128,6 +131,20 @@ export function PropostasCompraPainel({
     if (error) {
       setErro(error.message);
       carregar();
+    }
+  }
+
+  /** Compra o item de outro fornecedor do histórico: vai para a proposta dele. */
+  async function trocarFornecedor(p: Proposta, i: PropostaItem, f: ProdutoFornecedor) {
+    setErro(null);
+    setSucesso(null);
+    try {
+      await apiComprasMoverItemProposta(p.id, i.cod, f.cod_fornecedor, f.fornecedor, qtdDe(p, i));
+      setSucesso(`${i.cod} agora vai ser comprado de ${f.fornecedor}.`);
+      await carregar();
+      aoMudar?.();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao trocar o fornecedor");
     }
   }
 
@@ -352,6 +369,7 @@ export function PropostasCompraPainel({
                           <tr>
                             <th className={TH}>Código</th>
                             <th className={cn(TH, "text-left")}>Produto</th>
+                            <th className={cn(TH, "text-left")}>Comprar de</th>
                             <th className={TH}>Média/mês</th>
                             <th className={TH}>Saldo</th>
                             <th className={TH}>Pendente</th>
@@ -374,6 +392,14 @@ export function PropostasCompraPainel({
                                 {i.cod}
                               </td>
                               <td className="px-3 py-2 text-[11px] font-medium">{i.descricao}</td>
+                              <td className="px-3 py-2">
+                                <SeletorFornecedor
+                                  cod={i.cod}
+                                  atual={p.cod_fornecedor}
+                                  nomeAtual={p.fornecedor || p.cod_fornecedor}
+                                  aoEscolher={(f) => trocarFornecedor(p, i, f)}
+                                />
+                              </td>
                               <td className="px-3 py-2 text-center text-[11px] tabular-nums text-muted-foreground">
                                 {brNum(i.media, 1)}
                               </td>
@@ -441,6 +467,66 @@ export function PropostasCompraPainel({
 }
 
 const TH = "px-3 py-2 text-center text-[9px] font-black uppercase tracking-wider text-muted-foreground";
+
+/**
+ * Fornecedor do item, trocável pelo histórico de compras dele (último preço,
+ * quando foi e o prazo de entrega). O histórico só é buscado ao abrir a lista.
+ */
+function SeletorFornecedor({
+  cod, atual, nomeAtual, aoEscolher,
+}: {
+  cod: string;
+  atual: string;
+  nomeAtual: string;
+  aoEscolher: (f: ProdutoFornecedor) => void;
+}) {
+  const [opcoes, setOpcoes] = useState<ProdutoFornecedor[] | null>(null);
+  const [carregando, setCarregando] = useState(false);
+
+  async function carregar() {
+    if (opcoes || carregando) return;
+    setCarregando(true);
+    try {
+      const r = await apiComprasProdutoFornecedores(cod);
+      setOpcoes(r.fornecedores || []);
+    } catch {
+      setOpcoes([]);
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  const prazo = (f: ProdutoFornecedor) => {
+    const d = f.prazo_medio_item ?? f.prazo_medio_geral;
+    return d != null ? ` · ${Math.round(d)}d` : "";
+  };
+  const data = (s: string) => (s ? new Date(s).toLocaleDateString("pt-BR", { month: "2-digit", year: "2-digit" }) : "");
+
+  return (
+    <select
+      value={atual}
+      onFocus={carregar}
+      onMouseDown={carregar}
+      onChange={(e) => {
+        const f = opcoes?.find((o) => o.cod_fornecedor === e.target.value);
+        if (f) aoEscolher(f);
+      }}
+      title="Trocar o fornecedor deste item (pelo histórico de compras)"
+      className="w-full max-w-[240px] rounded-lg border border-border bg-background px-2 py-1 text-[10px] font-bold outline-none cursor-pointer focus:border-blue-500/60"
+    >
+      <option value={atual} className="bg-card text-foreground">{nomeAtual.slice(0, 32)}</option>
+      {carregando && <option disabled className="bg-card text-foreground">Carregando histórico…</option>}
+      {opcoes && !opcoes.some((o) => o.cod_fornecedor !== atual) && (
+        <option disabled className="bg-card text-foreground">Nenhum outro fornecedor no histórico</option>
+      )}
+      {(opcoes || []).filter((o) => o.cod_fornecedor !== atual).map((o) => (
+        <option key={o.cod_fornecedor} value={o.cod_fornecedor} className="bg-card text-foreground">
+          {`${o.fornecedor.slice(0, 26)} · ${brMoeda(o.ultimo_custo_final || o.ultimo_custo_unit)} em ${data(o.ultima_compra)}${prazo(o)}`}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 function Resumo({ titulo, valor }: { titulo: string; valor: string }) {
   return (

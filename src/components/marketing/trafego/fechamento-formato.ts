@@ -11,7 +11,7 @@ export const nomeMes = (mes: string) => {
   const t = new Date(a, m - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   return t.charAt(0).toUpperCase() + t.slice(1); // "Agosto de 2026", não "Agosto De 2026"
 };
-export const CANAL: Record<string, string> = { google: "Google Ads", meta: "Meta Ads", outro: "Anúncio (sem canal)", sem_origem: "Sem origem (número do tráfego)" };
+export const CANAL: Record<string, string> = { google: "Google Ads", meta: "Meta Ads", outro: "Anúncio", sem_origem: "WhatsApp" };
 
 /** Contra o que o mês é comparado: mês parcial = os mesmos dias do mês anterior. */
 export function rotuloComparacao(anterior: { mes: string; periodo: { inicio: string; fim: string; parcial: boolean } } | null) {

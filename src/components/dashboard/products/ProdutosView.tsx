@@ -17,7 +17,7 @@ import { SiShopify } from "react-icons/si";
 import { cn } from "@/lib/utils";
 import { TinyDropdown } from "@/components/ui/TinyDropdown";
 import { TinyLoader } from "@/components/ui/TinyLoader";
-import { apiDashboardProdutos, apiCaditeExportar, type ProductInfo } from "@/lib/api";
+import { apiDashboardProdutos, apiCaditeExportar, apiProdutosNegativosDesde, type ProductInfo } from "@/lib/api";
 import { anexarGuiaImportacao } from "@/lib/guia-importacao-produtos";
 import { ShopifyEnvioModal, type ItemEnvio } from "./ShopifyEnvioModal";
 import { EtiquetaPrecoModal } from "./EtiquetaPrecoModal";
@@ -221,6 +221,24 @@ export function ProdutosView() {
   // Ícone da linha imprime 1 etiqueta direto, sem abrir a janela de lote.
   const [imprimindoCod, setImprimindoCod] = useState<string | null>(null);
   const { showNotification } = useNotification();
+  // Negativos: desde quando (kardex) e filtro "negativos antes de".
+  const [negDesde, setNegDesde] = useState<Record<string, { desde: string | null; antesDe?: string | null }> | null>(null);
+  const [negAntesDe, setNegAntesDe] = useState("");
+  useEffect(() => {
+    if (filterStock !== "NEGATIVOS" || negDesde) return;
+    let vivo = true;
+    apiProdutosNegativosDesde().then(
+      (r) => vivo && setNegDesde(r.itens),
+      () => vivo && showNotification("error", "Negativo desde", "Não foi possível consultar o kardex no ERP."),
+    );
+    return () => { vivo = false; };
+  }, [filterStock, negDesde, showNotification]);
+  const dataBR = (d?: string | null) => (d ? d.split("-").reverse().join("/") : "");
+  const textoNegDesde = (cod: string) => {
+    const n = negDesde?.[cod];
+    if (!n) return negDesde ? "—" : "…";
+    return n.desde ? dataBR(n.desde) : n.antesDe ? `antes de ${dataBR(n.antesDe)}` : "sem movimento";
+  };
 
   const imprimirEtiqueta = async (p: Product) => {
     if (imprimindoCod) return;
@@ -393,7 +411,12 @@ export function ProdutosView() {
       const matchesStock = filterStock === "TODOS" ||
         (filterStock === "COM ESTOQUE" && p.stock > 0) ||
         (filterStock === "SEM ESTOQUE" && p.stock <= 0) ||
-        (filterStock === "NEGATIVOS" && p.stock <= -1);
+        (filterStock === "NEGATIVOS" && p.stock <= -1 && (() => {
+          if (!negAntesDe || !negDesde) return true;
+          const n = negDesde[p.cod];
+          // Sem data = negativo em todo o histórico consultado: entra em qualquer corte.
+          return !!n && (!n.desde || n.desde < negAntesDe);
+        })());
 
       const status = syncPorCod.get(p.cod)?.status;
       const matchesShopify =
@@ -435,7 +458,7 @@ export function ProdutosView() {
     }
 
     return filtered;
-  }, [products, searchTerm, filterBrand, filterStock, filterShopify, colunasTela, syncPorCod, sortConfig, filterCurva, curvaPorCod]);
+  }, [products, searchTerm, filterBrand, filterStock, filterShopify, colunasTela, syncPorCod, sortConfig, filterCurva, curvaPorCod, negAntesDe, negDesde]);
 
   const visibleProducts = filteredProducts.slice(0, visibleCount);
 
@@ -566,7 +589,13 @@ export function ProdutosView() {
     const campo = k.slice(7);
     return { key: k, label: campo, wch: 16, align: "left", valor: (p) => valorCadite(caditeDados.get(p.cod)?.[campo]) };
   };
-  const colunasVisiveis = colunasTela.map(colunaDe).filter((c): c is ColunaTabela => !!c);
+  const colunaNegDesde: ColunaTabela = {
+    key: "negDesde", label: "Negativo desde", wch: 16, align: "center", valor: (p) => textoNegDesde(p.cod),
+    render: (p) => <span className="text-[10px] font-bold text-rose-500 tabular-nums">{textoNegDesde(p.cod)}</span>,
+  };
+  // No filtro Negativos a coluna entra sozinha, logo depois do estoque (e vai para a planilha).
+  const colunasVisiveis = colunasTela.map(colunaDe).filter((c): c is ColunaTabela => !!c)
+    .flatMap((c) => (filterStock === "NEGATIVOS" && c.key === "stock" ? [c, colunaNegDesde] : [c]));
   // Tirou a coluna Shopify da tela: o filtro e o resumo do vínculo com a loja somem junto.
   const mostrarShopify = colunasTela.includes("shopify");
 
@@ -694,6 +723,21 @@ export function ProdutosView() {
               </button>
             ))}
           </div>
+
+          {filterStock === "NEGATIVOS" && (
+            <label
+              title="Mostra só os itens que já estavam negativos antes desta data (pelo kardex do ERP)"
+              className="flex items-center gap-2 bg-card rounded-xl border border-border px-3 py-1.5 shadow-sm text-[9px] font-black uppercase tracking-widest text-muted-foreground"
+            >
+              Negativos antes de
+              <input
+                type="date"
+                value={negAntesDe}
+                onChange={(e) => { setNegAntesDe(e.target.value); setVisibleCount(50); }}
+                className="bg-transparent text-[11px] font-bold text-foreground normal-case tracking-normal outline-none"
+              />
+            </label>
+          )}
 
           <TinyDropdown
             value={filterCurva}

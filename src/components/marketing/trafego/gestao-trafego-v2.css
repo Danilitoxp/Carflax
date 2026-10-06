@@ -27,7 +27,7 @@
 .gt2-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .gt2-card-head h3, .gt2-teto h3 { margin: 0; font: 700 16px var(--body); }
 
-.gt2-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.gt2-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
 .gt2-kpi { display: flex; gap: 16px; align-items: flex-start; padding: 18px 20px; }
 .gt2-kpi .ico { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; background: var(--azul-soft); color: var(--azul); flex: none; }
 .gt2-kpi p { margin: 2px 0 6px; font-size: 13px; color: var(--ink-2); }
