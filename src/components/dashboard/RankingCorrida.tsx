@@ -105,17 +105,20 @@ export function CarroF1({
       {/* pneus traseiros */}
       <rect x="26" y="2" width="34" height="18" rx="6" fill="#111" />
       <rect x="26" y="60" width="34" height="18" rx="6" fill="#111" />
-      <rect x="30" y="6" width="26" height="3" rx="1.5" fill="#facc15" opacity="0.8" />
-      <rect x="30" y="71" width="26" height="3" rx="1.5" fill="#facc15" opacity="0.8" />
       {/* pneus dianteiros */}
       <rect x="150" y="4" width="30" height="16" rx="6" fill="#111" />
       <rect x="150" y="60" width="30" height="16" rx="6" fill="#111" />
-      {/* rodas douradas: aro aparecendo no pneu */}
+      {/* rodas douradas: vistas de cima, o pneu inteiro ganha aro dourado com
+          brilho — sem a peça o pneu é todo preto, então a diferença é óbvia. */}
       {tem("rodas") &&
-        [[43, 11], [43, 69], [165, 12], [165, 68]].map(([x, y]) => (
+        [[26, 2, 34, 18], [26, 60, 34, 18], [150, 4, 30, 16], [150, 60, 30, 16]].map(([x, y, w, h]) => (
           <g key={`${x}-${y}`}>
-            <rect x={x - 11} y={y - 5} width="22" height="10" rx="4" fill="#fcd34d" stroke="#a16207" strokeWidth="1.5" />
-            <line x1={x} y1={y - 5} x2={x} y2={y + 5} stroke="#a16207" strokeWidth="1.5" />
+            <rect x={x} y={y} width={w} height={h} rx="6" fill="#fcd34d" stroke="#a16207" strokeWidth="2" />
+            <rect x={x + 3} y={y + 3} width={w - 6} height={h - 6} rx="4" fill="#111" />
+            <rect x={x + w / 2 - 5} y={y + h / 2 - 2.5} width="10" height="5" rx="2" fill="#fcd34d" />
+            <rect x={x + 4} y={y + 1} width={w - 8} height="1.5" rx="0.75" fill="#fff" opacity="0.7">
+              <animate attributeName="opacity" values="0.2;0.9;0.2" dur="1.6s" repeatCount="indefinite" />
+            </rect>
           </g>
         ))}
       {/* braços da suspensão */}
