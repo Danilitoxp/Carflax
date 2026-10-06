@@ -6,6 +6,10 @@ export interface RankingSeller {
   percentual: number;
   variacao: number | null;
   avatar?: string;
+  vendidoMes?: number;
+  metaMes?: number;
+  metaMesAnterior?: number;
+  faturadoMesAnterior?: number;
 }
 
 export type CelebrationKind = "goal" | "leader" | "double" | "team";

@@ -161,6 +161,12 @@ export interface RankingDiaRow {
   VENDIDO_HOJE: number | string;
   /** Meta do mês menos (faturado + em aberto). A meta DIÁRIA sai daqui, no front. */
   FALTANTE: number | string;
+  /** Faturado + em aberto no mês — acumulado que destrava as peças da garagem. */
+  VENDIDO_MES?: number | string;
+  META_MES?: number | string;
+  /** Mês passado fechado: base dos créditos da garagem. */
+  META_MES_ANTERIOR?: number | string;
+  FATURADO_MES_ANTERIOR?: number | string;
   /** 1 = meta do mês ainda não cadastrada; usando a do mês anterior. */
   META_PROVISORIA?: number | string;
 }

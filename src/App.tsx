@@ -1563,7 +1563,7 @@ function DashboardContent({
           ) : activeItem === "DB Admin" ? (
             <SqlRunnerView />
           ) : activeItem === "Ranking" ? (
-            <RankingView />
+            <RankingView meuCodigo={userProfile?.operator_code || userProfile?.operatorCode} />
           ) : activeItem === "Geral" ? (
             <GeralView
               userProfile={userProfile || undefined}

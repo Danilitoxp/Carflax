@@ -4,6 +4,7 @@ import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RankingSeller } from "./ranking-events";
 import { tocarAceleracao } from "./som-motor";
+import { coresDoCarro, ordenarFaixas, type Garagem, type PecaId } from "./garagem";
 
 /**
  * Modo corrida do Ranking do dia — "Grande Prêmio Carflax".
@@ -22,21 +23,47 @@ const COLUNA_PILOTO = 220;
 const DEPOIS_CHEGADA = 290;
 const LARGURA_CARRO = 132;
 
-const CORES: [string, string][] = [
-  ["#ef4444", "#7f1d1d"], ["#3b82f6", "#1e3a8a"], ["#f59e0b", "#78350f"], ["#10b981", "#064e3b"],
-  ["#a855f7", "#4c1d95"], ["#ec4899", "#831843"], ["#06b6d4", "#164e63"], ["#f97316", "#7c2d12"],
-  ["#84cc16", "#365314"], ["#eab308", "#713f12"], ["#6366f1", "#312e81"], ["#14b8a6", "#134e4a"],
-];
-
 const MEDALHA = ["from-amber-300 to-amber-500 text-amber-950", "from-slate-200 to-slate-400 text-slate-900", "from-orange-300 to-orange-600 text-orange-950"];
 
 /** Fração da pista percorrida: 100% da meta diária = na linha de chegada. */
 const posicao = (pct: number) => Math.max(0, Math.min(pct, 100)) / 100;
 
-function CarroF1({ cor, escura, numero, avatar, iniciais }: { cor: string; escura: string; numero: number; avatar?: string; iniciais: string }) {
+/** O carro da pista — o mesmo que a garagem mostra, com as peças compradas. */
+export function CarroF1({
+  cor,
+  escura,
+  numero,
+  avatar,
+  iniciais,
+  pecas,
+}: {
+  cor: string;
+  escura: string;
+  numero: number;
+  avatar?: string;
+  iniciais: string;
+  pecas?: Set<PecaId>;
+}) {
   const id = useId().replace(/:/g, "");
+  const tem = (p: PecaId) => !!pecas?.has(p);
   return (
-    <svg viewBox="0 0 220 80" className="w-full h-full" aria-hidden="true">
+    <svg viewBox="0 0 220 80" className="w-full h-full overflow-visible" aria-hidden="true">
+      {/* neon: brilho ciano no asfalto, pulsando */}
+      {tem("neon") && (
+        <ellipse cx="112" cy="40" rx="112" ry="38" fill="#22d3ee" opacity="0.45" style={{ filter: "blur(8px)" }}>
+          <animate attributeName="opacity" values="0.35;0.75;0.35" dur="1.2s" repeatCount="indefinite" />
+          <animate attributeName="fill" values="#22d3ee;#a855f7;#ec4899;#22d3ee" dur="4s" repeatCount="indefinite" />
+        </ellipse>
+      )}
+      {/* turbo: chamas saindo da traseira */}
+      {tem("turbo") && (
+        <g>
+          <path d="M4 30 L-30 40 L4 50 Z" fill="#f97316">
+            <animate attributeName="d" values="M4 30 L-30 40 L4 50 Z;M4 31 L-44 40 L4 49 Z;M4 30 L-30 40 L4 50 Z" dur="0.25s" repeatCount="indefinite" />
+          </path>
+          <path d="M4 34 L-18 40 L4 46 Z" fill="#fde047" />
+        </g>
+      )}
       <defs>
         <linearGradient id={`c${id}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={cor} />
@@ -50,8 +77,21 @@ function CarroF1({ cor, escura, numero, avatar, iniciais }: { cor: string; escur
       {/* sombra no asfalto */}
       <ellipse cx="112" cy="44" rx="104" ry="30" fill="#000" opacity="0.35" />
       {/* aerofólio traseiro */}
-      <rect x="4" y="8" width="16" height="64" rx="3" fill="#0f172a" />
-      <rect x="6" y="10" width="12" height="60" rx="2" fill={escura} />
+      {tem("aerofolio") ? (
+        <>
+          {/* aerofólio de corrida: mais largo, dois planos e ponteiras douradas */}
+          <rect x="0" y="0" width="22" height="80" rx="3" fill="#0f172a" />
+          <rect x="3" y="3" width="7" height="74" rx="2" fill={escura} />
+          <rect x="12" y="3" width="7" height="74" rx="2" fill={cor} />
+          <rect x="0" y="0" width="22" height="5" rx="2" fill="#fbbf24" />
+          <rect x="0" y="75" width="22" height="5" rx="2" fill="#fbbf24" />
+        </>
+      ) : (
+        <>
+          <rect x="4" y="8" width="16" height="64" rx="3" fill="#0f172a" />
+          <rect x="6" y="10" width="12" height="60" rx="2" fill={escura} />
+        </>
+      )}
       {/* pneus traseiros */}
       <rect x="26" y="2" width="34" height="18" rx="6" fill="#111" />
       <rect x="26" y="60" width="34" height="18" rx="6" fill="#111" />
@@ -60,6 +100,14 @@ function CarroF1({ cor, escura, numero, avatar, iniciais }: { cor: string; escur
       {/* pneus dianteiros */}
       <rect x="150" y="4" width="30" height="16" rx="6" fill="#111" />
       <rect x="150" y="60" width="30" height="16" rx="6" fill="#111" />
+      {/* rodas douradas: aro aparecendo no pneu */}
+      {tem("rodas") &&
+        [[43, 11], [43, 69], [165, 12], [165, 68]].map(([x, y]) => (
+          <g key={`${x}-${y}`}>
+            <rect x={x - 11} y={y - 5} width="22" height="10" rx="4" fill="#fcd34d" stroke="#a16207" strokeWidth="1.5" />
+            <line x1={x} y1={y - 5} x2={x} y2={y + 5} stroke="#a16207" strokeWidth="1.5" />
+          </g>
+        ))}
       {/* braços da suspensão */}
       <path d="M60 20 L80 30 M60 60 L80 50 M150 18 L135 32 M150 62 L135 48" stroke="#334155" strokeWidth="3" />
       {/* carroceria */}
@@ -87,12 +135,52 @@ function CarroF1({ cor, escura, numero, avatar, iniciais }: { cor: string; escur
           <text x="112" y="44" textAnchor="middle" fontSize="11" fontWeight="900" fontFamily="Arial, sans-serif" fill="#fff">{iniciais}</text>
         </>
       )}
-      <circle cx="112" cy="40" r="13" fill="none" stroke="#fff" strokeWidth="2" />
+      <circle cx="112" cy="40" r="13" fill="none" stroke={tem("ouro") ? "#fcd34d" : "#fff"} strokeWidth="2" />
+      {/* aerofólio: faixa de LED vermelha pulsando */}
+      {tem("aerofolio") && (
+        <rect x="19" y="4" width="3" height="72" rx="1.5" fill="#ff1744" style={{ filter: "drop-shadow(0 0 4px #ff1744)" }}>
+          <animate attributeName="opacity" values="1;0.35;1" dur="0.8s" repeatCount="indefinite" />
+        </rect>
+      )}
+      {/* kit ouro: reflexo passando pela lataria + brilhos */}
+      {tem("ouro") && (
+        <>
+          <path d="M18 30 L60 24 L96 20 L150 26 L190 34 L206 37 L206 43 L190 46 L150 54 L96 60 L60 56 L18 50 Z" fill="none" stroke="#fef3c7" strokeWidth="1.5" opacity="0.8" />
+          <rect x="-40" y="0" width="22" height="80" fill="#fff" opacity="0.35" transform="skewX(-20)" style={{ mixBlendMode: "overlay" }}>
+            <animate attributeName="x" values="-40;240" dur="2.2s" repeatCount="indefinite" />
+          </rect>
+          {[[70, 14, 0], [140, 66, 0.5], [190, 22, 1], [36, 44, 1.5]].map(([x, y, d]) => (
+            <path key={`${x}`} d={`M${x} ${y - 6} L${x + 1.5} ${y - 1.5} L${x + 6} ${y} L${x + 1.5} ${y + 1.5} L${x} ${y + 6} L${x - 1.5} ${y + 1.5} L${x - 6} ${y} L${x - 1.5} ${y - 1.5} Z`} fill="#fffbeb">
+              <animate attributeName="opacity" values="0;1;0" dur="2s" begin={`${d}s`} repeatCount="indefinite" />
+            </path>
+          ))}
+        </>
+      )}
     </svg>
   );
 }
 
-export function RankingCorrida({ linhas }: { linhas: RankingSeller[] }) {
+export function RankingCorrida({
+  linhas,
+  meuCodigo,
+  onAbrirGaragem,
+  garagens,
+}: {
+  linhas: RankingSeller[];
+  meuCodigo?: string;
+  onAbrirGaragem?: (cod: string) => void;
+  garagens?: Map<string, Garagem>;
+}) {
+  // Match exato (sem tirar zeros): vendedor "050" e motorista "00050" colidem.
+  // Mesma regra do avatar-by-code: exato primeiro; sem zeros só se não for ambíguo.
+  const cod = String(meuCodigo || "").trim();
+  const semZeros = (s: string) => s.trim().replace(/^0+/, "") || s.trim();
+  const porNorma = linhas.filter((l) => cod && semZeros(l.cod) === semZeros(cod));
+  const meu = linhas.some((l) => l.cod.trim() === cod)
+    ? cod
+    : porNorma.length === 1
+      ? porNorma[0].cod.trim()
+      : "";
   // Ronco de motor quando algum carro avança desde a última atualização.
   // A primeira carga não toca (seria todo mundo "andando" de uma vez).
   const anteriorRef = useRef<Map<string, number> | null>(null);
@@ -112,7 +200,7 @@ export function RankingCorrida({ linhas }: { linhas: RankingSeller[] }) {
 
   // Faixas em ordem fixa (por nome): o carro não troca de faixa quando a
   // classificação muda — quem ultrapassa, ultrapassa na pista.
-  const faixas = [...linhas].sort((a, b) => a.nome.localeCompare(b.nome));
+  const faixas = ordenarFaixas(linhas);
   const classificacao = [...linhas].sort((a, b) => b.percentual - a.percentual).map((l) => l.cod);
 
   return (
@@ -144,7 +232,8 @@ export function RankingCorrida({ linhas }: { linhas: RankingSeller[] }) {
           const lugar = classificacao.indexOf(l.cod) + 1;
           const chegou = l.percentual >= 100;
           const andando = l.percentual > 0 && !chegou;
-          const [cor, escura] = CORES[i % CORES.length];
+          const garagem = garagens?.get(l.cod.trim());
+          const [cor, escura] = coresDoCarro(i, garagem);
           return (
             <div key={l.cod} className="relative flex-1 min-h-[34px] flex items-center">
               {/* separador tracejado entre faixas */}
@@ -201,12 +290,25 @@ export function RankingCorrida({ linhas }: { linhas: RankingSeller[] }) {
                       ))}
                     </div>
                   )}
-                  <div
-                    className={cn("relative shrink-0", chegou && "drop-shadow-[0_0_18px_rgba(251,191,36,0.9)]")}
-                    style={{ width: LARGURA_CARRO, height: LARGURA_CARRO * (80 / 220) }}
-                  >
-                    <CarroF1 cor={cor} escura={escura} numero={i + 1} avatar={l.avatar} iniciais={l.nome.slice(0, 2).toUpperCase()} />
-                  </div>
+                  {(() => {
+                    const carro = <CarroF1 cor={cor} escura={escura} numero={i + 1} avatar={l.avatar} iniciais={l.nome.slice(0, 2).toUpperCase()} pecas={garagem?.pecas} />;
+                    const classe = cn("relative shrink-0", chegou && "drop-shadow-[0_0_18px_rgba(251,191,36,0.9)]");
+                    const tamanho = { width: LARGURA_CARRO, height: LARGURA_CARRO * (80 / 220) };
+                    const ehMeu = !!meu && l.cod.trim() === meu && !!onAbrirGaragem;
+                    if (!ehMeu) return <div className={classe} style={tamanho}>{carro}</div>;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => onAbrirGaragem(l.cod)}
+                        aria-label="Abrir minha garagem"
+                        title="Abrir minha garagem"
+                        className={cn(classe, "cursor-pointer rounded-lg transition-transform hover:scale-110 drop-shadow-[0_0_10px_rgba(251,191,36,0.7)]")}
+                        style={tamanho}
+                      >
+                        {carro}
+                      </button>
+                    );
+                  })()}
                   <span
                     className={cn(
                       "px-2 py-0.5 rounded-md text-sm font-black tabular-nums",

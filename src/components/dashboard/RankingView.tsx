@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Crown, TrendingUp, TrendingDown, Minus, Flame, Volume2, ArrowUp, ArrowDown } from "lucide-react";
+import { Crown, TrendingUp, TrendingDown, Minus, Flame, Volume2, ArrowUp, ArrowDown, CarFront } from "lucide-react";
+import { GaragemModal } from "./GaragemModal";
+import { ordenarFaixas, useGaragens } from "./garagem";
+
+const semZeros = (s: string) => s.trim().replace(/^0+/, "") || s.trim();
 import { motion, AnimatePresence } from "framer-motion";
 import "./ranking-animations.css";
 import { BeamsBackground } from "@/components/ui/beams-background";
@@ -95,7 +99,36 @@ function MovementBadge({ change }: { change?: number }) {
   </AnimatePresence>;
 }
 
-export function RankingView() {
+/** Carrinho ao lado do nome de quem tem meta no mês: abre a garagem 3D. */
+function BotaoGaragem({ l, onAbrir }: { l: Linha; onAbrir: (cod: string) => void }) {
+  if (!l.metaMes || l.metaMes <= 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => onAbrir(l.cod)}
+      aria-label={`Abrir garagem de ${l.nome}`}
+      title="Garagem"
+      className="relative inline-flex shrink-0 items-center justify-center rounded-md bg-white/10 p-1 text-amber-300 hover:bg-amber-400/25"
+    >
+      <CarFront aria-hidden="true" className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+/** `meuCodigo`: código de operador de quem está logado — no modo corrida, o próprio carro abre a garagem. */
+export function RankingView({ meuCodigo }: { meuCodigo?: string } = {}) {
+  const [garagemCod, setGaragemCod] = useState<string | null>(null);
+  const garagens = useGaragens();
+  // Na rota /ranking-dia ninguém passa o usuário: busca pela sessão do Supabase.
+  const [codSessao, setCodSessao] = useState<string | undefined>();
+  useEffect(() => {
+    if (meuCodigo) return;
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: u } = await supabase.from("usuarios").select("operator_code").eq("id", data.user.id).maybeSingle();
+      if (u?.operator_code) setCodSessao(String(u.operator_code));
+    });
+  }, [meuCodigo]);
   const [linhasRecebidas, setLinhas] = useState<Linha[]>([]);
   // Meta do dia da LOJA = soma das metas diárias; vendido = soma das vendas de
   // hoje. Conta todos os vendedores, não só os 10 que aparecem na tela.
@@ -126,6 +159,7 @@ export function RankingView() {
   const movements = useRankingMovement(linhas.map((row) => row.cod), !!active);
   const trackerRef = useRef(createRankingEventTracker());
   const dayRef = useRef("");
+  const pontuadosRef = useRef<Set<string>>(new Set());
   const loadingRef = useRef(false);
   const mountedRef = useRef(false);
 
@@ -181,6 +215,10 @@ export function RankingView() {
             percentual,
             variacao: base === undefined ? null : percentual - base,
             avatar: resolverRef.current?.(cod),
+            vendidoMes: num(r.VENDIDO_MES),
+            metaMes: num(r.META_MES),
+            metaMesAnterior: num(r.META_MES_ANTERIOR),
+            faturadoMesAnterior: num(r.FATURADO_MES_ANTERIOR),
           } as Linha;
         })
         .filter((l) => !ativosRef.current || ativosRef.current.has(l.cod.trim()))
@@ -192,6 +230,24 @@ export function RankingView() {
         dayRef.current = day;
         clear();
         rankingExibidoRef.current = [];
+      }
+      // Garagem: bateu a meta diária = 1 ponto. PK (vendedor, dia) garante um
+      // ponto por dia mesmo com vários telões abertos; o ref evita reenviar.
+      const novos = lista.filter(
+        (l) => l.metaDiaria > 0 && l.percentual >= 100 && !pontuadosRef.current.has(`${day}|${l.cod}`),
+      );
+      if (novos.length) {
+        novos.forEach((l) => pontuadosRef.current.add(`${day}|${l.cod}`));
+        supabase
+          .from("garagem_creditos")
+          .upsert(
+            novos.map((l) => ({ vendedor_cod: l.cod.trim(), mes_ref: day, creditos: 1, percentual: Math.round(l.percentual * 100) / 100 })),
+            { onConflict: "vendedor_cod,mes_ref", ignoreDuplicates: true },
+          )
+          .then(({ error }) => {
+            // Falhou: tenta de novo no próximo ciclo.
+            if (error) novos.forEach((l) => pontuadosRef.current.delete(`${day}|${l.cod}`));
+          });
       }
       const events = trackerRef.current(lista, day, Date.now() + RANKING_COUNT_DURATION_MS + 500);
       ultrapassagemTocouRef.current = events.some((event) => event.kind === "leader");
@@ -233,6 +289,8 @@ export function RankingView() {
     };
   }, [carregar]);
 
+  // Busca em `todas` a cada render: o modal acompanha a venda ao vivo.
+  const garagemSel = garagemCod ? todas.find((l) => l.cod === garagemCod) : undefined;
   const podio = linhas.slice(0, 3);
   const resto = linhas.slice(3);
   // Ordem visual: 2º à esquerda, 1º ao centro (maior), 3º à direita.
@@ -305,7 +363,7 @@ export function RankingView() {
             </div>
           );
         })()}
-        {modoCorrida ? <RankingCorrida linhas={todas} /> : (
+        {modoCorrida ? <RankingCorrida linhas={todas} meuCodigo={meuCodigo || codSessao} onAbrirGaragem={setGaragemCod} garagens={garagens} /> : (
         <div className="flex-1 min-h-0 flex flex-col gap-5">
             {/* Pódio */}
             <div className="grid grid-cols-3 gap-4 shrink-0 items-end">
@@ -364,11 +422,12 @@ export function RankingView() {
 
                     <p
                       className={cn(
-                        "font-black uppercase leading-tight mt-3",
+                        "flex items-center justify-center gap-1.5 font-black uppercase leading-tight mt-3",
                         primeiro ? "text-base" : "text-[11px]",
                       )}
                     >
                       {l.nome}
+                      <BotaoGaragem l={l} onAbrir={setGaragemCod} />
                     </p>
                     <p
                       className={cn(
@@ -440,6 +499,7 @@ export function RankingView() {
                           </div>
                         )}
                         <span className="text-[11px] font-black uppercase truncate">{l.nome}</span>
+                        <BotaoGaragem l={l} onAbrir={setGaragemCod} />
                         {bateu && <Flame aria-label={l.percentual >= 200 ? "200% da meta" : "Meta batida"} className={cn("w-3 h-3 text-amber-400 shrink-0", l.percentual >= 200 && "ranking-crown")} />}
                       </div>
                       <div className="h-2 rounded-full bg-white/10 overflow-hidden">
@@ -474,6 +534,26 @@ export function RankingView() {
 
       <AnimatePresence>
         {active && <RankingCelebration key={active.id} event={active} onClose={close} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {garagemSel && (
+          <GaragemModal
+            key={garagemSel.cod}
+            vendedor={garagemSel}
+            faixa={ordenarFaixas(todas).findIndex((l) => l.cod === garagemSel.cod)}
+            garagem={garagens.get(garagemSel.cod.trim())}
+            podeComprar={(() => {
+              // Mesma regra do avatar-by-code: exato; sem zeros só se não for ambíguo.
+              const meu = String(meuCodigo || codSessao || "").trim();
+              if (!meu) return false;
+              if (garagemSel.cod.trim() === meu) return true;
+              if (todas.some((l) => l.cod.trim() === meu)) return false;
+              const bate = todas.filter((l) => semZeros(l.cod) === semZeros(meu));
+              return bate.length === 1 && bate[0].cod === garagemSel.cod;
+            })()}
+            onClose={() => setGaragemCod(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
