@@ -157,7 +157,15 @@ const CAMPOS_CADITE_NOMEADOS: Record<string, { campo: string; label: string; for
 };
 
 // Colunas com código + descrição: a chave da coluna → o campo de código na CADITE.
-const CAMPOS_COM_DESCRICAO: Record<string, string> = { classFiscal: "ITE_CODABF", cest: "ITE_CDCEST" };
+const CAMPOS_COM_DESCRICAO: Record<string, string> = {
+  classFiscal: "ITE_CODABF",
+  cest: "ITE_CDCEST",
+  // Grupo/subgrupo: o backend devolve as descrições a partir de ITE_CODGRU.
+  grupo: "ITE_CODGRU",
+  subgrupo: "ITE_CODGRU",
+  // Não é campo da CADITE: o backend calcula a partir da ITEGER.
+  ultimoCusto: "ULTIMO_CUSTO",
+};
 
 const COLUNAS_PADRAO = ["cod", "desc", "brand", "codFornecedor", "stock", "media", "debit", "shopify", "etiqueta"];
 
@@ -474,7 +482,7 @@ export function ProdutosView() {
   // Busca na CADITE só os campos marcados, para todos os produtos carregados.
   const camposCadite = colunasTela
     .map((k) => (k.startsWith("cadite:") ? k.slice(7) : CAMPOS_COM_DESCRICAO[k] ?? CAMPOS_CADITE_NOMEADOS[k]?.campo))
-    .filter(Boolean)
+    .filter((c, i, todos): c is string => !!c && todos.indexOf(c) === i)
     .join(",");
   useEffect(() => {
     if (!camposCadite || products.length === 0) return;
@@ -547,6 +555,16 @@ export function ProdutosView() {
     { key: "sales", label: "Total vendido", wch: 14, align: "right", sort: "sales", num: "#,##0.##", valor: (p) => p.sales },
     { key: "debit", label: "Débito", wch: 14, align: "right", sort: "debit", num: '"R$" #,##0.00', valor: (p) => p.debit,
       render: (p) => <span className="text-[11px] font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">R$ {fmtNum(p.debit)}</span> },
+    { key: "ultimoCusto", label: "Último custo", wch: 14, align: "right", num: '"R$" #,##0.00',
+      valor: (p) => Number(caditeDados.get(p.cod)?.ULTIMO_CUSTO) || 0,
+      render: (p) => {
+        const v = Number(caditeDados.get(p.cod)?.ULTIMO_CUSTO) || 0;
+        return <span className="text-[11px] font-black text-amber-600 dark:text-amber-400 tracking-tighter">{v ? `R$ ${fmtNum(v)}` : "—"}</span>;
+      } },
+    { key: "grupo", label: "Grupo", wch: 24, align: "left", valor: (p) => valorCadite(caditeDados.get(p.cod)?.GRUPO_DESC),
+      render: (p) => <span className="text-[10px] font-bold text-muted-foreground uppercase">{valorCadite(caditeDados.get(p.cod)?.GRUPO_DESC) || "—"}</span> },
+    { key: "subgrupo", label: "Sub-grupo", wch: 24, align: "left", valor: (p) => valorCadite(caditeDados.get(p.cod)?.SUBGRUPO_DESC),
+      render: (p) => <span className="text-[10px] font-bold text-muted-foreground uppercase">{valorCadite(caditeDados.get(p.cod)?.SUBGRUPO_DESC) || "—"}</span> },
     { key: "credit", label: "Crédito", wch: 14, align: "right", sort: "credit", num: '"R$" #,##0.00', valor: (p) => p.credit,
       render: (p) => <span className="text-[11px] font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">R$ {fmtNum(p.credit)}</span> },
     ...Object.entries(CAMPOS_CADITE_NOMEADOS).map(([key, { campo, label, formato }]): ColunaTabela => ({

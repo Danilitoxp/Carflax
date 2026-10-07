@@ -60,7 +60,7 @@ export function texturaBrilho() {
 
 type Animacao = (t: number) => void;
 
-export function montarF1(v: Visual, texturaCarregada?: () => void) {
+export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garagem" | "pista" = "garagem") {
   const ativas = pecasDoCarro({ pecas: v.pecas });
   const carro = new THREE.Group();
   const anim: Animacao[] = [];
@@ -95,7 +95,7 @@ export function montarF1(v: Visual, texturaCarregada?: () => void) {
   const forma = new THREE.Shape();
   pts.forEach(([x, y], i) => (i ? forma.lineTo(X(x), Z(y) * (perfilCorpo?.largura ?? 1) * (x > 150 ? perfilCorpo?.bico ?? 1 : 1)) : forma.moveTo(X(x), Z(y) * (perfilCorpo?.largura ?? 1))));
   const corpo = sombra(new THREE.Mesh(
-    new THREE.ExtrudeGeometry(forma, { depth: 0.28, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.04, bevelSegments: 2, steps: 1 }),
+    new THREE.ExtrudeGeometry(forma, { depth: modo === "pista" ? 0.2 : 0.28, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.04, bevelSegments: 2, steps: 1 }),
     lataria,
   ));
   corpo.rotation.x = Math.PI / 2;
@@ -164,7 +164,8 @@ export function montarF1(v: Visual, texturaCarregada?: () => void) {
       faixaPneu.position.z = faceZ;
       roda.add(faixaPneu);
     }
-    roda.position.set(X(x), r, Z(y));
+    if (modo === "pista") roda.scale.setScalar(1.2);
+    roda.position.set(X(x), modo === "pista" ? r * 1.2 : r, Z(y) * (modo === "pista" ? 1.22 : 1));
     carro.add(roda);
     // Braços da suspensão
     const braco = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, Math.abs(Z(y)) - 0.3), carbono);
@@ -486,6 +487,38 @@ export function montarF1(v: Visual, texturaCarregada?: () => void) {
       ponta.position.set(x, 1.37, 0);
       carro.add(ponta);
     }
+  }
+
+  if (modo === "pista") {
+    // Cobertura esculpida e tomada de ar dão a silhueta de um monoposto.
+    const coberturaForma = new THREE.Shape();
+    coberturaForma.moveTo(-1.75, 0.62); coberturaForma.quadraticCurveTo(-1.05, 0.85, -0.4, 1.22);
+    coberturaForma.lineTo(-0.26, 1.22); coberturaForma.lineTo(-0.08, 0.66); coberturaForma.closePath();
+    const coberturaPista = new THREE.Mesh(new THREE.ExtrudeGeometry(coberturaForma, { depth: 0.28, steps: 1, bevelEnabled: true, bevelThickness: 0.045, bevelSize: 0.03, bevelSegments: 2, curveSegments: 8 }), lataria);
+    coberturaPista.position.z = -0.14;
+    carro.add(coberturaPista);
+    caixa(-0.25, 1.13, 0, 0.09, 0.13, 0.18, carbono);
+    for (const lado of [-1, 1]) {
+      const pod = new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 10), lataria);
+      pod.scale.set(1.25, 0.26, 0.4 * (perfilCorpo?.largura ?? 1));
+      pod.position.set(-0.56, 0.52, lado * 0.39 * (perfilCorpo?.largura ?? 1));
+      carro.add(pod);
+    }
+    const texto = document.createElement("canvas"); texto.width = 256; texto.height = 96;
+    const ctx = texto.getContext("2d")!;
+    ctx.fillStyle = "#fff"; ctx.font = "italic 900 64px Arial"; ctx.fillText(String(v.numero).padStart(2, "0"), 8, 70);
+    ctx.font = "900 19px Arial"; ctx.fillText("CARFLAX", 116, 42);
+    ctx.font = "12px Arial"; ctx.fillText("RACING", 117, 62);
+    const mapa = new THREE.CanvasTexture(texto); mapa.colorSpace = THREE.SRGBColorSpace;
+    const adesivo = new THREE.MeshBasicMaterial({ map: mapa, transparent: true, depthWrite: false });
+    for (const lado of [-1, 1]) {
+      const decal = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.35), adesivo);
+      decal.position.set(-0.55, 0.55, lado * 0.59 * (perfilCorpo?.largura ?? 1));
+      if (lado < 0) decal.rotation.y = Math.PI;
+      carro.add(decal);
+    }
+    // Lâminas da asa dianteira sem novos efeitos ou luzes dinâmicas.
+    for (const x of [2.28, 2.38, 2.48]) caixa(x, 0.15, 0, 0.035, 0.025, 1.35, carbono);
   }
 
   // Une as peças estáticas por material: menos chamadas de desenho à GPU.

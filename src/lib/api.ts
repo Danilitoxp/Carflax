@@ -760,6 +760,8 @@ export const apiCaditeExportar = (codigos: string[], colunas: string[]) =>
     colunas,
     descClassFiscal: colunas.includes("ITE_CODABF"),
     descCest: colunas.includes("ITE_CDCEST"),
+    descGrupo: colunas.includes("ITE_CODGRU"),
+    ultimoCusto: colunas.includes("ULTIMO_CUSTO"),
   });
 
 export interface ProdutoFornecedor {
