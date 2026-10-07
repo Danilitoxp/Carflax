@@ -76,6 +76,12 @@ export function CarroF1({
           </circle>)}
         </g>;
       })}
+      {asa && AEROFOLIOS.slice(-3).some(p=>p.id===asa.id) && <g>
+        {Array.from({length:4+AEROFOLIOS.slice(-3).findIndex(p=>p.id===asa.id)*2},(_,i)=><path key={i} d="M0 -4 L1 -1 L4 0 L1 1 L0 4 L-1 1 L-4 0 L-1 -1 Z" fill={asa.id==="asa-royal"?"#ffe8a3":asa.cor}>
+          <animateTransform attributeName="transform" type="translate" values={`10 ${i%2?12:68};-28 ${i%2?2:78}`} dur="1.6s" begin={`${-i*.2}s`} repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0;1;0" dur="1.6s" begin={`${-i*.2}s`} repeatCount="indefinite" />
+        </path>)}
+      </g>}
       {/* neon: brilho ciano no asfalto, pulsando */}
       {neon && (
         // Gradiente radial no lugar de filter: blur — o blur era refeito a cada quadro.
@@ -129,8 +135,7 @@ export function CarroF1({
         </>
       ) : (
         <>
-          <rect x="4" y="8" width="16" height="64" rx="3" fill="#0f172a" />
-          <rect x="6" y="10" width="12" height="60" rx="2" fill={escura} />
+          <rect x="9" y="20" width="7" height="40" rx="1" fill="#0f172a" />
         </>
       )}
       {/* pneus traseiros */}

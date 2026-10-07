@@ -47,6 +47,24 @@ export const CARROCERIAS = [
   { id: "corpo-viper", nome: "Viper Track", largura: 1.2, bico: 0.7, cor: "#a3e635", metal: 0.5, preco: 14 },
   { id: "corpo-phantom", nome: "Phantom Hyper", largura: 1.35, bico: 1.3, cor: "#a78bfa", metal: 0.9, preco: 18 },
 ] as const;
+/** Silhuetas distintas, compartilhadas pelo carro e pela miniatura. */
+export const FORMAS_CARROCERIA = [
+  { lateral: 1.15, bico: .85, altura: .26, cobertura: .45, comprimento: 1.25, aletas: 1 },
+  { lateral: .78, bico: .58, altura: .18, cobertura: .25, comprimento: 1.45, aletas: 2 },
+  { lateral: 1.35, bico: 1.4, altura: .34, cobertura: .7, comprimento: 1.75, aletas: 3 },
+  { lateral: .85, bico: .72, altura: .38, cobertura: .85, comprimento: .95, aletas: 0 },
+  { lateral: 1.5, bico: 1.05, altura: .3, cobertura: .5, comprimento: 1.9, aletas: 4 },
+  { lateral: 1.1, bico: .4, altura: .2, cobertura: .35, comprimento: 1.6, aletas: 5 },
+  { lateral: 1.3, bico: .8, altura: .32, cobertura: .6, comprimento: 1.45, aletas: 3 },
+  { lateral: 1.05, bico: 1.2, altura: .24, cobertura: .4, comprimento: 1.7, aletas: 4 },
+  { lateral: 1.4, bico: .5, altura: .22, cobertura: .55, comprimento: 1.85, aletas: 5 },
+  { lateral: 1.5, bico: 1.35, altura: .36, cobertura: .8, comprimento: 2, aletas: 6 },
+] as const;
+export function formaCarroceria(id: string) {
+  const indice = CARROCERIAS.findIndex(p => p.id === id);
+  return indice < 0 ? undefined : FORMAS_CARROCERIA[indice];
+}
+
 export const AEROFOLIOS = [
   { id: "asa-swan", nome: "Swan Neck GT", largura: 2, altura: 1.15, planos: 1, cor: "#e2e8f0", preco: 4 },
   { id: "asa-duck", nome: "Ducktail Classic", largura: 1.5, altura: 0.78, planos: 1, cor: "#fde68a", preco: 5 },
@@ -124,7 +142,7 @@ export const PECAS = [
   { id: "halo", nome: "Halo dourado", preco: 20, emoji: "🌟", categoria: "Especiais", descricao: "Proteção do cockpit com acabamento ouro." },
   { id: "ouro", nome: "Kit ouro", preco: 24, emoji: "🏆", categoria: "Especiais", descricao: "Carroceria dourada e brilhos animados." },
   { id: "antena", nome: "Bandeira do campeão", preco: 40, emoji: "🚩", categoria: "Especiais", descricao: "Bandeira dourada na traseira." },
-  { id: "coroa", nome: "Coroa lendária", preco: 60, emoji: "👑", categoria: "Especiais", descricao: "Coroa dourada sobre o piloto." },
+  { id: "coroa", nome: "Coroa lendária", preco: 60, emoji: "👑", categoria: "Especiais", descricao: "Coroa esculpida com rubis e estrelas douradas em órbita." },
   ...RODAS.map((r) => ({ ...r, emoji: "🛞", categoria: "Rodas" as const, descricao: r.raios ? `${r.raios} raios com aro ${r.nome.split(" ").at(-1)} e freios ventilados.` : "Disco aerodinâmico fechado com aro violeta." })),
   ...CARROCERIAS.map((c) => ({ ...c, emoji: "🏎️", categoria: "Carroceria" as const, descricao: "Novo perfil de carroceria, sidepods e acabamento exclusivo." })),
   ...AEROFOLIOS.map((a) => ({ ...a, emoji: "🪽", categoria: "Aerodinâmica" as const, descricao: `${a.planos} plano${a.planos > 1 ? "s" : ""}, ponteiras exclusivas e asa de ${a.largura.toFixed(1)} m.` })),
@@ -132,7 +150,7 @@ export const PECAS = [
   { id: "luz-freio", nome: "Rain Light", preco: 6, emoji: "🚨", categoria: "Iluminação", descricao: "Luz de chuva vermelha pulsante na traseira." },
   { id: "escape-titanio", nome: "Escape Titanium", preco: 9, emoji: "⚙️", categoria: "Especiais", descricao: "Dois escapes de titânio com ponteiras azuladas." },
   { id: "canards", nome: "Canards Attack", preco: 8, emoji: "⚡", categoria: "Aerodinâmica", descricao: "Quatro aletas nas laterais do bico." },
-  { id: "entrada-ar", nome: "Airbox Performance", preco: 10, emoji: "💨", categoria: "Especiais", descricao: "Entrada de ar elevada atrás do piloto." },
+  { id: "entrada-ar", nome: "Airbox Performance", preco: 10, emoji: "💨", categoria: "Especiais", descricao: "Tomada de ar em carbono com grelha cromada e pulsos ciano." },
 ] as const;
 export type PecaId = (typeof PECAS)[number]["id"];
 

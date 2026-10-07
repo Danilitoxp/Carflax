@@ -63,7 +63,7 @@ export function GaragemModal({
   let noCarro = new Set(equipadas);
   for (const id of provando) noCarro = equiparPeca(noCarro, id);
   const normalizar = (texto: string) => texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const filtradas = PECAS.filter((p) => p.categoria !== "Iluminação" && (categoria === "Todas" || (categoria === "Aerofólios" ? p.id === "aerofolio" || p.id.startsWith("asa-") : p.categoria === categoria)) && normalizar(`${p.nome} ${p.descricao}`).includes(normalizar(busca)));
+  const filtradas = PECAS.filter((p) => p.categoria !== "Iluminação" && p.id !== "halo" && (categoria === "Todas" || (categoria === "Aerofólios" ? p.id === "aerofolio" || p.id.startsWith("asa-") : p.categoria === categoria)) && normalizar(`${p.nome} ${p.descricao}`).includes(normalizar(busca)));
   const grupos = CATEGORIAS.filter((c) => c !== "Todas").map((nome) => ({ nome, itens: filtradas.filter((p) => p.categoria === nome) })).filter((grupo) => grupo.itens.length > 0);
   const [corVis, escuraVis] = coresDoCarro(faixa, { pecas: noCarro, cor: pendentes.cor ?? garagem?.cor });
   const g: Garagem = { pecas, cor: pendentes.cor ?? garagem?.cor };

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { RODAS, CARROCERIAS, AEROFOLIOS, PECAS, efeitoDaPeca, NEONS, PILOTOS, DESENHOS, TURBOS, pecasDoCarro, type PecaId } from "./garagem";
+import { RODAS, CARROCERIAS, AEROFOLIOS, formaCarroceria, PECAS, efeitoDaPeca, NEONS, PILOTOS, DESENHOS, TURBOS, pecasDoCarro, type PecaId } from "./garagem";
 
 /**
  * O F1 da pista (mesmo contorno do SVG do modo corrida) em 3D. O carro base
@@ -68,6 +68,7 @@ export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garag
   const ouro = tem("ouro");
   const perfilRoda = RODAS.find((p) => tem(p.id));
   const perfilCorpo = CARROCERIAS.find((p) => tem(p.id));
+  const silhueta = perfilCorpo ? formaCarroceria(perfilCorpo.id) : undefined;
   const perfilNeon = NEONS.find((p) => tem(p.id));
   const perfilPiloto = PILOTOS.find((p) => tem(p.id));
   const perfilDesenho = DESENHOS.find((p) => tem(p.id));
@@ -92,14 +93,18 @@ export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garag
   };
 
   // Carroceria: o path do SVG extrudado, com bisel.
+  const lateral = silhueta?.lateral ?? 1;
+  const nariz = silhueta?.bico ?? 1;
   const pts: [number, number][] = [
-    [18, 30], [60, 24], [96, 20], [150, 26], [190, 34], [206, 37],
-    [206, 43], [190, 46], [150, 54], [96, 60], [60, 56], [18, 50],
+    [18, 32], [48, 40 - 14*lateral], [88, 40 - 19*lateral], [128, 40 - 12*lateral],
+    [150, 40 - 7*nariz], [188, 40 - 5*nariz], [206, 40 - 3*nariz],
+    [206, 40 + 3*nariz], [188, 40 + 5*nariz], [150, 40 + 7*nariz],
+    [128, 40 + 12*lateral], [88, 40 + 19*lateral], [48, 40 + 14*lateral], [18, 48],
   ];
   const forma = new THREE.Shape();
-  pts.forEach(([x, y], i) => (i ? forma.lineTo(X(x), Z(y) * (perfilCorpo?.largura ?? 1) * (x > 150 ? perfilCorpo?.bico ?? 1 : 1)) : forma.moveTo(X(x), Z(y) * (perfilCorpo?.largura ?? 1))));
+  pts.forEach(([x, y], i) => (i ? forma.lineTo(X(x), Z(y)) : forma.moveTo(X(x), Z(y))));
   const corpo = sombra(new THREE.Mesh(
-    new THREE.ExtrudeGeometry(forma, { depth: modo === "pista" ? 0.2 : 0.28, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.04, bevelSegments: 2, steps: 1 }),
+    new THREE.ExtrudeGeometry(forma, { depth: silhueta?.altura ?? (modo === "pista" ? 0.2 : 0.28), bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.04, bevelSegments: 2, steps: 1 }),
     lataria,
   ));
   corpo.rotation.x = Math.PI / 2;
@@ -107,14 +112,14 @@ export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garag
   carro.add(corpo);
 
   for (const s of [-1, 1]) {
-    const pod = sombra(new THREE.Mesh(new THREE.CapsuleGeometry(0.12, perfilCorpo ? 1 : 0.8, 6, 20), escura));
+    const pod = sombra(new THREE.Mesh(new THREE.CapsuleGeometry(silhueta ? .14 + silhueta.altura*.2 : .12, silhueta?.comprimento ?? .8, 6, 20), escura));
     pod.rotation.z = Math.PI / 2;
-    pod.scale.z = perfilCorpo?.largura ?? 1;
-    pod.position.set(X(84), 0.45, s * 0.5 * (perfilCorpo?.largura ?? 1));
+    pod.scale.z = silhueta?.lateral ?? 1;
+    pod.position.set(X(84), 0.45, s * 0.5 * (silhueta?.lateral ?? 1));
     carro.add(pod);
   }
   const cobertura = sombra(new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 12), lataria));
-  cobertura.scale.set(1.4, 0.35, 0.55 * (perfilCorpo?.largura ?? 1));
+  cobertura.scale.set(silhueta?.comprimento ?? 1.4, silhueta?.cobertura ?? .35, .55 * (silhueta?.lateral ?? 1));
   cobertura.position.set(-0.95, 0.63, 0);
   carro.add(cobertura);
   // Faixa branca do bico
@@ -268,17 +273,15 @@ export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garag
       carro.add(haste);
     }
   } else {
-    const asa = sombra(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, 1.6), escura));
-    asa.position.set(X(12), 0.95, 0);
+    // Asa padrão: pequena, baixa e fosca, sem ponteiras altas ou efeitos.
+    const asa = sombra(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.045, 1.2), carbono));
+    asa.position.set(X(16), 0.73, 0);
     carro.add(asa);
     for (const s of [-1, 1]) {
-      const placa = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 0.04), carbono);
-      placa.position.set(X(12), 0.8, s * 0.8);
-      carro.add(placa);
+      const haste = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.16, 0.045), carbono);
+      haste.position.set(X(16), 0.63, s * 0.3);
+      carro.add(haste);
     }
-    const haste = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.45, 0.08), carbono);
-    haste.position.set(X(14), 0.72, 0);
-    carro.add(haste);
   }
 
   // Aerofólio dianteiro
@@ -303,7 +306,7 @@ export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garag
   cockpit.scale.set(1, 0.25, 0.8);
   cockpit.position.set(X(112), 0.68, 0);
   carro.add(cockpit);
-  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.035, 8, 32, Math.PI), ouro || tem("halo") ? douradoMat : new THREE.MeshStandardMaterial({ color: "#cbd5e1", metalness: 0.9 }));
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.035, 8, 32, Math.PI), ouro ? douradoMat : new THREE.MeshStandardMaterial({ color: "#cbd5e1", metalness: 0.9 }));
   halo.rotation.y = Math.PI / 2;
   halo.position.set(X(112), 0.7, 0);
   carro.add(halo);
@@ -501,9 +504,17 @@ export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garag
     const detalhe = new THREE.MeshStandardMaterial({ color: perfilCorpo.cor, metalness: 0.7, roughness: 0.3 });
     for (const lado of [-1, 1]) {
       caixa(-0.5, 0.57, lado * 0.46 * perfilCorpo.largura, 1.6, 0.06, 0.1, detalhe);
-      for (let i = 0; i < 3; i++) caixa(-0.7 + i * 0.15, 0.62, lado * 0.4 * perfilCorpo.largura, 0.05, 0.025, 0.17, carbono);
+      for (let i = 0; i < (silhueta?.aletas ?? 3); i++) caixa(-1 + i * .18, .68, lado * .5 * (silhueta?.lateral ?? 1), .07, .13 + i * .008, .24, carbono);
     }
-    caixa(1.2, 0.7, 0, 1.1, 0.025, 0.13 * perfilCorpo.bico, detalhe);
+    caixa(1.2, .7, 0, 1.4, .035, .16 * (silhueta?.bico ?? 1), detalhe);
+    for (const lado of [-1,1]) {
+      caixa(-.5,.4,lado*.64*(silhueta?.lateral ?? 1),silhueta?.comprimento ?? 1.4,.08,.19,carbono);
+      caixa(-.65,.6,lado*.52*(silhueta?.lateral ?? 1),.45,.16,.06,detalhe);
+    }
+    if ((silhueta?.aletas ?? 0) >= 4) {
+      const barbatana = new THREE.Mesh(new THREE.BoxGeometry(.95,.32,.025), detalhe);
+      barbatana.position.set(-1.1,.95,0); carro.add(barbatana);
+    }
     if (perfilCorpo.id === "corpo-wide" || perfilCorpo.id === "corpo-phantom") {
       for (const lado of [-1, 1]) caixa(-0.25, 0.3, lado * 0.7, 2, 0.08, 0.18, carbono);
     }
@@ -516,8 +527,23 @@ export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garag
   }
   if (tem("canards")) for (const lado of [-1, 1]) for (const x of [1.55, 1.8]) caixa(x, 0.48, lado * 0.3, 0.25, 0.04, 0.3, carbono);
   if (tem("entrada-ar")) {
-    caixa(-0.55, 1, 0, 0.45, 0.45, 0.25, lataria);
-    caixa(-0.31, 1.1, 0, 0.025, 0.18, 0.18, carbono);
+    const scoop = new THREE.Shape();
+    scoop.moveTo(-.94,.73);scoop.lineTo(-.88,1.27);scoop.quadraticCurveTo(-.6,1.45,-.32,1.24);scoop.lineTo(-.3,.88);scoop.lineTo(-.65,.73);scoop.closePath();
+    const carenagem=new THREE.Mesh(new THREE.ExtrudeGeometry(scoop,{depth:.34,bevelEnabled:true,bevelSize:.04,bevelThickness:.03,bevelSegments:3,steps:1}),carbono);
+    carenagem.position.z=-.17;carro.add(carenagem);
+    const boca=new THREE.Mesh(new THREE.CircleGeometry(.16,32),new THREE.MeshBasicMaterial({color:"#020617"}));
+    boca.rotation.y=Math.PI/2;boca.scale.y=.75;boca.position.set(-.275,1.14,0);carro.add(boca);
+    const luz=new THREE.MeshBasicMaterial({color:"#22d3ee",transparent:true,opacity:.8});
+    const contorno=new THREE.Mesh(new THREE.TorusGeometry(.16,.016,8,32),luz);
+    contorno.rotation.y=Math.PI/2;contorno.scale.y=.75;contorno.position.copy(boca.position);contorno.position.x+=.006;carro.add(contorno);
+    for(const lado of [-1,1])for(let i=0;i<4;i++)caixa(-.78+i*.09,1.03+i*.018,lado*.21,.04,.2,.025,cromo);
+    const impulsos=new THREE.Group();
+    for(let i=0;i<3;i++){
+      const linha=new THREE.Mesh(new THREE.TorusGeometry(.16,.009,6,24),luz);linha.rotation.y=Math.PI/2;linha.scale.y=.75;impulsos.add(linha);
+      anim.push(t=>{const f=(t*.7+i/3)%1;linha.position.set(-.27+f*.48,1.14,0);linha.scale.setScalar(1+f*.45);});
+    }
+    carro.add(impulsos);
+    anim.push(t=>{luz.opacity=.55+Math.sin(t*4)*.3;});
   }
   if (tem("escape-titanio")) for (const z of [-0.24, 0.24]) {
     const escape = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.4, 20, 1, true), new THREE.MeshStandardMaterial({ color: "#818cf8", metalness: 1, roughness: 0.2, side: THREE.DoubleSide }));
@@ -545,16 +571,34 @@ export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garag
         default: ctx.fillRect(x,12+i%3*14,24,5);
       }
     }
-    const mapa = new THREE.CanvasTexture(canvas); mapa.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.MeshStandardMaterial({ map: mapa, transparent: true, depthWrite: false, roughness: 0.4, emissive: perfilDesenho.cor, emissiveMap: mapa, emissiveIntensity: 0.12, side: THREE.DoubleSide });
-    for (const lado of [-1,1]) {
-      const decal = new THREE.Mesh(new THREE.PlaneGeometry(2.5,0.3),mat);
-      decal.position.set(-0.2,0.56,lado*0.61*(perfilCorpo?.largura ?? 1));
-      if(lado<0) decal.rotation.y=Math.PI; carro.add(decal);
+    // Pintura na própria malha: os grafismos acompanham as faces da lataria.
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.fillStyle = tem("cromo") && !ouro ? "#e2e8f0" : v.cor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const mapa = new THREE.CanvasTexture(canvas);
+    mapa.colorSpace = THREE.SRGBColorSpace;
+    const geo = corpo.geometry;
+    geo.computeBoundingBox();
+    const limites = geo.boundingBox!;
+    const pos = geo.attributes.position;
+    const normais = geo.attributes.normal;
+    const uv = new Float32Array(pos.count * 2);
+    const largura = Math.max(.001, limites.max.y - limites.min.y);
+    const altura = Math.max(.001, limites.max.z - limites.min.z);
+    const comprimento = Math.max(.001, limites.max.x - limites.min.x);
+    for (let i = 0; i < pos.count; i++) {
+      uv[i * 2] = (pos.getX(i) - limites.min.x) / comprimento;
+      uv[i * 2 + 1] = Math.abs(normais.getZ(i)) > .5
+        ? (pos.getY(i) - limites.min.y) / largura
+        : (pos.getZ(i) - limites.min.z) / altura;
     }
-    const bico = new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.22),mat); bico.rotation.x=-Math.PI/2;bico.position.set(1.3,0.73,0);carro.add(bico);
-    anim.push((t)=>{mat.emissiveIntensity=0.1+(Math.sin(t*2)+1)*0.06;});
+    geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    const pintura = lataria.clone();
+    pintura.color.set("#ffffff");
+    pintura.map = mapa;
+    corpo.material = pintura;
   }
+
   if (tem("splitter")) caixa(X(202), 0.18, 0, 0.5, 0.07, 1.9, carbono);
   if (tem("difusor")) for (const z of [-0.4, -0.2, 0, 0.2, 0.4]) caixa(X(22), 0.23, z, 0.7, 0.22, 0.04, carbono);
   if (tem("led")) for (const z of [-0.57, 0.57]) caixa(-0.3, 0.5, z, 2, 0.035, 0.035, new THREE.MeshBasicMaterial({ color: "#67e8f9" }));
@@ -563,12 +607,24 @@ export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garag
     caixa(-1.55, 1.65, 0.3, 0.5, 0.3, 0.025, douradoMat);
   }
   if (tem("coroa")) {
-    caixa(-0.02, 1.25, 0, 0.4, 0.07, 0.35, douradoMat);
-    for (const x of [-0.18, 0, 0.18]) {
-      const ponta = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.2, 4), douradoMat);
-      ponta.position.set(x, 1.37, 0);
-      carro.add(ponta);
+    const coroa=new THREE.Group();coroa.position.set(-.02,1.23,0);
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(.29,.26,.12,48,1,true),douradoMat);coroa.add(base);
+    for(const y of [-.055,.055]){const aro=new THREE.Mesh(new THREE.TorusGeometry(.28,.024,8,48),douradoMat);aro.rotation.x=Math.PI/2;aro.position.y=y;coroa.add(aro);}
+    const rubi=new THREE.MeshStandardMaterial({color:"#fb7185",metalness:.4,roughness:.1,emissive:"#e11d48",emissiveIntensity:.5});
+    for(let i=0;i<8;i++){
+      const ang=i*Math.PI/4;
+      const ponta=new THREE.Mesh(new THREE.ConeGeometry(.075,i%2?.19:.29,5),douradoMat);ponta.position.set(Math.cos(ang)*.25,.11,Math.sin(ang)*.25);coroa.add(ponta);
+      const joia=new THREE.Mesh(new THREE.OctahedronGeometry(.045),rubi);joia.position.set(Math.cos(ang)*.285,.015,Math.sin(ang)*.285);coroa.add(joia);
+      const estrela=new THREE.Mesh(new THREE.SphereGeometry(.025,8,6),new THREE.MeshBasicMaterial({color:"#fff0a3"}));estrela.position.set(Math.cos(ang)*.25,i%2?.2:.25,Math.sin(ang)*.25);coroa.add(estrela);
     }
+    coroa.traverse(o=>{if(o instanceof THREE.Mesh)o.userData.animado=true;});carro.add(coroa);
+    const orbita=new THREE.Group();orbita.position.copy(coroa.position);
+    for(let i=0;i<12;i++){
+      const estrela=new THREE.Mesh(new THREE.OctahedronGeometry(i%3?.018:.035),new THREE.MeshBasicMaterial({color:"#ffe8a3"}));
+      const a=i*Math.PI/6;estrela.position.set(Math.cos(a)*.48,.1+Math.sin(a*3)*.12,Math.sin(a)*.48);orbita.add(estrela);
+    }
+    carro.add(orbita);
+    anim.push(t=>{orbita.rotation.y=t*.8;coroa.position.y=1.23+Math.sin(t*2)*.035;rubi.emissiveIntensity=.35+(Math.sin(t*3)+1)*.2;});
   }
 
   if (modo === "pista") {
@@ -617,6 +673,37 @@ export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garag
       mesh.position.set(x,categoria==="Piloto"?1.06:categoria==="Aerodinâmica"?1.02+efeito.intensidade*.45:.65,lado*(categoria==="Piloto"?.15:.42));carro.add(mesh);
     }
     anim.push(t=>{mat.emissiveIntensity=.08+efeito.intensidade*.18*(.5+.5*Math.sin(t*2));});
+  }
+
+  // Os três aerofólios finais emitem estrelas luminosas pelas ponteiras.
+  if (perfilAsa) {
+    const nivel = AEROFOLIOS.slice(-3).findIndex(p => p.id === perfilAsa.id);
+    if (nivel >= 0) {
+      const efeito = efeitoDaPeca(perfilAsa.id);
+      const quantidade = 12 + nivel * 10;
+      const vertices = new Float32Array(quantidade * 3);
+      const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64;
+      const ctx = canvas.getContext("2d")!;
+      const gradiente = ctx.createRadialGradient(32,32,0,32,32,30);
+      gradiente.addColorStop(0,"#ffffff"); gradiente.addColorStop(.2,"#ffffffcc"); gradiente.addColorStop(1,"#ffffff00");
+      ctx.fillStyle=gradiente;ctx.fillRect(0,0,64,64);
+      ctx.fillStyle="#ffffff";ctx.beginPath();ctx.moveTo(32,3);ctx.lineTo(36,28);ctx.lineTo(61,32);ctx.lineTo(36,36);ctx.lineTo(32,61);ctx.lineTo(28,36);ctx.lineTo(3,32);ctx.lineTo(28,28);ctx.closePath();ctx.fill();
+      const textura=new THREE.CanvasTexture(canvas);
+      const mat=new THREE.PointsMaterial({map:textura,color:nivel===2?"#ffe8a3":perfilAsa.cor,size:.25+nivel*.09,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false});
+      const estrelas=new THREE.Points(new THREE.BufferGeometry().setAttribute("position",new THREE.BufferAttribute(vertices,3)),mat);
+      estrelas.frustumCulled=false;estrelas.userData.brilhoAerofolio=perfilAsa.id;carro.add(estrelas);
+      anim.push(t=>{
+        for(let i=0;i<quantidade;i++){
+          const vida=(t*(.65+nivel*.18)+i/quantidade)%1;
+          const lado=i%2?1:-1;
+          vertices[i*3]=-2.1-vida*(.8+nivel*.4);
+          vertices[i*3+1]=1+efeito.intensidade*.45+vida*.5+Math.sin(t*3+i)*vida*.12;
+          vertices[i*3+2]=lado*(1.8+efeito.intensidade*.7)/2+Math.sin(i*2.7+vida*4)*vida*.25;
+        }
+        estrelas.geometry.attributes.position.needsUpdate=true;
+        mat.size=(.25+nivel*.09)*(1+Math.sin(t*5)*.18);
+      });
+    }
   }
 
   // Emissores presos à peça: rastros e faíscas se movem para trás do carro.

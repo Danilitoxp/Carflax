@@ -106,9 +106,7 @@ export function F1em3D({ visual }: { visual: Visual }) {
         // A rotação faz parte do provador, mesmo com movimento reduzido.
         modelo.carro.rotation.y = tempo * 0.25;
         modelo.carro.traverse(obj => { if (obj.userData.velocidadeGiro) obj.rotation.z = tempo * obj.userData.velocidadeGiro; });
-        if (!movimentoReduzido.matches) {
-          modelo.anim.forEach((f) => f(tempo));
-        }
+        modelo.anim.forEach((f) => f(tempo));
         renderer.render(cena, camera);
       }
       frame = requestAnimationFrame(animar);

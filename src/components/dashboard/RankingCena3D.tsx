@@ -126,7 +126,7 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
             modelo.x += dx * fator; modelo.y += dy * fator;
             sujo = true; continua = !movimentoReduzido.matches;
           } else { modelo.x = modelo.alvoX; modelo.y = modelo.alvoY; }
-          if (modelo.anim.length && !movimentoReduzido.matches) {
+          if (modelo.anim.length) {
             continua = true;
             if (atualizarEfeitos) { modelo.anim.forEach((f) => f(tempo)); sujo = true; }
           }

@@ -1,6 +1,6 @@
 import { memo, useId } from "react";
 import { Flag, Flame, Crown, Lightbulb, Shield, Sparkles, Wind, Zap } from "lucide-react";
-import { PECAS, NEONS, PILOTOS, DESENHOS, TURBOS, RODAS, CARROCERIAS, AEROFOLIOS, type PecaId } from "./garagem";
+import { PECAS, formaCarroceria, NEONS, PILOTOS, DESENHOS, TURBOS, RODAS, CARROCERIAS, AEROFOLIOS, type PecaId } from "./garagem";
 
 /** Miniaturas vetoriais usam os mesmos perfis do modelo 3D. */
 export const MiniaturaPeca = memo(function MiniaturaPeca({ id, cor }: { id: PecaId; cor: string; emoji?: string }) {
@@ -11,13 +11,26 @@ export const MiniaturaPeca = memo(function MiniaturaPeca({ id, cor }: { id: Peca
   const turbo = TURBOS.find((p) => p.id === id);
   const roda = RODAS.find((p) => p.id === id);
   const corpo = CARROCERIAS.find((p) => p.id === id);
+  const silhueta = corpo ? formaCarroceria(corpo.id) : undefined;
   const carroceria = corpo || id === "listras" || id === "cromo";
   const acabamento = id === "cromo" ? "#e2e8f0" : corpo?.cor ?? "#f8fafc";
   const peca = PECAS.find((p) => p.id === id);
   const Icone = id === "antena" ? Flag : id === "coroa" ? Crown : id === "turbo" ? Flame : id === "ouro" ? Sparkles : peca?.categoria === "Iluminação" ? Lightbulb : peca?.categoria === "Piloto" ? Shield : peca?.categoria === "Aerodinâmica" ? Wind : Zap;
   const asa = AEROFOLIOS.find((p) => p.id === id) ?? (id === "aerofolio" ? { largura: 2, planos: 2, cor: "#e2e8f0" } : undefined);
   return <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded-xl bg-[radial-gradient(ellipse_at_top,_#25334c,_#0a1020)]">
-    {neon ? <svg viewBox="0 0 160 90" className="h-full w-full" aria-hidden="true">
+    {id === "coroa" ? <svg viewBox="0 0 160 90" className="h-full w-full" aria-hidden="true">
+      <ellipse cx="80" cy="76" rx="38" ry="5" fill="#020617"/>
+      <path d="M44 61 L36 26 L57 42 L68 18 L80 39 L93 18 L104 42 L125 26 L116 61 Z" fill="#fcd34d" stroke="#fef3c7" strokeWidth="2"/>
+      <rect x="44" y="60" width="72" height="9" rx="3" fill="#a16207" stroke="#fcd34d"/>
+      {[57,80,103].map(x=><path key={x} d={`M${x} 45 l5 6 -5 6 -5 -6 Z`} fill="#fb7185"/>)}
+      <g className="motion-safe:animate-pulse" fill="#fff0a3"><path d="M26 42 l3 5 5 3 -5 3 -3 5 -3 -5 -5 -3 5 -3 Z"/><path d="M132 12 l3 5 5 3 -5 3 -3 5 -3 -5 -5 -3 5 -3 Z"/></g>
+    </svg> : id === "entrada-ar" ? <svg viewBox="0 0 160 90" className="h-full w-full" aria-hidden="true">
+      <ellipse cx="80" cy="77" rx="39" ry="4" fill="#020617"/>
+      <path d="M37 67 L49 28 Q73 12 111 27 L123 59 L93 68 Z" fill="#1e293b" stroke="#64748b" strokeWidth="2"/>
+      <ellipse cx="106" cy="43" rx="16" ry="20" fill="#020617" stroke="#22d3ee" strokeWidth="3" className="motion-safe:animate-pulse"/>
+      {[55,64,73,82].map(x=><path key={x} d={`M${x} 36 l-5 23`} stroke="#94a3b8" strokeWidth="3"/>)}
+      <path d="M124 34 H141 M127 43 H149 M124 52 H141" stroke="#22d3ee" strokeWidth="2" className="motion-safe:animate-pulse"/>
+    </svg> : neon ? <svg viewBox="0 0 160 90" className="h-full w-full" aria-hidden="true">
       <ellipse cx="80" cy="68" rx="51" ry="9" fill={neon.cor} opacity="0.18" className="motion-safe:animate-pulse" style={{animationDuration: `${2/neon.ritmo}s`}} />
       <path d="M27 41 L56 26 H105 L135 43 V58 H27 Z" fill="#182437" stroke="#64748b" strokeWidth="2" />
       <path d="M34 61 H128 M40 67 H120" stroke={neon.cor} strokeWidth="4" strokeLinecap="round" className="motion-safe:animate-pulse" style={{animationDuration: `${2/neon.ritmo}s`}} />
@@ -54,8 +67,8 @@ export const MiniaturaPeca = memo(function MiniaturaPeca({ id, cor }: { id: Peca
       <circle cx="70" cy="43" r="5" fill="#e2e8f0" stroke="#64748b" />
     </svg> : carroceria ? <svg viewBox="0 0 160 90" className="h-full w-full" aria-hidden="true">
       <ellipse cx="80" cy="78" rx="55" ry="4" fill="#020617" />
-      <g transform={`translate(80 45) scale(1 ${corpo?.largura ?? 1}) translate(-80 -45)`}>
-        <path d="M25 35 L60 27 L90 29 L136 40 L140 45 L136 50 L90 61 L60 63 L25 55 Z" fill={id === "cromo" ? "#94a3b8" : cor} stroke={acabamento} strokeWidth="2" />
+      <g transform={`translate(80 45) scale(1 ${silhueta?.lateral ?? 1}) translate(-80 -45)`}>
+        <path d={`M25 35 L60 27 L90 29 L120 ${45-8*(silhueta?.bico ?? 1)} L140 43 L140 47 L120 ${45+8*(silhueta?.bico ?? 1)} L90 61 L60 63 L25 55 Z`} fill={id === "cromo" ? "#94a3b8" : cor} stroke={acabamento} strokeWidth="2" />
         {id === "listras" && <path d="M28 40 L62 34 L94 36 L136 43 M28 50 L62 56 L94 54 L136 47" fill="none" stroke="#f8fafc" strokeWidth="3" />}
         <path d="M32 39 H70 M32 51 H70 M102 44 H136" stroke={acabamento} strokeWidth="3" />
       </g>
