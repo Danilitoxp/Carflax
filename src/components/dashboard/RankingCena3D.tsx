@@ -6,13 +6,18 @@ import { coresDoCarro, ordenarFaixas, pecasDoCarro } from "./garagem";
 import { liberarObjeto, montarF1 } from "./modeloF1";
 import type { RankingCorridaProps } from "./RankingCorrida";
 
-const MARCAS = [0, 25, 50, 75, 100, 150, 200];
+// A chegada (meta 100%) fica sempre no fim da pista: quem passou da meta para
+// na linha e o % real aparece na etiqueta, sem a escala esticar até 200%.
+const MARCAS = [0, 25, 50, 75, 100];
+// Espaço depois da chegada: quem bateu a meta cruza a linha e para aqui,
+// com a etiqueta do % e a coroa.
+const MARGEM_CHEGADA = 300;
 const MEDALHAS = ["from-[#ffe783] to-[#e7a814] text-[#372100]", "from-[#d9e4ed] to-[#7c93aa] text-[#142334]", "from-[#ffc27b] to-[#e6792e] text-[#422009]"];
 const percentualNaPista = (pct: number) => {
-  const valor = Math.max(0, Math.min(200, Number.isFinite(pct) ? pct : 0));
-  return valor <= 100 ? valor / 100 * 0.62 : 0.62 + (valor - 100) / 100 * 0.38;
+  const valor = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
+  return valor / 100;
 };
-const pontoDaPista = (pct: number, largura: number) => 43 + percentualNaPista(pct) * (largura - 73);
+const pontoDaPista = (pct: number, largura: number) => 43 + percentualNaPista(pct) * (largura - 43 - MARGEM_CHEGADA);
 
 /** Pista compacta: interface nítida em HTML, todos os carros em um único canvas. */
 export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onIndisponivel }: RankingCorridaProps & { onIndisponivel: () => void }) {
@@ -56,13 +61,19 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
     ambiente.mapping = THREE.EquirectangularReflectionMapping;
     cena.environment = ambiente; cena.environmentIntensity = 0.7;
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400);
-    camera.position.set(8, 13, 30); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
+    // De lado e de cima (~27°): mostra a lateral e o topo da carroceria, com as
+    // quatro rodas no mesmo nível. Vista de frente-cima (x=8) escondia o pneu
+    // dianteiro e erguia a traseira; de perfil puro (y=7) sumia o topo.
+    camera.position.set(0, 15, 30); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
     const direita = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
     const cima = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
     cena.add(new THREE.AmbientLight(0xffffff, 1.2));
     const luz = new THREE.DirectionalLight(0xffffff, 3); luz.position.set(-12, 25, 30); cena.add(luz);
     const recorte = new THREE.DirectionalLight(0x8aa9ff, 1.5); recorte.position.set(12, 8, -25); cena.add(recorte);
-    type Carro = ReturnType<typeof montarF1> & { chave: string; x: number; y: number; alvoX: number; alvoY: number; largura: number };
+    type Carro = ReturnType<typeof montarF1> & {
+      chave: string; x: number; y: number; alvoX: number; alvoY: number; largura: number;
+      rodas: THREE.Object3D[]; pct: number; fase: number; giro: number; ultimoX: number; balanco: number;
+    };
     const carros = new Map<string, Carro>();
     let frame = 0;
     let ultimo = -Infinity;
@@ -72,10 +83,13 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
     let encerrado = false;
     let larguraAnterior = 0;
     let alturaAnterior = 0;
-    const movimentoReduzido = window.matchMedia("(prefers-reduced-motion: reduce)");
+    // Telão de ranking: anima sempre, mesmo com "efeitos de animação" desligados no
+    // Windows (que vira prefers-reduced-motion e deixava a pista toda parada).
+    // O ranking 2D antigo, em SVG, também ignorava essa preferência.
+    const movimentoReduzido = { matches: false };
     const posicionar = (cod: string, modelo: Carro) => {
       modelo.carro.position.copy(direita).multiplyScalar(modelo.x - el.clientWidth / 2);
-      modelo.carro.position.addScaledVector(cima, el.clientHeight / 2 - modelo.y - modelo.largura * 0.08);
+      modelo.carro.position.addScaledVector(cima, el.clientHeight / 2 - modelo.y - modelo.largura * 0.08 + modelo.balanco);
       modelo.carro.scale.setScalar(modelo.largura / 5.1);
       const etiqueta = etiquetas.current.get(cod);
       if (etiqueta) etiqueta.style.transform = `translate3d(${modelo.x + modelo.largura * 0.5 + 5}px,${modelo.y - 7}px,0)`;
@@ -98,7 +112,9 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
       frame = 0;
       if (encerrado || document.hidden) return;
       let continua = false;
-      if (agora - ultimo >= 1000 / 120 - 1) {
+      // 60 fps: agora os carros animam o tempo todo (rodas/motor), e no telão
+      // 120 fps só gastaria GPU.
+      if (agora - ultimo >= 1000 / 60 - 1) {
         const dt = Number.isFinite(ultimo) ? Math.min((agora - ultimo) / 1000, 0.1) : 0;
         ultimo = agora; tempo += dt;
         const atualizarEfeitos = agora - ultimoEfeito >= 1000 / 30 - 1;
@@ -113,6 +129,19 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
           if (modelo.anim.length && !movimentoReduzido.matches) {
             continua = true;
             if (atualizarEfeitos) { modelo.anim.forEach((f) => f(tempo)); sujo = true; }
+          }
+          // Carro "vivo": rodas girando (mais rápido quanto mais perto da meta,
+          // e muito mais quando está andando), motor tremendo e balanço leve.
+          if (!movimentoReduzido.matches) {
+            const andou = Math.abs(modelo.x - modelo.ultimoX); modelo.ultimoX = modelo.x;
+            const velocidade = (modelo.pct > 0 ? 3 + Math.min(modelo.pct, 150) / 12 : 0) + andou * 2.5;
+            modelo.giro -= velocidade * dt;
+            for (const r of modelo.rodas) r.rotation.z = modelo.giro;
+            const t = tempo + modelo.fase;
+            const tremor = modelo.pct > 0 ? 0.012 : 0.004;
+            modelo.carro.rotation.z = Math.sin(t * 9) * tremor * 0.6 + (andou > 0.3 ? 0.02 : 0);
+            modelo.balanco = Math.sin(t * 23) * tremor * modelo.largura * 0.08;
+            continua = true; sujo = true;
           }
           if (sujo) posicionar(cod, modelo);
         }
@@ -136,18 +165,31 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
         const [cor, escura] = coresDoCarro(indice, g);
         const pecas = pecasDoCarro(g);
         const chave = [cor, escura, indice, l.avatar, l.nome, [...pecas].sort().join()].join("|");
-        const margemEtiqueta = w > 1300 ? 100 : 75;
-        const x = Math.max(carroLargura / 2 + 42, Math.min(w - carroLargura / 2 - margemEtiqueta, pontoDaPista(l.percentual, w) - carroLargura / 2));
+        // Bico do carro encosta no ponto do %. Bateu a meta: cruza a linha e a
+        // traseira fica depois dela — quanto mais %, mais à frente (até 200%).
+        const linha = pontoDaPista(100, w);
+        const x = l.percentual >= 100
+          ? linha + 14 + carroLargura / 2 + Math.min(1, (l.percentual - 100) / 100) * Math.max(0, MARGEM_CHEGADA - carroLargura - 120)
+          // Abaixo da meta: 0% = traseira na largada, 100% = bico na chegada, e
+          // o meio proporcional. Antes o bico ia no ponto do % e, como o carro é
+          // mais largo que esse trecho, todo mundo até ~15% ficava travado na largada.
+          : pontoDaPista(0, w) + carroLargura / 2 + percentualNaPista(l.percentual) * Math.max(0, linha - pontoDaPista(0, w) - carroLargura);
         const y = (i + 0.5) * linhaAltura;
         let modelo = carros.get(l.cod);
         if (modelo?.chave !== chave) {
           const anterior = modelo;
           if (modelo) { cena.remove(modelo.carro); liberarObjeto(modelo.carro); }
           const novo = montarF1({ cor, escura, numero: indice + 1, avatar: l.avatar, iniciais: l.nome.slice(0, 2).toUpperCase(), pecas }, solicitar, "pista");
-          modelo = { ...novo, chave, x: anterior?.x ?? x, y: anterior?.y ?? y, alvoX: x, alvoY: y, largura: carroLargura };
+          const rodas: THREE.Object3D[] = [];
+          novo.carro.traverse((o) => { if (o.userData.roda) rodas.push(o); });
+          modelo = {
+            ...novo, chave, x: anterior?.x ?? x, y: anterior?.y ?? y, alvoX: x, alvoY: y, largura: carroLargura,
+            rodas, pct: l.percentual, fase: anterior?.fase ?? Math.random() * 10, giro: anterior?.giro ?? 0,
+            ultimoX: anterior?.x ?? x, balanco: 0,
+          };
           carros.set(l.cod, modelo); cena.add(modelo.carro);
         }
-        modelo.alvoX = x; modelo.alvoY = y; modelo.largura = carroLargura;
+        modelo.alvoX = x; modelo.alvoY = y; modelo.largura = carroLargura; modelo.pct = l.percentual;
         posicionar(l.cod, modelo);
       });
       for (const [pct, marcador] of marcas.current) marcador.style.left = `${pontoDaPista(pct, w)}px`;
@@ -158,12 +200,12 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
     const observador = new ResizeObserver(() => atualizar.current?.()); observador.observe(el);
     const visibilidade = () => { cancelAnimationFrame(frame); frame = 0; ultimo = -Infinity; if (!document.hidden) solicitar(); };
     const contextoPerdido = (event: Event) => { event.preventDefault(); dados.current.onIndisponivel(); };
-    document.addEventListener("visibilitychange", visibilidade); movimentoReduzido.addEventListener("change", solicitar);
+    document.addEventListener("visibilitychange", visibilidade);
     renderer.domElement.addEventListener("webglcontextlost", contextoPerdido);
     atualizar.current();
     return () => {
       encerrado = true; atualizar.current = null; cancelAnimationFrame(frame); observador.disconnect();
-      document.removeEventListener("visibilitychange", visibilidade); movimentoReduzido.removeEventListener("change", solicitar);
+      document.removeEventListener("visibilitychange", visibilidade);
       renderer.domElement.removeEventListener("webglcontextlost", contextoPerdido);
       liberarObjeto(cena); ambiente.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     };
@@ -201,7 +243,7 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
                 <div className="absolute top-1 bottom-1 w-[5px] -skew-x-6" style={{ left: 34 * (1 - (i + 0.5) / Math.max(1, faixas.length)), background: i === 0 ? "#ffda60" : cor }} />
               </div>
               {l.percentual > 0 && <div ref={(el) => { if (el) rastros.current.set(l.cod, el); else rastros.current.delete(l.cod); }} className="pointer-events-none absolute left-0 top-0 h-[20px]" style={{ background: `linear-gradient(90deg,transparent 15%,${rastroCor}00 50%,${rastroCor}22 85%,${rastroCor}80)`, maskImage: "linear-gradient(180deg,transparent,#000 45%,#000 55%,transparent)" }}>
-                <div className="absolute bottom-[9px] right-0 h-px w-[65%]" style={{ background: `linear-gradient(90deg,transparent,${rastroCor})`, boxShadow: `0 0 7px 2px ${rastroCor}70` }} />
+                <div className="absolute bottom-[9px] right-0 h-px w-[65%] animate-pulse" style={{ background: `linear-gradient(90deg,transparent,${rastroCor})`, boxShadow: `0 0 7px 2px ${rastroCor}70` }} />
               </div>}
             </div>;
           })}

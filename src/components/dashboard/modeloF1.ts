@@ -124,7 +124,10 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
   const freioMat = new THREE.MeshStandardMaterial({ color: "#475569", side: THREE.DoubleSide });
   const pincaMat = new THREE.MeshStandardMaterial({ color: "#ef4444" });
   const faixaMat = new THREE.MeshBasicMaterial({ color: tem("slick") ? "#ef4444" : perfilRoda?.aro ?? "#facc15" });
-  for (const [x, y, r, w] of [[43, 11, 0.36, 0.45], [43, 69, 0.36, 0.45], [165, 12, 0.3, 0.4], [165, 68, 0.3, 0.4]]) {
+  // Na pista o carro é visto de lado e pequeno: dianteira quase do tamanho da
+  // traseira, senão o pneu da frente some e o carro parece "empinado".
+  const rFrente = modo === "pista" ? 0.345 : 0.3;
+  for (const [x, y, r, w] of [[43, 11, 0.36, 0.45], [43, 69, 0.36, 0.45], [165, 12, rFrente, 0.4], [165, 68, rFrente, 0.4]]) {
     const roda = new THREE.Group();
     const pneu = sombra(new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 24), borracha));
     pneu.rotation.x = Math.PI / 2;
@@ -165,6 +168,8 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
       roda.add(faixaPneu);
     }
     if (modo === "pista") roda.scale.setScalar(1.2);
+    // A pista gira as rodas conforme a velocidade do piloto (RankingCena3D).
+    roda.userData.roda = true;
     roda.position.set(X(x), modo === "pista" ? r * 1.2 : r, Z(y) * (modo === "pista" ? 1.22 : 1));
     carro.add(roda);
     // Braços da suspensão
@@ -367,6 +372,31 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
       neonMat.color.copy(cor);
       neonMat.opacity = 0.7 + Math.sin(t * 5) * 0.2;
       tubos.forEach((m) => (m.material as THREE.MeshBasicMaterial).color.copy(cor));
+    });
+  }
+
+  // Escapamento aceso de série na pista (como no ranking 2D antigo): uma chama
+  // curta tremulando. O Turbo comprado troca por chamas maiores e faíscas.
+  if (modo === "pista" && !tem("turbo")) {
+    const chamas: THREE.Mesh[] = [];
+    for (const [cor, raio, comp] of [["#f97316", 0.09, 0.6], ["#fde047", 0.05, 0.38]] as const) {
+      const c = new THREE.Mesh(
+        new THREE.ConeGeometry(raio, comp, 12, 1, true),
+        new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }),
+      );
+      c.rotation.z = Math.PI / 2;
+      c.position.set(X(18) - 0.2 - comp / 2, 0.55, 0);
+      c.userData.base = c.position.x;
+      c.userData.comp = comp;
+      carro.add(c);
+      chamas.push(c);
+    }
+    anim.push(() => {
+      for (const c of chamas) {
+        const k = 0.5 + Math.random() * 0.6;
+        c.scale.set(1, k, 1);
+        c.position.x = c.userData.base + (c.userData.comp * (1 - k)) / 2;
+      }
     });
   }
 
