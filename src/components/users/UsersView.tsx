@@ -148,7 +148,7 @@ export function UsersView() {
   const ROLES_BY_DEPARTMENT: Record<string, string[]> = {
     "Estoque":      ["Gerente de Estoque", "Conferente", "Auxiliar de Expedição", "Auxiliar de Estoque", "Ajudante Geral", "Motorista"],
     "Segurança":    ["Gerente de Segurança", "Auxiliar de Segurança"],
-    "Vendas":       ["Gerente de Vendas", "Supervisor de Vendas", "Supervisora de Vendas", "Vendedor B2B", "Vendedor B2C", "Auxiliar de Vendas", "Check-out"],
+    "Vendas":       ["Gerente de Vendas", "Supervisor de Vendas B2B", "Supervisor de Vendas B2C", "Vendedor B2B", "Vendedor B2C", "Auxiliar de Vendas", "Check-out"],
     "Compras":      ["Gerente de Compras", "Auxiliar de Compras"],
     "Marketing":    ["Gerente de Marketing", "Auxiliar de Marketing", "Atendente do Tráfego"],
     "Recursos H":   ["Gerente de RH", "Auxiliar de RH"],

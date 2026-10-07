@@ -46,7 +46,10 @@ export interface ComissaoParametros {
    */
   metas_equipe: Record<string, number>;
   meta_margem_bruta_pct: number;
+  /** Meta de conversão da MESA (vendedor B2B). */
   meta_conversao_pct: number;
+  /** Meta de conversão do BALCÃO (vendedor B2C). */
+  meta_conversao_balcao_pct: number;
   meta_margem_loja_pct: number;
   bonus_valor: number;
   faixas: FaixaComissao[];
@@ -61,6 +64,7 @@ export const PARAMETROS_PADRAO: ComissaoParametros = {
   metas_equipe: { "342fb56e-1dfc-4644-8d16-d157a776b015": 585086.97 },
   meta_margem_bruta_pct: 37,
   meta_conversao_pct: 60,
+  meta_conversao_balcao_pct: 60,
   meta_margem_loja_pct: 37,
   bonus_valor: 150,
   faixas: [
@@ -125,7 +129,26 @@ export interface EntradaComissao {
   margemLojaPct: number;
   metaVendedor: number;
   metaLoja: number;
+  /** Canal pelo cargo: B2B = mesa, B2C = balcão. Define a meta de conversão. */
+  canal?: "mesa" | "balcao";
 }
+
+/** Meta de conversão do canal do vendedor. */
+export const metaConversaoDe = (canal: EntradaComissao["canal"], p: ComissaoParametros) =>
+  canal === "balcao" ? p.meta_conversao_balcao_pct : p.meta_conversao_pct;
+
+/** Canal pelo cargo do cadastro: "Vendedor B2B" = mesa, "Vendedor B2C" = balcão. */
+export function canalDoCargo(role?: string | null): "mesa" | "balcao" | undefined {
+  const r = String(role || "").toUpperCase();
+  if (r.includes("B2B")) return "mesa";
+  if (r.includes("B2C")) return "balcao";
+  return undefined;
+}
+
+// A meta de conversão do balcão é guardada dentro de `metas_equipe` (jsonb já
+// versionado por vigência) com esta chave reservada — evita migration. Nunca é
+// id de equipe, então não interfere nas metas de faturamento.
+const CHAVE_CONVERSAO_BALCAO = "__conversao_balcao";
 
 /**
  * Como a cascata deixou cada etapa:
@@ -180,7 +203,8 @@ export function calcularComissao(e: EntradaComissao, p: ComissaoParametros): Res
 
   const bateuFaturamento = e.metaVendedor > 0 && e.faturado > e.metaVendedor;
   const bateuMargem = bateuFaturamento && e.margemPct >= p.meta_margem_bruta_pct;
-  const bateuConversao = bateuMargem && e.conversaoPct >= p.meta_conversao_pct;
+  const metaConversao = metaConversaoDe(e.canal, p);
+  const bateuConversao = bateuMargem && e.conversaoPct >= metaConversao;
   const bateuLoja = bateuConversao && e.metaLoja > 0 && e.faturamentoLoja >= e.metaLoja;
   const bateuMargemLoja = bateuLoja && e.margemLojaPct >= p.meta_margem_loja_pct;
 
@@ -191,7 +215,7 @@ export function calcularComissao(e: EntradaComissao, p: ComissaoParametros): Res
   const etapas: Omit<BonusComissao, "status" | "valor">[] = [
     { label: "Faturamento", atingido: bateuFaturamento, realizado: brl(e.faturado), alvo: brl(e.metaVendedor), realizadoNum: e.faturado, alvoNum: e.metaVendedor },
     { label: "Margem bruta", atingido: bateuMargem, realizado: pct(e.margemPct), alvo: pct(p.meta_margem_bruta_pct), realizadoNum: e.margemPct, alvoNum: p.meta_margem_bruta_pct },
-    { label: "Conversão de orçamentos", atingido: bateuConversao, realizado: pct(e.conversaoPct), alvo: pct(p.meta_conversao_pct), realizadoNum: e.conversaoPct, alvoNum: p.meta_conversao_pct },
+    { label: "Conversão de orçamentos", atingido: bateuConversao, realizado: pct(e.conversaoPct), alvo: pct(metaConversao), realizadoNum: e.conversaoPct, alvoNum: metaConversao },
     { label: "Faturamento da equipe", atingido: bateuLoja, realizado: brl(e.faturamentoLoja), alvo: brl(e.metaLoja), realizadoNum: e.faturamentoLoja, alvoNum: e.metaLoja },
     { label: "Margem da equipe", atingido: bateuMargemLoja, realizado: pct(e.margemLojaPct), alvo: pct(p.meta_margem_loja_pct), realizadoNum: e.margemLojaPct, alvoNum: p.meta_margem_loja_pct },
   ];
@@ -245,8 +269,15 @@ export async function carregarParametros(mesRef: Date): Promise<ComissaoParametr
   if (error || !data) return { ...PARAMETROS_PADRAO };
   const row = data as Record<string, unknown>;
   const metasEquipe: Record<string, number> = {};
+  // Tabela antiga (antes da migration 20261007120000) só tem meta_loja: era a
+  // meta do balcão. Usa ela enquanto metas_equipe não existir.
+  if (row.metas_equipe === undefined && Number(row.meta_loja) > 0) {
+    row.metas_equipe = { ...PARAMETROS_PADRAO.metas_equipe, "342fb56e-1dfc-4644-8d16-d157a776b015": Number(row.meta_loja) };
+  }
+  let conversaoBalcao: number | undefined;
   for (const [k, v] of Object.entries((row.metas_equipe as Record<string, unknown>) || {})) {
     const n = Number(v);
+    if (k === CHAVE_CONVERSAO_BALCAO) { if (Number.isFinite(n)) conversaoBalcao = n; continue; }
     if (Number.isFinite(n)) metasEquipe[k] = n;
   }
   return {
@@ -255,6 +286,8 @@ export async function carregarParametros(mesRef: Date): Promise<ComissaoParametr
     metas_equipe: metasEquipe,
     meta_margem_bruta_pct: Number(row.meta_margem_bruta_pct),
     meta_conversao_pct: Number(row.meta_conversao_pct),
+    // Vigência antiga, sem a meta do balcão: usa a mesma da mesa (regra única de antes).
+    meta_conversao_balcao_pct: conversaoBalcao ?? Number(row.meta_conversao_pct),
     meta_margem_loja_pct: Number(row.meta_margem_loja_pct),
     bonus_valor: Number(row.bonus_valor),
     faixas: normalizarFaixas(row.faixas),
@@ -278,7 +311,7 @@ export async function salvarParametros(
   const { error } = await supabase.from("comissao_parametros").upsert(
     {
       vigencia_inicio: vigencia,
-      metas_equipe: p.metas_equipe,
+      metas_equipe: { ...p.metas_equipe, [CHAVE_CONVERSAO_BALCAO]: p.meta_conversao_balcao_pct },
       meta_margem_bruta_pct: p.meta_margem_bruta_pct,
       meta_conversao_pct: p.meta_conversao_pct,
       meta_margem_loja_pct: p.meta_margem_loja_pct,
@@ -412,6 +445,7 @@ export async function carregarComissoes(
   });
 
   const equipesUsadas = new Map<string, EquipeComissao>();
+  const cargoPorCodigo = new Map(usuarios.map((u) => [String(u.operator_code || "").trim(), u.role]));
 
   const linhas: LinhaComissao[] = visiveis
     .map((r) => {
@@ -440,6 +474,7 @@ export async function carregarComissoes(
         margemLojaPct: equipe.margemPct,
         metaVendedor: metaMap.get(cod) ?? num(r.META),
         metaLoja: equipe.meta,
+        canal: canalDoCargo(cargoPorCodigo.get(cod)),
       };
       return {
         codVendedor: cod,

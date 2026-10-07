@@ -119,8 +119,15 @@ export function ParametrosModal({ mesRef, parametros, equipes, usuario, onFechar
 
           <Campo label="Meta de margem bruta individual (%)"
             valor={String(form.meta_margem_bruta_pct)} onChange={setNum("meta_margem_bruta_pct")} />
-          <Campo label="Meta de conversão de orçamentos (%)"
-            valor={String(form.meta_conversao_pct)} onChange={setNum("meta_conversao_pct")} />
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Conversão · Mesa B2B (%)"
+              valor={String(form.meta_conversao_pct)} onChange={setNum("meta_conversao_pct")} />
+            <Campo label="Conversão · Balcão B2C (%)"
+              valor={String(form.meta_conversao_balcao_pct)} onChange={setNum("meta_conversao_balcao_pct")} />
+          </div>
+          <p className="text-[10px] text-muted-foreground -mt-2">
+            Pelo cargo do vendedor: "Vendedor B2B" usa a meta da mesa; "Vendedor B2C", a do balcão.
+          </p>
           <Campo label="Meta de margem bruta da equipe (%)"
             valor={String(form.meta_margem_loja_pct)} onChange={setNum("meta_margem_loja_pct")} />
           <Campo label="Valor de cada bônus (R$)" dica="São 5 bônus, em cascata"

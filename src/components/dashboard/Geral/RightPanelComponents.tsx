@@ -644,9 +644,17 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, s
     const dept = userProfile?.department?.toUpperCase() || "";
     const isComercialDept = dept === "COMERCIAL" || dept === "VENDAS";
     // Visão GERAL (loja inteira) só para Gerente de Vendas, Admin e Diretoria.
-    const isDirector = role.includes("DIRETOR"); // DIRETOR e DIRETORA → geral + times
     const isGerenteVendas =
       role.includes("GERENTE") && (isComercialDept || role.includes("VENDA") || role.includes("COMERCIAL"));
+    // Gerente de outra área (compras, logística…) vê o Total Geral da Carflax,
+    // montado igual ao do diretor — a API não traz mais a linha MEDIA pronta e o
+    // fallback pegava a primeira linha (Canal Balcão). O seletor fica escondido.
+    // Supervisor de Vendas B2B/B2C também vê Total + Time Mesa + Time Balcão no
+    // seletor (abre já no time dele), em vez do "Meu Time" pela hierarquia.
+    const supervisorCanal = role.includes("SUPERVISOR") && (role.includes("B2B") || role.includes("B2C"))
+      ? (role.includes("B2B") ? "TEAM:MESA" : "TEAM:BALCAO")
+      : null;
+    const isDirector = role.includes("DIRETOR") || (role.includes("GERENTE") && !isGerenteVendas) || !!supervisorCanal; // DIRETOR e DIRETORA → geral + times
     const isManager = role === "ADMIN" || isGerenteVendas;
     const isSupervisor = !isManager && !isDirector && (role.includes("SUPERVISOR") || userProfile?.is_leader === true);
 
@@ -688,7 +696,7 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, s
           );
 
           if (response && response.length > 0) {
-            const { mediaRow, teamTotals, individuais, semLinha } = montarTotalETimes(response, usuarios, metaMapDir);
+            const { mediaRow, teamTotals, individuais, semLinha } = montarTotalETimes(response, usuarios, metaMapDir, { doisCanais: true });
 
             if (cancelled) return;
             setAllVendedores([
@@ -697,7 +705,11 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, s
               ...individuais,
               ...semLinha,
             ]);
-            if (!extData) {
+            const meuTime = supervisorCanal ? teamTotals.find((t) => t.COD_VENDEDOR === supervisorCanal) : undefined;
+            if (meuTime) {
+              setData(meuTime);
+              setSelectedCod(meuTime.COD_VENDEDOR);
+            } else if (!extData) {
               if (mediaRow) {
                 setData(mediaRow);
                 setSelectedCod("MEDIA");
@@ -1026,8 +1038,13 @@ export function SalesMetricsCard({ isCompact, userProfile, data: externalData, s
   const showStoreBar = !!(storeData && storeMeta > 0 && storeAtingimento !== atingimento);
 
   const roleUpper = userProfile?.role?.toUpperCase() || "";
-  const canChangeSeller = roleUpper.includes("DIRETOR") || 
-                          roleUpper.includes("GERENTE") || 
+  const deptUpper = userProfile?.department?.toUpperCase() || "";
+  // Gerente de outra área (compras, logística…) vê só o total da Carflax:
+  // trocar de vendedor é do gerente de vendas.
+  const isGerenteVendasCard = roleUpper.includes("GERENTE") &&
+    (deptUpper === "COMERCIAL" || deptUpper === "VENDAS" || roleUpper.includes("VENDA") || roleUpper.includes("COMERCIAL"));
+  const canChangeSeller = roleUpper.includes("DIRETOR") ||
+                          isGerenteVendasCard ||
                           roleUpper === "ADMIN" ||
                           roleUpper.includes("SUPERVISOR") ||
                           (userProfile?.is_leader === true && allVendedores.length > 0);

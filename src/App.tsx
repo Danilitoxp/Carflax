@@ -1409,8 +1409,9 @@ function DashboardContent({
     "Relatórios Mkt",
     "Gestao Trafego",
   ].includes(activeItem);
-  // Só o COMERCIAL vê o painel de métricas; os demais veem "Funcionário do Mês".
-  // Gerente de outra área (ex.: logística) NÃO vê métricas.
+  // Comercial e gerentes veem o painel de métricas; os demais veem "Funcionário
+  // do Mês". Gerente de outra área (ex.: logística) vê o vendido geral da
+  // Carflax: o carregamento já traz a linha MEDIA (total da loja) para GERENTE.
   const roleUpper = userProfile?.role?.toUpperCase() || "";
   const deptUpper = userProfile?.department?.toUpperCase() || "";
   const isComercialDept = deptUpper === "COMERCIAL" || deptUpper === "VENDAS";
@@ -1427,6 +1428,7 @@ function DashboardContent({
     isVendedorRole ||
     isDiretoria ||
     isGerenteVendas ||
+    roleUpper.includes("GERENTE") ||
     roleUpper === "ADMIN" ||
     isVendedor;
 

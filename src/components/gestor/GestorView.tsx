@@ -45,7 +45,7 @@ async function carregarCards() {
   const metaMap = new Map<string, number>(
     (metas || []).map((mt) => [String(mt.COD_VENDEDOR).trim(), parseFloat(String(mt.META)) || 0]),
   );
-  const { mediaRow, teamTotals } = montarTotalETimes(response || [], (orgRes.data || []) as OrgUser[], metaMap);
+  const { mediaRow, teamTotals } = montarTotalETimes(response || [], (orgRes.data || []) as OrgUser[], metaMap, { doisCanais: true });
   // Sem meta não há ritmo nem atingimento: igual ao painel, time sem meta não entra.
   const times = teamTotals.filter((t) => Number(t.META) > 0);
   return { cards: [...(mediaRow ? [mediaRow] : []), ...times], perdidoMap };

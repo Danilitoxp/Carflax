@@ -71,6 +71,8 @@ export function montarTotalETimes(
   response: VendedorResumo[],
   usuarios: OrgUser[],
   metaMap: Map<string, number>,
+  /** doisCanais: só Time Mesa + Time Balcão (telas de vendas). */
+  opcoes?: { doisCanais?: boolean },
 ) {
   const mediaRow = response.find(r => r.COD_VENDEDOR === "MEDIA");
   const individuais = response.filter(r => r.COD_VENDEDOR !== "MEDIA");
@@ -128,9 +130,45 @@ export function montarTotalETimes(
     (a, b) => (parseFloat(String(b.FATURADO)) || 0) - (parseFloat(String(a.FATURADO)) || 0),
   );
 
+  // Comercial tem sempre dois times, pelo CARGO no cadastro (não pela
+  // hierarquia, que sumia com o Balcão quando o supervisor mudou de área):
+  //   Time Mesa   = cargo "Vendedor B2B"
+  //   Time Balcão = cargo "Vendedor B2C"
+  // Cargo com os dois ("Vendedor B2B / B2C") conta na Mesa, que vem primeiro.
+  // Times de áreas que não vendem (estoque, marketing…) ficam de fora.
+  let times = teamTotals;
+  if (opcoes?.doisCanais) {
+    const linhaDe = (u: OrgUser): VendedorResumo | null => {
+      const cod = String(u.operator_code || "").trim();
+      if (!cod) return null;
+      const erp = erpByCod.get(cod);
+      if (erp) return erp;
+      const meta = metaMap.get(cod) || 0;
+      return {
+        COD_VENDEDOR: cod, NOME_VENDEDOR: u.name || cod,
+        META: meta, FATURADO: 0, EM_ABERTO: 0, TOTAL: 0, FALTANTE: meta,
+        CUSTO: 0, MARGEM_REAL: 0, MARGEM_REAL_PERC: 0,
+        QTD_VENDAS: 0, TICKET_MEDIO: 0, QTD_ORCAMENTOS: 0, ORC_FECHADOS: 0,
+        PRAZO_MEDIO_DIAS: 0, TOTAL_VENDIDO_HOJE: 0,
+      } as VendedorResumo;
+    };
+    const canal = (u: OrgUser) => {
+      const r = String(u.role || "").toUpperCase();
+      if (r.includes("B2B")) return "mesa";
+      if (r.includes("B2C")) return "balcao";
+      return null;
+    };
+    const montar = (qual: "mesa" | "balcao", cod: string, nome: string) => {
+      const membros = usuarios.filter((u) => canal(u) === qual);
+      const rows = membros.map(linhaDe).filter(Boolean) as VendedorResumo[];
+      return rows.length ? [buildTeamTotal(rows, mediaRow, cod, nome)] : [];
+    };
+    times = [...montar("mesa", "TEAM:MESA", "Time Mesa"), ...montar("balcao", "TEAM:BALCAO", "Time Balcão")];
+  }
+
   return {
     mediaRow,
-    teamTotals,
+    teamTotals: times,
     individuais,
     semLinha: semLinhaGlobal.filter(
       (p, i, arr) => arr.findIndex((o) => o.COD_VENDEDOR === p.COD_VENDEDOR) === i,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   MapPin,
+  FileText,
   CheckCircle2,
   Navigation,
   Camera,
@@ -20,6 +21,7 @@ import { uploadImage } from "@/lib/uploadImage";
 import { useTheme } from "@/context/theme-provider";
 import { motion, AnimatePresence } from "framer-motion";
 import { TIPOS_OCORRENCIA } from "@/lib/ocorrencias";
+import { abrirPdfColeta, type ColetaPdf } from "@/lib/coleta-pdf";
 
 interface Delivery {
   id: string;
@@ -38,6 +40,8 @@ interface Delivery {
   coletaId?: string;
   pedidoCompra?: string | null;
   itens?: string[];
+  /** Dados da coleta para gerar o PDF do pedido. */
+  coleta?: ColetaPdf;
   sortOrder?: number;
 }
 
@@ -523,6 +527,15 @@ export function MotoristaView() {
                       ))}
                     </ul>
                   </div>
+                )}
+                {e.kind === "coleta" && e.coleta && (
+                  <button
+                    type="button"
+                    onClick={() => abrirPdfColeta(e.coleta!)}
+                    className="mt-3 w-full h-11 rounded-2xl border-2 border-pink-200 dark:border-pink-900/50 text-pink-600 dark:text-pink-400 text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2"
+                  >
+                    <FileText size={16} /> PDF do pedido
+                  </button>
                 )}
                 {e.instructions && (
                   <div className="flex items-start gap-2 text-blue-500 mt-2 bg-blue-50 px-3 py-2 rounded-2xl border border-blue-100">
