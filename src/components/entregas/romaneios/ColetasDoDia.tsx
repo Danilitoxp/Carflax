@@ -221,7 +221,8 @@ export function ColetasDoDia({
                 </div>
                 <p className="text-[10px] font-bold uppercase tracking-tight text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
                   <span className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> {[c.bairro, c.cidade, c.uf].filter(Boolean).join(" · ")}
+                    {/* Rua e número primeiro: é o que a expedição precisa para montar a rota. */}
+                    <MapPin className="w-3 h-3" /> {[c.endereco, c.bairro, [c.cidade, c.uf].filter(Boolean).join("/")].filter(Boolean).join(" · ")}
                   </span>
                   <span className={cn("flex items-center gap-1", c.coletar_ate < hojeISO() && "text-red-500")}>
                     <CalendarDays className="w-3 h-3" /> Até {brData(c.coletar_ate)}

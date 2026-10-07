@@ -4,7 +4,7 @@ import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RankingSeller } from "./ranking-events";
 import { tocarAceleracao } from "./som-motor";
-import { coresDoCarro, ordenarFaixas, pecasDoCarro, RODAS, CARROCERIAS, AEROFOLIOS, type Garagem, type PecaId } from "./garagem";
+import { coresDoCarro, ordenarFaixas, pecasDoCarro, RODAS, CARROCERIAS, AEROFOLIOS, efeitoDaPeca, NEONS, PILOTOS, DESENHOS, TURBOS, type Garagem, type PecaId } from "./garagem";
 
 /**
  * Modo corrida do Ranking do dia — "Grande Prêmio Carflax".
@@ -49,30 +49,54 @@ export function CarroF1({
   const tem = (p: PecaId) => ativas.has(p);
   const roda = RODAS.find((p) => tem(p.id));
   const corpo = CARROCERIAS.find((p) => tem(p.id));
+  const neon = NEONS.find((p) => tem(p.id));
+  const piloto = PILOTOS.find((p) => tem(p.id));
+  const desenho = DESENHOS.find((p) => tem(p.id));
+  const turbo = TURBOS.find((p) => tem(p.id));
   const asa = AEROFOLIOS.find((p) => tem(p.id));
   return (
     <svg viewBox="0 0 220 80" className="w-full h-full overflow-visible" aria-hidden="true">
+      {Array.from(ativas).map(id => {
+        const efeito = efeitoDaPeca(id);
+        if(efeito.intensidade < .2) return null;
+        return <g key={id} opacity={.3+efeito.intensidade*.5}>
+          {Array.from({length:efeito.detalhes},(_,i)=><path key={i} d={`M${55+i*10} 29 l4 5 M${55+i*10} 51 l4 -5`} stroke={desenho?.cor ?? neon?.cor ?? "#e2e8f0"} strokeWidth={1+efeito.intensidade} />)}
+        </g>;
+      })}
+      {Array.from(ativas).map(pecaId => {
+        const efeito=efeitoDaPeca(pecaId);
+        if(efeito.intensidade<.65) return null;
+        const origem=pecaId.startsWith("asa-")?18:pecaId.startsWith("roda-")?42:pecaId.startsWith("turbo-")?0:110;
+        const corEfeito=pecaId.startsWith("asa-")?asa?.cor:pecaId.startsWith("roda-")?roda?.aro:turbo?.cor ?? neon?.cor ?? desenho?.cor ?? piloto?.viseira;
+        return <g key={`fx-${pecaId}`}>
+          {Array.from({length:efeito.detalhes+2},(_,i)=><circle key={i} r={1+efeito.intensidade} fill={corEfeito ?? "#fcd34d"}>
+            <animate attributeName="cx" values={`${origem};${origem-25*efeito.escala}`} dur="1.1s" begin={`${-i*.15}s`} repeatCount="indefinite" />
+            <animate attributeName="cy" values={`${i%2?28:52};${i%2?20:60}`} dur="1.1s" begin={`${-i*.15}s`} repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0;1;0" dur="1.1s" begin={`${-i*.15}s`} repeatCount="indefinite" />
+          </circle>)}
+        </g>;
+      })}
       {/* neon: brilho ciano no asfalto, pulsando */}
-      {tem("neon") && (
+      {neon && (
         // Gradiente radial no lugar de filter: blur — o blur era refeito a cada quadro.
         <>
           <defs>
             <radialGradient id={`n${id}`}>
-              <stop offset="0" stopColor="#22d3ee" stopOpacity="0.9">
-                <animate attributeName="stop-color" values="#22d3ee;#a855f7;#ec4899;#22d3ee" dur="4s" repeatCount="indefinite" />
+              <stop offset="0" stopColor={neon.cor} stopOpacity="0.9">
+                {neon.arcoiris && <animate attributeName="stop-color" values="#22d3ee;#a855f7;#ec4899;#22d3ee" dur="4s" repeatCount="indefinite" />}
               </stop>
-              <stop offset="1" stopColor="#22d3ee" stopOpacity="0" />
+              <stop offset="1" stopColor={neon.cor} stopOpacity="0" />
             </radialGradient>
           </defs>
-          <ellipse cx="112" cy="40" rx="118" ry="44" fill={`url(#n${id})`}>
+          <ellipse cx="112" cy="40" rx={100 * efeitoDaPeca(neon.id).escala} ry={30 * efeitoDaPeca(neon.id).escala} fill={`url(#n${id})`}>
             <animate attributeName="opacity" values="0.5;1;0.5" dur="1.2s" repeatCount="indefinite" />
           </ellipse>
         </>
       )}
       {/* turbo: chamas saindo da traseira */}
-      {tem("turbo") && (
-        <g>
-          <path d="M4 30 L-30 40 L4 50 Z" fill="#f97316">
+      {turbo && (
+        <g transform={`translate(4 40) scale(${efeitoDaPeca(turbo.id).escala}) translate(-4 -40)`}>
+          <path d="M4 30 L-30 40 L4 50 Z" fill={turbo?.cor ?? "#f97316"}>
             <animate attributeName="d" values="M4 30 L-30 40 L4 50 Z;M4 31 L-44 40 L4 49 Z;M4 30 L-30 40 L4 50 Z" dur="0.25s" repeatCount="indefinite" />
           </path>
           <path d="M4 34 L-18 40 L4 46 Z" fill="#fde047" />
@@ -152,14 +176,14 @@ export function CarroF1({
       {/* aerofólio dianteiro */}
       <rect x="196" y="12" width="14" height="56" rx="3" fill="#0f172a" />
       <rect x="198" y="14" width="10" height="52" rx="2" fill={cor} />
-      {tem("listras") && <path d="M22 34 H152 M22 46 H152" stroke="#fff" strokeWidth="2" />}
+      {desenho && <path d={desenho.padrao % 2 ? "M22 34 L42 46 L62 34 L82 46 L102 34 L122 46 L152 34" : "M22 34 H152 M22 46 H152"} fill="none" stroke={desenho.cor} strokeWidth="2" />}
       {tem("cromo") && <path d="M24 31 L96 22 L150 28 L194 36" fill="none" stroke="#e2e8f0" strokeWidth="3" />}
       {tem("slick") && [3, 75].map((y) => <path key={y} d={`M30 ${y} H56 M154 ${y} H176`} stroke="#ef4444" strokeWidth="3" />)}
       {tem("splitter") && <rect x="210" y="8" width="5" height="64" rx="2" fill="#334155" />}
       {tem("difusor") && <path d="M20 26 H32 M20 34 H32 M20 46 H32 M20 54 H32" stroke="#94a3b8" strokeWidth="3" />}
       {tem("led") && <path d="M64 24 L94 21 M64 56 L94 59" stroke="#67e8f9" strokeWidth="3" />}
-      {tem("capacete-sakura") && <circle cx="112" cy="40" r="15" fill="none" stroke="#f9a8d4" strokeWidth="3" />}
-      {tem("capacete") && <circle cx="112" cy="40" r="15" fill="none" stroke="#fcd34d" strokeWidth="3" />}
+      {piloto && <circle cx="112" cy="40" r="15" fill={piloto.cor} stroke={piloto.viseira} strokeWidth="3" />}
+
       {tem("antena") && <g><path d="M28 30 V-12" stroke="#cbd5e1" strokeWidth="2" /><path d="M28 -12 H48 L43 -2 H28 Z" fill="#fcd34d" /></g>}
       {/* número */}
       <circle cx="166" cy="40" r="9" fill="#fff" />

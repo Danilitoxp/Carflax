@@ -25,6 +25,26 @@ export function F1em3D({ visual }: { visual: Visual }) {
     el.appendChild(renderer.domElement);
 
     const cena = new THREE.Scene();
+    // Metais precisam de um ambiente claro para refletir o estúdio.
+    const luzCanvas = document.createElement("canvas");
+    luzCanvas.width = 256; luzCanvas.height = 128;
+    const contexto = luzCanvas.getContext("2d")!;
+    const gradiente = contexto.createLinearGradient(0, 0, 0, 128);
+    gradiente.addColorStop(0, "#64748b");
+    gradiente.addColorStop(0.35, "#f8fafc");
+    gradiente.addColorStop(0.6, "#94a3b8");
+    gradiente.addColorStop(1, "#1e293b");
+    contexto.fillStyle = gradiente;
+    contexto.fillRect(0, 0, 256, 128);
+    contexto.fillStyle = "#ffffff";
+    contexto.fillRect(24, 16, 20, 78);
+    contexto.fillRect(150, 22, 28, 66);
+    const ambiente = new THREE.CanvasTexture(luzCanvas);
+    ambiente.colorSpace = THREE.SRGBColorSpace;
+    ambiente.mapping = THREE.EquirectangularReflectionMapping;
+    cena.environment = ambiente;
+    cena.environmentIntensity = 1;
+
     const camera = new THREE.PerspectiveCamera(38, el.clientWidth / el.clientHeight, 0.1, 100);
     camera.position.set(6.4, 4.3, 6.4);
     camera.lookAt(0, 0.4, 0);
@@ -85,6 +105,7 @@ export function F1em3D({ visual }: { visual: Visual }) {
         ultimoQuadro = agora;
         // A rotação faz parte do provador, mesmo com movimento reduzido.
         modelo.carro.rotation.y = tempo * 0.25;
+        modelo.carro.traverse(obj => { if (obj.userData.velocidadeGiro) obj.rotation.z = tempo * obj.userData.velocidadeGiro; });
         if (!movimentoReduzido.matches) {
           modelo.anim.forEach((f) => f(tempo));
         }
@@ -134,6 +155,7 @@ export function F1em3D({ visual }: { visual: Visual }) {
       document.removeEventListener("visibilitychange", aoMudarVisibilidade);
       movimentoReduzido.removeEventListener("change", solicitarQuadro);
       liberarObjeto(cena);
+      ambiente.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
       el.removeChild(renderer.domElement);

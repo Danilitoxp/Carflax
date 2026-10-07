@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { RODAS, CARROCERIAS, AEROFOLIOS, pecasDoCarro, type PecaId } from "./garagem";
+import { RODAS, CARROCERIAS, AEROFOLIOS, PECAS, efeitoDaPeca, NEONS, PILOTOS, DESENHOS, TURBOS, pecasDoCarro, type PecaId } from "./garagem";
 
 /**
  * O F1 da pista (mesmo contorno do SVG do modo corrida) em 3D. O carro base
@@ -60,7 +60,7 @@ export function texturaBrilho() {
 
 type Animacao = (t: number) => void;
 
-export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garagem" | "pista" = "garagem") {
+export function montarF1(v: Visual, _texturaCarregada?: () => void, modo: "garagem" | "pista" = "garagem") {
   const ativas = pecasDoCarro({ pecas: v.pecas });
   const carro = new THREE.Group();
   const anim: Animacao[] = [];
@@ -68,11 +68,15 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
   const ouro = tem("ouro");
   const perfilRoda = RODAS.find((p) => tem(p.id));
   const perfilCorpo = CARROCERIAS.find((p) => tem(p.id));
+  const perfilNeon = NEONS.find((p) => tem(p.id));
+  const perfilPiloto = PILOTOS.find((p) => tem(p.id));
+  const perfilDesenho = DESENHOS.find((p) => tem(p.id));
+  const perfilTurbo = TURBOS.find((p) => tem(p.id));
   const perfilAsa = AEROFOLIOS.find((p) => tem(p.id));
 
-  // Base do carro: mesmo estilo de sempre. Só o kit ouro mexe na lataria.
+  // Acabamento cromado usa prata; os demais preservam a pintura escolhida.
   const lataria = new THREE.MeshStandardMaterial({
-    color: v.cor,
+    color: tem("cromo") && !ouro ? "#e2e8f0" : v.cor,
     metalness: ouro || tem("cromo") ? 1 : perfilCorpo?.metal ?? 0.5,
     roughness: tem("cromo") ? 0.05 : ouro ? 0.15 : 0.3,
     emissive: ouro ? "#5c3d00" : "#000000",
@@ -134,13 +138,16 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
     roda.add(pneu);
     const lado = y < 40 ? -1 : 1;
     const faceZ = lado * (w / 2 + 0.012);
+    const aroGiratorio = new THREE.Group();
+    aroGiratorio.userData.aroGiratorio = true;
+    roda.add(aroGiratorio);
     // Raios abertos: o freio aparece atrás, em vez de um disco sólido.
     const freio = new THREE.Mesh(new THREE.CircleGeometry(r * 0.62, 24), freioMat);
     freio.position.z = faceZ;
     roda.add(freio);
     const borda = new THREE.Mesh(new THREE.TorusGeometry(r * 0.74, 0.025, 6, 24), aroMat);
     borda.position.z = faceZ + lado * 0.015;
-    roda.add(borda);
+    aroGiratorio.add(borda);
     const pinça = new THREE.Mesh(new THREE.BoxGeometry(r * 0.16, r * 0.55, 0.025), pincaMat);
     pinça.position.set(r * 0.45, 0, faceZ + lado * 0.018);
     if (perfilRoda?.raios !== 0) roda.add(pinça);
@@ -149,28 +156,47 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
       const disco = new THREE.Mesh(new THREE.CircleGeometry(r * 0.7, 48), aroMat);
       disco.material.side = THREE.DoubleSide;
       disco.position.z = faceZ + lado * 0.03;
-      roda.add(disco);
+      aroGiratorio.add(disco);
     }
     for (let k = 0; k < raios; k++) {
       const angulo = k / raios * Math.PI * 2;
       const raio = new THREE.Mesh(new THREE.BoxGeometry(r * 0.1, r * 0.62, 0.035), aroMat);
       raio.position.set(-Math.sin(angulo) * r * 0.36, Math.cos(angulo) * r * 0.36, faceZ + lado * 0.035);
       raio.rotation.z = angulo + (perfilRoda?.id === "roda-turbina" ? 0.3 : 0);
-      roda.add(raio);
+      aroGiratorio.add(raio);
     }
     const cubo = new THREE.Mesh(new THREE.SphereGeometry(r * 0.14, 16, 8), cromo);
     cubo.scale.z = 0.3;
     cubo.position.z = faceZ + lado * 0.055;
-    roda.add(cubo);
+    aroGiratorio.add(cubo);
     if (perfilRoda || douradas || tem("slick")) {
       const faixaPneu = new THREE.Mesh(new THREE.TorusGeometry(r * 0.88, 0.012, 6, 24), faixaMat);
       faixaPneu.position.z = faceZ;
       roda.add(faixaPneu);
     }
-    if (modo === "pista") roda.scale.setScalar(1.2);
+    const efeitoRoda = perfilRoda || douradas || tem("slick") ? efeitoDaPeca(perfilRoda?.id ?? (douradas ? "rodas" : "slick")) : null;
+    if (efeitoRoda) {
+      for (let i = 0; i < efeitoRoda.detalhes; i++) {
+        const anel = new THREE.Mesh(new THREE.TorusGeometry(r * (0.72 + i * 0.033), 0.006 + efeitoRoda.intensidade * 0.004, 6, 32), faixaMat);
+        anel.position.z = faceZ + lado * 0.02; aroGiratorio.add(anel);
+      }
+      for (let i = 0; i < efeitoRoda.detalhes * 4; i++) {
+        const a = i * Math.PI * 2 / (efeitoRoda.detalhes * 4);
+        const parafuso = new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 4), cromo);
+        parafuso.position.set(Math.cos(a)*r*.64,Math.sin(a)*r*.64,faceZ+lado*.04);aroGiratorio.add(parafuso);
+      }
+    }
+    if (efeitoRoda && efeitoRoda.intensidade >= .65) {
+      aroGiratorio.userData.velocidadeGiro = (1.5 + efeitoRoda.intensidade * 2) * lado;
+      anim.push(t => { aroGiratorio.rotation.z = t * aroGiratorio.userData.velocidadeGiro; });
+    }
+    const escalaRoda = (modo === "pista" ? 1.2 : 1) * (1 + (efeitoRoda?.intensidade ?? 0) * 0.12);
+    roda.scale.setScalar(escalaRoda);
     // A pista gira as rodas conforme a velocidade do piloto (RankingCena3D).
-    roda.userData.roda = true;
-    roda.position.set(X(x), modo === "pista" ? r * 1.2 : r, Z(y) * (modo === "pista" ? 1.22 : 1));
+    roda.userData.roda = Boolean(efeitoRoda && efeitoRoda.intensidade >= .65);
+    roda.position.set(X(x), r * escalaRoda, Z(y) * (modo === "pista" ? 1.22 : 1));
+    // Manter a geometria dentro da roda: o lote estático impedia o giro dos raios.
+    roda.traverse(obj => { if (obj instanceof THREE.Mesh) obj.userData.animado = true; });
     carro.add(roda);
     // Braços da suspensão
     const braco = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, Math.abs(Z(y)) - 0.3), carbono);
@@ -180,7 +206,11 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
 
   // Aerofólio traseiro
   if (perfilAsa) {
-    const { largura, altura, planos, cor } = perfilAsa;
+    const efeito = efeitoDaPeca(perfilAsa.id);
+    const largura = 1.8 + efeito.intensidade * 0.7;
+    const altura = 1 + efeito.intensidade * 0.45;
+    const planos = 1 + Math.floor(efeito.intensidade * 2);
+    const cor = perfilAsa.cor;
     const detalhe = new THREE.MeshStandardMaterial({ color: cor, metalness: 0.7, roughness: 0.25 });
     for (let i = 0; i < planos; i++) {
       const asa = sombra(new THREE.Mesh(new THREE.BoxGeometry(0.42 - i * 0.06, 0.045, largura - i * 0.08), i === 0 ? lataria : carbono));
@@ -268,7 +298,7 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
   numero.position.set(X(166), 0.705, 0);
   carro.add(numero);
 
-  // Cockpit, halo e capacete com a foto
+  // Cockpit, halo e capacete
   const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 12), new THREE.MeshStandardMaterial({ color: "#020617", roughness: 0.2 }));
   cockpit.scale.set(1, 0.25, 0.8);
   cockpit.position.set(X(112), 0.68, 0);
@@ -277,12 +307,10 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
   halo.rotation.y = Math.PI / 2;
   halo.position.set(X(112), 0.7, 0);
   carro.add(halo);
-  // Piloto: macacão, braços no volante e capacete com viseira. A foto do
-  // vendedor vai num adesivo redondo no alto do capacete (visto de cima, como
-  // no carro da pista).
+  // Piloto: macacão, braços no volante e capacete com viseira.
   const piloto = new THREE.Group();
   piloto.position.set(X(112), 0, 0);
-  const macacao = new THREE.MeshStandardMaterial({ color: v.escura, roughness: 0.6 });
+  const macacao = new THREE.MeshStandardMaterial({ color: perfilPiloto?.cor ?? v.escura, roughness: 0.6 });
   const tronco = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.14, 6, 16), macacao);
   tronco.position.set(-0.1, 0.74, 0);
   tronco.rotation.z = 0.25;
@@ -305,10 +333,11 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
     luva.position.copy(mao);
     piloto.add(luva);
   }
-  const capaceteMat = new THREE.MeshStandardMaterial({ color: tem("capacete-sakura") ? "#f9a8d4" : tem("capacete") ? "#fcd34d" : v.cor, metalness: 0.3, roughness: 0.25 });
+  const capaceteMat = new THREE.MeshStandardMaterial({ color: perfilPiloto?.cor ?? v.cor, metalness: 0.3, roughness: 0.25 });
   const capacete = sombra(new THREE.Mesh(new THREE.SphereGeometry(0.19, 20, 12), capaceteMat));
   capacete.scale.set(1.12, 1, 0.95);
   capacete.position.set(-0.02, 0.98, 0);
+  if (perfilPiloto) capacete.scale.multiplyScalar(1 + efeitoDaPeca(perfilPiloto.id).intensidade * .12);
   piloto.add(capacete);
   // faixa branca de frente a trás
   const faixaCap = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.016, 8, 40, Math.PI), new THREE.MeshStandardMaterial({ color: "#ffffff" }));
@@ -318,47 +347,40 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
   // viseira escura espelhada voltada para a frente (+X)
   const viseira = new THREE.Mesh(
     new THREE.SphereGeometry(0.195, 32, 12, Math.PI - 0.95, 1.9, 1.15, 0.55),
-    new THREE.MeshStandardMaterial({ color: "#0b1020", metalness: 1, roughness: 0.05, emissive: "#1e3a8a", emissiveIntensity: 0.25, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: perfilPiloto?.viseira ?? "#0b1020", metalness: 0.8, roughness: 0.12, emissive: perfilPiloto?.viseira ?? "#1e3a8a", emissiveIntensity: 0.18, side: THREE.DoubleSide }),
   );
   viseira.scale.copy(capacete.scale);
   viseira.position.copy(capacete.position);
   piloto.add(viseira);
-  // adesivo com a foto no alto do capacete
-  const adesivoMat = new THREE.MeshBasicMaterial({ transparent: true });
-  if (v.avatar) {
-    new THREE.TextureLoader().setCrossOrigin("anonymous").load(v.avatar, (t) => {
-      if (adesivoMat.userData.descartado) { t.dispose(); return; }
-      t.colorSpace = THREE.SRGBColorSpace;
-      adesivoMat.map = t;
-      adesivoMat.needsUpdate = true;
-      texturaCarregada?.();
-    });
-  } else {
-    adesivoMat.map = texturaTexto(v.iniciais, v.cor, "#ffffff");
+  if (perfilPiloto) {
+    const detalhe = new THREE.MeshBasicMaterial({ color: perfilPiloto.viseira });
+    for (let i = 0; i < efeitoDaPeca(perfilPiloto.id).detalhes; i++) {
+      const faixa = new THREE.Mesh(new THREE.TorusGeometry(0.193, 0.008, 6, 32, Math.PI), detalhe);
+      faixa.position.copy(capacete.position); faixa.position.z += (i - (efeitoDaPeca(perfilPiloto.id).detalhes-1)/2) * 0.027;
+      piloto.add(faixa);
+    }
+    anim.push((t) => { (viseira.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.14 + (Math.sin(t * (1.5 + perfilPiloto.padrao * 0.15)) + 1) * 0.08; });
   }
-  const adesivo = new THREE.Mesh(new THREE.CircleGeometry(0.1, 32), adesivoMat);
-  adesivo.rotation.x = -Math.PI / 2;
-  adesivo.rotation.z = -Math.PI / 2;
-  adesivo.position.set(-0.04, 0.98 + 0.19 + 0.003, 0);
-  piloto.add(adesivo);
-  const aroAdesivo = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.115, 32), new THREE.MeshBasicMaterial({ color: "#ffffff" }));
-  aroAdesivo.rotation.copy(adesivo.rotation);
-  aroAdesivo.position.copy(adesivo.position);
-  piloto.add(aroAdesivo);
   carro.add(piloto);
 
   const brilho = texturaBrilho();
 
   // Neon: luz por baixo trocando de cor e pintando o chão
-  if (tem("neon")) {
-    const neonMat = new THREE.MeshBasicMaterial({ map: brilho, color: "#22d3ee", transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
-    const mancha = new THREE.Mesh(new THREE.PlaneGeometry(7, 3.2), neonMat);
+  if (perfilNeon) {
+    const efeito = efeitoDaPeca(perfilNeon.id);
+    for (let i = 0; i < efeito.detalhes; i++) {
+      const halo = new THREE.Mesh(new THREE.RingGeometry(1.2 + i * 0.13, 1.23 + i * 0.13, 48), new THREE.MeshBasicMaterial({color:perfilNeon.cor,transparent:true,opacity:.2,blending:THREE.AdditiveBlending,depthWrite:false}));
+      halo.rotation.x=-Math.PI/2;halo.scale.y=.5;halo.position.y=.025+i*.001;carro.add(halo);
+      anim.push(t=>{(halo.material as THREE.MeshBasicMaterial).opacity=(.12+efeito.intensidade*.2)*(1+Math.sin(t*perfilNeon.ritmo*3-i)*.4);});
+    }
+    const neonMat = new THREE.MeshBasicMaterial({ map: brilho, color: perfilNeon.cor, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+    const mancha = new THREE.Mesh(new THREE.PlaneGeometry(5 * efeitoDaPeca(perfilNeon.id).escala, 2.2 * efeitoDaPeca(perfilNeon.id).escala), neonMat);
     mancha.rotation.x = -Math.PI / 2;
     mancha.position.y = 0.02;
     carro.add(mancha);
     const tubos: THREE.Mesh[] = [];
     for (const s of [-1, 1]) {
-      const tubo = new THREE.Mesh(new THREE.CapsuleGeometry(0.025, 3.6, 4, 8), new THREE.MeshBasicMaterial({ color: "#22d3ee" }));
+      const tubo = new THREE.Mesh(new THREE.CapsuleGeometry(0.025, 3.6, 4, 8), new THREE.MeshBasicMaterial({ color: perfilNeon.cor }));
       tubo.rotation.z = Math.PI / 2;
       tubo.position.set(0.1, 0.2, s * 0.45);
       carro.add(tubo);
@@ -368,16 +390,17 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
     // aditiva no chão já dá o efeito de luz.
     const cor = new THREE.Color();
     anim.push((t) => {
-      cor.setHSL((t * 0.08) % 1, 1, 0.55);
+      if (perfilNeon.arcoiris) cor.setHSL((t * 0.08) % 1, 1, 0.55);
+      else cor.set(perfilNeon.cor);
       neonMat.color.copy(cor);
-      neonMat.opacity = 0.7 + Math.sin(t * 5) * 0.2;
+      neonMat.opacity = 0.7 + Math.sin(t * 5 * perfilNeon.ritmo) * 0.2;
       tubos.forEach((m) => (m.material as THREE.MeshBasicMaterial).color.copy(cor));
     });
   }
 
   // Escapamento aceso de série na pista (como no ranking 2D antigo): uma chama
   // curta tremulando. O Turbo comprado troca por chamas maiores e faíscas.
-  if (modo === "pista" && !tem("turbo")) {
+  if (modo === "pista" && !perfilTurbo) {
     const chamas: THREE.Mesh[] = [];
     for (const [cor, raio, comp] of [["#f97316", 0.09, 0.6], ["#fde047", 0.05, 0.38]] as const) {
       const c = new THREE.Mesh(
@@ -401,14 +424,14 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
   }
 
   // Turbo: escapamentos cromados, chamas em camadas e faíscas
-  if (tem("turbo")) {
+  if (perfilTurbo) {
     const chamas: THREE.Mesh[] = [];
     for (const s of [-0.16, 0.16]) {
       const cano = sombra(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.4, 16, 1, true), cromo));
       cano.rotation.z = Math.PI / 2;
       cano.position.set(X(18) - 0.1, 0.62, s);
       carro.add(cano);
-      for (const [cor, raio, comp] of [["#2563eb", 0.07, 0.5], ["#f97316", 0.11, 0.9], ["#fde047", 0.06, 0.55]] as const) {
+      for (const [cor, raio, comp] of [[perfilTurbo.cor, 0.07, 0.5 * perfilTurbo.potencia], [perfilTurbo.cor, 0.11, 0.9 * efeitoDaPeca(perfilTurbo.id).escala * perfilTurbo.potencia], ["#f8fafc", 0.06, 0.55 * perfilTurbo.potencia]] as const) {
         const c = new THREE.Mesh(
           new THREE.ConeGeometry(raio, comp, 16, 1, true),
           new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }),
@@ -422,22 +445,22 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
         chamas.push(c);
       }
     }
-    const qtd = 24;
+    const qtd = efeitoDaPeca(perfilTurbo.id).particulas;
     const pos = new Float32Array(qtd * 3);
     const vel = Array.from({ length: qtd }, () => Math.random());
     const faiscas = new THREE.Points(
       new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(pos, 3)),
-      new THREE.PointsMaterial({ map: brilho, color: "#fbbf24", size: 0.12, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+      new THREE.PointsMaterial({ map: brilho, color: perfilTurbo.cor, size: 0.12, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
     );
     carro.add(faiscas);
     anim.push((t) => {
       for (const c of chamas) {
-        const k = 0.6 + Math.random() * 0.7;
+        const k = 0.85 + Math.sin(t * 16 * perfilTurbo.ritmo + c.position.z * 8) * 0.35;
         c.scale.set(1, k, 1);
         c.position.x = c.userData.base + (c.userData.comp * (1 - k)) / 2;
       }
       for (let i = 0; i < qtd; i++) {
-        const f = (t * 1.6 + vel[i]) % 1;
+        const f = (t * 1.6 * perfilTurbo.ritmo + vel[i]) % 1;
         pos[i * 3] = X(18) - 0.4 - f * 1.6;
         pos[i * 3 + 1] = 0.62 + Math.sin(i * 12.9 + f * 6) * 0.15 * f + f * 0.2;
         pos[i * 3 + 2] = (i % 2 ? 0.16 : -0.16) + Math.cos(i * 7.3) * 0.25 * f;
@@ -502,7 +525,36 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
     escape.position.set(-2.4, 0.55, z);
     carro.add(escape);
   }
-  if (tem("listras")) for (const z of [-0.16, 0.16]) caixa(0.9, 0.7, z, 2.8, 0.025, 0.07, cromo);
+  if (perfilDesenho) {
+    const canvas = document.createElement("canvas"); canvas.width = 256; canvas.height = 64;
+    const ctx = canvas.getContext("2d")!;
+    ctx.strokeStyle = perfilDesenho.cor; ctx.fillStyle = perfilDesenho.cor; ctx.lineWidth = 5;
+    for (let i = 0; i < 8; i++) {
+      const x = i * 32;
+      ctx.beginPath();
+      switch (perfilDesenho.padrao) {
+        case 0: ctx.fillRect(0, 16, 256, 6); ctx.fillRect(0, 42, 256, 6); break;
+        case 1: ctx.moveTo(x, 5); ctx.lineTo(x+22, 24); ctx.lineTo(x+10, 35); ctx.lineTo(x+30, 58); ctx.stroke(); break;
+        case 2: ctx.moveTo(x, 60); ctx.quadraticCurveTo(x+30, 30, x+18, 4); ctx.quadraticCurveTo(x+52, 35, x+28, 60); ctx.fill(); break;
+        case 3: for (let y=0;y<4;y++) if ((i+y)%2===0) ctx.fillRect(x,y*16,32,16); break;
+        case 4: ctx.moveTo(x,5); ctx.lineTo(x+24,32); ctx.lineTo(x,59); ctx.stroke(); break;
+        case 5: ctx.moveTo(x,48); ctx.lineTo(x+14,48); ctx.lineTo(x+14,16); ctx.lineTo(x+28,16); ctx.stroke(); break;
+        case 6: ctx.moveTo(x,32); ctx.bezierCurveTo(x+8,0,x+24,64,x+32,32); ctx.stroke(); break;
+        case 7: for(let j=0;j<10;j++){const a=j*Math.PI/5; const r=j%2?7:15; const px=x+16+Math.cos(a)*r;const py=32+Math.sin(a)*r;j?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.closePath();ctx.fill();break;
+        case 8: for(let j=0;j<6;j++){const a=j*Math.PI/3;const px=x+16+Math.cos(a)*14;const py=32+Math.sin(a)*14;j?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();ctx.stroke();break;
+        default: ctx.fillRect(x,12+i%3*14,24,5);
+      }
+    }
+    const mapa = new THREE.CanvasTexture(canvas); mapa.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshStandardMaterial({ map: mapa, transparent: true, depthWrite: false, roughness: 0.4, emissive: perfilDesenho.cor, emissiveMap: mapa, emissiveIntensity: 0.12, side: THREE.DoubleSide });
+    for (const lado of [-1,1]) {
+      const decal = new THREE.Mesh(new THREE.PlaneGeometry(2.5,0.3),mat);
+      decal.position.set(-0.2,0.56,lado*0.61*(perfilCorpo?.largura ?? 1));
+      if(lado<0) decal.rotation.y=Math.PI; carro.add(decal);
+    }
+    const bico = new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.22),mat); bico.rotation.x=-Math.PI/2;bico.position.set(1.3,0.73,0);carro.add(bico);
+    anim.push((t)=>{mat.emissiveIntensity=0.1+(Math.sin(t*2)+1)*0.06;});
+  }
   if (tem("splitter")) caixa(X(202), 0.18, 0, 0.5, 0.07, 1.9, carbono);
   if (tem("difusor")) for (const z of [-0.4, -0.2, 0, 0.2, 0.4]) caixa(X(22), 0.23, z, 0.7, 0.22, 0.04, carbono);
   if (tem("led")) for (const z of [-0.57, 0.57]) caixa(-0.3, 0.5, z, 2, 0.035, 0.035, new THREE.MeshBasicMaterial({ color: "#67e8f9" }));
@@ -551,6 +603,55 @@ export function montarF1(v: Visual, texturaCarregada?: () => void, modo: "garage
     for (const x of [2.28, 2.38, 2.48]) caixa(x, 0.15, 0, 0.035, 0.025, 1.35, carbono);
   }
 
+  // Detalhes adicionais de cada peça crescem com seu preço na categoria.
+  for (const id of ativas) {
+    const efeito = efeitoDaPeca(id);
+    if (!efeito || efeito.intensidade < .2) continue;
+    const categoria = PECAS.find(p=>p.id===id)?.categoria;
+    if (categoria === "Rodas" || categoria === "Neons" || categoria === "Turbos") continue;
+    const corDetalhe = categoria === "Piloto" ? perfilPiloto?.viseira ?? "#fcd34d" : categoria === "Desenhos" ? perfilDesenho?.cor ?? "#fff" : "#e2e8f0";
+    const mat = new THREE.MeshStandardMaterial({color:corDetalhe,metalness:.65,roughness:.2,emissive:corDetalhe,emissiveIntensity:.08});
+    for(let i=0;i<efeito.detalhes;i++) for(const lado of [-1,1]) {
+      const mesh=new THREE.Mesh(new THREE.BoxGeometry(.07,.025,.14+efeito.intensidade*.06),mat);
+      const x=categoria==="Aerodinâmica"?-2+i*.1:categoria==="Piloto"?-.13+i*.05:-.8+i*.18;
+      mesh.position.set(x,categoria==="Piloto"?1.06:categoria==="Aerodinâmica"?1.02+efeito.intensidade*.45:.65,lado*(categoria==="Piloto"?.15:.42));carro.add(mesh);
+    }
+    anim.push(t=>{mat.emissiveIntensity=.08+efeito.intensidade*.18*(.5+.5*Math.sin(t*2));});
+  }
+
+  // Emissores presos à peça: rastros e faíscas se movem para trás do carro.
+  for (const id of ativas) {
+    const efeito = efeitoDaPeca(id);
+    if (efeito.intensidade < .65) continue;
+    const peca = PECAS.find(p => p.id === id);
+    if (!peca) continue;
+    const categoria = peca.categoria;
+    const origem = categoria === "Rodas" ? [X(43), .35, .85] : categoria === "Aerodinâmica" ? [-2.1, 1 + efeito.intensidade * .45, .8] : categoria === "Turbos" ? [-2.55, .62, .16] : categoria === "Piloto" ? [-.04, 1.17, .1] : categoria === "Neons" ? [-.3, .06, .65] : [-.7, .65, .5];
+    const cor = categoria === "Rodas" ? perfilRoda?.aro ?? "#fcd34d" : categoria === "Aerodinâmica" ? perfilAsa?.cor ?? "#fcd34d" : categoria === "Turbos" ? perfilTurbo?.cor ?? "#fff" : categoria === "Neons" ? perfilNeon?.cor ?? "#22d3ee" : categoria === "Piloto" ? perfilPiloto?.viseira ?? "#fff" : perfilDesenho?.cor ?? "#fcd34d";
+    const quantidade = 8 + Math.floor(efeito.intensidade * 16);
+    const pos = new Float32Array(quantidade * 3);
+    const segmentos = new Float32Array(quantidade * 6);
+    const pontos = new THREE.Points(new THREE.BufferGeometry().setAttribute("position",new THREE.BufferAttribute(pos,3)), new THREE.PointsMaterial({map:brilho,color:cor,size:.07+efeito.intensidade*.07,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false}));
+    const rastros = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position",new THREE.BufferAttribute(segmentos,3)),new THREE.LineBasicMaterial({color:cor,transparent:true,opacity:.45,blending:THREE.AdditiveBlending,depthWrite:false}));
+    pontos.userData.emissor = id; rastros.userData.emissor = id;
+    pontos.frustumCulled = false; rastros.frustumCulled = false;
+    carro.add(pontos,rastros);
+    anim.push(t => {
+      for(let i=0;i<quantidade;i++) {
+        const vida=(t*(categoria==="Turbos"?2:1.1)+i/quantidade)%1;
+        const lado=i%2?1:-1;
+        const distancia=vida*(categoria==="Turbos"?2.7:1.3)*efeito.escala;
+        const x=origem[0]-distancia;
+        const y=Math.max(.025,origem[1]+Math.sin(i*2.4)*vida*.35+(categoria==="Neons"?.03:vida*.2));
+        const z=lado*origem[2]+Math.cos(i*3.7)*vida*.25;
+        pos.set([x,y,z],i*3);
+        segmentos.set([x,y,z,x+.07+vida*.12,y-.02,z],i*6);
+      }
+      pontos.geometry.attributes.position.needsUpdate=true;
+      rastros.geometry.attributes.position.needsUpdate=true;
+    });
+  }
+
   // Une as peças estáticas por material: menos chamadas de desenho à GPU.
   carro.updateMatrixWorld(true);
   const lotes = new Map<THREE.Material, THREE.Mesh[]>();
@@ -585,7 +686,7 @@ export function liberarObjeto(objeto: THREE.Object3D) {
   const materiais = new Set<THREE.Material>();
   const texturas = new Set<THREE.Texture>();
   objeto.traverse((obj) => {
-    if (!(obj instanceof THREE.Mesh || obj instanceof THREE.Points)) return;
+    if (!(obj instanceof THREE.Mesh || obj instanceof THREE.Points || obj instanceof THREE.LineSegments)) return;
     geometrias.add(obj.geometry);
     for (const mat of Array.isArray(obj.material) ? obj.material : [obj.material]) {
       materiais.add(mat);

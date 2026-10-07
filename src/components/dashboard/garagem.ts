@@ -21,7 +21,7 @@ export const OURO: [string, string] = ["#fcd34d", "#a16207"];
  *
  * Cada 100% da meta diária vale 1 ponto no dia — 200% = 2 (gravado pelo RankingView).
  */
-export const CATEGORIAS = ["Todas", "Rodas", "Carroceria", "Aerodinâmica", "Iluminação", "Piloto", "Especiais"] as const;
+export const CATEGORIAS = ["Todas", "Rodas", "Carroceria", "Desenhos", "Aerodinâmica", "Neons", "Iluminação", "Piloto", "Turbos", "Especiais"] as const;
 export type CategoriaPeca = (typeof CATEGORIAS)[number];
 export const RODAS = [
   { id: "roda-vertex", nome: "Vertex Forged", cor: "#e2e8f0", raios: 5, aro: "#94a3b8", preco: 3 },
@@ -60,19 +60,68 @@ export const AEROFOLIOS = [
   { id: "asa-royal", nome: "Royal Aero", largura: 2.3, altura: 1.35, planos: 3, cor: "#fcd34d", preco: 18 },
 ] as const;
 
+export const NEONS = [
+  {"id": "neon", "nome": "Neon Spectrum", "cor": "#22d3ee", "preco": 6, "ritmo": 0.7, "arcoiris": true},
+  {"id": "neon-violeta", "nome": "Violet Pulse", "cor": "#a855f7", "preco": 7, "ritmo": 0.83, "arcoiris": false},
+  {"id": "neon-sakura", "nome": "Sakura Glow", "cor": "#ec4899", "preco": 8, "ritmo": 0.96, "arcoiris": false},
+  {"id": "neon-inferno", "nome": "Inferno Red", "cor": "#ef4444", "preco": 9, "ritmo": 1.09, "arcoiris": false},
+  {"id": "neon-solar", "nome": "Solar Orange", "cor": "#f97316", "preco": 10, "ritmo": 1.22, "arcoiris": false},
+  {"id": "neon-ouro", "nome": "Golden Hour", "cor": "#fcd34d", "preco": 11, "ritmo": 1.35, "arcoiris": false},
+  {"id": "neon-acid", "nome": "Acid Wave", "cor": "#84cc16", "preco": 12, "ritmo": 1.48, "arcoiris": false},
+  {"id": "neon-aurora", "nome": "Aurora Green", "cor": "#10b981", "preco": 13, "ritmo": 1.61, "arcoiris": false},
+  {"id": "neon-ocean", "nome": "Ocean Blue", "cor": "#3b82f6", "preco": 14, "ritmo": 1.74, "arcoiris": false},
+  {"id": "neon-polar", "nome": "Polar White", "cor": "#e2e8f0", "preco": 16, "ritmo": 1.87, "arcoiris": false},
+] as const;
+export const PILOTOS = [
+  {"id": "capacete", "nome": "Piloto Gold", "cor": "#fcd34d", "preco": 5, "viseira": "#ef4444", "padrao": 0},
+  {"id": "capacete-sakura", "nome": "Piloto Sakura", "cor": "#f9a8d4", "preco": 7, "viseira": "#f97316", "padrao": 1},
+  {"id": "piloto-ice", "nome": "Piloto Ice", "cor": "#ec4899", "preco": 8, "viseira": "#fcd34d", "padrao": 2},
+  {"id": "piloto-inferno", "nome": "Piloto Inferno", "cor": "#ef4444", "preco": 9, "viseira": "#84cc16", "padrao": 3},
+  {"id": "piloto-solar", "nome": "Piloto Solar", "cor": "#f97316", "preco": 10, "viseira": "#10b981", "padrao": 4},
+  {"id": "piloto-royal", "nome": "Piloto Royal", "cor": "#fcd34d", "preco": 11, "viseira": "#3b82f6", "padrao": 5},
+  {"id": "piloto-acid", "nome": "Piloto Acid", "cor": "#84cc16", "preco": 12, "viseira": "#e2e8f0", "padrao": 6},
+  {"id": "piloto-aurora", "nome": "Piloto Aurora", "cor": "#10b981", "preco": 13, "viseira": "#22d3ee", "padrao": 7},
+  {"id": "piloto-ocean", "nome": "Piloto Ocean", "cor": "#3b82f6", "preco": 14, "viseira": "#a855f7", "padrao": 8},
+  {"id": "piloto-phantom", "nome": "Piloto Phantom", "cor": "#e2e8f0", "preco": 16, "viseira": "#ec4899", "padrao": 9},
+] as const;
+export const DESENHOS = [
+  {"id": "listras", "nome": "Listras de corrida", "cor": "#f8fafc", "preco": 2, "padrao": 0},
+  {"id": "desenho-raios", "nome": "Raios Voltage", "cor": "#a855f7", "preco": 3, "padrao": 1},
+  {"id": "desenho-chamas", "nome": "Chamas Inferno", "cor": "#ec4899", "preco": 4, "padrao": 2},
+  {"id": "desenho-xadrez", "nome": "Grid Xadrez", "cor": "#ef4444", "preco": 5, "padrao": 3},
+  {"id": "desenho-chevron", "nome": "Chevron Rush", "cor": "#f97316", "preco": 6, "padrao": 4},
+  {"id": "desenho-circuito", "nome": "Circuito Tech", "cor": "#fcd34d", "preco": 7, "padrao": 5},
+  {"id": "desenho-ondas", "nome": "Ondas Aurora", "cor": "#84cc16", "preco": 8, "padrao": 6},
+  {"id": "desenho-estrelas", "nome": "Constelação", "cor": "#10b981", "preco": 9, "padrao": 7},
+  {"id": "desenho-hex", "nome": "Hex Carbon", "cor": "#3b82f6", "preco": 10, "padrao": 8},
+  {"id": "desenho-velocidade", "nome": "Speed Lines", "cor": "#e2e8f0", "preco": 12, "padrao": 9},
+] as const;
+export const TURBOS = [
+  {"id": "turbo", "nome": "Turbo com chamas", "cor": "#22d3ee", "preco": 12, "potencia": 1.0, "ritmo": 1.0},
+  {"id": "turbo-violet", "nome": "Violet Jet", "cor": "#a855f7", "preco": 13, "potencia": 1.09, "ritmo": 1.17},
+  {"id": "turbo-sakura", "nome": "Sakura Boost", "cor": "#ec4899", "preco": 14, "potencia": 1.18, "ritmo": 1.34},
+  {"id": "turbo-inferno", "nome": "Inferno Twin", "cor": "#ef4444", "preco": 15, "potencia": 1.27, "ritmo": 1.51},
+  {"id": "turbo-solar", "nome": "Solar Burst", "cor": "#f97316", "preco": 16, "potencia": 1.36, "ritmo": 1.68},
+  {"id": "turbo-gold", "nome": "Gold Storm", "cor": "#fcd34d", "preco": 18, "potencia": 1.45, "ritmo": 1.85},
+  {"id": "turbo-acid", "nome": "Acid Reactor", "cor": "#84cc16", "preco": 20, "potencia": 1.54, "ritmo": 2.02},
+  {"id": "turbo-aurora", "nome": "Aurora Drive", "cor": "#10b981", "preco": 22, "potencia": 1.63, "ritmo": 2.19},
+  {"id": "turbo-ocean", "nome": "Ocean Plasma", "cor": "#3b82f6", "preco": 24, "potencia": 1.72, "ritmo": 2.36},
+  {"id": "turbo-polar", "nome": "Polar Nitro", "cor": "#e2e8f0", "preco": 28, "potencia": 1.81, "ritmo": 2.53},
+] as const;
+
 export const PECAS = [
+  ...NEONS.map((p) => ({ ...p, emoji: "", categoria: "Neons" as const, descricao: p.arcoiris ? "Cores em movimento sob o carro." : "Luz pulsante sob o carro." })),
+  ...PILOTOS.map((p) => ({ ...p, emoji: "", categoria: "Piloto" as const, descricao: "Capacete, viseira e macacão exclusivos." })),
+  ...DESENHOS.map((p) => ({ ...p, emoji: "", categoria: "Desenhos" as const, descricao: "Grafismo exclusivo nas laterais e no bico." })),
+  ...TURBOS.map((p) => ({ ...p, emoji: "", categoria: "Turbos" as const, descricao: "Jatos e partículas com pulso exclusivo." })),
   { id: "rodas", nome: "Rodas douradas", preco: 1, emoji: "🛞", categoria: "Rodas", descricao: "Aros dourados e detalhes nos pneus." },
   { id: "slick", nome: "Pneus de competição", preco: 4, emoji: "🏁", categoria: "Rodas", descricao: "Faixas vermelhas nos quatro pneus." },
   { id: "aerofolio", nome: "Aerofólio de corrida", preco: 3, emoji: "🪽", categoria: "Aerodinâmica", descricao: "Asa traseira dupla com DRS." },
   { id: "splitter", nome: "Splitter esportivo", preco: 8, emoji: "🏎️", categoria: "Aerodinâmica", descricao: "Asa dianteira extra em carbono." },
   { id: "difusor", nome: "Difusor traseiro", preco: 15, emoji: "🌪️", categoria: "Aerodinâmica", descricao: "Aletas de carbono na traseira." },
-  { id: "listras", nome: "Listras de corrida", preco: 2, emoji: "🎨", categoria: "Carroceria", descricao: "Duas faixas brancas na carroceria." },
   { id: "cromo", nome: "Acabamento cromado", preco: 18, emoji: "💎", categoria: "Carroceria", descricao: "Pintura metálica com brilho espelhado." },
-  { id: "neon", nome: "Neon por baixo", preco: 6, emoji: "💡", categoria: "Iluminação", descricao: "Iluminação colorida sob o carro." },
   { id: "led", nome: "LEDs laterais", preco: 10, emoji: "✨", categoria: "Iluminação", descricao: "Linhas de luz ciano nas laterais." },
-  { id: "capacete", nome: "Capacete dourado", preco: 5, emoji: "🪖", categoria: "Piloto", descricao: "Capacete exclusivo com pintura dourada." },
-  { id: "halo", nome: "Halo dourado", preco: 20, emoji: "🌟", categoria: "Piloto", descricao: "Proteção do cockpit com acabamento ouro." },
-  { id: "turbo", nome: "Turbo com chamas", preco: 12, emoji: "🔥", categoria: "Especiais", descricao: "Escapamentos com chamas e faíscas." },
+  { id: "halo", nome: "Halo dourado", preco: 20, emoji: "🌟", categoria: "Especiais", descricao: "Proteção do cockpit com acabamento ouro." },
   { id: "ouro", nome: "Kit ouro", preco: 24, emoji: "🏆", categoria: "Especiais", descricao: "Carroceria dourada e brilhos animados." },
   { id: "antena", nome: "Bandeira do campeão", preco: 40, emoji: "🚩", categoria: "Especiais", descricao: "Bandeira dourada na traseira." },
   { id: "coroa", nome: "Coroa lendária", preco: 60, emoji: "👑", categoria: "Especiais", descricao: "Coroa dourada sobre o piloto." },
@@ -81,7 +130,6 @@ export const PECAS = [
   ...AEROFOLIOS.map((a) => ({ ...a, emoji: "🪽", categoria: "Aerodinâmica" as const, descricao: `${a.planos} plano${a.planos > 1 ? "s" : ""}, ponteiras exclusivas e asa de ${a.largura.toFixed(1)} m.` })),
   { id: "farol-ice", nome: "Faróis Ice Blue", preco: 5, emoji: "🔦", categoria: "Iluminação", descricao: "Quatro faróis azuis no bico do carro." },
   { id: "luz-freio", nome: "Rain Light", preco: 6, emoji: "🚨", categoria: "Iluminação", descricao: "Luz de chuva vermelha pulsante na traseira." },
-  { id: "capacete-sakura", nome: "Capacete Sakura", preco: 7, emoji: "🌸", categoria: "Piloto", descricao: "Casco rosa com viseira violeta espelhada." },
   { id: "escape-titanio", nome: "Escape Titanium", preco: 9, emoji: "⚙️", categoria: "Especiais", descricao: "Dois escapes de titânio com ponteiras azuladas." },
   { id: "canards", nome: "Canards Attack", preco: 8, emoji: "⚡", categoria: "Aerodinâmica", descricao: "Quatro aletas nas laterais do bico." },
   { id: "entrada-ar", nome: "Airbox Performance", preco: 10, emoji: "💨", categoria: "Especiais", descricao: "Entrada de ar elevada atrás do piloto." },
@@ -101,8 +149,20 @@ export function encaixePeca(id: PecaId): string {
   if (id === "rodas" || id === "slick" || id.startsWith("roda-")) return "rodas";
   if (id.startsWith("corpo-")) return "carroceria";
   if (id === "aerofolio" || id.startsWith("asa-")) return "asa";
-  if (id === "capacete" || id === "capacete-sakura") return "capacete";
+  if (PILOTOS.some((p) => p.id === id)) return "capacete";
+  if (NEONS.some((p) => p.id === id)) return "neon";
+  if (DESENHOS.some((p) => p.id === id)) return "desenho";
+  if (TURBOS.some((p) => p.id === id)) return "turbo";
   return id;
+}
+/** Progressão relativa ao preço dentro da categoria, compartilhada pelos visuais. */
+export function efeitoDaPeca(id: PecaId) {
+  const peca = PECAS.find((p) => p.id === id);
+  if (!peca) return { intensidade: 0, escala: 1, detalhes: 1, particulas: 6 };
+  const precos = PECAS.filter((p) => p.categoria === peca.categoria).map((p) => p.preco);
+  const min = Math.min(...precos), max = Math.max(...precos);
+  const intensidade = max === min ? 0 : (peca.preco - min) / (max - min);
+  return { intensidade, escala: 1 + intensidade * 0.28, detalhes: 1 + Math.floor(intensidade * 5), particulas: 6 + Math.floor(intensidade * 24) };
 }
 export function equiparPeca(pecas: Iterable<PecaId>, id: PecaId): Set<PecaId> {
   const novas = new Set([...pecas].filter((p) => encaixePeca(p) !== encaixePeca(id)));

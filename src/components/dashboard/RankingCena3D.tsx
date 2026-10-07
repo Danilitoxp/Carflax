@@ -134,7 +134,7 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
           // e muito mais quando está andando), motor tremendo e balanço leve.
           if (!movimentoReduzido.matches) {
             const andou = Math.abs(modelo.x - modelo.ultimoX); modelo.ultimoX = modelo.x;
-            const velocidade = (modelo.pct > 0 ? 3 + Math.min(modelo.pct, 150) / 12 : 0) + andou * 2.5;
+            const velocidade = 3 + Math.max(0, Math.min(modelo.pct, 150)) / 12 + andou * 2.5;
             modelo.giro -= velocidade * dt;
             for (const r of modelo.rodas) r.rotation.z = modelo.giro;
             const t = tempo + modelo.fase;
@@ -222,7 +222,7 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
       <div className="relative z-10 flex flex-col bg-gradient-to-r from-[#07182c] to-[#061224]">
         {faixas.map((l, i) => {
           const [cor] = coresDoCarro(indices.get(l.cod) ?? i, garagens?.get(l.cod.trim()));
-          return <div key={l.cod} className="flex min-h-[42px] flex-1 items-center gap-2 border-b border-[#214055]/60 bg-[#061426] px-2" style={{ width: `calc(100% + ${34 * (1 - (i + 0.5) / Math.max(1, faixas.length))}px)`, clipPath: "polygon(0 0,100% 0,calc(100% - 4px) 100%,0 100%)" }} data-piloto={l.cod}>
+          return <div key={l.cod} className="flex min-h-[42px] flex-1 items-center gap-2 border-b border-[#214055]/60 bg-[#061426] px-2" data-piloto={l.cod}>
             <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-black shadow-[inset_0_1px_1px_#ffffff25]", i < 3 ? `bg-gradient-to-b ${MEDALHAS[i]}` : "bg-[#142b45] text-[#a8bfdc]")} style={{ width: "clamp(24px,2.3vw,36px)", height: "clamp(24px,2.3vw,36px)", fontSize: "clamp(12px,1vw,16px)" }}>{i + 1}</span>
             {l.avatar ? <img src={l.avatar} alt="" className="h-9 w-9 shrink-0 rounded-full border-2 object-cover" style={{ borderColor: i === 0 ? "#ffda60" : "#36b5e8", width: "clamp(34px,3vw,48px)", height: "clamp(34px,3vw,48px)" }} /> : <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 bg-[#10253b] text-[10px] font-bold text-white" style={{ borderColor: i === 0 ? "#ffda60" : cor, width: "clamp(34px,3vw,48px)", height: "clamp(34px,3vw,48px)" }}>{l.nome.slice(0, 2).toUpperCase()}</span>}
             <span className="min-w-0 truncate text-[10px] font-extrabold uppercase text-white" style={{ fontSize: "clamp(10px,0.9vw,15px)" }} title={l.nome}>{l.nome.split(" ")[0]}{l.cod.trim() === meu && <span className="mt-0.5 block w-fit rounded bg-[#ffda60] px-1 text-[8px] font-black leading-[13px] text-[#1c2230]">VOCÊ</span>}</span>
@@ -230,7 +230,7 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
         })}
       </div>
       <div className="relative min-h-0 bg-[#071427]">
-        <div className="absolute inset-0 overflow-hidden" style={{ clipPath: "polygon(34px 0,100% 0,100% 100%,0 100%)", backgroundColor: "#142335", backgroundImage: "radial-gradient(#70819716 0.7px, transparent 0.7px),linear-gradient(110deg,#172638,#101d2c 65%,#182637)", backgroundSize: "4px 4px,100% 100%" }}>
+        <div className="absolute inset-0 overflow-hidden" style={{ backgroundColor: "#142335", backgroundImage: "radial-gradient(#70819716 0.7px, transparent 0.7px),linear-gradient(110deg,#172638,#101d2c 65%,#182637)", backgroundSize: "4px 4px,100% 100%" }}>
           <div className="absolute inset-x-0 top-0 h-[5px] border-y border-[#cdd6df80]" style={{ background: "repeating-linear-gradient(90deg,#e4414d 0 22px,#e1e7ed 22px 44px)" }} />
           <div className="absolute inset-x-0 bottom-1 h-[5px] border-y border-[#cdd6df80]" style={{ background: "repeating-linear-gradient(90deg,#e4414d 0 22px,#e1e7ed 22px 44px)", transform: "rotate(.25deg)", transformOrigin: "left" }} />
           {MARCAS.filter((p) => p !== 100).map((pct) => <div key={pct} ref={(el) => { if (el) grades.current.set(pct, el); else grades.current.delete(pct); }} className="pointer-events-none absolute inset-y-0 w-px border-l border-dashed border-[#5683a54d]" data-grade={pct} />)}
@@ -240,7 +240,7 @@ export function RankingCena3D({ linhas, garagens, meuCodigo, onAbrirGaragem, onI
             return <div key={l.cod}>
               <div className="pointer-events-none absolute inset-x-0 border-b border-[#60809a55]" style={{ top: `${i / Math.max(1, faixas.length) * 100}%`, height: `${100 / Math.max(1, faixas.length)}%`, background: i % 2 ? "#06132018" : "#26394c12" }}>
                 <div className="absolute inset-x-0 top-[62%] h-px opacity-55" style={{ background: "repeating-linear-gradient(90deg,#9cb3c4 0 14px,transparent 14px 30px)" }} />
-                <div className="absolute top-1 bottom-1 w-[5px] -skew-x-6" style={{ left: 34 * (1 - (i + 0.5) / Math.max(1, faixas.length)), background: i === 0 ? "#ffda60" : cor }} />
+                <div className="absolute top-1 bottom-1 w-[5px]" style={{ left: 0, background: i === 0 ? "#ffda60" : cor }} />
               </div>
               {l.percentual > 0 && <div ref={(el) => { if (el) rastros.current.set(l.cod, el); else rastros.current.delete(l.cod); }} className="pointer-events-none absolute left-0 top-0 h-[20px]" style={{ background: `linear-gradient(90deg,transparent 15%,${rastroCor}00 50%,${rastroCor}22 85%,${rastroCor}80)`, maskImage: "linear-gradient(180deg,transparent,#000 45%,#000 55%,transparent)" }}>
                 <div className="absolute bottom-[9px] right-0 h-px w-[65%] animate-pulse" style={{ background: `linear-gradient(90deg,transparent,${rastroCor})`, boxShadow: `0 0 7px 2px ${rastroCor}70` }} />

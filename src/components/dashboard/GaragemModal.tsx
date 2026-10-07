@@ -7,6 +7,9 @@ import { supabase } from "@/lib/supabase";
 import type { RankingSeller } from "./ranking-events";
 import { CORES, PECAS, CATEGORIAS, type CategoriaPeca, avisarGaragemAlterada, coresDoCarro, type Garagem, type PecaId, pecasDoCarro, equiparPeca, encaixePeca } from "./garagem";
 
+const FILTROS = ["Todas", "Rodas", "Carroceria", "Desenhos", "Aerofólios", "Neons", "Piloto", "Turbos", "Especiais"] as const;
+type FiltroPeca = CategoriaPeca | "Aerofólios" | "Neons";
+
 const F1em3D = lazy(() => import("./F1em3D").then((m) => ({ default: m.F1em3D })));
 
 /**
@@ -35,7 +38,7 @@ export function GaragemModal({
 }) {
   const cod = vendedor.cod.trim();
   const [ganhos, setGanhos] = useState<number | null>(null);
-  const [categoria, setCategoria] = useState<CategoriaPeca>("Todas");
+  const [categoria, setCategoria] = useState<FiltroPeca>("Todas");
   const [busca, setBusca] = useState("");
   const [equipadasLocal, setEquipadasLocal] = useState<Set<PecaId> | null>(null);
   const [erro, setErro] = useState("");
@@ -60,7 +63,8 @@ export function GaragemModal({
   let noCarro = new Set(equipadas);
   for (const id of provando) noCarro = equiparPeca(noCarro, id);
   const normalizar = (texto: string) => texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const filtradas = PECAS.filter((p) => (categoria === "Todas" || p.categoria === categoria) && normalizar(`${p.nome} ${p.descricao}`).includes(normalizar(busca)));
+  const filtradas = PECAS.filter((p) => p.categoria !== "Iluminação" && (categoria === "Todas" || (categoria === "Aerofólios" ? p.id === "aerofolio" || p.id.startsWith("asa-") : p.categoria === categoria)) && normalizar(`${p.nome} ${p.descricao}`).includes(normalizar(busca)));
+  const grupos = CATEGORIAS.filter((c) => c !== "Todas").map((nome) => ({ nome, itens: filtradas.filter((p) => p.categoria === nome) })).filter((grupo) => grupo.itens.length > 0);
   const [corVis, escuraVis] = coresDoCarro(faixa, { pecas: noCarro, cor: pendentes.cor ?? garagem?.cor });
   const g: Garagem = { pecas, cor: pendentes.cor ?? garagem?.cor };
   const corAtual = g.cor ?? faixa % CORES.length;
@@ -199,23 +203,13 @@ export function GaragemModal({
           </div>
         </div>
 
-        <div className="flex w-full flex-col gap-4 overflow-y-auto border-t border-white/10 p-5 min-h-0 md:w-[440px] md:max-h-[min(780px,90vh)] md:border-l md:border-t-0">
-          <div className="rounded-2xl border border-amber-400/20 bg-gradient-to-br from-amber-400/10 to-transparent p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-widest text-amber-200/80">Saldo de créditos</span>
-              <span className="flex items-center gap-1.5 text-2xl font-black tabular-nums text-amber-300">
-                <Coins className="h-5 w-5" />
-                {saldo ?? "…"}
-              </span>
+        <div className="flex w-full flex-col gap-5 overflow-y-auto border-t border-white/10 p-4 pt-12 min-h-0 sm:p-5 sm:pt-12 md:w-[480px] md:max-h-[min(780px,90vh)] md:border-l md:border-t-0">
+          <div className="flex items-center justify-between rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold text-amber-100/80">Créditos disponíveis</p>
+              {vendedor.percentual >= 100 && <p className="mt-1 text-[11px] text-emerald-300">+{Math.floor(vendedor.percentual / 100)} hoje</p>}
             </div>
-            <p className="mt-1.5 text-xs text-white/60">
-              🎯 Cada 100% da meta diária vale <b className="text-amber-300">1 ponto</b> (200% = 2, 300% = 3...). Os pontos acumulam para turbinar o carro.
-              {vendedor.percentual >= 100 && (
-                <span className="mt-1 block font-bold text-emerald-300">
-                  ✅ Meta de hoje batida: +{Math.floor(vendedor.percentual / 100)} ponto{Math.floor(vendedor.percentual / 100) > 1 ? "s" : ""}!
-                </span>
-              )}
-            </p>
+            <span className="flex items-center gap-2 text-2xl font-black tabular-nums text-amber-300"><Coins className="h-5 w-5" />{saldo ?? "…"}</span>
           </div>
 
           {erro && <p className="rounded-lg bg-rose-500/15 px-3 py-2 text-xs text-rose-300">{erro}</p>}
@@ -247,18 +241,25 @@ export function GaragemModal({
           <div className="rounded-xl bg-white/5 p-3 text-xs text-white/60">
             <div className="flex justify-between"><span>Peças adquiridas</span><b className="text-emerald-300">{pecas.size} / {PECAS.length}</b></div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-emerald-400" style={{ width: `${pecas.size / PECAS.length * 100}%` }} /></div>
-            <p className="mt-2">Experimente sem gastar. Suas peças ficam na coleção para trocar quando quiser.</p>
+
           </div>
-          <div className="flex flex-wrap gap-1.5" aria-label="Categorias de peças">
-            {CATEGORIAS.map((c) => <button key={c} type="button" aria-pressed={categoria === c} onClick={() => setCategoria(c)} className={cn("rounded-lg px-2.5 py-1.5 text-xs font-bold transition", categoria === c ? "bg-amber-400 text-black" : "bg-white/5 text-white/60 hover:bg-white/10")}>{c}</button>)}
+          <div className="grid grid-cols-3 gap-2" aria-label="Categorias de peças">
+            {FILTROS.map((c) => <button key={c} type="button" aria-pressed={categoria === c} onClick={() => setCategoria(c)} className={cn("rounded-lg px-2.5 py-1.5 text-xs font-bold transition", categoria === c ? "bg-amber-400 text-black" : "bg-white/5 text-white/60 hover:bg-white/10")}>{c === "Piloto" ? "Pilotos" : c}</button>)}
           </div>
           <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-slate-400">
             <Search className="h-4 w-4" />
-            <input aria-label="Buscar peças" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Encontre sua próxima peça..." className="w-full bg-transparent text-xs text-white outline-none placeholder:text-slate-500" />
+            <input aria-label="Buscar peças" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar peça..." className="w-full bg-transparent text-xs text-white outline-none placeholder:text-slate-500" />
           </label>
           <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400"><span>{categoria === "Todas" ? "Catálogo de peças" : categoria}</span><span>{filtradas.length} opções</span></div>
-          <ul className="grid grid-cols-2 gap-2.5">
-            {filtradas.map((p) => {
+          <div className="space-y-6">
+          {grupos.map((grupo) => (
+            <section key={grupo.nome} aria-label={grupo.nome}>
+              <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
+                <h3 className="text-sm font-bold text-white">{categoria === "Aerofólios" || categoria === "Neons" ? categoria : grupo.nome === "Iluminação" ? "Neons" : grupo.nome === "Piloto" ? "Pilotos e cockpit" : grupo.nome}</h3>
+                <span className="text-xs text-slate-500">{grupo.itens.length} peças</span>
+              </div>
+              <ul className="grid grid-cols-2 gap-3">
+            {grupo.itens.map((p) => {
               const ok = pecas.has(p.id);
               const daPraComprar = podeComprar && saldo !== null && !ok && saldo >= p.preco;
               const instalada = equipadas.has(p.id);
@@ -267,7 +268,7 @@ export function GaragemModal({
                 <li
                   key={p.id}
                   className={cn(
-                    "group flex flex-col gap-2 rounded-2xl border p-3 transition hover:border-white/30",
+                    "group flex flex-col gap-3 rounded-xl border p-3 transition hover:border-white/30",
                     instalada ? "border-emerald-400/40 bg-emerald-400/[0.07]" : provandoEsta ? "border-sky-400/60 bg-sky-400/10" : "border-white/10 bg-white/[0.03]",
                   )}
                 >
@@ -287,7 +288,7 @@ export function GaragemModal({
                     </span>
                   </button>
                   {ok ? (
-                    <button type="button" disabled={!podeComprar || ocupado} onClick={() => alternarEquipada(p.id)} className={cn("flex items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-bold", instalada ? "bg-emerald-400/10 text-emerald-300" : "bg-white/5 text-slate-300")}><Check className="h-3 w-3" />{instalada ? "Equipada · remover" : "Adquirida · equipar"}</button>
+                    <button type="button" disabled={!podeComprar || ocupado} onClick={() => alternarEquipada(p.id)} className={cn("flex items-center justify-center gap-1 rounded-lg py-2 text-[10px] font-bold", instalada ? "bg-emerald-400/10 text-emerald-300" : "bg-white/5 text-slate-300")}><Check className="h-3 w-3" />{instalada ? "Equipada · remover" : "Adquirida · equipar"}</button>
                   ) : podeComprar ? (
                     <button
                       type="button"
@@ -295,7 +296,7 @@ export function GaragemModal({
                       onClick={() => comprar(p.id, p.preco)}
                       aria-label={`Comprar ${p.nome} por ${p.preco} créditos`}
                       title={saldo === null ? "Carregando saldo" : saldo < p.preco ? `Faltam ${p.preco - saldo} créditos` : "Comprar peça"}
-                      className="flex items-center justify-center gap-1 rounded-lg bg-amber-400 px-2 py-1 text-[11px] font-black text-black transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+                      className="flex items-center justify-center gap-1 rounded-lg bg-amber-400 px-2 py-2 text-[11px] font-black text-black transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
                     >
                       <Coins className="h-3 w-3" />
                       {p.preco} créditos
@@ -309,7 +310,10 @@ export function GaragemModal({
                 </li>
               );
             })}
-          </ul>
+              </ul>
+            </section>
+          ))}
+          </div>
           {filtradas.length === 0 && <p className="py-6 text-center text-xs text-slate-400">Nenhuma peça encontrada. Tente outro nome.</p>}
           {!podeComprar && <p className="text-center text-[11px] text-white/40">Só o dono do carro pode mexer na garagem.</p>}
         </div>
