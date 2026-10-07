@@ -1,10 +1,10 @@
-import { useEffect, useId, useRef } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RankingSeller } from "./ranking-events";
 import { tocarAceleracao } from "./som-motor";
-import { coresDoCarro, ordenarFaixas, type Garagem, type PecaId } from "./garagem";
+import { coresDoCarro, ordenarFaixas, pecasDoCarro, RODAS, CARROCERIAS, AEROFOLIOS, type Garagem, type PecaId } from "./garagem";
 
 /**
  * Modo corrida do Ranking do dia — "Grande Prêmio Carflax".
@@ -45,7 +45,11 @@ export function CarroF1({
   pecas?: Set<PecaId>;
 }) {
   const id = useId().replace(/:/g, "");
-  const tem = (p: PecaId) => !!pecas?.has(p);
+  const ativas = pecasDoCarro({ pecas: pecas ?? new Set() });
+  const tem = (p: PecaId) => ativas.has(p);
+  const roda = RODAS.find((p) => tem(p.id));
+  const corpo = CARROCERIAS.find((p) => tem(p.id));
+  const asa = AEROFOLIOS.find((p) => tem(p.id));
   return (
     <svg viewBox="0 0 220 80" className="w-full h-full overflow-visible" aria-hidden="true">
       {/* neon: brilho ciano no asfalto, pulsando */}
@@ -87,7 +91,10 @@ export function CarroF1({
       {/* sombra no asfalto */}
       <ellipse cx="112" cy="44" rx="104" ry="30" fill="#000" opacity="0.35" />
       {/* aerofólio traseiro */}
-      {tem("aerofolio") ? (
+      {asa ? <g>
+        {Array.from({ length: asa.planos }, (_, i) => <rect key={i} x={2 + i * 6} y={40 - asa.largura * 16} width="5" height={asa.largura * 32} rx="2" fill={i === 0 ? cor : "#334155"} stroke={asa.cor} />)}
+        {[40 - asa.largura * 16, 40 + asa.largura * 16].map((y) => <rect key={y} x="0" y={y - 2} width={asa.planos * 6 + 3} height="4" rx="1" fill={asa.cor} />)}
+      </g> : tem("aerofolio") ? (
         <>
           {/* aerofólio de corrida: mais largo, dois planos e ponteiras douradas */}
           <rect x="0" y="0" width="22" height="80" rx="3" fill="#0f172a" />
@@ -121,17 +128,39 @@ export function CarroF1({
             </rect>
           </g>
         ))}
+      {roda && [[26, 2, 34, 18], [26, 60, 34, 18], [150, 4, 30, 16], [150, 60, 30, 16]].map(([x, y, w, h]) => <g key={`${x}-${y}`}>
+        <rect x={x} y={y} width={w} height={h} rx="6" fill="#111" stroke={roda.aro} strokeWidth="2" />
+        <path d={`M${x + 4} ${y + h / 2} H${x + w - 4}`} stroke={roda.cor} strokeWidth={roda.raios === 0 ? 8 : 3} />
+      </g>)}
       {/* braços da suspensão */}
       <path d="M60 20 L80 30 M60 60 L80 50 M150 18 L135 32 M150 62 L135 48" stroke="#334155" strokeWidth="3" />
       {/* carroceria */}
       <path d="M18 30 L60 24 L96 20 L150 26 L190 34 L206 37 L206 43 L190 46 L150 54 L96 60 L60 56 L18 50 Z" fill={`url(#c${id})`} stroke="#0f172a" strokeWidth="1.5" />
       {/* sidepods */}
       <path d="M64 24 Q80 14 104 18 L104 24 Z M64 56 Q80 66 104 62 L104 56 Z" fill={escura} />
+      {corpo && <g>
+        <path d={`M30 30 L65 ${40 - 13 * corpo.largura} L95 ${40 - 15 * corpo.largura} L148 ${40 - 9 * corpo.bico} L194 36 M30 50 L65 ${40 + 13 * corpo.largura} L95 ${40 + 15 * corpo.largura} L148 ${40 + 9 * corpo.bico} L194 44`} fill="none" stroke={corpo.cor} strokeWidth="4" />
+        {[65, 72, 79].map((x) => <path key={x} d={`M${x} 27 v6 M${x} 47 v6`} stroke="#0f172a" strokeWidth="3" />)}
+      </g>}
+      {tem("farol-ice") && <path d="M202 18 v8 M202 54 v8" stroke="#7dd3fc" strokeWidth="4" />}
+      {tem("luz-freio") && <rect x="17" y="36" width="4" height="8" fill="#ff1744"><animate attributeName="opacity" values="1;0.2;1" dur="0.8s" repeatCount="indefinite" /></rect>}
+      {tem("canards") && <path d="M174 31 l10 -8 M174 49 l10 8" stroke="#64748b" strokeWidth="3" />}
+      {tem("entrada-ar") && <rect x="86" y="35" width="10" height="10" rx="2" fill="#111827" stroke={cor} strokeWidth="2" />}
+      {tem("escape-titanio") && <path d="M8 32 H24 M8 48 H24" stroke="#818cf8" strokeWidth="4" />}
       {/* faixa do bico */}
       <path d="M150 37 L206 39 L206 41 L150 43 Z" fill="#fff" opacity="0.9" />
       {/* aerofólio dianteiro */}
       <rect x="196" y="12" width="14" height="56" rx="3" fill="#0f172a" />
       <rect x="198" y="14" width="10" height="52" rx="2" fill={cor} />
+      {tem("listras") && <path d="M22 34 H152 M22 46 H152" stroke="#fff" strokeWidth="2" />}
+      {tem("cromo") && <path d="M24 31 L96 22 L150 28 L194 36" fill="none" stroke="#e2e8f0" strokeWidth="3" />}
+      {tem("slick") && [3, 75].map((y) => <path key={y} d={`M30 ${y} H56 M154 ${y} H176`} stroke="#ef4444" strokeWidth="3" />)}
+      {tem("splitter") && <rect x="210" y="8" width="5" height="64" rx="2" fill="#334155" />}
+      {tem("difusor") && <path d="M20 26 H32 M20 34 H32 M20 46 H32 M20 54 H32" stroke="#94a3b8" strokeWidth="3" />}
+      {tem("led") && <path d="M64 24 L94 21 M64 56 L94 59" stroke="#67e8f9" strokeWidth="3" />}
+      {tem("capacete-sakura") && <circle cx="112" cy="40" r="15" fill="none" stroke="#f9a8d4" strokeWidth="3" />}
+      {tem("capacete") && <circle cx="112" cy="40" r="15" fill="none" stroke="#fcd34d" strokeWidth="3" />}
+      {tem("antena") && <g><path d="M28 30 V-12" stroke="#cbd5e1" strokeWidth="2" /><path d="M28 -12 H48 L43 -2 H28 Z" fill="#fcd34d" /></g>}
       {/* número */}
       <circle cx="166" cy="40" r="9" fill="#fff" />
       <text x="166" y="44" textAnchor="middle" fontSize="11" fontWeight="900" fontFamily="Arial, sans-serif" fill="#0f172a">{numero}</text>
@@ -139,6 +168,8 @@ export function CarroF1({
       <ellipse cx="112" cy="40" rx="20" ry="16" fill="#020617" />
       <path d="M94 28 Q112 18 130 28" stroke="#cbd5e1" strokeWidth="3" fill="none" />
       <path d="M94 52 Q112 62 130 52" stroke="#cbd5e1" strokeWidth="3" fill="none" />
+      {tem("halo") && <ellipse cx="112" cy="40" rx="20" ry="16" fill="none" stroke="#fcd34d" strokeWidth="3" />}
+      {tem("coroa") && <path d="M100 24 L98 13 L106 18 L112 10 L118 18 L126 13 L124 24 Z" fill="#fcd34d" stroke="#a16207" />}
       {/* piloto: foto do vendedor */}
       {avatar ? (
         <image href={avatar} x="99" y="27" width="26" height="26" clipPath={`url(#a${id})`} preserveAspectRatio="xMidYMid slice" />
@@ -173,7 +204,7 @@ export function CarroF1({
   );
 }
 
-export function RankingCorrida({
+function RankingCorridaPlana({
   linhas,
   meuCodigo,
   onAbrirGaragem,
@@ -194,25 +225,6 @@ export function RankingCorrida({
     : porNorma.length === 1
       ? porNorma[0].cod.trim()
       : "";
-  // Ronco de motor quando algum carro avança desde a última atualização.
-  // A primeira carga não toca (seria todo mundo "andando" de uma vez).
-  const anteriorRef = useRef<Map<string, number> | null>(null);
-  useEffect(() => {
-    const atual = new Map(linhas.map((l) => [l.cod, l.percentual]));
-    const anterior = anteriorRef.current;
-    anteriorRef.current = atual;
-    if (!anterior) return;
-    let maiorAvanco = 0;
-    for (const [cod, pct] of atual) {
-      const antes = anterior.get(cod);
-      if (antes != null) maiorAvanco = Math.max(maiorAvanco, pct - antes);
-    }
-    // Só acelera em salto de mais de 10% da meta diária de uma vez: venda
-    // pequena (1%, 2%) fazia barulho o dia inteiro. Avanço maior = acelerada
-    // mais longa e aguda.
-    if (maiorAvanco > 10) tocarAceleracao(Math.min(1, maiorAvanco / 30));
-  }, [linhas]);
-
   // Faixas em ordem fixa (por nome): o carro não troca de faixa quando a
   // classificação muda — quem ultrapassa, ultrapassa na pista.
   const faixas = ordenarFaixas(linhas);
@@ -308,7 +320,7 @@ export function RankingCorrida({
                     </div>
                   )}
                   {(() => {
-                    const carro = <CarroF1 cor={cor} escura={escura} numero={i + 1} avatar={l.avatar} iniciais={l.nome.slice(0, 2).toUpperCase()} pecas={garagem?.pecas} />;
+                    const carro = <CarroF1 cor={cor} escura={escura} numero={i + 1} avatar={l.avatar} iniciais={l.nome.slice(0, 2).toUpperCase()} pecas={pecasDoCarro(garagem)} />;
                     const classe = cn("relative shrink-0", chegou && "drop-shadow-[0_0_18px_rgba(251,191,36,0.9)]");
                     const tamanho = { width: LARGURA_CARRO, height: LARGURA_CARRO * (80 / 220) };
                     const ehMeu = !!meu && l.cod.trim() === meu && !!onAbrirGaragem;
@@ -344,4 +356,40 @@ export function RankingCorrida({
 
     </div>
   );
+}
+
+const CenaCorrida3D = lazy(() => import("./RankingCena3D").then((m) => ({ default: m.RankingCena3D })));
+export interface RankingCorridaProps {
+  linhas: RankingSeller[];
+  meuCodigo?: string;
+  onAbrirGaragem?: (cod: string) => void;
+  garagens?: Map<string, Garagem>;
+}
+
+export function RankingCorrida(props: RankingCorridaProps) {
+  const { linhas } = props;
+  const [visao, setVisao] = useState<"3d" | "superior">("3d");
+  // Ronco de motor quando algum carro avança desde a última atualização.
+  // A primeira carga não toca (seria todo mundo "andando" de uma vez).
+  const anteriorRef = useRef<Map<string, number> | null>(null);
+  useEffect(() => {
+    const atual = new Map(linhas.map((l) => [l.cod, l.percentual]));
+    const anterior = anteriorRef.current;
+    anteriorRef.current = atual;
+    if (!anterior) return;
+    let maiorAvanco = 0;
+    for (const [cod, pct] of atual) {
+      const antes = anterior.get(cod);
+      if (antes != null) maiorAvanco = Math.max(maiorAvanco, pct - antes);
+    }
+    // Só acelera em salto de mais de 10% da meta diária de uma vez: venda
+    // pequena (1%, 2%) fazia barulho o dia inteiro. Avanço maior = acelerada
+    // mais longa e aguda.
+    if (maiorAvanco > 10) tocarAceleracao(Math.min(1, maiorAvanco / 30));
+  }, [linhas]);
+
+
+  return <div className="flex min-h-0 flex-1 flex-col">
+    {visao === "3d" ? <Suspense fallback={<div className="flex min-h-[320px] flex-1 items-center justify-center rounded-2xl border border-sky-900/60 bg-[#061224] text-sm text-slate-400">Preparando a pista…</div>}><CenaCorrida3D {...props} onIndisponivel={() => setVisao("superior")} /></Suspense> : <RankingCorridaPlana {...props} />}
+  </div>;
 }

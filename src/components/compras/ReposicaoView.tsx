@@ -7,10 +7,10 @@
 // backend (reposicaoHandler.js) — aqui é só apresentação, filtro e paginação.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Boxes, Search, Loader2, Truck, Download, ChevronLeft, ChevronRight, AlertCircle, PackageX, CalendarClock, Link2, ClipboardList } from "lucide-react";
+import { Boxes, Search, Loader2, FilePlus2, Truck, Download, ChevronLeft, ChevronRight, AlertCircle, PackageX, CalendarClock, Link2, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { apiComprasReposicao, type ReposicaoItem, type ReposicaoResponse } from "@/lib/api";
+import { apiComprasGerarPropostaFornecedor, apiComprasReposicao, type ReposicaoItem, type ReposicaoResponse } from "@/lib/api";
 import { anexarGuiaImportacao } from "@/lib/guia-importacao-produtos";
 import { KardexMesModal } from "./KardexMesModal";
 import { AgendaReposicaoModal } from "./AgendaReposicaoModal";
@@ -52,6 +52,29 @@ export function ReposicaoView({ userProfile }: { userProfile?: { id?: string; na
   // "lista" = tabela de reposição · "propostas" = conferência dos pedidos montados
   const [aba, setAba] = useState<"lista" | "propostas">("lista");
   const [pendentes, setPendentes] = useState(0);
+  const [gerando, setGerando] = useState(false);
+  const [avisoProposta, setAvisoProposta] = useState<{ ok: boolean; texto: string } | null>(null);
+
+  // Proposta só do fornecedor filtrado — a mesma conta da agenda, sem esperar o dia.
+  async function gerarProposta() {
+    if (!fornecedor || gerando) return;
+    setGerando(true);
+    setAvisoProposta(null);
+    try {
+      const r = await apiComprasGerarPropostaFornecedor(fornecedor, dados?.meses_estoque);
+      if (!r.propostas) {
+        setAvisoProposta({ ok: false, texto: "Nada a comprar deste fornecedor: a necessidade já está coberta por estoque, pedido ou outra proposta." });
+      } else {
+        contarPendentes();
+        setAba("propostas");
+      }
+    } catch (e) {
+      setAvisoProposta({ ok: false, texto: e instanceof Error ? e.message : "Falha ao gerar a proposta." });
+    } finally {
+      setGerando(false);
+    }
+  }
+  useEffect(() => setAvisoProposta(null), [fornecedor]);
 
   // Propostas aguardando conferência, para o botão mostrar o contador.
   const contarPendentes = useCallback(() => {
@@ -159,6 +182,24 @@ export function ReposicaoView({ userProfile }: { userProfile?: { id?: string; na
             ))}
           </select>
         </div>
+
+        {fornecedor && (
+          <button
+            onClick={gerarProposta}
+            disabled={gerando}
+            title="Montar a proposta de pedido deste fornecedor agora"
+            className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-emerald-500/40 bg-card text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50 transition-colors"
+          >
+            {gerando ? <Loader2 className="w-4 h-4 animate-spin" /> : <FilePlus2 className="w-4 h-4" />}
+            Gerar proposta
+          </button>
+        )}
+
+        {avisoProposta && (
+          <span className={cn("text-[11px] font-semibold max-w-[320px]", avisoProposta.ok ? "text-emerald-600" : "text-amber-600")}>
+            {avisoProposta.texto}
+          </span>
+        )}
 
         {/* Propostas montadas pela agenda, esperando conferência. */}
         {pendentes > 0 && (

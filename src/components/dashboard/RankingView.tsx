@@ -159,7 +159,7 @@ export function RankingView({ meuCodigo }: { meuCodigo?: string } = {}) {
   const movements = useRankingMovement(linhas.map((row) => row.cod), !!active);
   const trackerRef = useRef(createRankingEventTracker());
   const dayRef = useRef("");
-  const pontuadosRef = useRef<Set<string>>(new Set());
+  const pontuadosRef = useRef<Map<string, number>>(new Map());
   const loadingRef = useRef(false);
   const mountedRef = useRef(false);
 
@@ -231,22 +231,31 @@ export function RankingView({ meuCodigo }: { meuCodigo?: string } = {}) {
         clear();
         rankingExibidoRef.current = [];
       }
-      // Garagem: bateu a meta diária = 1 ponto. PK (vendedor, dia) garante um
-      // ponto por dia mesmo com vários telões abertos; o ref evita reenviar.
+      // Garagem: cada 100% da meta diária = 1 ponto (200% = 2...). PK
+      // (vendedor, dia): o upsert sobe o ponto do dia conforme o % cresce;
+      // o ref evita reenviar o mesmo nível.
+      const nivel = (l: Linha) => Math.floor(l.percentual / 100);
       const novos = lista.filter(
-        (l) => l.metaDiaria > 0 && l.percentual >= 100 && !pontuadosRef.current.has(`${day}|${l.cod}`),
+        (l) => l.metaDiaria > 0 && nivel(l) >= 1 && (pontuadosRef.current.get(`${day}|${l.cod}`) ?? 0) < nivel(l),
       );
       if (novos.length) {
-        novos.forEach((l) => pontuadosRef.current.add(`${day}|${l.cod}`));
+        const antes = new Map(novos.map((l) => [l.cod, pontuadosRef.current.get(`${day}|${l.cod}`)]));
+        novos.forEach((l) => pontuadosRef.current.set(`${day}|${l.cod}`, nivel(l)));
         supabase
           .from("garagem_creditos")
           .upsert(
-            novos.map((l) => ({ vendedor_cod: l.cod.trim(), mes_ref: day, creditos: 1, percentual: Math.round(l.percentual * 100) / 100 })),
-            { onConflict: "vendedor_cod,mes_ref", ignoreDuplicates: true },
+            novos.map((l) => ({ vendedor_cod: l.cod.trim(), mes_ref: day, creditos: nivel(l), percentual: Math.round(l.percentual * 100) / 100 })),
+            { onConflict: "vendedor_cod,mes_ref" },
           )
           .then(({ error }) => {
             // Falhou: tenta de novo no próximo ciclo.
-            if (error) novos.forEach((l) => pontuadosRef.current.delete(`${day}|${l.cod}`));
+            if (error)
+              novos.forEach((l) => {
+                const k = `${day}|${l.cod}`;
+                const v = antes.get(l.cod);
+                if (v === undefined) pontuadosRef.current.delete(k);
+                else pontuadosRef.current.set(k, v);
+              });
           });
       }
       const events = trackerRef.current(lista, day, Date.now() + RANKING_COUNT_DURATION_MS + 500);

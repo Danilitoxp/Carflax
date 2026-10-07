@@ -1541,6 +1541,12 @@ export const apiComprasExecutarAgenda = (id: string, meses?: number) =>
     "/api/compras/reposicao/agenda/" + id + "/executar", meses ? { meses } : {},
   );
 
+/** Monta agora a proposta de pedido de um fornecedor só (tela de reposição). */
+export const apiComprasGerarPropostaFornecedor = (codFornecedor: string, meses?: number) =>
+  apiPost<{ success: boolean; propostas: number; itens: number }>(
+    "/api/compras/reposicao/propostas/gerar", { cod_fornecedor: codFornecedor, ...(meses ? { meses } : {}) },
+  );
+
 /**
  * Descarta a proposta. Passa pelo backend porque, ao descartar, a necessidade
  * que ela reservava precisa voltar para as propostas que continuam pendentes —
