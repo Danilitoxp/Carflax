@@ -103,9 +103,9 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   // Filtros travados (pedido do Danilo, 09/10): só CNPJ, parado há 3+ meses, qualquer valor.
-  const minValor = 0;
-  const minMeses = 3;
-  const filterDoc: (typeof DOC_FILTROS)[number] = "CNPJ";
+  const minValor: number = 0;
+  const minMeses: number = 3;
+  const filterDoc = "CNPJ" as (typeof DOC_FILTROS)[number];
   const minDias = minMeses * 30;
   const [sortField, setSortField] = useState<SortField>("recencia_dias");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
