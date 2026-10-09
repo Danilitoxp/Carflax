@@ -11,6 +11,8 @@ import { AvaliacoesView } from "./avaliacoes/AvaliacoesView";
 import { CriativoView } from "./criativo/CriativoView";
 import { BlogView } from "./blog/BlogView";
 import { GestaoTrafegoView } from "./trafego/GestaoTrafegoView";
+import { LandingPageView } from "./trafego/LandingPageView";
+import { OrcamentosAbertosView } from "./trafego/OrcamentosAbertosView";
 
 interface UserProfile {
   id?: string;
@@ -30,6 +32,14 @@ export function MarketingView({ activeTab, userProfile }: MarketingViewProps) {
 
   if (activeTab === "Gestao Trafego") {
     return <GestaoTrafegoView userProfile={userProfile} />;
+  }
+
+  if (activeTab === "Landing Page") {
+    return <LandingPageView />;
+  }
+
+  if (activeTab === "Orcamentos Abertos") {
+    return <OrcamentosAbertosView />;
   }
 
   if (activeTab === "Whatsapp API") {

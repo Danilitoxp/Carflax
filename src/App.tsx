@@ -1421,6 +1421,8 @@ function DashboardContent({
     "Criativo",
     "Relatórios Mkt",
     "Gestao Trafego",
+    "Landing Page",
+    "Orcamentos Abertos",
   ].includes(activeItem);
   // Comercial e gerentes veem o painel de métricas; os demais veem "Funcionário
   // do Mês". Gerente de outra área (ex.: logística) vê o vendido geral da

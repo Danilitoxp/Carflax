@@ -2014,6 +2014,38 @@ export interface TrafegoFechamento {
   cacheEm?: string;
 }
 
+/** Landing page dos anúncios: visitas e cliques no WhatsApp (por sessão, sem robôs). */
+export interface LpResumo { visitas: number; cliques: number; taxa: number | null }
+export interface LpGrupo extends LpResumo { nome: string }
+export interface LandingPageRelatorio {
+  periodo: { inicio: string; fim: string; anteriorInicio: string; anteriorFim: string };
+  total: LpResumo;
+  anuncio: LpResumo;
+  organico: LpResumo;
+  anterior: LpResumo;
+  robos: number;
+  porCampanha: LpGrupo[];
+  porCidade: LpGrupo[];
+  porLinha: LpGrupo[];
+  porDispositivo: LpGrupo[];
+  testeAB: { variantes: (LpResumo & { variante: string; titulo: string })[]; confianca: number | null; vencedora: string | null };
+  serie: (LpResumo & { dia: string })[];
+}
+export type OrcamentoAberto = {
+  remote_jid: string; cliente: string; vendedor_id: string | null; vendedor: string; valor: number;
+  data_orcamento: string | null; horas_parado: number | null; atrasado: boolean; temperatura: string | null; status: string | null;
+};
+export type OrcamentosAbertos = {
+  total: { qtd: number; valor: number; atrasados: number };
+  porVendedor: { vendedor: string; vendedor_id: string | null; qtd: number; valor: number; atrasados: number }[];
+  itens: OrcamentoAberto[];
+  horasAlerta: number;
+};
+export const apiOrcamentosAbertos = () => trafegoReq<OrcamentosAbertos>("GET", "orcamentos-abertos");
+
+export const apiLandingPage = (inicio: string, fim: string) =>
+  trafegoReq<LandingPageRelatorio>("GET", "landing-page", undefined, { inicio, fim });
+
 /** `ateDia`: corta o mês no dia N (comparar com os mesmos dias do mês anterior). */
 export const apiTrafegoFechamento = (mes: string, impostos: number, taxas: number, atualizar = false, ateDia?: number) =>
   trafegoReq<TrafegoFechamento>("GET", "fechamento", undefined, {

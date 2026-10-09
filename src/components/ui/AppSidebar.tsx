@@ -59,7 +59,7 @@ import { useNotification } from "@/hooks/useNotification";
 import { NAV_SECTIONS, ESTEIRA_SUBQUADRO_PREFIX, canAccessSection } from "@/lib/menu-config";
 import { useLiderDoDia } from "@/hooks/useLiderDoDia";
 import { usePremioTrimestralPendente } from "@/hooks/usePremioTrimestralPendente";
-import { Crown } from "lucide-react";
+import { Crown, MousePointerClick } from "lucide-react";
 import { abrirConversaWhatsapp, alertarTransferenciaCarlinhos } from "@/lib/isabela";
 
 // Reexporta para não quebrar imports existentes (ex: App.tsx). A fonte da verdade
@@ -104,6 +104,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "Whatsapp API": MessageCircle,
   "Automação": Bot,
   "Gestao Trafego": Target,
+  "Landing Page": MousePointerClick,
+  "Orcamentos Abertos": ClipboardList,
   Leads: Users,
   Cronograma: Calendar,
   Esteira: Kanban,

@@ -71,6 +71,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Automação" },
       // Campanhas do Google Ads e do Meta Ads direto pelas APIs, com trava do teto mensal.
       { label: "Tráfego", value: "Gestao Trafego" },
+      // Conversão da landing page dos anúncios (orcamento.carflax.com.br).
+      { label: "Landing page", value: "Landing Page" },
+      { label: "Orçamentos em aberto", value: "Orcamentos Abertos" },
       // Chave própria em vez de "Eventos": 9 usuários ainda têm "Eventos" salvo
       // em permissions (legado do Calendário) e passariam a ver as cotas dos
       // fornecedores sem ninguém ter liberado.
@@ -240,7 +243,7 @@ const VENDEDOR_SECTIONS = [
 ];
 
 const MARKETING_SECTIONS = [
-  "Marketing", "Whatsapp API", "Automação", "Leads", "Gestao Trafego", "Eventos Marketing", "Relatórios Mkt",
+  "Marketing", "Whatsapp API", "Automação", "Leads", "Gestao Trafego", "Landing Page", "Orcamentos Abertos", "Eventos Marketing", "Relatórios Mkt",
 ];
 
 const VENDAS_SECTIONS = [

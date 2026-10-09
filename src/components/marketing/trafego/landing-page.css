@@ -1,0 +1,53 @@
+/* Marketing › Landing page. Reaproveita o visual da Gestão de Tráfego (gt/gt2)
+   e só acrescenta o que é desta tela. Aqui a página rola: não usa a altura
+   travada da Gestão de Tráfego. */
+.gt2.lp { height: 100%; overflow-y: auto; }
+.gt2.lp .gt-wrap { height: auto; }
+
+.gt2.lp .gt2-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .gt2.lp .gt2-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.lp-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.lp-grade > .gt2-card { min-width: 0; overflow: hidden; }
+/* A Gestão de Tráfego força min-width: 980px em toda tabela: aqui a tabela cabe no card. */
+.gt2.lp table.lp-tab { min-width: 0; width: 100%; table-layout: auto; }
+@media (max-width: 1100px) { .lp-grade { grid-template-columns: 1fr; } }
+.lp-grade .gt2-card h3 { display: flex; align-items: center; gap: 8px; }
+
+.lp-vazio { margin: 6px 0; font-size: 13px; color: var(--ink-3); }
+.lp-nota { margin: 10px 0 0; font-size: 12px; color: var(--ink-3); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+.lp-tab { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lp-tab th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); padding: 0 8px 8px; border-bottom: 1px solid var(--line); }
+.lp-tab td { padding: 9px 8px; border-bottom: 1px solid var(--line-2); }
+.lp-tab tr:last-child td { border-bottom: 0; }
+.lp-tab .num { text-align: right; font-variant-numeric: tabular-nums; }
+.lp-taxa { position: relative; display: inline-block; min-width: 76px; padding: 2px 6px; font-weight: 700; z-index: 0; }
+.lp-taxa i { position: absolute; right: 0; top: 0; bottom: 0; border-radius: 6px; background: color-mix(in srgb, var(--good) 22%, transparent); z-index: -1; }
+
+.lp-ab { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; }
+.lp-ab.ganhou { border-color: var(--good); background: var(--good-soft); }
+.lp-ab-letra { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--line-2); }
+.lp-ab-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lp-ab-txt b { font-size: 13px; }
+.lp-ab-txt small { font-size: 12px; color: var(--ink-3); }
+.lp-ab strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+
+.lp-serie { display: flex; align-items: flex-end; gap: 3px; height: 160px; padding-top: 6px; }
+.lp-dia { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+.lp-dia span { font-size: 10px; color: var(--ink-3); }
+.lp-barra { width: 100%; max-width: 26px; min-height: 2px; position: relative; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--google) 30%, transparent); box-shadow: inset 0 2px 0 var(--google); }
+.lp-barra i { position: absolute; left: 0; right: 0; bottom: 0; display: block; border-radius: 4px 4px 0 0; background: var(--good); }
+.lp-leg { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.lp-leg.v { background: color-mix(in srgb, var(--google) 30%, transparent); box-shadow: inset 0 2px 0 var(--google); }
+.lp-leg.c { background: var(--good); margin-left: 8px; }
+
+/* Orçamentos em aberto (mesma base visual) */
+.oa-grade { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+@media (max-width: 1100px) { .oa-grade { grid-template-columns: 1fr; } }
+.oa-linha { cursor: pointer; }
+.oa-linha:hover td, .oa-linha.ativa td { background: var(--line-2); }
+.oa-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-3); }
+.oa-rolagem { max-height: 560px; overflow-y: auto; }
+.oa-atraso { color: var(--bad); font-weight: 700; }
+.gt2.lp .gt2-card-head:has(.oa-check) { display: flex; justify-content: space-between; align-items: center; }
