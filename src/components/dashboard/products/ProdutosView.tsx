@@ -148,7 +148,11 @@ function SyncBadge({ status, loja, carregando, erpPrice, erpStock, onEnviar }: S
   );
 }
 
-const CURVA_FILTROS = ["Curva: Todas", "Curva A", "Curva B", "Curva C"] as const;
+const margemDe = (venda: number, custo: number) => (venda > 0 && custo > 0 ? ((venda - custo) / venda) * 100 : null);
+const markupDe = (venda: number, custo: number) => (venda > 0 && custo > 0 ? ((venda - custo) / custo) * 100 : null);
+const fmtPct = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+const CURVA_FILTROS =["Curva: Todas", "Curva A", "Curva B", "Curva C"] as const;
 
 // Campos fiscais da CADITE com nome amigável na lista de colunas.
 const CAMPOS_CADITE_NOMEADOS: Record<string, { campo: string; label: string; formato?: (v: string | number) => string | number }> = {
@@ -165,6 +169,10 @@ const CAMPOS_COM_DESCRICAO: Record<string, string> = {
   subgrupo: "ITE_CODGRU",
   // Não é campo da CADITE: o backend calcula a partir da ITEGER.
   ultimoCusto: "ULTIMO_CUSTO",
+  precoCusto: "PRECO_CUSTO",
+  // Calculadas na tela sobre o preço de custo e o débito.
+  margem: "PRECO_CUSTO",
+  markup: "PRECO_CUSTO",
 };
 
 const COLUNAS_PADRAO = ["cod", "desc", "brand", "codFornecedor", "stock", "media", "debit", "shopify", "etiqueta"];
@@ -555,6 +563,26 @@ export function ProdutosView() {
     { key: "sales", label: "Total vendido", wch: 14, align: "right", sort: "sales", num: "#,##0.##", valor: (p) => p.sales },
     { key: "debit", label: "Débito", wch: 14, align: "right", sort: "debit", num: '"R$" #,##0.00', valor: (p) => p.debit,
       render: (p) => <span className="text-[11px] font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">R$ {fmtNum(p.debit)}</span> },
+    { key: "precoCusto", label: "Preço de custo", wch: 14, align: "right", num: '"R$" #,##0.00',
+      valor: (p) => Number(caditeDados.get(p.cod)?.PRECO_CUSTO) || 0,
+      render: (p) => {
+        const v = Number(caditeDados.get(p.cod)?.PRECO_CUSTO) || 0;
+        return <span className="text-[11px] font-black text-sky-600 dark:text-sky-400 tracking-tighter">{v ? `R$ ${fmtNum(v)}` : "—"}</span>;
+      } },
+    // Margem = lucro sobre o preço de venda; markup = lucro sobre o custo.
+    // Base: débito (preço de venda) x preço de custo cadastrado.
+    { key: "margem", label: "Margem", wch: 10, align: "right", num: '0.0"%"',
+      valor: (p) => margemDe(p.debit, Number(caditeDados.get(p.cod)?.PRECO_CUSTO) || 0) ?? 0,
+      render: (p) => {
+        const v = margemDe(p.debit, Number(caditeDados.get(p.cod)?.PRECO_CUSTO) || 0);
+        return <span className={cn("text-[11px] font-black tracking-tighter tabular-nums", v == null ? "text-muted-foreground" : v < 0 ? "text-rose-500" : "text-violet-600 dark:text-violet-400")}>{v == null ? "—" : `${fmtPct(v)}%`}</span>;
+      } },
+    { key: "markup", label: "Markup", wch: 10, align: "right", num: '0.0"%"',
+      valor: (p) => markupDe(p.debit, Number(caditeDados.get(p.cod)?.PRECO_CUSTO) || 0) ?? 0,
+      render: (p) => {
+        const v = markupDe(p.debit, Number(caditeDados.get(p.cod)?.PRECO_CUSTO) || 0);
+        return <span className={cn("text-[11px] font-black tracking-tighter tabular-nums", v == null ? "text-muted-foreground" : v < 0 ? "text-rose-500" : "text-fuchsia-600 dark:text-fuchsia-400")}>{v == null ? "—" : `${fmtPct(v)}%`}</span>;
+      } },
     { key: "ultimoCusto", label: "Último custo", wch: 14, align: "right", num: '"R$" #,##0.00',
       valor: (p) => Number(caditeDados.get(p.cod)?.ULTIMO_CUSTO) || 0,
       render: (p) => {

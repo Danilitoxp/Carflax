@@ -7,6 +7,7 @@ import { type CrmItem } from "@/lib/api";
 interface ActiveChat {
   id: number;
   doc: string;
+  empresa?: string;
   title: string;
   sellerName?: string;
   sellerCode?: string;
@@ -156,7 +157,8 @@ export function ChatCenter({
                   onCloseChatDoc(chat.doc);
                 }}
                 documento={chat.doc}
-                empresa="001"
+                empresa={chat.empresa || "001"}
+                filtrarPorEmpresa={!!chat.empresa}
                 title={chat.title}
                 userProfile={userProfile}
                 sellerName={chat.sellerName}

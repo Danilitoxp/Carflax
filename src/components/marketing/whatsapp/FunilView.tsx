@@ -10,6 +10,8 @@ import {
   Thermometer,
   User,
   ChevronDown,
+  Check,
+  Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { apiCrmOrcamentos } from "@/lib/api";
@@ -212,6 +214,142 @@ const IconeTemp = ({ t }: { t: string | null }) => {
   return null;
 };
 
+/** Mesma regra dos operadores do WhatsappView: permissão "Whatsapp API" ou admin/gerente/diretor. */
+function temAcessoWhatsapp(u: { permissions?: unknown; is_admin?: boolean | null; role?: string | null }) {
+  if (u.is_admin) return true;
+  const role = (u.role || "").toUpperCase();
+  if (role === "ADMIN" || role.includes("GERENTE") || role.includes("DIRETOR")) return true;
+  return Array.isArray(u.permissions) && u.permissions.includes("Whatsapp API");
+}
+
+function iniciais(nome: string) {
+  const partes = nome.trim().split(/\s+/);
+  return ((partes[0]?.[0] || "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
+}
+
+function AvatarAtendente({ id, nome, avatar }: { id: string; nome: string; avatar?: string | null }) {
+  if (id === ISABELA) return <CarlinhosAvatar className="w-5 h-5" />;
+  if (id === SEM_ATENDENTE)
+    return (
+      <span className="w-5 h-5 rounded-full border border-dashed border-muted-foreground/50 flex items-center justify-center shrink-0">
+        <User className="w-3 h-3 text-muted-foreground" />
+      </span>
+    );
+  if (avatar) return <img src={avatar} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />;
+  return (
+    <span className="w-5 h-5 rounded-full bg-secondary text-[8px] font-black flex items-center justify-center shrink-0 text-muted-foreground">
+      {iniciais(nome)}
+    </span>
+  );
+}
+
+/** Menu do filtro por atendente: avatar, contagem em selo e "Você" destacado. */
+function FiltroAtendente({
+  valor,
+  onChange,
+  opcoes,
+  atendentes,
+  usuarioId,
+}: {
+  valor: string;
+  onChange: (v: string) => void;
+  opcoes: { id: string; nome: string; total: number }[];
+  atendentes: Map<string, { nome: string; avatar: string | null; comAcesso: boolean }>;
+  usuarioId: string | null;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!aberto) return;
+    const fora = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAberto(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setAberto(false);
+    document.addEventListener("mousedown", fora);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", fora);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [aberto]);
+
+  const atual = opcoes.find((o) => o.id === valor);
+  const totalGeral = opcoes.reduce((s, o) => s + o.total, 0);
+
+  const item = (id: string, nome: string, total: number, sub?: string) => {
+    const ativo = valor === id;
+    return (
+      <button
+        key={id || "todos"}
+        onClick={() => {
+          onChange(id);
+          setAberto(false);
+        }}
+        className={cn(
+          "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-[11px] font-bold transition-colors",
+          ativo ? "bg-primary/15 text-primary" : "hover:bg-secondary text-foreground",
+        )}
+      >
+        {id ? (
+          <AvatarAtendente id={id} nome={nome} avatar={atendentes.get(id)?.avatar} />
+        ) : (
+          <span className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+            <Users className="w-3 h-3 text-primary" />
+          </span>
+        )}
+        <span className="flex-1 min-w-0 truncate">
+          {nome}
+          {sub && <span className="ml-1 text-[9px] font-black uppercase text-muted-foreground">{sub}</span>}
+        </span>
+        <span
+          className={cn(
+            "min-w-[22px] text-center px-1.5 py-0.5 rounded-full text-[10px] font-black tabular-nums",
+            total === 0 ? "text-muted-foreground/60" : ativo ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground",
+          )}
+        >
+          {total}
+        </span>
+        {ativo && <Check className="w-3.5 h-3.5 shrink-0" />}
+      </button>
+    );
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setAberto((a) => !a)}
+        title="Mostrar só as conversas de um atendente"
+        className={cn(
+          "flex items-center gap-2 bg-secondary/50 border rounded-lg pl-2 pr-2 py-1 text-[11px] font-bold transition-all max-w-[220px]",
+          // Filtro ligado muda a cor da borda: o quadro passa a mostrar um
+          // recorte, e nada mais na tela avisaria que faltam cards.
+          valor ? "border-primary/60 text-primary" : "border-border hover:border-primary/30",
+        )}
+      >
+        {atual ? (
+          <AvatarAtendente id={atual.id} nome={atual.nome} avatar={atendentes.get(atual.id)?.avatar} />
+        ) : (
+          <Users className="w-3.5 h-3.5 text-muted-foreground" />
+        )}
+        <span className="truncate">{atual ? atual.nome : "Todos os atendentes"}</span>
+        <span className="text-[10px] font-black tabular-nums text-muted-foreground">{atual ? atual.total : totalGeral}</span>
+        <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", aberto && "rotate-180")} />
+      </button>
+
+      {aberto && (
+        <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-card border border-border rounded-xl shadow-xl p-1.5">
+          {item("", "Todos os atendentes", totalGeral)}
+          <div className="my-1 h-px bg-border" />
+          <div className="max-h-72 overflow-y-auto space-y-0.5">
+            {opcoes.map((o) => item(o.id, o.nome, o.total, o.id === usuarioId ? "você" : undefined))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Sem filtro por atendente de propósito: o quadro mostra exatamente o mesmo
 // universo da lista de conversas do WhatsApp, que também é do time todo. (O
 // `vendedorId` do WhatsappView NÃO serve para isso — ele é o id de quem está
@@ -255,7 +393,7 @@ export function FunilView({
   // estática, então uma busca na montagem basta — não precisa recarregar junto
   // com o quadro a cada evento de realtime.
   const [atendentes, setAtendentes] = useState<
-    Map<string, { nome: string; avatar: string | null }>
+    Map<string, { nome: string; avatar: string | null; comAcesso: boolean }>
   >(new Map());
   // Conversas em que a Isabela está ativa. Só 'ativa' conta: transferida e
   // assumida já têm vendedor, pausada é ela desligada à mão.
@@ -263,13 +401,19 @@ export function FunilView({
 
   /** Dono do card: vendedor gravado vence; senão a Isabela, se estiver ativa. */
   const donoDe = useCallback(
-    (c: ClienteFunil) =>
-      c.vendedor_id
-        ? String(c.vendedor_id)
-        : comIsabela.has(c.remote_jid)
-          ? ISABELA
-          : SEM_ATENDENTE,
-    [comIsabela],
+    (c: ClienteFunil) => {
+      if (c.vendedor_id) {
+        const id = String(c.vendedor_id);
+        // Dono que perdeu o acesso ao WhatsApp API (saiu, mudou de setor) não
+        // atende mais: a conversa volta a ser de todo mundo, senão ela fica
+        // presa num nome que ninguém usa e some dos filtros do time.
+        const u = atendentes.get(id);
+        if (u && !u.comAcesso) return SEM_ATENDENTE;
+        return id;
+      }
+      return comIsabela.has(c.remote_jid) ? ISABELA : SEM_ATENDENTE;
+    },
+    [comIsabela, atendentes],
   );
 
   // `silencioso` = recarga vinda do realtime: atualiza sem acender o spinner
@@ -372,14 +516,18 @@ export function FunilView({
     let vivo = true;
     supabase
       .from("usuarios")
-      .select("id, name, avatar")
+      .select("id, name, avatar, permissions, is_admin, role")
       .then(({ data }) => {
         if (!vivo) return;
         setAtendentes(
           new Map(
             (data || []).map((u) => [
               String(u.id),
-              { nome: String(u.name || ""), avatar: u.avatar || null },
+              {
+                nome: String(u.name || ""),
+                avatar: u.avatar || null,
+                comAcesso: temAcessoWhatsapp(u),
+              },
             ]),
           ),
         );
@@ -472,6 +620,9 @@ export function FunilView({
   const opcoesAtendente = useMemo(() => {
     const contagem = new Map<string, number>();
     for (const c of clientes) {
+      // Conta só o que está em aberto no quadro: tudo que cai na coluna
+      // Arquivado (arquivada, perdida no ERP, arrastada) fica de fora.
+      if (etapaDoCliente(c, statusErp, comIsabela.has(c.remote_jid)) === "PERDIDO") continue;
       const chave = donoDe(c);
       contagem.set(chave, (contagem.get(chave) || 0) + 1);
     }
@@ -511,7 +662,7 @@ export function FunilView({
       lista.push({ id: SEM_ATENDENTE, nome: "Sem atendente", total: semDono });
     }
     return lista;
-  }, [clientes, atendentes, usuarioId, donoDe]);
+  }, [clientes, atendentes, usuarioId, donoDe, statusErp, comIsabela]);
 
   const porEtapa = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -643,27 +794,14 @@ export function FunilView({
 
         {/* Filtro por atendente. Fica ANTES da busca porque recorta o quadro
             inteiro, enquanto a busca só procura dentro do que sobrou. */}
-        <div className="relative ml-auto">
-          <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-          <select
-            value={filtroAtendente}
-            onChange={(e) => setFiltroAtendente(e.target.value)}
-            title="Mostrar só as conversas de um atendente"
-            className={cn(
-              "appearance-none bg-secondary/50 border rounded-lg pl-8 pr-7 py-1 text-[11px] font-bold outline-none focus:border-primary/50 transition-all cursor-pointer max-w-[190px]",
-              // Filtro ligado muda a cor da borda: o quadro passa a mostrar um
-              // recorte, e nada mais na tela avisaria que faltam cards.
-              filtroAtendente ? "border-primary/60 text-primary" : "border-border",
-            )}
-          >
-            <option value="">Todos os atendentes</option>
-            {opcoesAtendente.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.nome} ({o.total})
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+        <div className="ml-auto">
+          <FiltroAtendente
+            valor={filtroAtendente}
+            onChange={setFiltroAtendente}
+            opcoes={opcoesAtendente}
+            atendentes={atendentes}
+            usuarioId={usuarioId ? String(usuarioId) : null}
+          />
         </div>
 
         <div className="relative w-56">

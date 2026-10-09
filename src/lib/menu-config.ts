@@ -70,7 +70,7 @@ export const NAV_SECTIONS: NavSection[] = [
       // Disparos pelo WhatsApp de automação (avaliações, café da manhã).
       { label: "Automação" },
       // Campanhas do Google Ads e do Meta Ads direto pelas APIs, com trava do teto mensal.
-      { label: "Gestão de Tráfego", value: "Gestao Trafego" },
+      { label: "Tráfego", value: "Gestao Trafego" },
       // Chave própria em vez de "Eventos": 9 usuários ainda têm "Eventos" salvo
       // em permissions (legado do Calendário) e passariam a ver as cotas dos
       // fornecedores sem ninguém ter liberado.

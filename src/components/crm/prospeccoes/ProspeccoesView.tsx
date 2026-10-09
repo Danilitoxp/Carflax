@@ -102,10 +102,10 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
   const [clientes, setClientes] = useState<ClienteFRV[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  // Abre com a carteira inteira; os filtros afinam para reativação.
-  const [minValor, setMinValor] = useState(0);
-  const [minMeses, setMinMeses] = useState(0);
-  const [filterDoc, setFilterDoc] = useState<(typeof DOC_FILTROS)[number]>("Todos");
+  // Filtros travados (pedido do Danilo, 09/10): só CNPJ, parado há 3+ meses, qualquer valor.
+  const minValor = 0;
+  const minMeses = 3;
+  const filterDoc: (typeof DOC_FILTROS)[number] = "CNPJ";
   const minDias = minMeses * 30;
   const [sortField, setSortField] = useState<SortField>("recencia_dias");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -312,8 +312,8 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
             <span className="text-[10px] font-bold text-muted-foreground">Valor mín.</span>
             <select
               value={minValor}
-              onChange={e => setMinValor(Number(e.target.value))}
-              className="text-[10px] font-black bg-transparent outline-none cursor-pointer text-foreground"
+              disabled
+              className="text-[10px] font-black bg-transparent outline-none cursor-not-allowed text-foreground"
             >
               <option value={0}>Qualquer</option>
               <option value={5000}>R$ 5.000</option>
@@ -328,8 +328,8 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
             <span className="text-[10px] font-bold text-muted-foreground">Documento</span>
             <select
               value={filterDoc}
-              onChange={e => setFilterDoc(e.target.value as (typeof DOC_FILTROS)[number])}
-              className="text-[10px] font-black bg-transparent outline-none cursor-pointer text-foreground"
+              disabled
+              className="text-[10px] font-black bg-transparent outline-none cursor-not-allowed text-foreground"
             >
               {DOC_FILTROS.map(d => (
                 <option key={d} value={d}>{d}</option>
@@ -342,8 +342,8 @@ export function ProspeccoesView({ userProfile }: ProspeccoesViewProps) {
             <span className="text-[10px] font-bold text-muted-foreground">Sem comprar há</span>
             <select
               value={minMeses}
-              onChange={e => setMinMeses(Number(e.target.value))}
-              className="text-[10px] font-black bg-transparent outline-none cursor-pointer text-foreground"
+              disabled
+              className="text-[10px] font-black bg-transparent outline-none cursor-not-allowed text-foreground"
             >
               {MESES_PARADO.map(m => (
                 <option key={m} value={m}>{m === 0 ? "Todos" : `${m} ${m === 1 ? "mês" : "meses"}`}</option>

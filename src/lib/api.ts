@@ -762,6 +762,7 @@ export const apiCaditeExportar = (codigos: string[], colunas: string[]) =>
     descCest: colunas.includes("ITE_CDCEST"),
     descGrupo: colunas.includes("ITE_CODGRU"),
     ultimoCusto: colunas.includes("ULTIMO_CUSTO"),
+    precoCusto: colunas.includes("PRECO_CUSTO"),
   });
 
 export interface ProdutoFornecedor {

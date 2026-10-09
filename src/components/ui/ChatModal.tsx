@@ -44,6 +44,8 @@ interface ChatModalProps {
   onClose: () => void;
   documento: string;
   empresa: string;
+  /** Só mostra mensagens desta empresa (quando a empresa do pedido é conhecida). */
+  filtrarPorEmpresa?: boolean;
   title: string;
   userProfile?: UserProfile;
   sellerName?: string;
@@ -61,6 +63,7 @@ export function ChatModal({
   onClose,
   documento,
   empresa,
+  filtrarPorEmpresa = false,
   title,
   userProfile,
   sellerName,
@@ -343,10 +346,20 @@ export function ChatModal({
 
     const cleanDocForQuery = documento.replace("#", "").trim();
 
+    // O número do pedido se repete entre empresas (#1529 da 001 e #1529 da
+    // 003 são pedidos diferentes). Filtrar só por documento misturava as
+    // conversas — a divergência de separação de um cliente aparecia no
+    // pedido de outro. Mensagem sem empresa gravada continua aparecendo.
+    const empresaNorm = (e?: string | null) => String(e ?? "").trim().replace(/^0+/, "");
+    const minhaEmpresa = filtrarPorEmpresa ? empresaNorm(empresa) : "";
+    const daMinhaEmpresa = (m: CrmConversa) =>
+      !minhaEmpresa || !empresaNorm(m.empresa) || empresaNorm(m.empresa) === minhaEmpresa;
+
     Promise.all([
       fetchOwner(),
       getConversas(cleanDocForQuery),
-    ]).then(([, data]) => {
+    ]).then(([, todas]) => {
+      const data = todas.filter(daMinhaEmpresa);
       setConversas(data);
       setLoading(false);
       // Prévia da lista usa o último DIÁLOGO (ignora atualizações de status do SISTEMA).
@@ -364,7 +377,7 @@ export function ChatModal({
 
     const handleNewMsg = (newMsg: CrmConversa) => {
       const msgDoc = (newMsg.documento || "").replace("#", "").trim();
-      if (msgDoc !== cleanDoc) return;
+      if (msgDoc !== cleanDoc || !daMinhaEmpresa(newMsg)) return;
       if (newMsg.enviado_por === userProfile?.id) return;
 
       setPartnerTyping(false);
@@ -381,7 +394,7 @@ export function ChatModal({
     // coletor a cada item conferido, então a tabela precisa mudar na tela.
     const handleMsgUpdate = (upd: CrmConversa) => {
       const msgDoc = (upd.documento || "").replace("#", "").trim();
-      if (msgDoc !== cleanDoc) return;
+      if (msgDoc !== cleanDoc || !daMinhaEmpresa(upd)) return;
       setConversas((prev) => {
         let mudou = false;
         const proximo = prev.map((m) => {
@@ -498,7 +511,7 @@ export function ChatModal({
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, documento, userProfile?.id, userProfile?.name, itemsInitial, amICentralizer, resolvedResponsavelId, sellerCode, effectiveSellerCode, sellerName]);
+  }, [isOpen, documento, empresa, filtrarPorEmpresa, userProfile?.id, userProfile?.name, itemsInitial, amICentralizer, resolvedResponsavelId, sellerCode, effectiveSellerCode, sellerName]);
 
   // 2. Efeito de Resolução Dinâmica de Perfil baseada em Mensagens e Cache Global
   useEffect(() => {
@@ -625,7 +638,11 @@ export function ChatModal({
         const isDivergencia = title.includes("Divergência:");
         // Divergências são sobre pedidos (PD). Se houver um PD e um OR com mesmo
         // número, prioriza o PD para mostrar o cliente correto.
-        const matches = raw.filter(b => b.ORCAMENTO === cleanDocId || b.ORCAMENTO?.includes(cleanDocId));
+        const empNorm = (e?: string | null) => String(e ?? "").trim().replace(/^0+/, "");
+        const matches = raw.filter(b =>
+          (b.ORCAMENTO === cleanDocId || b.ORCAMENTO?.includes(cleanDocId)) &&
+          // Mesmo número em outra empresa é outro pedido, de outro cliente.
+          (!filtrarPorEmpresa || empNorm(b.EMPRESA) === empNorm(empresa)));
         let budget = isDivergencia
           ? matches.find(b => (b as unknown as { ESPDOC?: string }).ESPDOC === "PD" || b.PEDIDO === "Sim") || matches[0]
           : matches[0];
@@ -642,8 +659,10 @@ export function ChatModal({
 
     // Sem documento não há orçamento para consultar — o nome do cliente, quando
     // existe, veio do próprio título ou do texto da divergência, acima.
-    if (documento) fetchClientName();
-  }, [isOpen, documento, title, sellerName, userProfile?.name, conversas]);
+    // Quem abriu já mandou o cliente no título: não deixa a busca por número
+    // (que pode achar o mesmo número em outra empresa) sobrescrever.
+    if (documento && !isTitleNotSellerOrCentralizer) fetchClientName();
+  }, [isOpen, documento, empresa, filtrarPorEmpresa, title, sellerName, userProfile?.name, conversas]);
 
   // Mantém a lista de mensagens de divergência (editáveis pelo coletor) atualizada.
   useEffect(() => {

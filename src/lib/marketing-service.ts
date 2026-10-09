@@ -1539,7 +1539,12 @@ export const marketingService = {
           data: s.data_venda,
         };
       })
-      .sort((a, b) => b.valor - a.valor);
+      // Mais recente primeiro; no mesmo dia, o maior valor na frente.
+      .sort(
+        (a, b) =>
+          (new Date(b.data || 0).getTime() || 0) - (new Date(a.data || 0).getTime() || 0) ||
+          b.valor - a.valor,
+      );
 
     const bySeller: SellerReport[] = [...sellerAcc.entries()].map(([id, acc]) => {
       const resp = respBySeller[id];

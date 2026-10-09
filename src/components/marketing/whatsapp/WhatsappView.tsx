@@ -42,6 +42,16 @@ import {
   CornerUpLeft,
   Eye,
   Plus,
+  MessageSquare,
+  MessageSquareText,
+  CheckCircle2,
+  Circle,
+  CalendarDays,
+  AlertTriangle,
+  Tag,
+  Hourglass,
+  CreditCard,
+  Info,
 } from "lucide-react";
 import { evolutionApi } from "@/lib/evolution-v2";
 import { supabase } from "@/lib/supabase";
@@ -1599,14 +1609,45 @@ export function WhatsappView({
     );
   }, [userProfile]);
   const [customArchiveReason, setCustomArchiveReason] = useState("");
-  const [isEnteringCustomReason, setIsEnteringCustomReason] = useState(false);
   const [materialInput, setMaterialInput] = useState("");
-  const [isEnteringMaterial, setIsEnteringMaterial] = useState(false);
   const [selectedReason, setSelectedReason] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [archiveObservation, setArchiveObservation] = useState("");
+  // Desfecho escolhido no modal de encerramento (o motivo vem depois).
+  const [archiveResultado, setArchiveResultado] = useState<"venda" | "perda" | null>(null);
   const [showTempDropdown, setShowTempDropdown] = useState(false);
   const [showAtendentePicker, setShowAtendentePicker] = useState(false);
+  // Atendimentos em aberto por atendente, para o menu "Atribuir para". Conta
+  // direto no banco (a lista de conversas é paginada e daria número parcial),
+  // com os mesmos filtros do funil: não arquivada, contato individual, com
+  // conversa e fora de Perdido.
+  const [atendimentosPorOperador, setAtendimentosPorOperador] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (!showAtendentePicker) return;
+    let vivo = true;
+    supabase
+      .from("marketing_clientes")
+      .select("vendedor_id, temperatura, funil_etapa")
+      .or("arquivado.eq.false,arquivado.is.null")
+      .eq("descartado", false)
+      .not("vendedor_id", "is", null)
+      .not("ultima_conversa_em", "is", null)
+      .like("remote_jid", "%@s.whatsapp.net")
+      .limit(5000)
+      .then(({ data }) => {
+        if (!vivo || !data) return;
+        const mapa = new Map<string, number>();
+        for (const c of data) {
+          if (c.funil_etapa === "PERDIDO" || (!c.funil_etapa && c.temperatura === "Perdido")) continue;
+          const id = String(c.vendedor_id);
+          mapa.set(id, (mapa.get(id) || 0) + 1);
+        }
+        setAtendimentosPorOperador(mapa);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [showAtendentePicker]);
   const [isNoteMode, setIsNoteMode] = useState(false);
 
   // Atribuição de atendente e resposta a mensagens
@@ -1743,9 +1784,7 @@ export function WhatsappView({
   useEffect(() => {
     if (!showArchiveModal) {
       setCustomArchiveReason("");
-      setIsEnteringCustomReason(false);
       setMaterialInput("");
-      setIsEnteringMaterial(false);
       // Fechou o modal (sem confirmar ou já confirmado): descarta a trava do alvo.
       archiveTargetRef.current = null;
     }
@@ -2523,13 +2562,12 @@ export function WhatsappView({
 
   const handleCloseArchiveModal = () => {
     setShowArchiveModal(false);
-    setIsEnteringMaterial(false);
-    setIsEnteringCustomReason(false);
     setMaterialInput("");
     setCustomArchiveReason("");
     setSelectedReason("");
     setPaymentMethod("");
     setArchiveObservation("");
+    setArchiveResultado(null);
   };
 
   const handleArchiveChat = async (reasonText?: string) => {
@@ -2545,7 +2583,8 @@ export function WhatsappView({
 
     const finalReason = reasonText || selectedReason;
     const finalPayment = finalReason === "Convertido" ? paymentMethod : "";
-    const finalObs = finalReason === "Convertido" ? archiveObservation : "";
+    // Observação vale para qualquer desfecho (o modal mostra o campo nos dois).
+    const finalObs = archiveObservation.trim();
 
     // Venda só conta com cliente vinculado na Citel. A checagem vem antes da
     // atualização otimista: sem isso a tela mostrava "Convertido" e o banco recusava.
@@ -5217,8 +5256,7 @@ export function WhatsappView({
           .update({ vendedor_id: novoId, updated_at: new Date().toISOString() })
           .eq("remote_jid", selectedChat.id);
       } catch (err) {
-        console.error("[Atendente] Erro ao trocar atendente:", err);
-        // Reverte
+        console.error("[Atendente] Erro ao trocar atendente:", err);        // Reverte
         setSelectedChat((prev) =>
           prev
             ? { ...prev, vendedor_id: selectedChat.vendedor_id }
@@ -5235,6 +5273,12 @@ export function WhatsappView({
     },
     [selectedChat],
   );
+
+  // Dono da conversa pode transferi-la para um colega; reatribuir conversa
+  // de outra pessoa segue exclusivo de admin/líder.
+  const souDono =
+    !!selectedChat?.vendedor_id && !!vendedorId && String(selectedChat.vendedor_id) === String(vendedorId);
+  const podeTransferir = isAdminUser || souDono;
 
   const triggerTemperatureClassification = useCallback(
     async (remoteJid: string) => {
@@ -5745,33 +5789,47 @@ export function WhatsappView({
         />
       )}
 
-      {showArchiveModal && (
+      {showArchiveModal && (() => {
+        // Motivo de perda escolhido (Outros / Não vendemos pedem um texto).
+        const precisaTexto = selectedReason === "Outros" || selectedReason === "Não vendemos o material";
+        const motivoFinal =
+          selectedReason === "Outros" ? customArchiveReason.trim()
+          : selectedReason === "Não vendemos o material"
+            ? (materialInput.trim() ? `Não vendemos o material: ${materialInput.trim()}` : "")
+          : selectedReason;
+        const podeConfirmar =
+          archiveResultado === "venda" ? !!paymentMethod && vinculoDoArquivamento !== "nao"
+          : archiveResultado === "perda" ? !!motivoFinal
+          : false;
+        const ICONE_MOTIVO: Record<string, typeof User> = {
+          "Cliente Curioso": UserRound,
+          "Não vendemos o material": Package,
+          "Falta de Estoque": AlertTriangle,
+          "Preço Alto": Tag,
+          "Prazo Longo": Hourglass,
+          "Condição de pagamento": CreditCard,
+          Outros: MessageSquareText,
+        };
+        const ROTULO_MOTIVO: Record<string, string> = {
+          "Cliente Curioso": "Cliente curioso",
+          "Falta de Estoque": "Falta de estoque",
+          "Preço Alto": "Preço alto",
+          "Prazo Longo": "Prazo longo",
+        };
+        const cartaoResultado = "flex-1 min-w-[180px] p-4 flex items-start gap-3 text-left rounded-2xl border transition-all duration-200 active:scale-[0.99]";
+        return (
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div
-            className={cn(
-              "bg-card border border-border rounded-3xl shadow-2xl w-full overflow-hidden transform transition-all duration-300",
-              // Os dois passos de digitação continuam estreitos: é um campo só.
-              isEnteringMaterial || isEnteringCustomReason ? "max-w-sm" : "max-w-2xl",
-            )}
-          >
+          <div className="bg-card border border-border rounded-3xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
             <div className="p-6 border-b border-border/50 flex items-start justify-between gap-4">
-              <div className="space-y-1">
-                <h3 className="font-black text-sm uppercase tracking-tighter">
-                  {isEnteringMaterial
-                    ? "Qual Material?"
-                    : isEnteringCustomReason
-                    ? "Escreva o Motivo"
-                    : "Encerrar Atendimento"}
-                </h3>
-                {!isEnteringMaterial && !isEnteringCustomReason && (
-                  <p className="text-[10px] font-bold text-muted-foreground">
+              <div className="flex items-start gap-4">
+                <MessageSquare className="w-8 h-8 text-blue-500 shrink-0" />
+                <div className="space-y-1">
+                  <h3 className="font-black text-lg tracking-tight">Encerrar atendimento</h3>
+                  <p className="text-xs text-muted-foreground">
                     Como terminou a conversa com{" "}
-                    <span className="text-foreground">
-                      {archiveTarget?.name || "este cliente"}
-                    </span>
-                    ?
+                    <span className="font-bold text-foreground">{archiveTarget?.name || "este cliente"}</span>?
                   </p>
-                )}
+                </div>
               </div>
               <button
                 onClick={handleCloseArchiveModal}
@@ -5781,254 +5839,170 @@ export function WhatsappView({
               </button>
             </div>
 
-            {isEnteringMaterial ? (
-              <div className="space-y-4">
-                <div className="p-6 space-y-2">
-                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
-                    Qual material o cliente procurava?
-                  </label>
-                  <input
-                    value={materialInput}
-                    onChange={(e) => setMaterialInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && materialInput.trim()) {
-                        const reason = `Não vendemos o material: ${materialInput.trim()}`;
-                        setIsEnteringMaterial(false);
-                        handleArchiveChat(reason);
-                      }
-                    }}
-                    placeholder="Ex: Cabo flexível 2.5mm, disjuntor DR..."
-                    className="w-full bg-secondary/50 border border-border rounded-2xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-rose-500/50 focus:ring-2 focus:ring-rose-500/20 transition-all"
-                    autoFocus
-                  />
-                </div>
-                <div className="p-6 border-t border-border/50 flex items-center justify-between gap-2 bg-secondary/10">
+            <div className="p-6 space-y-6 overflow-y-auto">
+              {/* 1. Desfecho */}
+              <div className="space-y-3">
+                <p className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Resultado do atendimento</p>
+                <div className="flex flex-wrap gap-3">
                   <button
-                    onClick={() => setIsEnteringMaterial(false)}
-                    className="px-4 py-2 text-xs font-bold text-muted-foreground hover:bg-secondary rounded-xl transition-all"
+                    onClick={() => { setArchiveResultado("venda"); setSelectedReason(ARCHIVE_REASON_GANHO); }}
+                    className={cn(cartaoResultado, archiveResultado === "venda"
+                      ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40"
+                      : "border-border hover:border-emerald-500/40 hover:bg-emerald-500/5")}
                   >
-                    Voltar
-                  </button>
-                  <button
-                    disabled={!materialInput.trim()}
-                    onClick={() => {
-                      if (materialInput.trim()) {
-                        const reason = `Não vendemos o material: ${materialInput.trim()}`;
-                        setIsEnteringMaterial(false);
-                        handleArchiveChat(reason);
-                      }
-                    }}
-                    className="px-5 py-2 text-xs font-black uppercase bg-rose-500 hover:bg-rose-600 text-white rounded-xl transition-all shadow-md hover:shadow-rose-500/20 active:scale-95 disabled:opacity-55 disabled:cursor-not-allowed disabled:active:scale-100"
-                  >
-                    Confirmar
-                  </button>
-                </div>
-              </div>
-            ) : isEnteringCustomReason ? (
-              <div className="space-y-4">
-                <div className="p-6 space-y-2">
-                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
-                    Descreva o motivo personalizado
-                  </label>
-                  <textarea
-                    value={customArchiveReason}
-                    onChange={(e) => setCustomArchiveReason(e.target.value)}
-                    placeholder="Ex: Cliente fechou com o concorrente, não responde..."
-                    rows={3}
-                    className="w-full bg-secondary/50 border border-border/80 rounded-2xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-rose-500/50 focus:ring-2 focus:ring-rose-500/20 transition-all resize-none"
-                    autoFocus
-                  />
-                </div>
-                <div className="p-6 border-t border-border/50 flex items-center justify-between gap-2 bg-secondary/10">
-                  <button
-                    onClick={() => setIsEnteringCustomReason(false)}
-                    className="px-4 py-2 text-xs font-bold text-muted-foreground hover:bg-secondary rounded-xl transition-all"
-                  >
-                    Voltar
-                  </button>
-                  <button
-                    disabled={!customArchiveReason.trim()}
-                    onClick={() => {
-                      if (customArchiveReason.trim()) {
-                        const reason = customArchiveReason.trim();
-                        setIsEnteringCustomReason(false);
-                        handleArchiveChat(reason);
-                      }
-                    }}
-                    className="px-5 py-2 text-xs font-black uppercase bg-rose-500 hover:bg-rose-600 text-white rounded-xl transition-all shadow-md hover:shadow-rose-500/20 active:scale-95 disabled:opacity-55 disabled:cursor-not-allowed disabled:active:scale-100"
-                  >
-                    Confirmar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
-                {/* 1. GANHOU — primeiro e em destaque: é o desfecho que o time
-                    persegue, e era o mais difícil de achar na lista antiga. */}
-                <button
-                  onClick={() =>
-                    setSelectedReason(
-                      selectedReason === ARCHIVE_REASON_GANHO ? "" : ARCHIVE_REASON_GANHO,
-                    )
-                  }
-                  className={cn(
-                    "w-full p-4 flex items-center gap-3 text-left rounded-2xl border transition-all duration-200 active:scale-[0.99]",
-                    selectedReason === ARCHIVE_REASON_GANHO
-                      ? "border-emerald-500/40 bg-emerald-500/10"
-                      : "border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10",
-                  )}
-                >
-                  <span className="text-xl leading-none">🎉</span>
-                  <span className="flex-1">
-                    <span className="block text-xs font-black uppercase tracking-tight text-emerald-500">
-                      Fechou negócio
+                    <CheckCircle2 className="w-7 h-7 text-emerald-500 shrink-0" />
+                    <span>
+                      <span className="block text-sm font-black">Venda realizada</span>
+                      <span className="block text-[11px] text-muted-foreground mt-0.5">Registra a venda e arquiva como convertido</span>
                     </span>
-                    <span className="block text-[10px] font-bold text-muted-foreground mt-0.5">
-                      Registra a venda e arquiva como convertido
+                  </button>
+                  <button
+                    onClick={() => { setArchiveResultado("perda"); if (selectedReason === ARCHIVE_REASON_GANHO) setSelectedReason(""); }}
+                    className={cn(cartaoResultado, archiveResultado === "perda"
+                      ? "border-blue-500 bg-blue-500/10 ring-1 ring-blue-500/40"
+                      : "border-border hover:border-blue-500/40 hover:bg-blue-500/5")}
+                  >
+                    {archiveResultado === "perda"
+                      ? <CheckCircle2 className="w-7 h-7 text-blue-500 shrink-0" />
+                      : <Circle className="w-7 h-7 text-muted-foreground shrink-0" />}
+                    <span>
+                      <span className="block text-sm font-black">Não fechou</span>
+                      <span className="block text-[11px] text-muted-foreground mt-0.5">Registra o motivo e arquiva o atendimento</span>
                     </span>
-                  </span>
-                  <span className="text-emerald-500 text-sm font-black">
-                    {selectedReason === ARCHIVE_REASON_GANHO ? "✓" : "→"}
-                  </span>
-                </button>
-
-                {/* 2. PERDEU — em grade de duas colunas: a lista em coluna única
-                    estourava a altura do modal e escondia o rodapé. */}
-                <div className="space-y-2">
-                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                    Não fechou — qual o motivo?
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {ARCHIVE_REASONS_PERDA.map((r) => (
-                      <button
-                        key={r.text}
-                        // Convertido = venda: exige a conversa vinculada ao cliente na Citel.
-                        disabled={r.text === ARCHIVE_REASON_GANHO && vinculoDoArquivamento === "nao"}
-                        title={
-                          r.text === ARCHIVE_REASON_GANHO && vinculoDoArquivamento === "nao"
-                            ? "Vincule a conversa ao cliente na Citel (aba Cadastro) para marcar como convertido"
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (r.text === "Outros") {
-                            setIsEnteringCustomReason(true);
-                          } else if (r.text === "Não vendemos o material") {
-                            setIsEnteringMaterial(true);
-                          } else {
-                            handleArchiveChat(r.text);
-                          }
-                        }}
-                        className="w-full px-4 py-3 flex items-center gap-2.5 text-left rounded-xl text-xs font-semibold border border-border/40 text-muted-foreground hover:text-foreground hover:bg-secondary/50 hover:border-border transition-all duration-200 active:scale-[0.99] group disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground disabled:cursor-not-allowed disabled:active:scale-100"
-                      >
-                        <span className="opacity-70 group-hover:opacity-100 transition-opacity shrink-0">
-                          {r.icon}
-                        </span>
-                        <span className="flex-1 leading-tight">
-                          {r.text}
-                          {r.text === ARCHIVE_REASON_GANHO && vinculoDoArquivamento === "nao" && (
-                            <span className="block text-[10px] font-bold text-amber-500 mt-0.5">
-                              Vincule o cliente na Citel primeiro (aba Cadastro)
-                            </span>
-                          )}
-                        </span>
-                        {/* Reticências avisam que ainda vai pedir mais informação
-                            antes de arquivar, em vez de arquivar no clique. */}
-                        {(r.text === "Outros" || r.text === "Não vendemos o material") && (
-                          <span className="text-[10px] font-black opacity-40 shrink-0">...</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Se for Convertido, mostra a Forma de Pagamento e Observação logo abaixo na mesma tela */}
-                {selectedReason === "Convertido" && (
-                  <div className="space-y-3.5 pt-4 border-t border-border/50 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
-                        Forma de Pagamento
-                      </label>
-                      <select
-                        value={paymentMethod}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                        className="w-full bg-secondary/50 border border-border/80 rounded-2xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-rose-500/50 focus:ring-2 focus:ring-rose-500/20 transition-all cursor-pointer"
-                      >
-                        <option value="">Selecione a forma de pagamento</option>
-                        <option value="Pix">Pix</option>
-                        <option value="Dinheiro">Dinheiro</option>
-                        <option value="Cartão de Crédito">Cartão de Crédito</option>
-                        <option value="Cartão de Débito">Cartão de Débito</option>
-                        <option value="Boleto">Boleto</option>
-                        <option value="Faturamento">Faturamento (Faturado)</option>
-                        <option value="Outra">Outra</option>
-                        <option value="Nenhuma">Não se aplica / Nenhuma</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
-                        Observação / Detalhes (Opcional)
-                      </label>
-                      <textarea
-                        value={archiveObservation}
-                        onChange={(e) => setArchiveObservation(e.target.value)}
-                        placeholder="Adicione observações importantes sobre este atendimento..."
-                        rows={2}
-                        className="w-full bg-secondary/50 border border-border/80 rounded-2xl px-4 py-3 text-xs font-bold text-foreground outline-none focus:border-rose-500/50 focus:ring-2 focus:ring-rose-500/20 transition-all resize-none"
-                      />
-                    </div>
-
-                    <button
-                      onClick={() => handleArchiveChat()}
-                      disabled={!paymentMethod}
-                      className="w-full p-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-55 disabled:cursor-not-allowed disabled:active:scale-100 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 transition-all active:scale-[0.98] text-center"
-                    >
-                      Confirmar e Arquivar
-                    </button>
-                  </div>
-                )}
-
-                {/* Follow-up: veio do sino que ficava no cabeçalho da conversa.
-                    Fica separado da lista de propósito — não é motivo de perda,
-                    é o oposto: manter a conversa viva para retomar depois, e
-                    clicar aqui NÃO arquiva. */}
-                <div className="pt-4 border-t border-border/50 space-y-2">
-                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                    Ainda vai decidir?
-                  </p>
+                  </button>
+                  {/* Agendar retorno NÃO arquiva: abre o modal de retorno. */}
                   <button
                     onClick={() => {
-                      setFollowUpDateInput(
-                        paraInputDateTime(archiveTarget?.leadInfo?.followUpDate),
-                      );
+                      setFollowUpDateInput(paraInputDateTime(archiveTarget?.leadInfo?.followUpDate));
                       setShowArchiveModal(false);
                       setShowFollowUpModal(true);
                     }}
-                    className={cn(
-                      "w-full px-4 py-3 flex items-center justify-between text-left rounded-xl text-xs font-semibold border transition-all duration-200 active:scale-[0.99] group",
-                      archiveTarget?.leadInfo?.followUpDate
-                        ? "border-yellow-500/30 bg-yellow-500/5 text-foreground font-bold"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border/30 hover:bg-secondary/50",
-                    )}
+                    className={cn(cartaoResultado, "border-border hover:border-amber-500/40 hover:bg-amber-500/5")}
                   >
-                    <span className="flex items-center gap-2">
-                      <Bell className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
-                      <span>
+                    <CalendarDays className="w-7 h-7 text-muted-foreground shrink-0" />
+                    <span>
+                      <span className="block text-sm font-black">Agendar retorno</span>
+                      <span className="block text-[11px] text-muted-foreground mt-0.5">
                         {archiveTarget?.leadInfo?.followUpDate
-                          ? `Retornar em ${formatFollowUpDate(archiveTarget.leadInfo.followUpDate)} — não arquiva`
-                          : "Agendar retorno e manter a conversa aberta"}
+                          ? `Retorno marcado para ${formatFollowUpDate(archiveTarget.leadInfo.followUpDate)}`
+                          : "Mantém a conversa aberta para um retorno futuro"}
                       </span>
-                    </span>
-                    <span className="text-[10px] opacity-0 group-hover:opacity-60 transition-all transform translate-x-2 group-hover:translate-x-0 font-bold">
-                      →
                     </span>
                   </button>
                 </div>
               </div>
-            )}
+
+              {/* 2a. Venda: forma de pagamento */}
+              {archiveResultado === "venda" && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                  {vinculoDoArquivamento === "nao" && (
+                    <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                      Vincule a conversa ao cliente na Citel (aba Cadastro) antes de registrar a venda.
+                    </p>
+                  )}
+                  <p className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Forma de pagamento</p>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full bg-secondary/50 border border-border rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500/60 cursor-pointer"
+                  >
+                    <option value="">Selecione a forma de pagamento</option>
+                    <option value="Pix">Pix</option>
+                    <option value="Dinheiro">Dinheiro</option>
+                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                    <option value="Cartão de Débito">Cartão de Débito</option>
+                    <option value="Boleto">Boleto</option>
+                    <option value="Faturamento">Faturamento (Faturado)</option>
+                    <option value="Outra">Outra</option>
+                    <option value="Nenhuma">Não se aplica / Nenhuma</option>
+                  </select>
+                </div>
+              )}
+
+              {/* 2b. Não fechou: motivo */}
+              {archiveResultado === "perda" && (
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div>
+                    <p className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Por que não fechou?</p>
+                    <p className="text-xs text-muted-foreground mt-1">Selecione o principal motivo.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {ARCHIVE_REASONS_PERDA.filter((r) => r.text !== ARCHIVE_REASON_GANHO).map((r) => {
+                      const Icone = ICONE_MOTIVO[r.text] || MessageSquareText;
+                      const ativo = selectedReason === r.text;
+                      return (
+                        <button
+                          key={r.text}
+                          onClick={() => setSelectedReason(r.text)}
+                          className={cn(
+                            "w-full px-4 py-3.5 flex items-center gap-3 text-left rounded-xl border text-sm transition-all duration-200",
+                            ativo ? "border-blue-500 bg-blue-500/10 font-bold text-foreground" : "border-border/60 text-foreground/90 hover:bg-secondary/50 hover:border-border",
+                          )}
+                        >
+                          <span className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0", ativo ? "border-blue-500" : "border-muted-foreground/50")}>
+                            {ativo && <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                          </span>
+                          <Icone className="w-5 h-5 text-muted-foreground shrink-0" />
+                          <span className="flex-1">{ROTULO_MOTIVO[r.text] || r.text}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {precisaTexto && (
+                    <input
+                      autoFocus
+                      value={selectedReason === "Outros" ? customArchiveReason : materialInput}
+                      onChange={(e) => (selectedReason === "Outros" ? setCustomArchiveReason(e.target.value) : setMaterialInput(e.target.value))}
+                      placeholder={selectedReason === "Outros" ? "Qual foi o motivo? Ex.: fechou com o concorrente" : "Qual material o cliente procurava? Ex.: cabo flexível 2,5mm"}
+                      className="w-full bg-secondary/50 border border-blue-500/40 rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-500"
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* 3. Observações (venda ou perda) */}
+              {archiveResultado && (
+                <div className="space-y-2">
+                  <p className="flex items-center gap-2 text-[11px] font-black text-muted-foreground uppercase tracking-widest">
+                    Observações
+                    <span className="rounded-full bg-secondary px-2 py-0.5 text-[9px] font-bold normal-case tracking-normal">Opcional</span>
+                  </p>
+                  <textarea
+                    value={archiveObservation}
+                    onChange={(e) => setArchiveObservation(e.target.value)}
+                    placeholder="Adicione um detalhe sobre o atendimento..."
+                    rows={2}
+                    className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:border-blue-500/60 resize-y"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-border/50 flex flex-wrap items-center justify-between gap-3 bg-secondary/10">
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Info className="w-4 h-4" />
+                {archiveResultado ? "O atendimento será arquivado." : "Escolha o resultado do atendimento."}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCloseArchiveModal}
+                  className="px-5 py-2.5 text-sm font-bold rounded-xl border border-border hover:bg-secondary transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  disabled={!podeConfirmar}
+                  onClick={() => handleArchiveChat(archiveResultado === "venda" ? ARCHIVE_REASON_GANHO : motivoFinal)}
+                  className="px-5 py-2.5 text-sm font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                >
+                  Confirmar encerramento
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Funil de vendas — ocupa o lugar da lista de conversas. A área da
           conversa (abaixo) continua montada, então clicar em CHAT num card abre
@@ -6528,11 +6502,11 @@ export function WhatsappView({
                     ref={atendenteBtnRef}
                     className={cn(
                       "h-8 pl-1 pr-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5",
-                      isAdminUser && "cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/20 transition-colors",
+                      podeTransferir && "cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/20 transition-colors",
                     )}
-                    title={`Atendido por ${operators.find((o) => o.id === selectedChat.vendedor_id)?.name || "atendente"}${isAdminUser ? " · Clique para trocar" : ""}`}
+                    title={`Atendido por ${operators.find((o) => o.id === selectedChat.vendedor_id)?.name || "atendente"}${isAdminUser ? " · Clique para trocar" : souDono ? " · Clique para transferir" : ""}`}
                     onClick={() => {
-                      if (!isAdminUser) return;
+                      if (!podeTransferir) return;
                       const rect = atendenteBtnRef.current?.getBoundingClientRect();
                       if (rect) setAtendenteBtnRect({ top: rect.bottom + 4, left: rect.left });
                       setShowAtendentePicker((v) => !v);
@@ -6558,7 +6532,7 @@ export function WhatsappView({
                         .find((o) => o.id === selectedChat.vendedor_id)
                         ?.name?.split(" ")[0] || "Atendente"}
                     </span>
-                    {isAdminUser && <ChevronDown className="w-3 h-3 opacity-60 pointer-events-none" />}
+                    {podeTransferir && <ChevronDown className="w-3 h-3 opacity-60 pointer-events-none" />}
                   </div>
                 ) : (
                   // Sem atendente: QUALQUER atendente pode clicar e assumir para
@@ -6724,21 +6698,22 @@ export function WhatsappView({
             {/* Admin/líder vê a lista inteira (reatribuir para qualquer um).
                 Atendente comum só vê isto quando a conversa está SEM dono —
                 e a única ação possível é assumir para si mesmo, nunca
-                atribuir para outro colega. */}
-            {(isAdminUser || !selectedChat?.vendedor_id) && showAtendentePicker && selectedChat && atendenteBtnRect && (
+                atribuir para outro colega. Exceção: o DONO da conversa pode
+                transferir o próprio atendimento para um colega. */}
+            {(podeTransferir || !selectedChat?.vendedor_id) && showAtendentePicker && selectedChat && atendenteBtnRect && (
               <div
                 className="fixed w-56 bg-card border border-border rounded-xl shadow-2xl z-[9999] overflow-hidden"
                 style={{ top: atendenteBtnRect.top, left: atendenteBtnRect.left }}
               >
                 <div className="px-3 py-2 border-b border-border">
                   <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                    {isAdminUser ? "Atribuir para" : "Assumir atendimento"}
+                    {isAdminUser ? "Atribuir para" : souDono ? "Transferir atendimento para" : "Assumir atendimento"}
                   </span>
                 </div>
                 <div className="max-h-64 overflow-y-auto">
-                  {isAdminUser ? (
+                  {podeTransferir ? (
                     <>
-                      {operators.map((op) => (
+                      {operators.filter((op) => isAdminUser || op.id !== selectedChat.vendedor_id).map((op) => (
                         <button
                           key={op.id}
                           onClick={() => handleTrocarAtendente(op.id)}
@@ -6755,12 +6730,30 @@ export function WhatsappView({
                             )}
                           </div>
                           <span className="text-[11px] font-bold truncate flex-1">{op.name}</span>
+                          {(() => {
+                            const total = atendimentosPorOperador.get(String(op.id)) || 0;
+                            return (
+                              <span
+                                title={`${total} atendimento${total === 1 ? "" : "s"} em aberto`}
+                                className={cn(
+                                  "min-w-[22px] text-center px-1.5 py-0.5 rounded-full text-[10px] font-black tabular-nums",
+                                  total === 0
+                                    ? "text-muted-foreground/50"
+                                    : selectedChat.vendedor_id === op.id
+                                      ? "bg-emerald-500/20 text-emerald-500"
+                                      : "bg-secondary text-muted-foreground",
+                                )}
+                              >
+                                {total}
+                              </span>
+                            );
+                          })()}
                           {selectedChat.vendedor_id === op.id && (
                             <span className="text-[9px] font-black text-emerald-500">✓</span>
                           )}
                         </button>
                       ))}
-                      {selectedChat.vendedor_id && (
+                      {isAdminUser && selectedChat.vendedor_id && (
                         <button
                           onClick={() => handleTrocarAtendente(null)}
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors border-t border-border"

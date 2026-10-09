@@ -181,8 +181,15 @@ export function PosVendaView({ userProfile }: PosVendaViewProps) {
   const paginas = Math.max(1, Math.ceil(filtrada.length / POR_PAGINA));
   const visiveis = filtrada.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
 
-  const ABAS: { id: Filtro; label: string; icone: typeof Phone; total: number }[] = [
-    { id: "ligar", label: "A ligar", icone: Phone, total: fila.length },
+  // O limite diário vale para os NOVOS; quem pediu para ligar depois ("retornar")
+  // fica na fila até ser atendido e somava no mesmo número — 10 do dia + 17
+  // retornos pareciam 27 novos, como se o limite não funcionasse.
+  const retornos = fila.filter((c) => c.status === "retornar").length;
+  const ABAS: { id: Filtro; label: string; icone: typeof Phone; total: number; detalhe?: string }[] = [
+    {
+      id: "ligar", label: "A ligar", icone: Phone, total: fila.length,
+      detalhe: retornos > 0 ? `${fila.length - retornos} novos · ${retornos} retornos` : undefined,
+    },
     { id: "pendencias", label: "Pendências", icone: AlertTriangle, total: tratativas.length },
     { id: "oportunidades", label: "Oportunidades", icone: Calendar, total: oportunidades.length },
     { id: "feitas", label: "Feitas (30d)", icone: Check, total: feitas.length },
@@ -244,7 +251,10 @@ export function PosVendaView({ userProfile }: PosVendaViewProps) {
               )}
             >
               <a.icone className={cn("w-5 h-5 shrink-0", filtro === a.id ? "text-primary" : "text-muted-foreground")} />
-              <span className="text-sm font-bold flex-1">{a.label}</span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-bold">{a.label}</span>
+                {a.detalhe && <span className="block text-[11px] text-muted-foreground">{a.detalhe}</span>}
+              </span>
               <span className={cn("text-2xl font-black tabular-nums", filtro === a.id ? "text-primary" : "text-foreground")}>
                 {a.total}
               </span>
@@ -255,23 +265,12 @@ export function PosVendaView({ userProfile }: PosVendaViewProps) {
 
       <div className="flex-1 min-h-0 px-6 pb-6">
         <div className="h-full flex flex-col rounded-2xl border border-border bg-card overflow-hidden">
+          {/* As abas já são os cards de cima; aqui fica só o título da lista
+              aberta e a busca/filtro. */}
           <div className="flex flex-wrap items-center gap-3 px-4 border-b border-border/60 shrink-0">
-            <div className="flex items-center gap-1 overflow-x-auto">
-              {abas.map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => setFiltro(a.id)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-3 text-xs font-bold whitespace-nowrap border-b-2 transition-colors",
-                    filtro === a.id
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <a.icone className="w-3.5 h-3.5" /> {a.label} ({a.total})
-                </button>
-              ))}
-            </div>
+            <span className="text-xs font-black uppercase tracking-wider text-muted-foreground py-3">
+              {abas.find((a) => a.id === filtro)?.label}
+            </span>
 
             <div className="flex items-center gap-2 ml-auto py-2">
               <div className="relative">

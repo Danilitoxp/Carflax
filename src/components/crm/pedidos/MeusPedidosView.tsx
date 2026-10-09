@@ -818,6 +818,7 @@ function SeparatedOrderCard({
                 new CustomEvent("open-crm-chat", {
                   detail: {
                     doc: numDoc,
+                    empresa: order.FGO_CODEMP,
                     title: order.CLIENTE,
                     sellerName: order.SEPARADOR || "Separador",
                     sellerCode: namesToCodesCache.get((order.SEPARADOR || "").toUpperCase().trim()) || "",
@@ -945,6 +946,7 @@ function FaturamentoOrderCard({ order, onViewItems }: { order: FaturamentoOrder;
                 new CustomEvent("open-crm-chat", {
                   detail: {
                     doc: numDoc,
+                    empresa: order.FGO_CODEMP,
                     title: order.NOME_CLIENTE,
                     sellerName: order.NOME_SEPARADOR || "Separador",
                     sellerCode: order.CODIGO_SEPARADOR || "",
@@ -1117,6 +1119,7 @@ function OrderCard({
                 new CustomEvent("open-crm-chat", {
                   detail: {
                     doc: numDoc,
+                    empresa: order.FGO_CODEMP,
                     title: order.NOME_CLIENTE,
                     sellerName: order.separatorName || order.NOME_SEPARADOR || "Separador",
                     sellerCode: order.separatorCode || order.CODIGO_SEPARADOR || "",
@@ -1206,6 +1209,7 @@ function OrderCard({
                   new CustomEvent("open-crm-chat", {
                     detail: {
                       doc: numDoc,
+                      empresa: order.FGO_CODEMP,
                       title: order.NOME_CLIENTE,
                       sellerName: order.separatorName || order.NOME_SEPARADOR || "Separador",
                       sellerCode: order.separatorCode || order.CODIGO_SEPARADOR || "",

@@ -215,6 +215,8 @@ function DashboardContent({
   interface ActiveChat {
     id: number;
     doc: string;
+    /** Empresa do pedido — o número se repete entre empresas. */
+    empresa?: string;
     title: string;
     sellerName?: string;
     sellerCode?: string;
@@ -1296,12 +1298,23 @@ function DashboardContent({
         // checar `activeChats.some(...)` aqui fora via de false para um doc que
         // já existia — dois eventos seguidos criavam duas linhas iguais.
         setActiveChats((prev) => {
-          if (prev.some((c) => c.doc === detail.doc)) return prev;
+          const existente = prev.find((c) => c.doc === detail.doc);
+          if (existente) {
+            // Mesmo número, outra empresa: é outro pedido — troca a janela
+            // em vez de reaproveitar a conversa do pedido errado.
+            if (!detail.empresa || existente.empresa === detail.empresa) return prev;
+            return prev.map((c) =>
+              c.doc === detail.doc
+                ? { ...c, empresa: detail.empresa, title: displayTitle, sellerName: resolvedSellerName, sellerCode: resolvedSellerCode, items: detail.items, unreadCount: 0 }
+                : c,
+            );
+          }
           return [
             ...prev,
             {
               id: Date.now(),
               doc: detail.doc,
+              empresa: detail.empresa,
               title: displayTitle,
               sellerName: resolvedSellerName,
               sellerCode: resolvedSellerCode,
