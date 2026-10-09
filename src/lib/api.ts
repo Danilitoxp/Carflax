@@ -2040,6 +2040,7 @@ export type OrcamentosAbertos = {
   porVendedor: { vendedor: string; vendedor_id: string | null; qtd: number; valor: number; atrasados: number }[];
   itens: OrcamentoAberto[];
   horasAlerta: number;
+  erpConferido: boolean;
 };
 export const apiOrcamentosAbertos = () => trafegoReq<OrcamentosAbertos>("GET", "orcamentos-abertos");
 

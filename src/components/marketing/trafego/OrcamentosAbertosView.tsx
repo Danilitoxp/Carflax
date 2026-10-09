@@ -48,6 +48,9 @@ export function OrcamentosAbertosView() {
         </header>
 
         {erro && <div className="gt-banner bad"><b>Não foi possível carregar:</b> {erro}</div>}
+        {dados && !dados.erpConferido && (
+          <div className="gt-banner bad"><b>ERP fora do ar agora:</b> a lista pode incluir orçamentos já declinados. Tente atualizar em alguns minutos.</div>
+        )}
 
         <div className="gt2-kpis">
           <Kpi icone={<ClipboardText size={24} weight="duotone" />} titulo="Orçamentos abertos" valor={!dados ? "…" : String(dados.total.qtd)} sub="sem venda e não perdidos" />
